@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {inspectSavedChatWork,processSignedSavedChatWork}
+import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment}
  from '../src/reality-saved-chat-work-adapter-v1.js';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const conversationId='a8c800f6-6848-492c-b6aa-e8deca0db3fe';
@@ -216,9 +217,14 @@ test('Chat work UI binds existing authenticated composer and dispatches one sign
   addEventListener(name,fn){received.set(name,fn)},
  };
  const fakeFetch=async(url,options)=>{
-  outbound.push({url,body:JSON.parse(options.body)});
+  const body=JSON.parse(options.body);
+  outbound.push({url,body});
   return {ok:true,json:async()=>({
-   ok:true,status:'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   ok:true,status:body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+    'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED':
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   worker_status:body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+    'CHAT_NEW_DEVELOPMENT_MODEL_CREDENTIAL_UNAVAILABLE':undefined,
    request_id:requestId,source_ref,original_work_id:workId,
    installation_authorized:false,production_changed:false
   })};
@@ -234,11 +240,13 @@ test('Chat work UI binds existing authenticated composer and dispatches one sign
  received.get('reality:chat-request-started')({detail:{...detail,work_status_requested:true}});
  received.get('reality:chat-intake-saved')({detail:{...detail,duplicate_content:false}});
  await new Promise(resolve=>setImmediate(resolve));
- assert.equal(outbound.length,1);
+ assert.equal(outbound.length,2);
  assert.equal(outbound[0].url,'/api/reality/personal-chat-work');
  assert.equal(outbound[0].body.action,'PROCESS_SIGNED_WORK_REQUEST');
+ assert.equal(outbound[1].body.action,'ADVANCE_SIGNED_NEW_DEVELOPMENT');
  assert.equal(outbound[0].body.request_id,requestId);
- assert.match(container.children[0].children[1].textContent,/Build admitted and independently read back/);
+ assert.equal(outbound[1].body.request_id,requestId);
+ assert.match(container.children[0].children[1].textContent,/REAL BUILD BLOCKER/);
 });
 
 test('missing authenticated Chat DOM cannot set the direct-work installed flag',()=>{
@@ -282,7 +290,11 @@ test('saved build buttons work after login without history event and distinguish
    return {ok:true,status:200,json:async()=>({ok:true,
     conversation_id:conversationId,messages:history})};
   return {ok:true,status:202,json:async()=>({ok:true,
-   status:'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   status:requests.at(-1).body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+    'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED':
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   worker_status:requests.at(-1).body.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+    'CHAT_NEW_DEVELOPMENT_MODEL_CREDENTIAL_UNAVAILABLE':undefined,
    request_id:requestId,source_ref,original_work_id:workId,
    installation_authorized:false,production_changed:false})};
  },AbortSignal,Date,encodeURIComponent});
@@ -303,13 +315,15 @@ test('saved build buttons work after login without history event and distinguish
  assert.match(buttons[1].textContent,/Continue this exact saved build/);
  assert.equal(requests.length,1,'read-only lookup cannot start work');
  await buttons[1].onclick();
- assert.equal(requests.length,2);
+ assert.equal(requests.length,3);
  assert.equal(requests[1].method,'POST');
  assert.equal(requests[1].url,'/api/reality/personal-chat-work');
  assert.equal(requests[1].body.action,'PROCESS_SIGNED_WORK_REQUEST');
+ assert.equal(requests[2].body.action,'ADVANCE_SIGNED_NEW_DEVELOPMENT');
  assert.equal(requests[1].body.request_id,requestId);
+ assert.equal(requests[2].body.request_id,requestId);
  assert.equal(requests[1].body.conversation_id,conversationId);
- assert.match(panel.children[1].textContent,/Build admitted and independently read back/);
+ assert.match(panel.children[1].textContent,/REAL BUILD BLOCKER/);
 });
 
 test('saved work lookup shows an actionable authenticated readback error, never silently fails',async()=>{
@@ -397,4 +411,125 @@ test('status-only message and general approval never turn into code development'
   assert.equal(x.action_eligible,false);
   assert.equal(calls,0);
  }
+});
+
+
+
+test('shared service database boundary permits exact Chat development RPCs but rejects unregistered operations',async()=>{
+ const allowed=[
+  'reality_read_chat_new_development_v1',
+  'reality_admit_chat_new_development_v1',
+  'reality_claim_chat_new_development_release_v2',
+  'reality_claim_chat_new_development_signed_v3',
+  'reality_record_chat_new_development_draft_v1',
+  'reality_mark_chat_new_development_unverified_v1',
+  'reality_read_next_chat_new_development_candidate_v2'
+ ];
+ for(const name of allowed){
+  let called=0;
+  const value=await shiftRpc({url:'https://isolated.supabase.co',
+   secretKey:'test-secret',strictSecrets:true},name,{},{
+   fetchImpl:async url=>{
+    called++;assert.ok(url.endsWith('/rpc/'+name));
+    return {ok:true,json:async()=>({status:'READBACK_TEST'})};
+   }});
+  assert.equal(called,1);
+  assert.equal(value.status,'READBACK_TEST');
+ }
+ await assert.rejects(()=>shiftRpc({url:'https://isolated.supabase.co',
+  secretKey:'test-secret',strictSecrets:true},
+  'reality_owner_approve_general_original_install_v1',{},{
+  fetchImpl:async()=>{throw Error('MUST_NOT_CALL_PROVIDER')}
+ }),/SHIFT_RPC_NOT_ALLOWLISTED/);
+});
+
+test('owner signed queued Chat job makes exactly one source-bound model draft claim',async()=>{
+ let generated=0,published=0;
+ const item={request_id:requestId,source_ref,original_work_id:workId,
+  phase:'QUEUED',model_generated:false,
+  installation_authorized:false,production_changed:false};
+ const result=await advanceSignedChatDevelopment({...args,
+  env:{VERCEL_ENV:'preview',
+   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw'},
+  session:{...session,config:{url:'https://hvkfreoagbrphwghjajw.supabase.co'}},
+  readNew:async()=>({status:'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
+   owner_id:owner,conversation_id:conversationId,items:[item],
+   installation_authorized:false,production_changed:false}),
+  dbFactory:()=>({strictSecrets:true,project:'hvkfreoagbrphwghjajw',
+   url:'https://hvkfreoagbrphwghjajw.supabase.co'}),
+  generate:async({ownerScope})=>{
+   generated++;assert.equal(ownerScope.owner_id,owner);
+   assert.equal(ownerScope.request_id,requestId);
+   assert.equal(ownerScope.conversation_id,conversationId);
+   return {status:'CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED',
+    original_work_id:workId,model_generated:true,
+    source_path:'src/example.js',installation_authorized:false,
+    original_job_completed:false,production_changed:false,new_shift_started:false};
+  },
+  publish:async()=>{published++}
+ });
+ assert.equal(result.status,'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED');
+ assert.equal(result.original_work_id,workId);
+ assert.equal(result.source_ref,source_ref);
+ assert.equal(result.model_generated,true);
+ assert.equal(result.installation_authorized,false);
+ assert.equal(generated,1);
+ assert.equal(published,0);
+});
+
+test('a queued Chat job from another owner cannot claim or stage source',async()=>{
+ let effects=0;
+ await assert.rejects(()=>advanceSignedChatDevelopment({...args,
+  env:{VERCEL_ENV:'preview'},
+  readNew:async()=>({status:'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
+   owner_id:'99999999-1111-4111-8111-111111111111',
+   conversation_id:conversationId,
+   installation_authorized:false,production_changed:false,
+   items:[{request_id:requestId,source_ref,original_work_id:workId,
+    phase:'QUEUED',installation_authorized:false,production_changed:false}]}),
+  generate:async()=>{effects++},
+  publish:async()=>{effects++}
+ }),/CHAT_WORK_NEW_DEVELOPMENT_OWNER_READBACK_REQUIRED/);
+ assert.equal(effects,0);
+});
+
+test('only matching original and release may reach the existing broker and CI',async()=>{
+ let published=0;
+ const env={VERCEL_ENV:'preview',
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw',
+  VERCEL_GIT_COMMIT_SHA:'a'.repeat(40)};
+ const sessionWithConfig={...session,config:{url:'https://hvkfreoagbrphwghjajw.supabase.co'}};
+ const item={request_id:requestId,source_ref,original_work_id:workId,
+  phase:'DRAFT_GENERATED',model_generated:true,installation_authorized:false,
+  production_changed:false};
+ const selected={status:'EXACT_SIGNED_CHAT_NEW_DEVELOPMENT_CANDIDATE',
+  request_id:requestId,conversation_id:conversationId,owner_id:owner,
+  original_work_id:workId,source_sha256:'b'.repeat(64),
+  release_sha:'a'.repeat(40),installation_authorized:false,
+  production_changed:false};
+ const shared={...args,env,session:sessionWithConfig,
+  readNew:async()=>({status:'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
+   owner_id:owner,conversation_id:conversationId,items:[item],
+   installation_authorized:false,production_changed:false}),
+  dbFactory:()=>({strictSecrets:true,project:env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF,
+   url:sessionWithConfig.config.url})};
+ const wrong=await advanceSignedChatDevelopment({...shared,
+  callRpc:async()=>({...selected,owner_id:'99999999-1111-4111-8111-111111111111'}),
+  publish:async()=>{published++}
+ });
+ assert.equal(wrong.status,'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_NOT_CURRENT');
+ assert.equal(published,0);
+ const good=await advanceSignedChatDevelopment({...shared,
+  callRpc:async()=>selected,
+  publish:async()=>{published++;return {
+   status:'NEW_CHAT_DEVELOPMENT_PROVIDER_CANDIDATE_STAGED',
+   original_work_id:workId,pr_url:'https://github.com/maloney2323/Reality/pull/350',
+   artifact_commit_sha:'c'.repeat(40),
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false}}
+ });
+ assert.equal(good.status,'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED');
+ assert.equal(good.pr_url,'https://github.com/maloney2323/Reality/pull/350');
+ assert.equal(good.installation_authorized,false);
+ assert.equal(published,1);
 });
