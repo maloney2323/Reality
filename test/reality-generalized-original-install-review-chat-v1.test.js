@@ -75,9 +75,13 @@ test('one-use install and independent settlement remain separate workers and fen
   '../supabase/migrations/20261115_general_original_independent_postinstall_settlement_v1.sql',
   import.meta.url),'utf8');
  assert.match(worker,/continueGeneralOwnerApprovedOriginalInstall/);
+ assert.match(worker,/GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT/);
+ assert.match(worker,/originalInstallNeedsRecovery\?/);
  assert.match(worker,/settleGeneralOwnerApprovedOriginal/);
  assert.match(installer,/reality_claim_general_original_install_v1/);
  assert.match(installer,/REALITY_GOVERNED_INSTALL_DISPOSITION/);
+ assert.match(installer,/REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY/);
+ assert.match(installer,/const repository=await gh\(token,''\)/);
  assert.match(installer,/console\.info\('REALITY_GOVERNED_INSTALL_DISPOSITION',status\)/);
  assert.match(installer,/GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED/);
  // Diagnostics must not change the one-use install fence or retry unknown writes.
