@@ -277,7 +277,11 @@ test('existing authenticated saved instruction is never re-executed on page load
  },AbortSignal});
  const details={conversation_id:conversationId,messages:[
   {role:'user',request_id:requestId,source_ref,
-   created_at:new Date().toISOString()}]};
+   text:'Reality, build the source-code repair through my existing governed worker.',
+   created_at:new Date().toISOString()},
+  {role:'user',request_id:'95aa144f-6e18-457f-9cd9-963426803451',
+   source_ref:'supabase:reality_chat_messages:71e01bbd-5a5a-4b8c-869f-247478e82aaa',
+   text:'Yes I approve this',created_at:new Date().toISOString()}]};
  events.get('reality:saved-chat-readback')({detail:details});
  assert.equal(writes.length,0,'authenticated history never auto-runs work');
  const panel=container.children[0];
@@ -285,6 +289,8 @@ test('existing authenticated saved instruction is never re-executed on page load
  const buttons=panel.children[2].children;
  assert.equal(buttons.length,2);
  assert.match(buttons[1].textContent,/Continue this saved instruction/);
+ assert.match(panel.children[1].textContent,/Reality, build the source-code repair/);
+ assert.doesNotMatch(panel.children[1].textContent,/Yes I approve this/);
  await buttons[1].onclick();
  assert.equal(writes.length,1);
  assert.equal(writes[0].action,'PROCESS_SIGNED_WORK_REQUEST');
