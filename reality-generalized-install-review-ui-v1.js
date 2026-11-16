@@ -181,6 +181,9 @@ async function refresh(){
 if(document.readyState==='loading')
  document.addEventListener('DOMContentLoaded',refresh,{once:true});
 else refresh();
+// Sign-in and saved transcript restoration are additional read-only refresh
+// signals. They cannot issue an approval or restart any worker/job.
+window.addEventListener('reality:saved-chat-readback',()=>refresh());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
 document.addEventListener('click',e=>{
  if(e.target?.closest?.('#realityChatTabProof,#realityChatPanelProof,#chatNavLink'))refresh();
