@@ -77,6 +77,12 @@ test('one-use install and independent settlement remain separate workers and fen
  assert.match(worker,/continueGeneralOwnerApprovedOriginalInstall/);
  assert.match(worker,/settleGeneralOwnerApprovedOriginal/);
  assert.match(installer,/reality_claim_general_original_install_v1/);
+ assert.match(installer,/REALITY_GOVERNED_INSTALL_DISPOSITION/);
+ assert.match(installer,/console\.info\('REALITY_GOVERNED_INSTALL_DISPOSITION',status\)/);
+ assert.match(installer,/GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED/);
+ // Diagnostics must not change the one-use install fence or retry unknown writes.
+ assert.match(installer,/NO_SECOND_WRITE/);
+ assert.doesNotMatch(installer,/force:true/);
  assert.match(installer,/force:false/);
  assert.match(installer,/GENERAL_INSTALL_FENCED_EFFECT_UNCERTAIN_NO_SECOND_WRITE/);
  assert.match(settlement,/reality_record_general_original_independent_settlement_v1/);
