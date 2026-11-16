@@ -609,8 +609,10 @@ test('saved PR on mobile displays independent CI next step and records actual ve
  assert.match(panel.children[4].textContent,/GitHub draft PR contains code/);
  assert.match(panel.children[4].textContent,/○ Independent CI/);
  await buttons[2].onclick();
- assert.equal(requests.length,3);
+ assert.equal(requests.length,4,'one exact CI write plus one read-only final receipt check');
  assert.equal(requests[2].body.action,'ADVANCE_SIGNED_NEW_DEVELOPMENT');
+ assert.equal(requests[3].method,'GET');
+ assert.match(requests[3].url,/personal-genuine-loop-status/);
  assert.equal(requests[2].body.request_id,requestId);
  assert.match(panel.children[1].textContent,/INDEPENDENT SOURCE\/SYNTAX CI VERIFIED/);
  assert.match(panel.children[4].textContent,/✓ Independent CI recorded/);
