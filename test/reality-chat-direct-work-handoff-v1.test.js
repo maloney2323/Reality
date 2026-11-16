@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {processSignedSavedChatWork}
+import {inspectSavedChatWork,processSignedSavedChatWork}
  from '../src/reality-saved-chat-work-adapter-v1.js';
 
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -331,4 +331,70 @@ test('saved work lookup shows an actionable authenticated readback error, never 
  assert.equal(panel.hidden,false);
  assert.match(panel.children[1].textContent,/CHAT_WORK_SIGN_IN_REQUIRED/);
  assert.equal(panel.children[3].children.length,0,'no work action offered without verified saved source');
+});
+
+
+test('signed Chat build with no exact existing issue routes to NEW isolated development even when model chooses old engineering',async()=>{
+ let existingReads=0,newReads=0;
+ const instruction='Reality, build an isolated code repair so Chat recognizes my already-authorized employee shift. Use the existing Chat infrastructure and produce a GitHub code candidate; do not create a duplicate shift or install production.';
+ const x=await inspectSavedChatWork({...args,
+  messages:[{...messages[0],text:instruction}],
+  classify:async()=>({kind:'WORK_REQUEST',explicit_request:true,
+   source_quote:'build an isolated code repair',
+   objective:'Build isolated Chat-to-work repair',
+   capability_id:'governed-original-engineering',action_eligible:true}),
+  readNew:async()=>{newReads++;return {status:'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
+   owner_id:owner,conversation_id:conversationId,items:[]}},
+  readWork:async()=>{existingReads++;throw Error('INCORRECT_OLD_ORIGINAL')},
+  readBuild:async()=>{existingReads++;throw Error('INCORRECT_OLD_ORIGINAL')}
+ });
+ assert.equal(x.status,'CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE');
+ assert.equal(x.capability_id,'governed-chat-new-development');
+ assert.equal(x.action_eligible,true);
+ assert.equal(x.source_ref,source_ref);
+ assert.equal(newReads,1);
+ assert.equal(existingReads,0);
+ assert.equal(x.installation_authorized,false);
+});
+
+test('named issue #185 is not quietly converted into new work and a mismatched source fails closed',async()=>{
+ let newReads=0,oldReads=0;
+ const message='Reality, build a corrective patch for issue #185 in the existing authorized original, run tests, do not install.';
+ const actual=await inspectSavedChatWork({...args,
+  messages:[{...messages[0],text:message}],
+  classify:async()=>({kind:'WORK_REQUEST',explicit_request:true,
+   source_quote:'build a corrective patch',objective:'Patch original issue #185',
+   capability_id:'governed-chat-new-development',action_eligible:true}),
+  readWork:async()=>{oldReads++;return {status:'OWNER_CHAT_WORK_INTAKE_READBACK',
+   owner_id:owner,conversation_id:conversationId,
+   installation_authorized:false,production_changed:false,
+   items:[{request_id:requestId,source_ref,status:'INVESTIGATED_SCOPED',
+    selected_source_refs:['https://github.com/maloney2323/Reality/issues/143'],
+    shift_id:'c13a7a00-2345-4d5e-95ab-8239899ef000',
+    work_chain:[{source_ref:'https://github.com/maloney2323/Reality/issues/143',
+      original_work_id:workId,shift_id:'c13a7a00-2345-4d5e-95ab-8239899ef000',
+      current_evidence_stage:'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI'}]}]}},
+  readNew:async()=>{newReads++;throw Error('NEVER_ADMIT_AS_NEW')}
+ });
+ assert.equal(actual.status,'CHAT_WORK_ENGINEERING_SOURCE_NOT_EXPLICIT');
+ assert.equal(oldReads,1);
+ assert.equal(newReads,0);
+ assert.equal(actual.installation_authorized,false);
+});
+
+test('status-only message and general approval never turn into code development',async()=>{
+ for(const instruction of ['Yes I approve this',
+  'How would we build a code repair in the future?']){
+  let calls=0;
+  const x=await inspectSavedChatWork({...args,
+   messages:[{...messages[0],text:instruction}],
+   classify:async()=>({kind:'CONVERSATION',explicit_request:false,
+    source_quote:instruction,objective:'Discuss scope',
+    capability_id:'governed-original-engineering',action_eligible:false}),
+   readNew:async()=>{calls++},
+   readWork:async()=>{calls++}
+  });
+  assert.equal(x.action_eligible,false);
+  assert.equal(calls,0);
+ }
 });
