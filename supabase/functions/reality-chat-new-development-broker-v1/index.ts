@@ -1,9 +1,9 @@
 // Protected broker for Reality Chat's NEW development source candidate.
-// Vercel's signed service worker proposes code; this broker reads its exact
-// one-shot database provenance and writes only an INERT evidence JSON into
-// an isolated GitHub branch + draft PR. NO executable repo source is changed.
-// A separate independent PR CI checks source identity/syntax without running
-// model code. No production, merge, installation, shift or settlement.
+// Vercel's signed service worker proposes code. This broker validates the
+// frozen source, then writes its exact bounded patch into an ISOLATED draft
+// GitHub PR alongside independent evidence. No merge, preview installation,
+// production change, model-code execution, shift or settlement is permitted.
+// A separate CI checks source identity and syntax before owner review.
 const REPO='maloney2323/Reality';
 const GH='https://api.github.com/repos/'+REPO;
 const FLOW='.github/workflows/reality-chat-new-development-candidate-v1.yml';
@@ -115,27 +115,67 @@ function evidenceText(s){
   feature_acceptance_verified:false
  },null,2)+'\n';
 }
+function proposedSource(s,original){
+ if(typeof original!=='string'||original.length<100||
+    original.includes('\0'))return null;
+ const find=s.candidate.find;
+ const at=original.indexOf(find);
+ if(at<0||original.indexOf(find,at+1)!==-1)return null;
+ const updated=original.slice(0,at)+s.candidate.replace+
+  original.slice(at+find.length);
+ const bytes=asBytes(updated);
+ if(updated===original||bytes.length>280000||updated.includes('\0'))
+  return null;
+ return {updated,bytes};
+}
 async function readExisting(s,token,base){
- const {branch,artifact}=branchAndArtifact(s);
- const [ref,file,prs]=await Promise.all([
+ const {branch,artifact}=branchAndArtifact(s),target=s.candidate.target_path;
+ const [ref,file,source,prs,head]=await Promise.all([
   gh(token,'/git/ref/heads/'+branch),
   gh(token,'/contents/'+artifact+'?ref='+encodeURIComponent(branch)),
-  gh(token,'/pulls?state=all&head='+encodeURIComponent('maloney2323:'+branch)+'&per_page=100')
+  gh(token,'/contents/'+target+'?ref='+encodeURIComponent(branch)),
+  gh(token,'/pulls?state=all&head='+encodeURIComponent('maloney2323:'+branch)+'&per_page=100'),
+  gh(token,'/commits/'+branch)
  ]);
  if(ref.status===404)return null;
- if(!ref.ok||!SHA.test(ref.data?.object?.sha||'')||!file.ok||
-  !Array.isArray(prs.data)||!prs.ok)return null;
+ if(!ref.ok||!SHA.test(ref.data?.object?.sha||'')||
+  !file.ok||!source.ok||!prs.ok||!Array.isArray(prs.data)||
+  !head.ok||head.data?.sha!==ref.data.object.sha||
+  !Array.isArray(head.data?.parents)||head.data.parents.length!==1||
+  !Array.isArray(head.data?.files)||head.data.files.length!==1||
+  head.data.files[0]?.filename!==artifact||
+  head.data.files[0]?.status!=='added')return null;
  const commit=ref.data.object.sha;
  const text=evidenceText(s),bytes=asBytes(text),blob=await gitBlob(bytes);
  const fromProvider=decodeBase64(file.data.content);
  if(!fromProvider||file.data.sha!==blob||
   b64(bytes)!==btoa(fromProvider))return null;
+ const parentSha=head.data.parents[0].sha;
+ const parent=await gh(token,'/commits/'+parentSha);
+ if(!parent.ok||!Array.isArray(parent.data?.parents)||
+  parent.data.parents.length!==1||
+  parent.data.parents[0]?.sha!==s.release_sha||
+  !Array.isArray(parent.data?.files)||parent.data.files.length!==1||
+  parent.data.files[0]?.filename!==target||
+  parent.data.files[0]?.status!=='modified')return null;
+ const original=await gh(token,'/contents/'+target+'?ref='+s.release_sha);
+ if(!original.ok||original.data?.sha!==s.candidate.source_blob_sha)
+  return null;
+ let old='';
+ try{old=new TextDecoder().decode(
+  Uint8Array.from(decodeBase64(original.data.content),c=>c.charCodeAt(0)))}catch{return null}
+ const proposal=proposedSource(s,old);
+ if(!proposal)return null;
+ const expected=await gitBlob(proposal.bytes);
+ if(source.data.sha!==expected||source.data.encoding!=='base64'||
+    source.data.content?.replace(/\s/g,'')!==b64(proposal.bytes))
+  return null;
  const exact=prs.data.filter(p=>p.head?.ref===branch&&p.head?.sha===commit&&
   p.base?.ref===base&&p.head?.repo?.full_name===REPO&&
   p.base?.repo?.full_name===REPO&&p.draft===true&&
   Number.isSafeInteger(p.number)&&p.number>0);
  if(exact.length!==1)return null;
- return {commit,blob,pr:exact[0].number};
+ return {commit,blob,pr:exact[0].number,source_commit:parentSha};
 }
 async function verifyPinnedSource(s,token,base){
  const head=await gh(token,'/git/ref/heads/'+base);
@@ -144,17 +184,16 @@ async function verifyPinnedSource(s,token,base){
  if(!head.ok||head.data?.object?.sha!==s.release_sha||
     !source.ok||source.data?.sha!==s.candidate.source_blob_sha||
     source.data?.encoding!=='base64'||
-    typeof source.data?.content!=='string')return false;
+    typeof source.data?.content!=='string')return null;
  let original='';
  try{
   const raw=decodeBase64(source.data.content);
   original=new TextDecoder().decode(
    Uint8Array.from(raw,c=>c.charCodeAt(0)));
- }catch{return false}
- const find=s.candidate.find;
- return original.indexOf(find)>=0&&
-   original.indexOf(find)===original.lastIndexOf(find);
+ }catch{return null}
+ return proposedSource(s,original);
 }
+
 async function recordCandidate(s,db,secret,receipt){
  const {branch}=branchAndArtifact(s);
  const r=await rpc(db,secret,'reality_record_chat_new_development_candidate_v1',{
@@ -185,7 +224,8 @@ async function stage(s,db,secret,token,base){
   if(!prev)return bodySafe('CHAT_NEW_DEV_UNKNOWN_EFFECT_RECONCILIATION_ONLY');
   return recordCandidate(s,db,secret,prev);
  }
- if(!await verifyPinnedSource(s,token,base))
+ const proposal=await verifyPinnedSource(s,token,base);
+ if(!proposal)
   return bodySafe('CHAT_NEW_DEV_GIT_SOURCE_OR_PREVIEW_DRIFT');
  const prior=await gh(token,'/git/ref/heads/'+branch);
  if(prior.status!==404)
@@ -206,33 +246,54 @@ async function stage(s,db,secret,token,base){
  if(created.status!==201||created.data?.ref!=='refs/heads/'+branch||
     created.data?.object?.sha!==s.release_sha)
   return bodySafe('CHAT_NEW_DEV_BRANCH_WRITE_EFFECT_UNVERIFIED');
+ // Commit 1 writes ACTUAL bounded source code to the isolated proposal
+ // branch, never to the base branch, production or a running deployment.
+ const target=s.candidate.target_path;
+ const stagedCode=await gh(token,'/contents/'+target,'PUT',{
+  message:'Reality isolated source candidate '+s.message_id,
+  branch,sha:s.candidate.source_blob_sha,content:b64(proposal.bytes)});
+ const sourceCommit=stagedCode.data?.commit?.sha;
+ const sourceBlob=await gitBlob(proposal.bytes);
+ if(stagedCode.status!==200||!SHA.test(sourceCommit||'')||
+    stagedCode.data?.content?.sha!==sourceBlob)
+  return bodySafe('CHAT_NEW_DEV_SOURCE_WRITE_EFFECT_UNVERIFIED');
+ // Commit 2 attaches immutable provenance to that exact code candidate.
  const written=await gh(token,'/contents/'+artifact,'PUT',{
-  message:'Reality signed Chat isolated code proposal '+s.message_id,
+  message:'Reality signed Chat source evidence '+s.message_id,
   branch,content:b64(bytes)});
  const commit=written.data?.commit?.sha;
  const blob=await gitBlob(bytes);
  if(written.status!==201||!SHA.test(commit||'')||
     written.data?.content?.sha!==blob)
   return bodySafe('CHAT_NEW_DEV_ARTIFACT_WRITE_EFFECT_UNVERIFIED');
- const [ref,file,commitRead]=await Promise.all([
+ const [ref,file,sourceFile,commitRead,sourceCommitRead]=await Promise.all([
   gh(token,'/git/ref/heads/'+branch),
   gh(token,'/contents/'+artifact+'?ref='+encodeURIComponent(branch)),
-  gh(token,'/commits/'+commit)
+  gh(token,'/contents/'+target+'?ref='+encodeURIComponent(branch)),
+  gh(token,'/commits/'+commit),
+  gh(token,'/commits/'+sourceCommit)
  ]);
  if(ref.data?.object?.sha!==commit||file.data?.sha!==blob||
+  sourceFile.data?.sha!==sourceBlob||
   !Array.isArray(commitRead.data?.parents)||
   commitRead.data.parents.length!==1||
-  commitRead.data.parents[0]?.sha!==s.release_sha||
+  commitRead.data.parents[0]?.sha!==sourceCommit||
   !Array.isArray(commitRead.data?.files)||
   commitRead.data.files.length!==1||
   commitRead.data.files[0]?.filename!==artifact||
-  commitRead.data.files[0]?.status!=='added')
+  commitRead.data.files[0]?.status!=='added'||
+  !Array.isArray(sourceCommitRead.data?.parents)||
+  sourceCommitRead.data.parents.length!==1||
+  sourceCommitRead.data.parents[0]?.sha!==s.release_sha||
+  sourceCommitRead.data.files?.length!==1||
+  sourceCommitRead.data.files[0]?.filename!==target||
+  sourceCommitRead.data.files[0]?.status!=='modified')
   return bodySafe('CHAT_NEW_DEV_ARTIFACT_PROVIDER_READBACK_UNVERIFIED');
  const opened=await gh(token,'/pulls','POST',{
   title:'Reality Chat · isolated development '+s.original_work_id.slice(5,13),
   body:'Owner-authenticated new Chat development code proposal.\\n'+
    'Source: '+s.evidence.candidate_sha256+'\\n'+
-   'No model code executed or installed. Independent source/syntax CI required.',
+   'Source patch staged in isolated draft PR; no installation or execution. Independent acceptance required.',
   head:branch,base,draft:true
  });
  if(!opened.ok||opened.status!==201||
