@@ -80,16 +80,32 @@ export async function inspectSavedChatWork({
    action_eligible:false,execution_started:false,
    installation_authorized:false,production_changed:false});
  }
- // A literal, signed request to code an exact GitHub issue or original work
- // identity wins over a vague "discover existing work" classification. This
- // narrows the destination; it cannot add an original or mint an authority.
- if(intent.kind==='WORK_REQUEST'&&intent.explicit_request===true&&
-    typeof intent.source_quote==='string'&&
-    verified.text.includes(intent.source_quote)&&
-    /\b(?:build|code|implement|repair|fix|develop|upgrade)\b/i.test(verified.text)&&
-    (/(?:https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*|\b(?:issue|job|repair)\s*#?[1-9]\d*\b|work:[a-f0-9]{32})/i)
-      .test(verified.text)){
+ // Do not allow model-selected "original engineering" to attach a
+ // general owner instruction to an unrelated existing repair. A specific
+ // original must be named in the CURRENT signed human message; Universe
+ // source discovery alone is not the owner's exact-work authorization.
+ const exactOriginalReference=/(?:https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*|(?:^|[^\w])work:[a-f0-9]{32}(?![\w])|\b(?:issue|job|repair)\s*#?[1-9]\d*\b)/i
+  .test(verified.text);
+ const explicitBuildInstruction=intent.kind==='WORK_REQUEST'&&
+  intent.explicit_request===true&&intent.action_eligible===true&&
+  typeof intent.source_quote==='string'&&
+  verified.text.includes(intent.source_quote)&&
+  /\b(?:build|implement|develop|create|generate)\b/i.test(verified.text);
+ if(explicitBuildInstruction&&exactOriginalReference){
+  // A named original is NEVER silently re-admitted as brand-new development.
   intent={...intent,capability_id:'governed-original-engineering',
+   action_eligible:true};
+ }else if(explicitBuildInstruction&&
+    intent.capability_id==='governed-original-engineering'&&
+    !exactOriginalReference&&
+    !/\b(?:continue|resume)\s+(?:(?:my|the|our|this|an|already|existing)\s+){0,3}(?:existing|previous|original|prior|job|issue|repair)\b/i
+      .test(verified.text)){
+  // The installed new-development adapter can admit an isolated task from
+  // this exact signed build request; the original-engineering adapter cannot.
+  // This is destination normalization only, not permission to install or
+  // to reuse an old shift: the new-development database must still validate
+  // the immutable source and require idempotent owner-scoped admission.
+  intent={...intent,capability_id:'governed-chat-new-development',
    action_eligible:true};
  }
  const common={
