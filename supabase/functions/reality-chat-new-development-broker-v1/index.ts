@@ -8,7 +8,7 @@ const REPO='maloney2323/Reality';
 const GH='https://api.github.com/repos/'+REPO;
 const FLOW='.github/workflows/reality-chat-new-development-candidate-v1.yml';
 const FLOW_NAME='Reality signed Chat new development isolated source acceptance';
-const STEP='Independently validate inert source candidate and syntax';
+const STEP='Independently validate staged source candidate and syntax';
 const SHA=/^[a-f0-9]{40}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -130,17 +130,18 @@ function proposedSource(s,original){
 }
 async function readExisting(s,token,base){
  const {branch,artifact}=branchAndArtifact(s),target=s.candidate.target_path;
- const [ref,file,source,prs,head]=await Promise.all([
+ const [ref,file,source,prs]=await Promise.all([
   gh(token,'/git/ref/heads/'+branch),
   gh(token,'/contents/'+artifact+'?ref='+encodeURIComponent(branch)),
   gh(token,'/contents/'+target+'?ref='+encodeURIComponent(branch)),
-  gh(token,'/pulls?state=all&head='+encodeURIComponent('maloney2323:'+branch)+'&per_page=100'),
-  gh(token,'/commits/'+branch)
+  gh(token,'/pulls?state=all&head='+encodeURIComponent('maloney2323:'+branch)+'&per_page=100')
  ]);
  if(ref.status===404)return null;
  if(!ref.ok||!SHA.test(ref.data?.object?.sha||'')||
-  !file.ok||!source.ok||!prs.ok||!Array.isArray(prs.data)||
-  !head.ok||head.data?.sha!==ref.data.object.sha||
+  !file.ok||!source.ok||!prs.ok||!Array.isArray(prs.data))
+  return null;
+ const head=await gh(token,'/commits/'+ref.data.object.sha);
+ if(!head.ok||head.data?.sha!==ref.data.object.sha||
   !Array.isArray(head.data?.parents)||head.data.parents.length!==1||
   !Array.isArray(head.data?.files)||head.data.files.length!==1||
   head.data.files[0]?.filename!==artifact||
