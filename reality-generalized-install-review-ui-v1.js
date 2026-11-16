@@ -23,6 +23,7 @@ function panel(){
   p.setAttribute('aria-live','polite');
   add('h4',p,'Reality · your decision is needed');
   add('p',p).id='generalizedOriginalInstallReviewStatus';
+  add('p',p).id='generalizedOriginalInstallRecoveryUpdate';
   add('p',p).id='generalizedOriginalInstallReviewArtifact';
   add('p',p).id='generalizedOriginalInstallReviewGates';
   const links=add('p',p);links.id='generalizedOriginalInstallReviewEvidence';
@@ -142,6 +143,7 @@ async function refresh(){
    get('generalizedOriginalInstallReviewStatus').textContent=
     'Current original installation review is unavailable or not independently verified.';
    get('generalizedOriginalInstallReviewArtifact').textContent='';
+   get('generalizedOriginalInstallRecoveryUpdate').textContent='';
    get('generalizedOriginalInstallReviewGates').textContent='';
    get('generalizedOriginalInstallReviewEvidence').replaceChildren();
    return;
@@ -161,6 +163,19 @@ async function refresh(){
   get('generalizedOriginalInstallReviewArtifact').textContent=
     'Exact independently tested source '+d.candidate_commit_sha.slice(0,12)+
     ' · artifact '+d.candidate_artifact_sha256.slice(0,20)+'…';
+  const investigation=d.recovery_diagnosis;
+  const hasDiagnosis=investigation?.status===
+    'FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED'&&
+   investigation.independently_tested===false&&
+   investigation.external_retry_authorized===false&&
+   typeof investigation.repair_proposal==='string'&&
+   investigation.repair_proposal.length<=2500;
+  get('generalizedOriginalInstallRecoveryUpdate').textContent=
+   hasDiagnosis?
+    'Reality · Riley investigated the stalled installation and recorded a source-backed repair hypothesis. '+investigation.repair_proposal.slice(0,700)+
+    ' Independent repair testing is still required. No second installation is authorized.':
+    d.phase==='INSTALL_INTENT_FENCED'?
+    'Reality has recorded your exact approval. The installation remains fenced; source installation and original-job completion are not yet verified.':'';
   const gates=[
    ['GitHub write transport',d.isolated_github_write_verified],
    ['Automatic isolated preview deployment',d.preview_auto_deploy_verified],
