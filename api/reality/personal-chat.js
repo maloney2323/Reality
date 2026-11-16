@@ -43,6 +43,8 @@ import {createUniversePostgresPersistence}
  from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import {createContinuitySpine}
  from '../../src/reality-continuity-spine-v2.0.js';
+import {readFreshPersonalAccountMissionState}
+ from '../../src/reality-personal-goal-readback-v0.1.js';
 export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
@@ -250,6 +252,14 @@ export default async function handler(req,res){
   // optional sources and existing read-only governance.
   const wantsWorkerHealth=/(?:\bwatchdog\b|\bauto[ -]?wake\b|\bwake(?:up)?\s+(?:status|health|failure|trigger)\b|\bworker\s+(?:health|status|wake|failed)\b)/i.test(text);
   const optionalContextPromise=collectOptionalChatEvidence([
+   {id:'primary_mission',
+    read:()=>readFreshPersonalAccountMissionState({session}),
+    validate:x=>x?.version==='reality-account-primary-business-mission-v1'&&
+     x.principal_id===session.user_id&&
+     x.source==='OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY'&&
+     x.execution_authorized===false&&x.external_actions_authorized===false&&
+     x.state?.assistant_can_mutate_goals===false,
+    fallback:null},
    {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({
       session,conversationId}),validate:v=>v!==null&&typeof v==='object',
       fallback:null},
@@ -335,6 +345,7 @@ export default async function handler(req,res){
   const optionalContext=await optionalContextPromise;
   optionalContextWaitMs=Date.now()-optionalContextWaitStart;
   const {
+   primary_mission:ownerMissionReadback,
    work_handoff:chatWorkReadback,
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
    employee_shift:employeeShiftObservations,worker_wake:workerWakeObservations,
@@ -400,7 +411,30 @@ export default async function handler(req,res){
   };
   // ONE authenticated Universe observation window supplies Reality and
   // its underlying model in both response modes. Not a second ledger.
+  const primaryMission=ownerMissionReadback?.state?.active_goal||null;
+  const activePrimaryMission=primaryMission?.goal_id&&
+   ownerMissionReadback.state.active_goal_id===primaryMission.goal_id&&
+   primaryMission.user_confirmed===true&&primaryMission.status==='ACTIVE'&&
+   typeof primaryMission.title==='string'&&primaryMission.title.length<=700&&
+   /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(
+    primaryMission.source_user_message_ref||'')?
+    primaryMission:null;
+  const primaryMissionObservation=activePrimaryMission?Object.freeze({
+   entry_id:'reality:owner-primary-business-mission',
+   event_kind:'owner_confirmed_account_primary_business_mission',
+   source_kind:'OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY',
+   source_ref:activePrimaryMission.source_user_message_ref,
+   epistemic_status:'OWNER_CONFIRMED_OBJECTIVE_NOT_BUSINESS_OUTCOME',
+   assertion_time:new Date().toISOString(),
+   summary:'Owner-confirmed standing business mission: '+
+    activePrimaryMission.title+
+    '. This defines long-term intent, NOT approval for external execution, '+
+    'employment actions, purchases, production deployment, or completion.',
+   execution_authorized:false,installation_authorized:false,
+   production_changed:false
+  }):null;
   const ownerCurrentUniverseObservations=[
+   ...(primaryMissionObservation?[primaryMissionObservation]:[]),
    buildRealityProposedEmployeeRoleDiscussionContext(),
    ...native263TemporalObservations,...ownerCompletedWorkObservations,
    ...marketStageObservations,...verifiedUpgradeObservations,
@@ -499,6 +533,12 @@ export default async function handler(req,res){
      weekly_workload_gap:weeklyWorkloadObservations[0]?.weekly_workload_insight||null,
      verified_workforce:companyWorkforceObservations.slice(0,12),
      authoritative_goal_state:currentGoal,
+     verified_primary_business_mission:activePrimaryMission?Object.freeze({
+      goal_id:activePrimaryMission.goal_id,
+      owner_confirmed_text:activePrimaryMission.title,
+      source_user_message_ref:activePrimaryMission.source_user_message_ref,
+      grants_execution_authority:false
+     }):null,
      universe_cognitive_state_id:ownerUniverse.state_id,
      universe_read_model:'EXISTING_UNIVERSE_PLUS_CANONICAL_CONTINUITY',
      source_status:ownerContext.status,
