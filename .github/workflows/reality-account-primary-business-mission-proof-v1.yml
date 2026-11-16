@@ -1,0 +1,37 @@
+name: Reality account-wide business mission evidence proof
+on:
+  push:
+    branches:
+      - reality/chat-direct-work-handoff-20261115
+    paths:
+      - 'api/reality/personal-goals.js'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-personal-goal-readback-v0.1.js'
+      - 'index.html'
+      - 'test/reality-account-primary-business-mission-v1.test.js'
+      - '.github/workflows/reality-account-primary-business-mission-proof-v1.yml'
+  pull_request:
+    paths:
+      - 'api/reality/personal-goals.js'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-personal-goal-readback-v0.1.js'
+      - 'index.html'
+      - 'test/reality-account-primary-business-mission-v1.test.js'
+      - '.github/workflows/reality-account-primary-business-mission-proof-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verified-account-mission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify owner-account goal and Chat authority boundaries
+        run: |
+          node --check api/reality/personal-goals.js
+          node --check api/reality/personal-chat.js
+          node --check src/reality-personal-goal-readback-v0.1.js
+          node --test test/reality-account-primary-business-mission-v1.test.js
