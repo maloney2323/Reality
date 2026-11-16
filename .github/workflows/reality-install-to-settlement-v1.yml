@@ -76,6 +76,7 @@ jobs:
         run: |
           node --check src/reality-general-original-fenced-investigator-v1.js
           node --test test/reality-general-original-fenced-investigator-v1.test.js
+          node --test test/reality-general-original-fenced-reconcile-v1.test.js
           node --test test/reality-generalized-original-install-review-chat-v1.test.js
       - run: node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
       - run: node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
