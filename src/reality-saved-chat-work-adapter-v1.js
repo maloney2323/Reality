@@ -558,3 +558,63 @@ export async function advanceSignedChatDevelopment({
   model_generated:item.model_generated===true,
   independent_ci_verified:item.independent_ci_verified===true});
 }
+
+
+// Owner-scoped, READ-ONLY reconstruction of an exact signed Chat
+// development request. This permits persisted status on reload without
+// reclassifying, starting a worker, approving or claiming completion.
+export async function readSignedChatDevelopmentStatus({
+ session,conversationId,requestId,messages,
+ readNew=readOwnerNewDevelopment
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ const r=await readNew({session,conversationId});
+ if(r?.status!=='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'||
+   r.owner_id!==session.user_id||
+   r.conversation_id!==conversationId||
+   r.installation_authorized!==false||
+   r.original_job_completed!==false||
+   r.production_changed!==false||
+   r.new_shift_started!==false||
+   !Array.isArray(r.items))
+  fail('CHAT_WORK_DEVELOPMENT_STATUS_OWNER_READBACK_UNVERIFIED',503);
+ const matches=r.items.filter(x=>x.request_id===requestId&&
+  x.source_ref===signed.source_ref&&
+  x.installation_authorized===false&&
+  x.original_job_completed===false&&
+  x.production_changed===false&&
+  x.new_shift_started===false);
+ if(matches.length>1)
+  fail('CHAT_WORK_DEVELOPMENT_STATUS_DUPLICATE_SOURCE',503);
+ const item=matches[0];
+ const base={request_id:requestId,source_ref:signed.source_ref,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false};
+ if(!item)return Object.freeze({...base,
+  status:'CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED',
+  development_phase:'NOT_ADMITTED',independent_readback_verified:true,
+  model_generated:false,independent_ci_verified:false});
+ if(!workId(item.original_work_id))
+  fail('CHAT_WORK_DEVELOPMENT_STATUS_WORK_ID_UNVERIFIED',503);
+ const evidence=item.evidence&&typeof item.evidence==='object'?
+  item.evidence:{};
+ const prUrl=typeof evidence.pr_url==='string'&&
+  /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(evidence.pr_url)?
+   evidence.pr_url:null;
+ const commit=typeof evidence.artifact_commit_sha==='string'&&
+  /^[a-f0-9]{40}$/.test(evidence.artifact_commit_sha)?
+   evidence.artifact_commit_sha:null;
+ const run=Number.isSafeInteger(evidence.ci_run_id)&&
+  evidence.ci_run_id>10000?evidence.ci_run_id:null;
+ return Object.freeze({...base,
+  status:'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK',
+  original_work_id:item.original_work_id,
+  development_phase:item.phase,
+  model_generated:item.model_generated===true,
+  independent_ci_verified:item.independent_ci_verified===true,
+  independent_readback_verified:true,
+  ...(prUrl?{pr_url:prUrl}:{}),
+  ...(commit?{artifact_commit_sha:commit}:{}),
+  ...(run?{ci_run_id:run}:{})
+ });
+}
