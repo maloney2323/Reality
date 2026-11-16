@@ -11,12 +11,14 @@
  const WORK=/^work:[a-f0-9]{32}$/;
  const key=(c,r)=>c+':'+r;
  const started=new Map(),processing=new Set();
- // The existing Chat transcript and composer live inside privateReady.
- // Never bind to a synthetic container: an absent element previously disabled
- // all Chat work dispatch while ordinary assistant text kept answering.
- const container=document.getElementById('privateReady');
+ // The premium Chat workspace moves the genuine, original composer into
+ // its conversation panel. Bind to the ACTUAL parent, not privateReady's
+ // former direct-child layout. Require the composer to remain inside the
+ // authenticated owner workspace before wiring any signed work action.
+ const ready=document.getElementById('privateReady');
  const composer=document.getElementById('realityChatComposer');
- if(!container||!composer||composer.parentElement!==container)return;
+ const container=composer?.parentElement||null;
+ if(!ready||!composer||!container||!ready.contains(composer))return;
  window.realityChatDirectWorkEnabled=true;
  const panel=document.createElement('section');
  panel.id='realityChatDirectWorkStatus';
