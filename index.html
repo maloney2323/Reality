@@ -1541,6 +1541,11 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
+  <div id="privateAccountMissionBanner" role="status" aria-live="polite" style="padding:12px;margin:8px 0;border:1px solid #42637b;border-radius:12px;background:#11283c;font-size:13px;line-height:1.6">
+   <strong>Permanent business mission</strong>
+   <p id="privateMissionBannerText" style="margin:6px 0">Checking your account-wide mission…</p>
+   <button id="privateMissionEditShortcut" type="button" class="simple-secondary">Review or confirm permanent mission</button>
+  </div>
   <section id="realityChatShiftBrief" class="reality-chat-shift-brief" aria-label="Realtime verified eight-hour workday briefing">
     <div class="label">REALITY · EMPLOYEE WORKDAY · LIVE EVIDENCE</div>
     <h4 id="realityChatShiftHeadline" role="status" aria-live="polite">Checking your latest shift…</h4>
@@ -1640,7 +1645,14 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p class="muted" style="font-size:11px">No new queue or dispatch. This opens Reality's existing authenticated original-job review. Reality checks fresh GitHub and Continuity evidence before showing the separate owner approval. No change to production.</p>
   </section>
   <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
-   <strong>Confirmed user objective</strong>
+   <strong>Permanent Reality business mission (account-wide)</strong>
+   <p class="muted">Saved across every conversation and sign-in. Separate from temporary Chat goals and from execution approval.</p>
+   <p id="privateMissionStatus" class="muted" role="status" aria-live="polite">Checking the account mission ledger…</p>
+   <label for="privateMissionText">Confirm your permanent mission</label>
+   <textarea id="privateMissionText" minlength="12" maxlength="700" style="width:100%;min-height:150px" placeholder="Describe the long-term mission for your business."></textarea>
+   <button id="privateMissionConfirm" type="button">Save permanent business mission to my account</button>
+   <hr style="margin:18px 0;border-color:#30465d">
+   <strong>Conversation-specific objective</strong>
    <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
    <label for="privateGoalText">Required for business work: your confirmed active goal</label>
    <p class="muted" style="font-size:12px">Enter your objective in your own words, or resume an existing confirmed goal. Reality will not choose or change your goal for you.</p>
@@ -6685,7 +6697,71 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   try{await loadSaved();await loadConversations();void wcLoadCompletionReports()}catch(e){status(e.message)}
  };
  let confirmedActiveGoal=null;
+ const realityProposedPermanentMission="Build Reality into a trustworthy, profitable Personal Operational Intelligence business. Prove value by operating Reality as Customer Zero, then serving owner-operated residential remodeling and construction companies. Continuously assess launch readiness, customers, finances, risks, and unfinished work. Each AI employee investigates its own authorized sources, qualifies useful jobs, and coordinates through one continuity ledger. Advance authorized work, recover safely, independently verify outcomes, and produce durable receipts measuring cost, time, and ROI where proven. Keep improving launch, customer value, retention, and growth, with owner control and clear Past, Present, and Future.";
+ let confirmedPermanentMission=null;
+ async function loadPermanentMission(){
+  const banner=el('privateMissionBannerText'),state=el('privateMissionStatus');
+  try{
+   const r=await fetch('/api/reality/personal-goals?scope=account&conversation_id='+
+    encodeURIComponent(conversationId()),{credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(15000)});
+   const out=await r.json().catch(()=>null);
+   if(!r.ok||out?.ok!==true||out.goal_scope!=='OWNER_ACCOUNT_PRIMARY_MISSION'||
+      out.goal_state?.assistant_can_mutate_goals!==false||
+      out.goal_state?.external_execution_authorized!==false)
+    throw Error('ACCOUNT_MISSION_VERIFIED_READBACK_UNAVAILABLE');
+   const g=out.goal_state.active_goal;
+   if(g?.goal_id&&out.goal_state.active_goal_id===g.goal_id&&
+     g.status==='ACTIVE'&&g.user_confirmed===true&&
+     g.title?.length<=700&&g.source_user_message_ref){
+    confirmedPermanentMission={goal_id:g.goal_id,text:g.title,
+     receipt:g.last_transition_receipt_id};
+    banner.textContent='SAVED ACROSS YOUR ACCOUNT · '+g.title;
+    state.textContent='Confirmed account-wide mission · Continuity receipt: '+
+      String(g.last_transition_receipt_id||'not returned');
+    el('privateMissionText').value=g.title;
+   }else{
+    confirmedPermanentMission=null;
+    banner.textContent='No account-wide primary mission confirmed yet. Review the proposal in Chat settings and save it once.';
+    state.textContent='No owner-confirmed permanent mission recorded. This proposal is NOT yet your active account mission.';
+    if(!el('privateMissionText').value.trim())
+     el('privateMissionText').value=realityProposedPermanentMission;
+   }
+  }catch(e){
+   confirmedPermanentMission=null;
+   banner.textContent='Account mission verification unavailable; Reality cannot claim it was saved.';
+   state.textContent='Unable to read the account mission: '+String(e.message||'UNKNOWN')+
+     '. Your previous goals were not deleted.';
+  }
+ }
+ el('privateMissionEditShortcut').onclick=()=>{
+  if(el('realityChatSettings'))el('realityChatSettings').open=true;
+  el('privateMissionText').scrollIntoView({behavior:'smooth',block:'center'});
+  el('privateMissionText').focus({preventScroll:true});
+ };
+ el('privateMissionConfirm').onclick=async()=>{
+  const field=el('privateMissionText'),message=field.value.trim();
+  if(message.length<12||message.length>700||message.includes(String.fromCharCode(0)))
+   return status('Permanent mission must contain 12–700 characters.');
+  if(!confirm('Confirm this exact mission as your permanent Reality business objective across all conversations? This does not authorize any work, payments, releases, or external actions.'))
+   return;
+  const button=el('privateMissionConfirm');button.disabled=true;
+  try{
+   const saved=await saveGoalCommand('SET_ACTIVE',message,null,'account');
+   if(saved.goal_scope!=='OWNER_ACCOUNT_PRIMARY_MISSION'||
+      saved.goal_state?.active_goal?.title!==message||
+      saved.goal_state?.active_goal?.user_confirmed!==true||
+      !saved.transition_receipt_id)
+    throw Error('ACCOUNT_MISSION_WRITE_READBACK_UNVERIFIED');
+   await loadPermanentMission();
+   if(confirmedPermanentMission?.text!==message)
+    throw Error('ACCOUNT_MISSION_PERSISTED_SOURCE_MISMATCH');
+   status('Permanent business mission independently saved to your account. It will remain visible across conversations. No new shift or installation was authorized.');
+  }catch(e){status('Permanent mission not confirmed: '+String(e.message||'UNAVAILABLE'))}
+  finally{button.disabled=false}
+ };
  async function loadGoals(){
+  void loadPermanentMission();
   const label=el('privateGoalStatus');
   try{
    const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store',signal:AbortSignal.timeout(12000)});
@@ -6724,11 +6800,12 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    el('privateResumeGoal').disabled=true;
   }
  }
- async function saveGoalCommand(operation,message,target_goal_id=null){
+ async function saveGoalCommand(operation,message,target_goal_id=null,scope='conversation'){
   const r=await fetch('/api/reality/personal-goals',{method:'POST',
-   headers:{'content-type':'application/json'},
+   credentials:'same-origin',headers:{'content-type':'application/json'},
    body:JSON.stringify({conversation_id:conversationId(),
-    request_id:crypto.randomUUID(),operation,message,target_goal_id})});
+    request_id:crypto.randomUUID(),operation,message,target_goal_id,
+    ...(scope==='account'?{scope:'account'}:{})})});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Goal change not recorded');
   if(!data.transition_receipt_id||data.goal_state?.external_execution_authorized!==false)
    throw Error('GOAL_TRANSITION_READBACK_NOT_VERIFIED');
