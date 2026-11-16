@@ -37,10 +37,37 @@
  recoverButton.type='button';
  recoverButton.textContent='Find my saved build request';
  recoverControls.append(recoverButton);
- panel.append(label,description,recoverControls,actions);
+ const timeline=document.createElement('div');
+ timeline.id='realityChatBuildTimeline';
+ timeline.style.cssText='padding:8px 0;white-space:pre-line;line-height:1.65;font-size:13px;opacity:0.95';
+ panel.append(label,description,recoverControls,actions,timeline);
  panel.hidden=false;
  description.textContent='Chat work status · Check an existing saved build instruction. No new message, shift or installation is created by looking it up.';
  container.insertBefore(panel,composer);
+ function renderTimeline(result){
+  const phase=result?.development_phase||(
+   result?.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED'?'DRAFT_GENERATED':
+   result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED'?'CANDIDATE_STAGED':
+   result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED'?'CI_VERIFIED':null);
+  const order=['QUEUED','DRAFT_GENERATED','CANDIDATE_STAGED','CI_VERIFIED'];
+  const idx=order.indexOf(phase);
+  if(idx<0){timeline.textContent='';return}
+  const titles=['Instruction admitted to saved work','AI wrote a source patch',
+   'GitHub draft PR contains code','Independent CI recorded in Reality'];
+  timeline.textContent=titles.map((name,i)=>
+   (idx>=i?'✓ ':'○ ')+name).join('\n');
+ }
+ function renderPrLink(result){
+  const url=result?.pr_url;
+  if(typeof url!=='string'||!/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(url))return;
+  const link=document.createElement('a');
+  link.textContent='View real GitHub code candidate';
+  link.href=url;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  link.style.cssText='display:inline-block;margin-top:8px;text-decoration:underline';
+  actions.append(link);
+ }
  function show(message,readOnly=false,ref=null){
   panel.hidden=false;
   description.textContent=message;
@@ -51,12 +78,13 @@
    inspect.textContent='Inspect saved work (read only)';
    inspect.onclick=async()=>{
     inspect.disabled=true;
-    description.textContent='Reading the exact saved request and permitted next action…';
+    description.textContent='Reading the saved job and its latest verified development state…';
     try{
-     const reply=await call('INSPECT_VERIFIED_WORK',ref);
-     description.textContent=explain(reply);
-    }catch{
-     description.textContent='Exact work readback unavailable. Your Chat instruction remains saved; do not resend it.';
+     const reply=await call('READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
+     showCheckedResult(reply,ref);
+    }catch(err){
+     description.textContent='Exact status readback blocked: '+String(err?.message||'UNVERIFIED')+
+      '. No work was restarted.';
     }finally{inspect.disabled=false}
    };
    actions.append(inspect);
@@ -84,6 +112,15 @@
  function explain(result){
   const id=WORK.test(result.original_work_id||'')?
    result.original_work_id:null;
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')
+   return 'SAVED BUILD STATUS · '+id+
+    ' · phase '+String(result.development_phase||'UNKNOWN')+
+    '. '+(result.independent_ci_verified===true?
+      'Independent CI has a durable receipt.':
+      'Independent CI is not yet recorded in Reality.')+
+    ' No installation or customer-job completion has been claimed.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED')
+   return 'This exact saved Chat instruction has no admitted development record yet. Continue it once to create the original work ID; do not resend the message.';
   if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED')
    return 'REAL CODE DRAFT RECORDED for '+id+
     ' · Source file: '+String(result.source_path||'verified candidate source')+
@@ -97,6 +134,10 @@
     ' · Commit '+String(result.artifact_commit_sha||'not supplied')+
     ', CI run '+String(result.ci_run_id||'not supplied')+
     '. This is NOT feature acceptance and no model code was installed or run.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED'&&
+     result.worker_status==='CHAT_NEW_DEV_INDEPENDENT_SOURCE_CI_PENDING')
+   return 'GitHub code candidate for '+id+
+    ' is staged. Independent CI is still being reconciled; the same job can be checked again without creating another build.';
   if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED'||
      result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED')
    return 'REAL BUILD BLOCKER for '+id+': '+String(result.worker_status||'UNKNOWN')+
@@ -160,31 +201,56 @@
   const second=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
   if(second.original_work_id!==first.original_work_id)
    throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
+  if(second.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED'){
+   showCheckedResult(second,ref);
+   description.textContent=explain(second)+
+    ' Independent GitHub CI is now being checked and reconciled…';
+   const checked=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
+   if(checked.original_work_id!==second.original_work_id)
+    throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
+   return checked;
+  }
   return second;
  }
  function showCheckedResult(result,ref){
   show(explain(result),true,ref);
-  if(['CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED',
-   'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED'].includes(result.status)){
-   const b=document.createElement('button');
-   b.type='button';
-   b.textContent='Check this build’s independent CI';
-   b.onclick=async()=>{
-    if(b.disabled)return;
-    b.disabled=true;
-    description.textContent='Reading exact GitHub/CI evidence for '+ref.request_id+'…';
-    try{
-     const next=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
-     if(next.original_work_id!==result.original_work_id)
-      throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
-     showCheckedResult(next,ref);
-    }catch(err){
-     show('Independent CI check blocked: '+String(err?.message||'UNVERIFIED')+
-      '. No installation or verified completion is inferred.',true,ref);
-    }
-   };
-   actions.append(b);
-  }
+  renderTimeline(result);
+  renderPrLink(result);
+  const phase=result?.development_phase;
+  const pending=result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED'&&
+    result.worker_status==='CHAT_NEW_DEV_INDEPENDENT_SOURCE_CI_PENDING';
+  const canCheck=phase==='CANDIDATE_STAGED'||pending||
+    result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED';
+  const canContinue=result?.status==='CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED'||
+   ['QUEUED','DRAFT_GENERATED','PUBLISH_FENCED'].includes(phase);
+  if(!canCheck&&!canContinue)return;
+  const btn=document.createElement('button');
+  btn.type='button';
+  btn.textContent=canCheck?'Check and record independent CI (same build)':
+   'Continue this exact saved build (no resend)';
+  btn.style.cssText='margin-top:10px;display:block;max-width:100%;white-space:normal';
+  btn.onclick=async()=>{
+   if(btn.disabled)return;
+   btn.disabled=true;
+   description.textContent=canCheck?
+    'Checking the independent GitHub CI for '+String(result.original_work_id)+
+     ' and reconciling its saved receipt…':
+    'Continuing the saved '+String(ref.request_id)+
+     ' through the existing governed builder…';
+   try{
+    const next=canCheck?
+     await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref):
+     await processAndAdvance(ref);
+    if(result.original_work_id&&next.original_work_id&&
+       next.original_work_id!==result.original_work_id)
+     throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
+    showCheckedResult(next,ref);
+   }catch(err){
+    description.textContent='This exact build cannot advance: '+String(err?.message||'UNVERIFIED')+
+     '. The saved work is preserved. Inspect its status; do not resend or approve another shift.';
+   }finally{btn.disabled=false}
+  };
+  actions.append(btn);
  }
  // The durable signed history is looked up by an explicit user click.
  // Do not depend on page-load CustomEvents, event timing or old Chat bubbles.
@@ -224,41 +290,27 @@
    const preview=latest.text.trim().replace(/\s+/g,' ').slice(0,200);
    description.textContent='Saved, signed request found: “'+preview+'” · Request '+latest.request_id+
     '. Review this source before continuing. This lookup made no changes.';
-   const inspect=document.createElement('button');
-   inspect.type='button';
-   inspect.textContent='Inspect current work (read only)';
-   inspect.onclick=async()=>{
-    inspect.disabled=true;
-    description.textContent='Reading this exact signed instruction without executing work…';
-    try{
-     const result=await call('INSPECT_VERIFIED_WORK',ref);
-     showCheckedResult(result,ref);
-    }catch(err){
-     const code=String(err?.message||'CHAT_WORK_READBACK_UNAVAILABLE');
-     description.textContent='Inspection blocked: '+
-       (/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(code)?code:'CHAT_WORK_READBACK_UNAVAILABLE')+
-       '. No action was performed.';
-    }finally{inspect.disabled=false;}
-   };
-   const proceed=document.createElement('button');
-   proceed.type='button';
-   proceed.textContent='Continue this exact saved build (no resend)';
-   proceed.onclick=async()=>{
-    if(proceed.disabled)return;
-    proceed.disabled=true;
-    description.textContent='Checking and processing exact signed source '+ref.request_id+
-      ' through the existing governed work adapter…';
-    try{
-     const result=await processAndAdvance(ref);
-     description.textContent=explain(result);
-    }catch(err){
-     const code=String(err?.message||'CHAT_WORK_UNVERIFIED');
-     description.textContent='Work handoff not verified: '+
-      (/^CHAT_WORK_[A-Z0-9_]{4,110}$/.test(code)?code:'CHAT_WORK_UNVERIFIED')+
-      '. No completion or installation is claimed. Do not resend the same request.';
-    }
-   };
-   actions.append(inspect,proceed);
+   // The server reads only this exact signed source from the owner's
+   // durable Chat record. No model call, worker claim or approval occurs.
+   try{
+    const state=await call('READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
+    showCheckedResult(state,ref);
+   }catch(err){
+    description.textContent='Saved Chat request found, but work status is not available: '+
+     String(err?.message||'UNVERIFIED')+'. No work was restarted.';
+    const resume=document.createElement('button');
+    resume.type='button';
+    resume.textContent='Continue this exact saved build (no resend)';
+    resume.onclick=async()=>{
+     resume.disabled=true;
+     try{showCheckedResult(await processAndAdvance(ref),ref)}
+     catch(error){description.textContent='Work handoff not verified: '+
+      String(error?.message||'UNVERIFIED')+'. The request remains saved.'}
+     finally{resume.disabled=false}
+    };
+    actions.append(resume);
+   }
+
   }catch(err){
    const code=String(err?.message||'CHAT_WORK_HISTORY_UNAVAILABLE');
    description.textContent='Could not read your saved work: '+
