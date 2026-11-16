@@ -613,6 +613,12 @@ export async function readSignedChatDevelopmentStatus({
   model_generated:item.model_generated===true,
   independent_ci_verified:item.independent_ci_verified===true,
   independent_readback_verified:true,
+  ...(typeof item.objective==='string'&&item.objective.length<=450?
+    {objective:item.objective}:{}),
+  ...(typeof evidence.target_path==='string'&&
+     /^src\/[a-z0-9][a-z0-9._/-]{3,160}\.[cm]?js$/i.test(evidence.target_path)&&
+     !evidence.target_path.includes('..')?
+    {target_path:evidence.target_path}:{}),
   ...(prUrl?{pr_url:prUrl}:{}),
   ...(commit?{artifact_commit_sha:commit}:{}),
   ...(run?{ci_run_id:run}:{})
