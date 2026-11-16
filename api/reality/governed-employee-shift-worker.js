@@ -86,6 +86,8 @@ import {continueGeneralOwnerApprovedOriginalInstall}
  from '../../src/reality-general-original-auto-install-bridge-v1.js';
 import {settleGeneralOwnerApprovedOriginal}
  from '../../src/reality-general-original-auto-settlement-bridge-v1.js';
+import {continueGeneralOriginalOwnerApprovedRecovery}
+ from '../../src/reality-general-original-auto-recovery-publisher-v1.js';
 import {investigateGeneralOriginalFencedRecovery}
  from '../../src/reality-general-original-fenced-investigator-v1.js';
 import {generateNextSignedChatDevelopmentDraft}
@@ -438,6 +440,18 @@ export default async function handler(req,res){
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
     status:'GENERAL_INSTALL_PRIVILEGED_PROVIDER_UNVERIFIED',
+    source_installed:false,original_job_completed:false,
+    production_changed:false
+   }));
+  // The original one-use installation is consumed. A separate signed,
+  // independently tested exact recovery decision may publish once; all
+  // subsequent wakes are read-only reconciliations, not retry permissions.
+  workerStage='GENERAL_ORIGINAL_ONE_USE_RECOVERY_PUBLICATION';
+  const generalOriginalRecoveryPublication=
+   await continueGeneralOriginalOwnerApprovedRecovery({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'RECOVERY_SIGNED_PROVIDER_UNVERIFIED_NO_REPLAY',
     source_installed:false,original_job_completed:false,
     production_changed:false
    }));
@@ -1258,7 +1272,17 @@ export default async function handler(req,res){
      fencedOriginalInvestigationState.original_job_completed===false&&
      fencedOriginalInvestigationState.independently_tested===false&&
      fencedOriginalInvestigationState.external_retry_authorized===false);
-   const outcomeCode=autonomousRecoveryDiagnosisReady?
+   const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
+    'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    generalOriginalRecoveryPublication?.source_installed===true?
+    'GENERAL_ORIGINAL_SOURCE_INSTALLED_POSTINSTALL_RECEIPT_PENDING':
+    generalOriginalRecoveryPublication?.status===
+     'RECOVERY_EXACT_OWNER_APPROVAL_PENDING'?
+    'GENERAL_ORIGINAL_RECOVERY_READY_FOR_EXACT_OWNER_DECISION':
+    generalOriginalRecoveryPublication?.status===
+     'RECOVERY_WRITE_FENCED_ORIGINAL_HEAD_UNCHANGED_NO_RETRY'?
+    'GENERAL_ORIGINAL_RECOVERY_FENCED_NO_GITHUB_EFFECT':
+    autonomousRecoveryDiagnosisReady?
     'FENCED_RILEY_DIAGNOSIS_RECORDED_INDEPENDENT_REPAIR_TEST_REQUIRED':
     originalInstallNeedsRecovery?
     'GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT':
@@ -1337,6 +1361,7 @@ export default async function handler(req,res){
     generalized_original_acceptance_push_preflight:generalOriginalAcceptancePush,
     generalized_original_preview_auto_deploy:generalizedPreviewDeployment,
     generalized_original_approved_install:generalOriginalInstall,
+    generalized_original_recovery_publication:generalOriginalRecoveryPublication,
     generalized_original_final_settlement:generalOriginalSettlement,
     generalized_original_fenced_investigation:fencedOriginalInvestigation,
     generalized_original_fenced_investigation_state:fencedOriginalInvestigationState,
