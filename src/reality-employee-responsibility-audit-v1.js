@@ -19,6 +19,29 @@ const RESPONSIBILITY_CHECKS=Object.freeze({
  Jordan:['Inspect customer commitments and follow-up needs','Qualify customer opportunities without assuming revenue'],
  Sage:['Inspect expenses, cost evidence and operational risk','Check labor and ROI assumptions against independently completed work']
 });
+const ROLE_DISCOVERY=Object.freeze({
+ Avery:['Product goals and known customer problems','Customer-need evidence and validated use cases','Unanswered launch assumptions and market positioning'],
+ Riley:['Repository defects and current failure reproductions','Missing engineering capabilities','Unsettled original jobs and source regressions'],
+ Quinn:['Independent acceptance and customer-job receipts','Security and consent boundaries','Current authorization and release-gate failures'],
+ Taylor:['Worker wakes, shift progression, connectivity and deployment evidence','Integration incidents and unfinished operational work','Recovery, replay safety and observed provider effects'],
+ Casey:['Customer onboarding and usability evidence','Chat-to-work experience and accessibility','First-customer acceptance problems'],
+ Morgan:['Saved market research and competitor source updates','Claims that require current validation','Discovered capability hypotheses requiring independent qualification'],
+ Jordan:['Connected customer requests and follow-up obligations','Qualified sales opportunities and launch funnel evidence','Support issues and customer outcome measurements'],
+ Sage:['Verified subscriptions, invoices and model operating costs','Financial runway and recorded revenue','Compliance obligations and attributable ROI evidence']
+});
+const discoveryScope=(name,item,weeklyCoverage)=>Object.freeze({
+ employee:name,
+ categories:Object.freeze([...ROLE_DISCOVERY[name]]),
+ cadence:'WEEKLY_DISCOVERY_SCOPE_PROPOSED_NOT_AUTONOMOUS_SHIFT',
+ weekly_source_refresh_verified:weeklyCoverage,
+ needs_continuous_trigger_proof:true,
+ source_evidence_status:typeof item.evidence_status==='string'?
+  item.evidence_status:'SOURCE_COVERAGE_UNVERIFIED',
+ evidence_required_before_original_job:true,
+ original_job_created:false,
+ execution_authorized:false,
+ installation_authorized:false
+});
 const fail=x=>{throw Error('EMPLOYEE_RESPONSIBILITY_AUDIT_'+x)};
 export function buildEmployeeResponsibilityAudit({
  roster,snapshot=null,employee='ALL',capabilityAudit=null,now=new Date()
@@ -96,6 +119,17 @@ export function buildEmployeeResponsibilityAudit({
    employee_name:name,role:item.role,
    responsibility_summary:item.role_summary,
    responsibility_checks:RESPONSIBILITY_CHECKS[name],
+   standing_discovery:discoveryScope(name,item,coverage),
+   business_launch_requirement:Object.freeze({
+    business_outcome:typeof item.business_outcome==='string'?
+     item.business_outcome:null,
+    required_gate:typeof item.launch_gate==='string'?item.launch_gate:null,
+    evidence_status:typeof item.evidence_status==='string'?
+     item.evidence_status:'SOURCE_COVERAGE_UNVERIFIED',
+    readiness:'NOT_VERIFIED_FOR_CUSTOMER_LAUNCH',
+    launch_authorized:false,
+    next_action:'Investigate the current source evidence for this role, verify the remaining gap and route only qualified work into the existing governed queue.'
+   }),
    weekly_source_inspected:inspected.length,
    weekly_investigation_assignments:unsettled.length,
    settled_origins_excluded:inspected.length-unsettled.length,
@@ -122,6 +156,11 @@ export function buildEmployeeResponsibilityAudit({
   weekly_source_inspected:weekly.length,
   included_employee_roles:roles.length,
   role_audits:Object.freeze(roles),
+  business_launch_readiness:'NOT_VERIFIED_FROM_CONNECTED_EVIDENCE',
+  launch_decision_authorized:false,
+  standing_discovery_roles_defined:roles.length,
+  standing_discovery_is_execution:false,
+  recurring_discovery_worker_auto_wake_verified:false,
   capability_audit_receipt:capabilityAudit?.audit_id||null,
   capability_opportunities_independently_reviewed:
    capabilityAudit?.candidates?.length??0,
