@@ -36,6 +36,16 @@ function panel(){
  }
  const proof=get('realityChatPanelProof');
  if(proof&&p.parentNode!==proof)proof.append(p);
+ else if(!proof&&p.parentNode===host&&
+     host.id==='privateReady'&&
+     typeof host.insertBefore==='function'){
+  // Current Chat uses the authenticated privateReady container rather than
+  // the legacy proof tab. Put exact verified work beside the mission, where
+  // the owner can actually see the independent evidence and consent action.
+  const banner=get('privateAccountMissionBanner');
+  const before=banner?.parentNode===host?banner.nextSibling:host.firstChild;
+  if(before!==p)host.insertBefore(p,before||null);
+ }
  return p;
 }
 function safe(d){
