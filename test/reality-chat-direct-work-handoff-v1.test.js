@@ -163,7 +163,7 @@ test('preview only: saved intake feeds direct work and never mistakes Chat text 
  assert.match(ui,/reality:chat-intake-saved/);
  assert.match(ui,/PROCESS_SIGNED_WORK_REQUEST/);
  assert.match(ui,/duplicate_content===true/);
- assert.match(ui,/INSPECT_VERIFIED_WORK/);
+ assert.match(ui,/READ_SIGNED_NEW_DEVELOPMENT_STATUS/);
  assert.match(endpoint,/processSignedSavedChatWork/);
  assert.match(adapter,/readOwnerNewDevelopment/);
  assert.match(worker,/generateNextSignedChatDevelopmentDraft/);
