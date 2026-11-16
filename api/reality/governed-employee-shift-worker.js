@@ -1220,6 +1220,13 @@ export default async function handler(req,res){
   const chatWorkHandoff=await chatWorkPromise;
   workerStage='GENERAL_ORIGINAL_FENCED_MODEL_INVESTIGATION';
   const fencedOriginalInvestigation=await fencedOriginalInvestigationPromise;
+  // A model result belongs to the same original across all later wakes,
+  // even after its one-time model lease has been consumed.
+  const fencedOriginalInvestigationState=await shiftRpc(db,
+   'reality_read_general_original_fenced_investigation_state_v1',{})
+   .catch(()=>({status:'FENCED_ORIGINAL_READBACK_UNVERIFIED',
+     independently_tested:false,external_retry_authorized:false,
+     original_job_completed:false,production_changed:false}));
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -1245,7 +1252,12 @@ export default async function handler(req,res){
      'GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED';
    const autonomousRecoveryDiagnosisReady=
     fencedOriginalInvestigation?.status===
-     'FENCED_ORIGINAL_RILEY_MODEL_HYPOTHESIS_RECORDED';
+     'FENCED_ORIGINAL_RILEY_MODEL_HYPOTHESIS_RECORDED'||
+    (fencedOriginalInvestigationState?.status===
+     'FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED'&&
+     fencedOriginalInvestigationState.original_job_completed===false&&
+     fencedOriginalInvestigationState.independently_tested===false&&
+     fencedOriginalInvestigationState.external_retry_authorized===false);
    const outcomeCode=autonomousRecoveryDiagnosisReady?
     'FENCED_RILEY_DIAGNOSIS_RECORDED_INDEPENDENT_REPAIR_TEST_REQUIRED':
     originalInstallNeedsRecovery?
@@ -1327,6 +1339,7 @@ export default async function handler(req,res){
     generalized_original_approved_install:generalOriginalInstall,
     generalized_original_final_settlement:generalOriginalSettlement,
     generalized_original_fenced_investigation:fencedOriginalInvestigation,
+    generalized_original_fenced_investigation_state:fencedOriginalInvestigationState,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
