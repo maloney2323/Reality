@@ -113,10 +113,29 @@ function validScope(x){
 }
 async function reconcile(token,base,key,scope,head){
  const expected=scope.expected_parent_commit_sha;
- if(!SHA.test(expected||'')||head===expected)
+ if(!SHA.test(expected||''))
   return safe('GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED',{
    original_work_id:scope.original_work_id,installation_authorized:true,
    next_gate:'WAIT_FOR_EXACT_PROVIDER_READBACK_OR_CONTROLLED_RECOVERY'});
+ if(head===expected){
+  // Read-only diagnostic against the SAME runtime GitHub credential.
+  // A passing inert Contents canary does not prove the Git Data API
+  // commit/ref path is writable. NEVER probe with a POST or PATCH here.
+  try{
+   const repository=await gh(token,'');
+   const permission=repository.ok&&repository.data?.permissions?.push===true?
+    'RUNTIME_REPO_PUSH_PERMISSION_CONFIRMED':
+    repository.ok?'RUNTIME_REPO_PUSH_PERMISSION_NOT_CONFIRMED':
+    'RUNTIME_REPO_METADATA_READ_UNAVAILABLE';
+   console.info('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY',permission,
+    Number.isInteger(repository.status)?repository.status:0);
+  }catch{
+   console.warn('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY','PROBE_UNAVAILABLE');
+  }
+  return safe('GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED',{
+   original_work_id:scope.original_work_id,installation_authorized:true,
+   next_gate:'WAIT_FOR_EXACT_PROVIDER_READBACK_OR_CONTROLLED_RECOVERY'});
+ }
  const commit=await gh(token,'/commits/'+head);
  const source=await checkedSource(token,scope.target_path,head);
  if(!commit.ok||!Array.isArray(commit.data?.parents)||
