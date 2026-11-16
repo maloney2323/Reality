@@ -44,6 +44,131 @@
  panel.hidden=false;
  description.textContent='Chat work status · Check an existing saved build instruction. No new message, shift or installation is created by looking it up.';
  container.insertBefore(panel,composer);
+ const transcript=document.getElementById('privateTranscript');
+ let activeRef=null,activePhase=null,verifiedComplete=false;
+ const phaseOrder=['QUEUED','DRAFT_GENERATED','CANDIDATE_STAGED','CI_VERIFIED'];
+ const steps=['Saved instruction admitted to original work',
+  'AI generated a source-code proposal',
+  'Real source committed to isolated GitHub draft PR',
+  'Independent source/syntax CI receipt recorded',
+  'Functional acceptance, exact installation and final settlement'];
+ function inlineWork(ref,message,result=null){
+  if(!transcript||!UUID.test(ref?.request_id||'')||
+     window.realityActiveConversationId?.()!==ref.conversation_id)
+   return null;
+  const nodes=Array.from(transcript.children||[]);
+  let card=nodes.find(n=>n.dataset?.realityBuildRequest===ref.request_id);
+  if(!card){
+   card=document.createElement('section');
+   card.className='bubble reality-chat-live-work';
+   card.dataset.realityBuildRequest=ref.request_id;
+   card.setAttribute('role','status');
+   card.setAttribute('aria-live','polite');
+   card.style.cssText='margin:12px 0;border:1px solid #5284a5;border-radius:14px;padding:15px;max-width:100%;overflow-wrap:anywhere;background:#0d263b';
+   const source=nodes.find(n=>n.dataset?.requestId===ref.request_id&&
+    n.classList?.contains('user'));
+   if(source&&typeof source.after==='function')source.after(card);
+   else transcript.append(card);
+  }
+  card.replaceChildren();
+  const head=document.createElement('div');
+  head.className='label';head.textContent='REALITY · LIVE GOVERNED WORK';
+  const detail=document.createElement('p');
+  detail.textContent=String(message||'Reading exact saved work evidence…');
+  detail.style.cssText='margin:8px 0;white-space:pre-wrap';
+  const timeline=document.createElement('div');
+  timeline.style.cssText='display:grid;gap:7px;margin:12px 0;font-size:13px';
+  const actions=document.createElement('div');
+  actions.style.cssText='display:flex;gap:9px;flex-wrap:wrap;margin-top:12px';
+  const label=document.createElement('div');
+  label.style.cssText='font-size:12px;opacity:.86';
+  const work=result?.original_work_id;
+  label.textContent=WORK.test(work||'')?work:
+   'Original work ID will appear only after durable admission';
+  card.append(head,label,detail,timeline,actions);
+  if(result){
+   const phase=result.development_phase||(
+    result.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED'?'DRAFT_GENERATED':
+    result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED'?'CANDIDATE_STAGED':
+    result.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED'?'CI_VERIFIED':null);
+   const idx=phaseOrder.indexOf(phase);
+   for(let i=0;i<steps.length;i++){
+    const row=document.createElement('div');
+    let mark=i<4&&idx>=i?'✓':'○';
+    if(i===4&&verifiedComplete)mark='✓';
+    row.textContent=mark+' '+steps[i];
+    row.style.opacity=mark==='✓'?'1':'.70';
+    timeline.append(row);
+   }
+   const url=result.pr_url;
+   if(/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(url||'')){
+    const link=document.createElement('a');link.href=url;
+    link.target='_blank';link.rel='noopener noreferrer';
+    link.textContent='Open actual GitHub code and tests';
+    link.style.cssText='color:#9edfff;text-decoration:underline;min-height:40px';
+    actions.append(link);
+   }
+   if(idx>=3&&!verifiedComplete){
+    const note=document.createElement('p');
+    note.style.cssText='font-size:12px;margin:5px 0;opacity:.85';
+    note.textContent='Source/syntax checks are not installation or full-job acceptance. Final completion and economic savings remain unverified until independent settlement.';
+    card.append(note);
+   }
+  }
+  panel.hidden=true;panel.style.display='none';
+  activeRef=ref;
+  return {card,detail,timeline,actions};
+ }
+ async function readFinalCompletion(ref,workId){
+  if(!WORK.test(workId||''))return false;
+  try{
+   const response=await fetch('/api/reality/personal-genuine-loop-status',{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(18000)});
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.status!=='OWNER_GOVERNED_LOOP_READBACK'||
+      data.production_changed!==false||
+      data.external_action_performed!==false||
+      !Array.isArray(data.jobs)||data.jobs.length>12||
+      !Array.isArray(data.independent_final_receipts)||
+      data.independent_final_receipts.length>12)
+    return false;
+   const job=data.jobs.find(j=>j.original_work_id===workId&&
+     j.independently_settled===true&&j.universe_settlement_verified===true);
+   const receipt=data.independent_final_receipts.find(r=>
+    r.original_work_id===workId&&
+    r.status==='FULL_LOOP_INDEPENDENTLY_VERIFIED'&&
+    /^[a-f0-9]{64}$/.test(r.artifact_sha256||'')&&
+    /^[a-f0-9]{40}$/.test(r.installed_commit_sha||'')&&
+    /^[0-9a-f-]{36}$/i.test(r.settlement_event_id||'')&&
+    Number.isSafeInteger(r.provider_run_id)&&r.provider_run_id>0&&
+    r.production_changed===false);
+   if(!job||!receipt)return false;
+   verifiedComplete=true;
+   const proof={status:'CHAT_WORK_NEW_DEVELOPMENT_VERIFIED_FINAL',
+    original_work_id:workId,development_phase:'CI_VERIFIED',
+    independent_ci_verified:true,pr_url:null};
+   const ui=inlineWork(ref,
+    'VERIFIED CUSTOMER JOB COMPLETED. Reality independently read back the original-job settlement and final receipt. It did not infer completion from the model or CI alone.',proof);
+   if(ui){
+    const a=document.createElement('a');
+    a.href='/api/reality/personal-genuine-final-receipt-pdf?work_id='+
+      encodeURIComponent(workId);
+    a.textContent='Download independently verified final receipt (PDF)';
+    a.style.cssText='color:#9edfff;text-decoration:underline;padding:10px 0';
+    ui.actions.append(a);
+    const b=document.createElement('a');b.href='/value';
+    b.textContent='View verified value and ROI evidence';
+    b.style.cssText='color:#9edfff;text-decoration:underline;padding:10px 0';
+    ui.actions.append(b);
+    const note=document.createElement('p');
+    note.textContent='Realized cash savings, human hours returned and drift reduction: not verified unless separately measured.';
+    note.style.cssText='font-size:12px;opacity:.85;margin:5px 0';
+    ui.card.append(note);
+   }
+   return true;
+  }catch{return false}
+ }
  function renderTimeline(result){
   const phase=result?.development_phase||(
    result?.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED'?'DRAFT_GENERATED':
@@ -189,22 +314,25 @@
      !['QUEUED','DRAFT_GENERATED','PUBLISH_FENCED','CANDIDATE_STAGED']
        .includes(admitted.development_phase||''))
    return admitted;
-  description.textContent=explain(admitted)+
+  const stageMessage=explain(admitted)+
    ' Reality is advancing the exact signed job through its guarded worker…';
+  if(!inlineWork(ref,stageMessage,admitted))description.textContent=stageMessage;
   const first=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
   if(first.original_work_id!==admitted.original_work_id)
    throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
   if(first.status!=='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED')
    return first;
-  description.textContent=explain(first)+
+  const draftMessage=explain(first)+
    ' Checking the existing isolated GitHub publisher for this exact job…';
+  if(!inlineWork(ref,draftMessage,first))description.textContent=draftMessage;
   const second=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
   if(second.original_work_id!==first.original_work_id)
    throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
   if(second.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED'){
    showCheckedResult(second,ref);
-   description.textContent=explain(second)+
+   const ciMessage=explain(second)+
     ' Independent GitHub CI is now being checked and reconciled…';
+   if(!inlineWork(ref,ciMessage,second))description.textContent=ciMessage;
    const checked=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
    if(checked.original_work_id!==second.original_work_id)
     throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
@@ -213,9 +341,12 @@
   return second;
  }
  function showCheckedResult(result,ref){
-  show(explain(result),true,ref);
-  renderTimeline(result);
-  renderPrLink(result);
+  const inline=inlineWork(ref,explain(result),result);
+  if(!inline){
+   show(explain(result),true,ref);
+   renderTimeline(result);
+   renderPrLink(result);
+  }
   const phase=result?.development_phase;
   const pending=result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED'&&
     result.worker_status==='CHAT_NEW_DEV_INDEPENDENT_SOURCE_CI_PENDING';
@@ -250,7 +381,10 @@
      '. The saved work is preserved. Inspect its status; do not resend or approve another shift.';
    }finally{btn.disabled=false}
   };
-  actions.append(btn);
+  (inline?.actions||actions).append(btn);
+  if(result?.development_phase==='CI_VERIFIED'||
+     result?.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED')
+   void readFinalCompletion(ref,result.original_work_id);
  }
  // The durable signed history is looked up by an explicit user click.
  // Do not depend on page-load CustomEvents, event timing or old Chat bubbles.
