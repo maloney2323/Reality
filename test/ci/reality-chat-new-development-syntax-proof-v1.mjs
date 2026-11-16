@@ -1,6 +1,6 @@
 // Independent GitHub Actions source-patch acceptance. No model content is
 // imported or run; no credentials or installation APIs are available.
-// The only PR file permitted is an inert evidence JSON proposal.
+// Only one bounded source file and its corresponding evidence JSON are permitted.
 import {readFileSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -17,18 +17,21 @@ if(!SHA.test(BASE_SHA||'')||!SHA.test(HEAD_SHA||'')||
  fail('EXACT_GITHUB_PR_SOURCE_REQUIRED');
 const changed=execFileSync('git',['diff','--name-only',BASE_SHA,HEAD_SHA],{
  encoding:'utf8',maxBuffer:400000}).trim().split('\n').filter(Boolean);
-if(changed.length!==1||!/^evidence\/reality-chat-development\/[a-f0-9-]{36}\.json$/.test(changed[0]))
- fail('ONLY_INERT_DRAFT_EVIDENCE_PERMITTED');
-const artifact=JSON.parse(readFileSync(changed[0],'utf8'));
+if(changed.length!==2)
+ fail('ONLY_ONE_SOURCE_PATCH_AND_EXACT_EVIDENCE_PERMITTED');
+const evidencePath=changed.find(x=>/^evidence\/reality-chat-development\/[a-f0-9-]{36}\.json$/.test(x));
+if(!evidencePath)fail('EXACT_SIGNED_EVIDENCE_MISSING');
+const artifact=JSON.parse(readFileSync(evidencePath,'utf8'));
 const path=artifact.candidate?.target_path;
 const a=artifact.candidate;
-const uuid=changed[0].split('/').at(-1).replace('.json','');
+const uuid=evidencePath.split('/').at(-1).replace('.json','');
 if(!ID.test(uuid)||artifact.message_id!==uuid||
  PR_HEAD_BRANCH!=='reality/chat-development/'+uuid||
  artifact.version!=='reality-chat-new-development-candidate-v1'||
  !WORK.test(artifact.original_work_id||'')||
  !SHA.test(artifact.base_sha||'')||
  !PATH.test(path||'')||path.includes('..')||path.includes('//')||
+ !changed.includes(path)||
  !SHA.test(a?.source_blob_sha||'')||
  !SHA.test(a?.base_sha||'')||a.base_sha!==artifact.base_sha||
  typeof a.find!=='string'||a.find.length<20||a.find.length>12000||
@@ -42,8 +45,19 @@ if(!ID.test(uuid)||artifact.message_id!==uuid||
  fail('INERT_DRAFT_OR_ORIGINAL_IDENTITY_INVALID');
 const parent=execFileSync('git',['rev-list','--parents','-n','1',HEAD_SHA],{
  encoding:'utf8'}).trim().split(' ');
-if(parent.length!==2||parent[1]!==artifact.base_sha)
+if(parent.length!==2||!SHA.test(parent[1]))
  fail('CANDIDATE_PARENT_SOURCE_CHANGED');
+const first=parent[1];
+const prior=execFileSync('git',['rev-list','--parents','-n','1',first],{
+ encoding:'utf8'}).trim().split(' ');
+if(prior.length!==2||prior[1]!==artifact.base_sha)
+ fail('CANDIDATE_PARENT_SOURCE_CHANGED');
+const newCodeFiles=execFileSync('git',['diff-tree','--no-commit-id',
+ '--name-only','-r',first],{encoding:'utf8'}).trim();
+const evidenceFiles=execFileSync('git',['diff-tree','--no-commit-id',
+ '--name-only','-r',HEAD_SHA],{encoding:'utf8'}).trim();
+if(newCodeFiles!==path||evidenceFiles!==evidencePath)
+ fail('ISOLATED_PATCH_COMMITS_HAVE_WRONG_FILES');
 const blob=execFileSync('git',['show',artifact.base_sha+':'+path],{
  maxBuffer:350000});
 if(blob.length<100||blob.length>250000)
@@ -60,6 +74,9 @@ const next=original.slice(0,at)+a.replace+
 if(next===original||Buffer.byteLength(next,'utf8')>280000||
  next.includes('\0'))
  fail('MODEL_GENERATED_SOURCE_INVALID');
+const actual=execFileSync('git',['show',HEAD_SHA+':'+path],{maxBuffer:350000});
+if(!actual.equals(Buffer.from(next,'utf8')))
+ fail('STAGED_CODE_NOT_EQUAL_TO_VERIFIED_SIGNED_PATCH');
 if(path.endsWith('.js')){
  const folder=mkdtempSync(join(tmpdir(),'reality-chat-dev-syntax-'));
  const filename=join(folder,'proposal.mjs');
@@ -71,7 +88,7 @@ if(path.endsWith('.js')){
 }else{
  if(next.length<100||next.includes('\0'))fail('NON_JS_SOURCE_UNVERIFIED');
 }
-console.log('INDEPENDENT_CHAT_NEW_DEVELOPMENT_SOURCE_AND_SYNTAX_ACCEPTED');
+console.log('INDEPENDENT_CHAT_NEW_DEVELOPMENT_STAGED_SOURCE_AND_SYNTAX_ACCEPTED');
 console.log(JSON.stringify({
  original_work_id:artifact.original_work_id,head_sha:HEAD_SHA,
  source_blob_verified:true,model_code_executed:false,
