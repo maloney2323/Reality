@@ -13,14 +13,15 @@ const get=id=>document.getElementById(id);
 const add=(kind,parent,value)=>{const e=document.createElement(kind);
  if(value)e.textContent=value;parent.append(e);return e;};
 function panel(){
- const host=get('realityChatPanelProof')||get('chat')||get('privateReady');
+ const host=get('realityChatConversation')||get('privateReady');
  if(!host)return null;
  let p=get('generalizedOriginalInstallReviewPanel');
  if(!p){
   p=add('section',host);p.id='generalizedOriginalInstallReviewPanel';
-  p.className='team-proof';p.hidden=true;
+  p.className='team-proof bubble reality-chat-live-work';p.hidden=true;
+  p.style.cssText='margin:12px 0;padding:16px;border:1px solid #5284a5;border-radius:14px;background:#0d263b;max-width:100%;overflow-wrap:anywhere';
   p.setAttribute('aria-live','polite');
-  add('h4',p,'Verified original repair · release readiness');
+  add('h4',p,'Reality · your decision is needed');
   add('p',p).id='generalizedOriginalInstallReviewStatus';
   add('p',p).id='generalizedOriginalInstallReviewArtifact';
   add('p',p).id='generalizedOriginalInstallReviewGates';
@@ -34,17 +35,18 @@ function panel(){
    'Reality does not install a repair or settle an original job from a passing model answer or CI check. The exact owner approval must follow independent release-continuation readiness.');
   warning.style.fontSize='13px';
  }
- const proof=get('realityChatPanelProof');
- if(proof&&p.parentNode!==proof)proof.append(p);
- else if(!proof&&p.parentNode===host&&
-     host.id==='privateReady'&&
-     typeof host.insertBefore==='function'){
-  // Current Chat uses the authenticated privateReady container rather than
-  // the legacy proof tab. Put exact verified work beside the mission, where
-  // the owner can actually see the independent evidence and consent action.
+ // The actual Chat conversation is the first view on desktop and mobile.
+ // Keep this as an inline, evidence-bound Reality message beside the thread,
+ // not inside the default-hidden Proof inspector or a floating dialog.
+ const thread=get('privateTranscript');
+ if(host.id==='realityChatConversation'&&thread?.parentNode===host){
+  if(p.parentNode!==host||p.nextSibling!==thread)host.insertBefore(p,thread);
+ }else if(host.id==='privateReady'){
+  // Fallback for layouts that do not mount the premium Chat workspace.
   const banner=get('privateAccountMissionBanner');
   const before=banner?.parentNode===host?banner.nextSibling:host.firstChild;
-  if(before!==p)host.insertBefore(p,before||null);
+  if(p.parentNode!==host||(banner&&p.previousSibling!==banner))
+   host.insertBefore(p,before||null);
  }
  return p;
 }
