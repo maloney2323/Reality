@@ -23,7 +23,8 @@ async function rpc(url,key,name,input={}){
        'reality_claim_general_original_push_probe_v1',
        'reality_record_general_original_push_provider_v1',
        'reality_record_general_original_push_ci_v1',
-       'reality_record_general_original_pr_acceptance_v2'].includes(name))
+       'reality_record_general_original_pr_acceptance_v2',
+       'reality_attest_general_original_preinstall_contract_v1'].includes(name))
   bad('RPC_NOT_ALLOWLISTED');
  const r=await fetch(url+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -87,12 +88,40 @@ async function main(){
    const scope=await rpc(u.origin,key,'reality_read_general_original_push_probe_v1');
    if(scope.status==='NO_CURRENT_AUTHORIZED_PUSH_PROBE')return clean(scope.status);
    if(!scoped(scope))bad('CURRENT_OWNER_ORIGINAL_SCOPE_DRIFT');
-   if(scope.status==='EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED')
+   if(scope.status==='EXACT_ISOLATED_PR_SYNC_INDEPENDENTLY_VERIFIED'){
+    // Existing signed employee wake: reconcile the independent frozen CI,
+    // distinct source integration CI, owner warrant, GitHub/Vercel transport,
+    // and original acceptance-contract receipts. This makes the already
+    // tested candidate REVIEWABLE, never approved or installed.
+    let contract=null;
+    try{
+     contract=await rpc(u.origin,key,
+      'reality_attest_general_original_preinstall_contract_v1');
+    }catch{/* Missing/contradictory evidence keeps the owner gate closed. */}
+    const ready=contract?.status===
+      'GENERAL_ORIGINAL_PREINSTALL_CONTRACT_INDEPENDENTLY_ATTESTED'&&
+     contract.original_work_id===scope.original_work_id&&
+     contract.attempt_id===scope.attempt_id&&
+     contract.shift_id===scope.shift_id&&
+     contract.owner_approval_ready===true&&
+     contract.owner_approval_recorded===false&&
+     contract.installation_authorized===false&&
+     contract.source_installed===false&&
+     contract.original_job_completed===false&&
+     contract.production_changed===false&&
+     contract.new_shift_started===false&&
+     /^sha256:[a-f0-9]{64}$/.test(contract.evidence_sha256||'');
     return clean(scope.status,{original_work_id:scope.original_work_id,
       github_commit_sha:scope.github_commit_sha,push_ci_run_id:scope.push_ci_run_id,
       acceptance_event:scope.accepted_event,
       acceptance_pr_number:scope.acceptance_pr_number,
-      independent_pr_sync_acceptance_verified:scope.accepted_event==='pull_request'});
+      independent_pr_sync_acceptance_verified:scope.accepted_event==='pull_request',
+      preinstall_contract_status:ready?
+        'EXACT_ORIGINAL_PREINSTALL_CONTRACT_INDEPENDENTLY_ATTESTED':
+        'EXACT_ORIGINAL_PREINSTALL_CONTRACT_NOT_YET_VERIFIED',
+      owner_approval_ready:ready,
+      ...(ready?{preinstall_contract_evidence_sha256:contract.evidence_sha256}:{})});
+   }
    if(scope.status==='EXACT_ISOLATED_PUSH_FENCED_OR_UNVERIFIED')
     return clean('ONE_SHOT_GITHUB_PUSH_EFFECT_UNVERIFIED_NO_RETRY');
    const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
