@@ -244,3 +244,43 @@ test('missing authenticated Chat DOM cannot set the direct-work installed flag',
  runInNewContext(code,{window,document:{getElementById:()=>null}});
  assert.notEqual(window.realityChatDirectWorkEnabled,true);
 });
+
+
+test('existing authenticated saved instruction is never re-executed on page load, only resumed by owner click',async()=>{
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ const events=new Map(),writes=[];
+ function element(){
+  return {hidden:false,style:{},textContent:'',parentElement:null,children:[],
+   setAttribute(){},append(...nodes){this.children.push(...nodes)},
+   replaceChildren(){this.children=[]},insertBefore(node){this.children.push(node)}};
+ }
+ const container=element(),composer=element();composer.parentElement=container;
+ const window={location:{pathname:'/chat'},
+  addEventListener(name,fn){events.set(name,fn)}};
+ runInNewContext(code,{window,document:{
+  getElementById:id=>id==='privateReady'?container:
+   id==='realityChatComposer'?composer:null,
+  createElement:element
+ },fetch:async(url,options)=>{
+  writes.push(JSON.parse(options.body));
+  return {ok:true,json:async()=>({ok:true,
+   status:'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   request_id:requestId,source_ref,original_work_id:workId,
+   installation_authorized:false,production_changed:false})};
+ },AbortSignal});
+ const details={conversation_id:conversationId,messages:[
+  {role:'user',request_id:requestId,source_ref,
+   created_at:new Date().toISOString()}]};
+ events.get('reality:saved-chat-readback')({detail:details});
+ assert.equal(writes.length,0,'authenticated history never auto-runs work');
+ const panel=container.children[0];
+ assert.equal(panel.hidden,false);
+ const buttons=panel.children[2].children;
+ assert.equal(buttons.length,2);
+ assert.match(buttons[1].textContent,/Continue this saved instruction/);
+ await buttons[1].onclick();
+ assert.equal(writes.length,1);
+ assert.equal(writes[0].action,'PROCESS_SIGNED_WORK_REQUEST');
+ assert.equal(writes[0].request_id,requestId);
+ assert.equal(writes[0].conversation_id,conversationId);
+});
