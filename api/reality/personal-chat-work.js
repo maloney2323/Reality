@@ -5,9 +5,9 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {readPrivateChat,validUuid}
  from '../../src/reality-private-chat-store-v0.1.js';
-import {inspectSavedChatWork,authorizeSavedChatExistingOriginal,continueVerifiedChatEngineering,authorizeSavedChatNewDevelopment,processSignedSavedChatWork}
+import {inspectSavedChatWork,authorizeSavedChatExistingOriginal,continueVerifiedChatEngineering,authorizeSavedChatNewDevelopment,processSignedSavedChatWork,advanceSignedChatDevelopment}
  from '../../src/reality-saved-chat-work-adapter-v1.js';
-export const maxDuration=60;
+export const maxDuration=180;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  try{
@@ -31,11 +31,13 @@ export default async function handler(req,res){
    return res.status(400).json({ok:false,error:'CHAT_WORK_EXACT_SOURCE_INVALID'});
   if(!['INSPECT_VERIFIED_WORK','AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY',
       'CONTINUE_VERIFIED_SCOPED_ENGINEERING','ADMIT_SIGNED_NEW_DEVELOPMENT',
-      'PROCESS_SIGNED_WORK_REQUEST'].includes(action))
+      'PROCESS_SIGNED_WORK_REQUEST','ADVANCE_SIGNED_NEW_DEVELOPMENT'].includes(action))
    return res.status(400).json({ok:false,error:'CHAT_WORK_ACTION_UNSUPPORTED'});
   const {messages}=await readPrivateChat(session,conversationId);
   const args={session,conversationId,requestId,messages};
-  const result=action==='PROCESS_SIGNED_WORK_REQUEST'?
+  const result=action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?
+   await advanceSignedChatDevelopment(args):
+   action==='PROCESS_SIGNED_WORK_REQUEST'?
    await processSignedSavedChatWork(args):
    action==='INSPECT_VERIFIED_WORK'?
    await inspectSavedChatWork(args):
@@ -44,6 +46,8 @@ export default async function handler(req,res){
    action==='CONTINUE_VERIFIED_SCOPED_ENGINEERING'?
    await continueVerifiedChatEngineering(args):
    await authorizeSavedChatNewDevelopment(args);
+  // An exact, signed owner development advancement returns its true worker
+  // state; it does not imply preview installation or production authority.
   // A non-actionable signed message remains an inspected conversation, not
   // a claimed build or a job authorization.
   const transition=action==='PROCESS_SIGNED_WORK_REQUEST'&&
