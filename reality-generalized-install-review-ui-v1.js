@@ -262,9 +262,11 @@ async function refresh(){
   ];
   get('generalizedOriginalInstallReviewGates').textContent=
    gates.map(([name,ok])=>(ok?'Verified: ':'Not yet independently verified: ')+name).join(' · ')+
-   (d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'&&d.owner_approval_ready?
+   (actionableRecovery(d)?
+    ' · A separate one-use recovery approval is now needed because the first installation fence was consumed':
+    d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'&&d.owner_approval_ready?
     ' · Ready for exact owner decision through Reality governance':
-    ' · No additional approval required or currently available');
+    ' · No additional installation authorization currently available');
   const links=get('generalizedOriginalInstallReviewEvidence');
   links.replaceChildren();
   evidenceLink(links,'Original source',d.source_ref);
