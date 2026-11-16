@@ -20,10 +20,12 @@ test('owner review API is strictly GET, same signed-in owner and isolated servic
 });
 test('owner proof UI exposes evidence and the separately authenticated one-click action only after all gates',()=>{
  assert.match(html,/reality-generalized-install-review-ui-v1\.js/);
- // The real thread, not a default-hidden inspector, owns the exact owner decision.
- assert.match(ui,/const host=get\('realityChatConversation'\)\|\|get\('privateReady'\)/);
- assert.match(ui,/host\.insertBefore\(p,thread\)/);
+ // The real scrollable transcript owns the exact decision, not a
+ // flex sibling that the mobile overflow:hidden shell would clip.
+ assert.match(ui,/const host=get\('privateTranscript'\)\|\|get\('privateReady'\)/);
+ assert.match(ui,/if\(p.parentNode!==host\)host.append\(p\)/);
  assert.match(ui,/p\.className='team-proof bubble reality-chat-live-work'/);
+ assert.doesNotMatch(ui,/host\.insertBefore\(p,thread\)/);
  assert.doesNotMatch(ui,/const host=get\('realityChatPanelProof'\)/);
  assert.match(ui,/privateAccountMissionBanner/);
  assert.match(ui,/host\.insertBefore\(p,before\|\|null\)/);
