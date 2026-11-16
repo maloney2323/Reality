@@ -15,6 +15,10 @@ test('owner review API is strictly GET, same signed-in owner and isolated servic
  assert.match(api,/r\.same_original_execution_and_settlement_contract_verified===true/);
  assert.match(api,/r\.approval_receipt_id===null/);
  assert.match(api,/no_installation_effect_by_get:true/);
+ assert.match(api,/recovery_diagnosis:recovery/);
+ assert.match(api,/reality_read_general_original_fenced_investigation_state_v1/);
+ assert.match(api,/diagnosis.original_work_id===r.original_work_id/);
+ assert.match(api,/diagnosis.external_retry_authorized===false/);
  assert.doesNotMatch(api,/create.*[Ii]nstall|owner_approve_native263|OWNER_APPROVED_EXACT/);
  assert.match(api,/private, no-store/);
 });
@@ -35,6 +39,9 @@ test('owner proof UI exposes evidence and the separately authenticated one-click
  assert.match(ui,/owner_approval_action_available===true/);
  assert.match(ui,/approveExactFromUserClick/);
  assert.match(ui,/generalizedOriginalInstallApproveExactButton/);
+ assert.match(ui,/generalizedOriginalInstallRecoveryUpdate/);
+ assert.match(ui,/FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED/);
+ assert.match(ui,/Independent repair testing is still required/);
  assert.match(ui,/GENERAL_ORIGINAL_FINAL_RELEASE_CONTINUATION_NOT_READY|same_original_execution_and_settlement_contract_verified===true/);
  assert.match(ui,/independent_frozen_run_id/);
  assert.match(ui,/integrated_test_run_id/);
@@ -79,6 +86,9 @@ test('one-use install and independent settlement remain separate workers and fen
   import.meta.url),'utf8');
  assert.match(worker,/continueGeneralOwnerApprovedOriginalInstall/);
  assert.match(worker,/GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT/);
+ assert.match(worker,/fencedOriginalInvestigationState/);
+ assert.match(worker,/FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED/);
+ assert.match(worker,/FENCED_RILEY_DIAGNOSIS_RECORDED_INDEPENDENT_REPAIR_TEST_REQUIRED/);
  assert.match(worker,/originalInstallNeedsRecovery\?/);
  assert.match(worker,/settleGeneralOwnerApprovedOriginal/);
  assert.match(installer,/reality_claim_general_original_install_v1/);
