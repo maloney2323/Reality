@@ -107,6 +107,10 @@ function validScope(x){
   SHA.test(x.expected_installed_blob_sha||'')&&
   HASH.test(x.candidate_artifact_sha256||'')&&
   x.expected_preinstall_blob_sha!==x.expected_installed_blob_sha&&
+  // A missing pinned parent cannot be reported as a verified no-effect
+  // recovery after the one-use GitHub write has been durably claimed.
+  (x.phase==='OWNER_APPROVED'||
+   SHA.test(x.expected_parent_commit_sha||''))&&
   x.installation_authorized===true&&
   x.original_job_completed===false&&x.production_changed===false&&
   ['OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED','DEPLOYMENT_VERIFIED']
@@ -115,9 +119,7 @@ function validScope(x){
 async function reconcile(token,base,key,scope,head){
  const expected=scope.expected_parent_commit_sha;
  if(!SHA.test(expected||''))
-  return safe('GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED',{
-   original_work_id:scope.original_work_id,installation_authorized:true,
-   next_gate:'WAIT_FOR_EXACT_PROVIDER_READBACK_OR_CONTROLLED_RECOVERY'});
+  fail('FENCED_EXPECTED_PARENT_COMMIT_SHA_NOT_VERIFIED');
  if(head===expected){
   // Read-only diagnostic against the SAME runtime GitHub credential.
   // A passing inert Contents canary does not prove the Git Data API
