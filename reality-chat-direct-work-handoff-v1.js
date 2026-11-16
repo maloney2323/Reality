@@ -66,7 +66,7 @@
   const response=await fetch('/api/reality/personal-chat-work',{
    method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'content-type':'application/json'},
-   signal:AbortSignal.timeout(65000),
+   signal:AbortSignal.timeout(action==='ADVANCE_SIGNED_NEW_DEVELOPMENT'?185000:65000),
    body:JSON.stringify({action,conversation_id:ref.conversation_id,
     request_id:ref.request_id})
   });
@@ -84,6 +84,28 @@
  function explain(result){
   const id=WORK.test(result.original_work_id||'')?
    result.original_work_id:null;
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED')
+   return 'REAL CODE DRAFT RECORDED for '+id+
+    ' · Source file: '+String(result.source_path||'verified candidate source')+
+    '. This is model-written proposed code, not installed or independently accepted.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED')
+   return 'GITHUB CANDIDATE STAGED for '+id+
+    ' · '+String(result.pr_url||'Draft PR available from development evidence')+
+    '. Independent CI still needs to be checked; no installation or customer-job completion is claimed.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED')
+   return 'INDEPENDENT SOURCE/SYNTAX CI VERIFIED for '+id+
+    ' · Commit '+String(result.artifact_commit_sha||'not supplied')+
+    ', CI run '+String(result.ci_run_id||'not supplied')+
+    '. This is NOT feature acceptance and no model code was installed or run.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED'||
+     result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED')
+   return 'REAL BUILD BLOCKER for '+id+': '+String(result.worker_status||'UNKNOWN')+
+    '. No successful code generation, PR, or installation is claimed without evidence.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_NOT_CURRENT')
+   return 'This source-backed build '+id+' is awaiting its turn in the existing governed candidate queue. No other owner work was advanced.';
+  if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_TERMINAL_OR_BLOCKED')
+   return 'Saved build '+id+' is in '+String(result.development_phase||'unknown')+
+    '. Exact readback required before further work.';
   if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK')
    return 'Build admitted and independently read back: '+id+
     '. The existing signed worker can now draft code, stage an isolated candidate and run independent CI. Execution, installation and completion are NOT yet verified.';
@@ -113,6 +135,56 @@
    return 'Original '+id+' has CI evidence and awaits its separate exact installation decision.';
   return 'Saved work decision: '+String(result.status||'UNVERIFIED').replaceAll('_',' ')+
    '. No completed job or installation is inferred.';
+ }
+ // One owner gesture may request consecutive independent, bounded
+ // development transitions. Each server step reauthenticates the same
+ // signed user source and reads the exact persisted job again.
+ async function processAndAdvance(ref){
+  const admitted=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
+  if(!['CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   'CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'].includes(admitted.status))
+   return admitted;
+  if(admitted.status==='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'&&
+     !['QUEUED','DRAFT_GENERATED','PUBLISH_FENCED','CANDIDATE_STAGED']
+       .includes(admitted.development_phase||''))
+   return admitted;
+  description.textContent=explain(admitted)+
+   ' Reality is advancing the exact signed job through its guarded worker…';
+  const first=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
+  if(first.original_work_id!==admitted.original_work_id)
+   throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
+  if(first.status!=='CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED')
+   return first;
+  description.textContent=explain(first)+
+   ' Checking the existing isolated GitHub publisher for this exact job…';
+  const second=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
+  if(second.original_work_id!==first.original_work_id)
+   throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
+  return second;
+ }
+ function showCheckedResult(result,ref){
+  show(explain(result),true,ref);
+  if(['CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED',
+   'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED'].includes(result.status)){
+   const b=document.createElement('button');
+   b.type='button';
+   b.textContent='Check this build’s independent CI';
+   b.onclick=async()=>{
+    if(b.disabled)return;
+    b.disabled=true;
+    description.textContent='Reading exact GitHub/CI evidence for '+ref.request_id+'…';
+    try{
+     const next=await call('ADVANCE_SIGNED_NEW_DEVELOPMENT',ref);
+     if(next.original_work_id!==result.original_work_id)
+      throw Error('CHAT_WORK_BUILD_IDENTITY_DRIFT');
+     showCheckedResult(next,ref);
+    }catch(err){
+     show('Independent CI check blocked: '+String(err?.message||'UNVERIFIED')+
+      '. No installation or verified completion is inferred.',true,ref);
+    }
+   };
+   actions.append(b);
+  }
  }
  // The durable signed history is looked up by an explicit user click.
  // Do not depend on page-load CustomEvents, event timing or old Chat bubbles.
@@ -160,7 +232,7 @@
     description.textContent='Reading this exact signed instruction without executing work…';
     try{
      const result=await call('INSPECT_VERIFIED_WORK',ref);
-     description.textContent=explain(result);
+     showCheckedResult(result,ref);
     }catch(err){
      const code=String(err?.message||'CHAT_WORK_READBACK_UNAVAILABLE');
      description.textContent='Inspection blocked: '+
@@ -177,7 +249,7 @@
     description.textContent='Checking and processing exact signed source '+ref.request_id+
       ' through the existing governed work adapter…';
     try{
-     const result=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
+     const result=await processAndAdvance(ref);
      description.textContent=explain(result);
     }catch(err){
      const code=String(err?.message||'CHAT_WORK_UNVERIFIED');
@@ -239,11 +311,11 @@
   show('Instruction saved. Reality is matching it to a currently installed, governed work capability…');
   void (async()=>{
    try{
-    const result=await call('PROCESS_SIGNED_WORK_REQUEST',ref);
+    const result=await processAndAdvance(ref);
     if(window.realityJustSavedWorkRequest?.conversation_id===ref.conversation_id&&
        window.realityJustSavedWorkRequest?.request_id===ref.request_id)
      window.realityJustSavedWorkRequest=null;
-    show(explain(result),true,ref);
+    showCheckedResult(result,ref);
    }catch{
     show('The instruction is saved, but this attempt to verify a governed work handoff failed. Check the exact saved request; do not resend it.',true,ref);
    }finally{
