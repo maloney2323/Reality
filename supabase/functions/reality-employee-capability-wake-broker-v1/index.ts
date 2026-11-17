@@ -88,6 +88,7 @@ Deno.serve(async req=>{
    !UUID.test(request.shift_id)||!UUID.test(request.trigger_id)||
    !WORK.test(request.original_work_id)||
    !PROOF.test(request.source_proof_sha256)||!ISSUE.test(request.source_ref)||
+   BRANCH!==(Deno.env.get('REALITY_CAPABILITY_PREVIEW_BRANCH')||CURRENT_PREVIEW_BRANCH)||
    !SAFE_BRANCH.test(BRANCH||'')||String(BRANCH).includes('//')||
    String(BRANCH).split('/').includes('production')||
    (exactRelease&&!SHA.test(request.base_sha||'')))
