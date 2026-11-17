@@ -24,13 +24,50 @@ const SOURCES=Object.freeze([
  {id:'quickbooks',label:'QuickBooks',group:'Accounting',roles:['Sage','Avery'],
   description:'Business cost and accounting evidence when an integration is available.'},
  {id:'slack',label:'Slack',group:'Team',roles:['Taylor','Jordan'],
-  description:'Authorized team work signals, decisions and handoffs.'}
+  description:'Authorized team work signals, decisions and handoffs.'},
+ {id:'paypal',label:'PayPal',group:'Finance',roles:["Sage","Jordan","Avery"],
+  description:"PayPal Business transaction and subscription evidence; merchant consent required."},
+ {id:'square',label:'Square',group:'Finance',roles:["Sage","Jordan"],
+  description:"Point-of-sale payment and customer records when connected."},
+ {id:'shopify',label:'Shopify',group:'Commerce',roles:["Jordan","Morgan","Sage"],
+  description:"Store orders, inventory, and customer activity."},
+ {id:'google-drive',label:'Google Drive',group:'Files',roles:["Avery","Jordan","Taylor"],
+  description:"Customer documents, operating procedures and project files."},
+ {id:'microsoft-365',label:'Microsoft 365',group:'Communication',roles:["Jordan","Taylor"],
+  description:"Microsoft mail, files, and scheduling."},
+ {id:'notion',label:'Notion',group:'Productivity',roles:["Avery","Taylor"],
+  description:"Knowledge base, projects and documented decisions."},
+ {id:'hubspot',label:'HubSpot',group:'Sales',roles:["Jordan","Morgan"],
+  description:"Sales pipeline, contacts and customer lifecycle."},
+ {id:'mailchimp',label:'Mailchimp',group:'Marketing',roles:["Morgan","Jordan"],
+  description:"Marketing audiences, campaigns and reporting."},
+ {id:'xero',label:'Xero',group:'Accounting',roles:["Sage"],
+  description:"Accounting, invoices, and costs."},
+ {id:'zoom',label:'Zoom',group:'Meetings',roles:["Jordan","Taylor"],
+  description:"Meeting coordination and follow-up evidence."},
+ {id:'meta-business',label:'Meta Business',group:'Marketing',roles:["Morgan","Jordan"],
+  description:"Business social channels and marketing signals."},
+ {id:'google-analytics',label:'Google Analytics',group:'Marketing',roles:["Morgan","Avery"],
+  description:"Website engagement and conversion analytics."},
+ {id:'asana',label:'Asana',group:'Projects',roles:["Taylor","Avery"],
+  description:"Task assignments and project progress."},
+ {id:'trello',label:'Trello',group:'Projects',roles:["Taylor","Avery"],
+  description:"Task boards and customer project coordination."},
+ {id:'jobber',label:'Jobber',group:'Field Services',roles:["Taylor","Jordan","Sage"],
+  description:"Service scheduling, clients and job status."},
+ {id:'housecall-pro',label:'Housecall Pro',group:'Field Services',roles:["Taylor","Jordan","Sage"],
+  description:"Field service dispatch, invoices, and customer operations."},
+ {id:'servicetitan',label:'ServiceTitan',group:'Field Services',roles:["Taylor","Jordan","Sage"],
+  description:"Service operations, job workflows and revenue records."},
+ {id:'airtable',label:'Airtable',group:'Productivity',roles:["Taylor","Avery"],
+  description:"Custom work databases and process tracking."}
 ]);
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  res.setHeader('X-Content-Type-Options','nosniff');
- if(req.method!=='GET')return res.status(405).setHeader('Allow','GET')
-  .json({ok:false,error:'REALITY_CONNECTIONS_READ_ONLY'});
+ if(!['GET','POST'].includes(req.method))
+  return res.status(405).setHeader('Allow','GET, POST')
+   .json({ok:false,error:'REALITY_CONNECTIONS_METHOD_DENIED'});
  if(Object.keys(req.query||{}).length)
   return res.status(400).json({ok:false,error:'REALITY_CONNECTIONS_CLIENT_SCOPE_DENIED'});
  try{
@@ -43,6 +80,45 @@ export default async function handler(req,res){
   const db=shiftDatabase(process.env);
   if(db.url!==session.config?.url)
    throw Error('REALITY_CONNECTIONS_OWNER_PROJECT_MISMATCH');
+  if(req.method==='POST'){
+   // An explicit click may request onboarding work. It cannot authorize a
+   // provider, exchange credentials, grant permissions, or send a payment.
+   const origin=req.headers?.origin||'';
+   const host=req.headers?.host||'';
+   const contentType=req.headers?.['content-type']||'';
+   const site=req.headers?.['sec-fetch-site']||'';
+   const body=req.body;
+   if(!/^[-a-z0-9.]+(?::[0-9]{2,5})?$/.test(host)||
+    origin!=='https://'+host||
+    (site&&site!=='same-origin')||
+    !/^application\/json(?:;|$)/i.test(contentType)||
+    !body||typeof body!=='object'||Array.isArray(body)||
+    Object.keys(body).length!==1||
+    typeof body.provider_id!=='string'||
+    !SOURCES.some(x=>x.id===body.provider_id))
+    return res.status(403).json({ok:false,
+     error:'REALITY_CONNECTION_SETUP_EXPLICIT_OWNER_SCOPE_REQUIRED',
+     provider_connected:false,provider_authorized:false});
+   const saved=await shiftRpc(db,'reality_request_owner_connector_setup_v1',{
+    p_owner_id:session.user_id,p_provider_id:body.provider_id});
+   if(saved?.status!=='OWNER_CONNECTION_SETUP_REQUEST_RECORDED'||
+    saved.owner_id!==session.user_id||
+    saved.provider_id!==body.provider_id||
+    saved.setup_state!=='SETUP_REQUESTED_NO_CREDENTIALS'||
+    saved.actual_provider_connected!==false||
+    saved.credentials_saved!==false||
+    saved.oauth_consent_granted!==false||
+    saved.external_action_authorized!==false||
+    saved.payment_action_authorized!==false)
+    throw Error('REALITY_CONNECTION_SETUP_WRITE_READBACK_MISMATCH');
+   return res.status(202).json({
+    ok:true,status:'OWNER_CONNECTION_SETUP_REQUEST_RECORDED',
+    provider_id:body.provider_id,setup_state:saved.setup_state,
+    actual_provider_connected:false,credentials_saved:false,
+    oauth_consent_granted:false,payment_action_authorized:false,
+    external_execution_authorized:false
+   });
+  }
   // Reuse the independently saved discovery ledger: this verifies data read
   // inside Reality, not possession of a GitHub or Stripe OAuth token.
   const evidence=await shiftRpc(db,'reality_read_owner_employee_discovery_v1',{
@@ -60,6 +136,25 @@ export default async function handler(req,res){
      'MARKET_ASSESSMENT','CAPABILITY_AUDIT'].includes(x.source_family)&&
     x.qualified_job===false&&x.execution_authorized===false))
    throw Error('REALITY_CONNECTIONS_INDEPENDENT_READBACK_UNVERIFIED');
+  const requested=await shiftRpc(db,'reality_read_owner_connector_setup_v1',{
+   p_owner_id:session.user_id});
+  if(requested?.status!=='OWNER_CONNECTION_SETUP_REQUESTS_READ'||
+   requested.owner_id!==session.user_id||
+   !Array.isArray(requested.requests)||
+   requested.requests.length>SOURCES.length||
+   requested.request_count!==requested.requests.length||
+   requested.oauth_credentials_returned!==false||
+   requested.provider_connection_claimed!==false||
+   requested.billing_authorized!==false||
+   requested.external_actions_authorized!==false||
+   new Set(requested.requests.map(x=>x.provider_id)).size!==requested.requests.length||
+   !requested.requests.every(x=>
+    SOURCES.some(s=>s.id===x.provider_id)&&
+    x.setup_state==='SETUP_REQUESTED_NO_CREDENTIALS'&&
+    x.credentials_saved===false&&x.provider_connected===false&&
+    x.external_action_authorized===false))
+   throw Error('REALITY_CONNECTION_SETUP_OWNER_READBACK_UNVERIFIED');
+  const requestIds=new Set(requested.requests.map(x=>x.provider_id));
   const registry=new Map(inspectConnectorRegistry(process.env)
    .map(x=>[x.id,x]));
   const ghObserved=evidence.items.filter(x=>
@@ -74,6 +169,14 @@ export default async function handler(req,res){
    return {
     id:source.id,label:source.label,group:source.group,
     description:source.description,employee_roles:source.roles,
+    setup_requested:requestIds.has(source.id),
+    setup_request_state:requestIds.has(source.id)?
+     'SETUP_REQUESTED_NO_CREDENTIALS':'NOT_REQUESTED',
+    setup_request_action_available:true,
+    auto_detect_supported:Boolean(registered),
+    documented_setup_url:source.id==='paypal'?
+     'https://developer.paypal.com/api/rest/':
+     source.id==='stripe'?'https://docs.stripe.com/connect':null,
     adapter_registered:Boolean(registered),
     credential_configured:configured,
     provider_account_authenticated:false,
@@ -100,6 +203,9 @@ export default async function handler(req,res){
    connection_grants_created:0,oauth_flows_completed:0,
    owner_billing_authorized:false,external_execution_authorized:false,
    provider_oauth_verified_count:0,
+   setup_requests_pending:requestIds.size,
+   automatic_discovery_of_existing_sources:true,
+   automatic_grant_of_new_provider_access:false,
    discovery_checked_at:evidence.checked_at,
    source_work_items_not_jobs:true,providers:connectors
   });
