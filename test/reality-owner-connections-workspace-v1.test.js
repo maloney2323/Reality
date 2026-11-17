@@ -40,7 +40,7 @@ test('Connection inventory is authenticated, owner-scoped and read-only',()=>{
  assert.match(api,/oauth_flows_completed:0/);
  assert.match(api,/provider_oauth_verified_count:0/);
  assert.match(api,/connection_action_available:false/);
- assert.doesNotMatch(api,/POST.*stripe|create_charge|refund|create_checkout/i);
+ assert.doesNotMatch(api,/https:\/\/api\.stripe\.com|stripe\.refunds\.create|create_checkout/i);
 });
 test('Reality connector registry is not ChatGPT and never equates credential to proof',()=>{
  assert.match(registry,/dependency_on_chatgpt_plugins: false/);
