@@ -108,6 +108,8 @@ import {investigateOneSignedShiftContinuityIncident}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
+import {requalifyOneChangedEmployeeSource}
+ from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -186,6 +188,21 @@ export default async function handler(req,res){
     })):
     {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
      new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  // The same evidence job is allowed ONE bounded requalification when
+  // its original Github source changed between two signed worker runs.
+  // This is not a code repair. The first failure receipt remains immutable.
+  workerStage='SAME_QUALIFIED_EVIDENCE_SOURCE_REQUALIFICATION';
+  const changedSourceRequalification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await requalifyOneChangedEmployeeSource({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'CHANGED_SOURCE_REQUALIFICATION_PROOF_UNAVAILABLE',
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_SOURCE_REQUALIFICATION_SCOPE',
      installation_authorized:false,production_changed:false};
   // Execute exactly one dynamically qualified, read-only job on this
   // existing owner-authorized signed shift. Review and execution run in
@@ -1583,6 +1600,7 @@ export default async function handler(req,res){
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
     qualified_employee_executable_work:qualifiedEmployeeWork,
+    changed_source_same_job_requalification:changedSourceRequalification,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
