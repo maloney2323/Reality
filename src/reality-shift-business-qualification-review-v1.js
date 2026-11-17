@@ -34,6 +34,8 @@ export async function reviewOneSignedBusinessQualificationStall({
  if(claim?.status!=='SIGNED_BUSINESS_QUALIFICATION_REVIEW_CLAIMED'||
   !UUID.test(claim.incident_id||'')||!UUID.test(claim.owner_id||'')||
   !UUID.test(claim.source_claim_id||'')||!UUID.test(claim.claim_id||'')||
+  !Number.isSafeInteger(claim.review_attempt)||
+  claim.review_attempt<1||claim.review_attempt>2||
   claim.shift_id!==shiftId||claim.worker_run_id!==workerRunId||
   !SOURCE.test(claim.source_ref||'')||
   !HASH.test(claim.prior_source_sha256||'')||

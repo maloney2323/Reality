@@ -16,7 +16,7 @@ const db={strictSecrets:true,secretKey:'fixture',project:'sandbox',url:'https://
 const env={VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'sandbox'};
 const claim={status:'SIGNED_BUSINESS_QUALIFICATION_REVIEW_CLAIMED',
  incident_id:incident,shift_id:shift,owner_id:owner,source_claim_id:inquiry,
- claim_id:claimId,worker_run_id:run,reviewer:'Quinn',
+ claim_id:claimId,worker_run_id:run,review_attempt:1,reviewer:'Quinn',
  reviewer_function_id:'quality_security_reliability',
  source_ref:ref,prior_source_sha256:hash('a'),
  investigation_receipt_sha256:hash('b'),
@@ -129,4 +129,38 @@ test('signed reviewer SQL verifies original claims, never evidence job count as 
  assert.match(sql,/check\(original_job_completed=false\)/);
  assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
  assert.doesNotMatch(sql,/grant execute[^;]*to (anon|authenticated)/is);
+});
+
+test('one signed post-failure retry is acceptable but a third is refused',async()=>{
+ const ready=stub({claimed:{...claim,review_attempt:2}});
+ const passed=await reviewOneSignedBusinessQualificationStall({
+  db,env,shiftId:shift,workerRunId:run,call:ready.call,
+  rolesBuilder,readSource:async()=>sourceProof(),
+  fetchImpl:async()=>{throw Error('FORBIDDEN_PROVIDER')}
+ });
+ assert.equal(passed.status,'NO_ORIGINAL_ADMISSION_CONFIRMED');
+ for(const invalid of [0,3,null]){
+  const f=stub({claimed:{...claim,review_attempt:invalid}});
+  await assert.rejects(reviewOneSignedBusinessQualificationStall({
+   db,env,shiftId:shift,workerRunId:run,call:f.call,
+   rolesBuilder,readSource:async()=>{throw Error('SHOULD_NOT_READ')},
+   fetchImpl:async()=>{throw Error('SHOULD_NOT_FETCH')}
+  }),/BUSINESS_QUALIFICATION_INDEPENDENT_EXACT_OWNER_SOURCE_AND_LEASE_REQUIRED/);
+  assert.equal(f.calls.length,1);
+ }
+});
+test('SQL repair preserves prior reviewer claim and allows just one next signed worker',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_business_review_signed_write_and_bounded_reclaim_v11.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/into shift_state/);
+ assert.match(sql,/i\.finished_at>shift_state\.authorized_at/);
+ assert.doesNotMatch(sql,/select s\.owner_id,s\.shift_id,s\.authorized_at into s/);
+ assert.match(sql,/review_attempts between 1 and 2/);
+ assert.match(sql,/review_attempts=2/);
+ assert.match(sql,/current_review\.status='PROVIDER_PROOF_UNAVAILABLE'/);
+ assert.match(sql,/review_failure_history=review_failure_history/);
+ assert.match(sql,/'review_attempt',\(select r\.review_attempts/);
+ assert.doesNotMatch(sql,/set\s+review_attempts\s*=\s*0/i);
+ assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/i);
 });
