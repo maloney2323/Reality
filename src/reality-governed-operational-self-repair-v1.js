@@ -8,7 +8,7 @@ const HASH=/^sha256:[a-f0-9]{64}$/;
 const fail=s=>{throw Error('GOVERNED_SELF_REPAIR_'+s)};
 export async function continueGovernedOperationalSelfRepair({
  original,warrant,observeFrozenFailure,independentlyTestCandidate,
- loadRepairAdapter,independentlyResumeOriginal,settleOriginal,
+ loadRepairAdapter,loadOriginalResumeAdapter,independentlyResumeOriginal,settleOriginal,
  execute=executeAuthorizedWork,
 }={}){
  const owner=original?.owner_id,work=original?.original_work_id;
@@ -18,7 +18,7 @@ export async function continueGovernedOperationalSelfRepair({
     original.nonconsequential!==true||
     original.settled!==false||original.production_changed!==false||
     [observeFrozenFailure,independentlyTestCandidate,loadRepairAdapter,
-     independentlyResumeOriginal,settleOriginal,execute].some(x=>typeof x!=='function'))
+     loadOriginalResumeAdapter,independentlyResumeOriginal,settleOriginal,execute].some(x=>typeof x!=='function'))
   fail('EXACT_EXISTING_OWNER_ORIGINAL_REQUIRED');
  const checkWarrant=()=>{
   if(warrant?.status!=='OWNER_EXACT_ISOLATED_REPAIR_WARRANT_ACTIVE'||
@@ -92,10 +92,45 @@ export async function continueGovernedOperationalSelfRepair({
    installation_authorized:false,production_changed:false
   });
  checkWarrant();
+ // Resume is not a model-supplied assertion. Invoke the ORIGINAL job through
+ // the same governed executor and a separately provided source verifier.
+ const originalAdapter=await loadOriginalResumeAdapter({
+  owner_id:owner,original_work_id:work,warrant,
+  candidate_sha256:candidate.candidate_sha256
+ });
+ if(originalAdapter?.original_work_id!==work||
+   originalAdapter.workItem?.work_item_id!==work||
+   originalAdapter.workItem.workflow_id!=='workflow:'+work||
+   originalAdapter.workItem.connector!==null||
+   originalAdapter.workItem.consequential!==false||
+   originalAdapter.workItem.operation!=='read'||
+   originalAdapter.authorization?.authorization_id!==warrant.warrant_id||
+   originalAdapter.authorization.authorized!==true||
+   typeof originalAdapter.connector?.execute!=='function'||
+   typeof originalAdapter.independentVerifier?.verify!=='function')
+   fail('RESUME_ADAPTER_NOT_ORIGINAL_OWNER_WORK');
+ const resumeOutcome=await execute({
+  workItem:originalAdapter.workItem,
+  workflowId:originalAdapter.workItem.workflow_id,
+  originalWorkId:work,authorization:originalAdapter.authorization,
+  connector:originalAdapter.connector,
+  independentVerifier:originalAdapter.independentVerifier
+ });
+ if(resumeOutcome?.status!=='VERIFIED'||
+  resumeOutcome.verification?.independent!==true||
+  resumeOutcome.verification?.verified!==true||
+  resumeOutcome.outcome?.verified!==true||
+  resumeOutcome.execution?.execution_state!=='EXECUTED')
+  return Object.freeze({
+   status:'ORIGINAL_JOB_NOT_INDEPENDENTLY_RESUMED',
+   original_work_id:work,original_job_completed:false,
+   installation_authorized:false,production_changed:false
+  });
  const resumed=await independentlyResumeOriginal({
   owner_id:owner,original_work_id:work,warrant,
   candidate_sha256:candidate.candidate_sha256,
-  repair_verification:outcome.verification
+  repair_verification:outcome.verification,
+  original_execution:resumeOutcome
  });
  if(resumed?.status!=='SAME_ORIGINAL_JOB_INDEPENDENTLY_RESUMED'||
    resumed.owner_id!==owner||resumed.original_work_id!==work||
