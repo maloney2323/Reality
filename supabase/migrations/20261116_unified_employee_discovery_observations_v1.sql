@@ -69,7 +69,7 @@ BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'EMPLOYEE_DISCOVERY_SERVICE_ONLY';END IF;
  SELECT * INTO v_snapshot FROM reality_internal.next_week_employee_source_snapshots_v1
  ORDER BY prepared_at DESC LIMIT 1;
- IF NOT FOUND OR v_snapshot.source_scope<>'REALITY_GITHUB_OPEN_ISSUES_ONLY'
+ IF NOT FOUND OR v_snapshot.source_scope<>'maloney2323/Reality'
   OR v_snapshot.source_complete IS DISTINCT FROM true
   OR v_snapshot.shift_execution_authorized IS DISTINCT FROM false
   OR v_snapshot.installation_authorized IS DISTINCT FROM false
