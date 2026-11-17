@@ -241,7 +241,7 @@ body.reality-unified-ui :is(button,a,summary,input,textarea,select):focus-visibl
  }
  body.reality-unified-ui .rx-nav-mobile{
   position:fixed;left:0;right:0;bottom:0;z-index:190;
-  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));
   align-items:center;gap:2px;
   min-height:65px;padding:4px 5px max(7px,env(safe-area-inset-bottom));
   border-top:1px solid #3485bd;
