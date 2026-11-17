@@ -435,3 +435,46 @@ test('source read failure cannot be laundered into verified evidence or an insta
  assert.equal(result.self_repair_proven,false);
  assert.equal(result.installation_authorized,false);
 });
+
+test('model transport timeout is recorded as specific evidence instead of generic proof unavailable',async()=>{
+ const f=fixture({claimed:{...claim,investigation_attempt:2}});
+ const x=await investigateOneSignedShiftContinuityIncident({
+  db,env,shiftId:shift,call:f.call,
+  fetchImpl:async(url,{signal}={})=>{
+   assert.equal(url,'https://api.openai.com/v1/responses');
+   assert.equal(signal.aborted,false);
+   const err=new Error('Model request exhausted its allotted time');
+   err.name='TimeoutError';
+   throw err;
+  },rolesBuilder:()=>({roles})
+ });
+ assert.equal(x.status,'SHIFT_CONTINUITY_INVESTIGATION_BLOCKED');
+ assert.equal(x.failure_reason,'MODEL_PROVIDER_TIMEOUT');
+ assert.equal(f.calls.at(-1).args.p_reason,'MODEL_PROVIDER_TIMEOUT');
+ assert.equal(x.installation_authorized,false);
+ assert.equal(x.self_repair_proven,false);
+ const src=readFileSync(new URL('../src/reality-shift-continuity-auto-investigation-v1.js',
+  import.meta.url),'utf8');
+ assert.match(src,/signal:AbortSignal\.timeout\(30000\)/);
+});
+test('missing model configuration and role directory failure have distinct safe reason codes',async()=>{
+ for(const [invoke,reason] of [
+  [undefined,'MODEL_PROVIDER_CONFIG_UNVERIFIED'],
+  [undefined,'ROLE_DIRECTORY_UNVERIFIED']
+ ]){
+  const f=fixture();
+  const envCase=reason==='MODEL_PROVIDER_CONFIG_UNVERIFIED'?
+   {...env,REALITY_STANDALONE_OPENAI_API_KEY:'x',OPENAI_API_KEY:''}:env;
+  const rolesCase=reason==='ROLE_DIRECTORY_UNVERIFIED'?
+   ()=>({roles:[]}):()=>({roles});
+  const x=await investigateOneSignedShiftContinuityIncident({
+   db,env:envCase,shiftId:shift,call:f.call,
+   fetchImpl:async()=>{throw Error('provider should not be called')},
+   invokeModel:invoke,rolesBuilder:rolesCase
+  });
+  assert.equal(x.failure_reason,reason);
+  assert.equal(f.calls.at(-1).args.p_reason,reason);
+  assert.equal(x.original_job_created,false);
+  assert.equal(x.production_changed,false);
+ }
+});
