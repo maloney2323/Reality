@@ -55,6 +55,7 @@ test('different signed employee independently verifies 41 inquiries but zero ori
  });
  assert.equal(readCount,2);
  assert.equal(x.status,'NO_ORIGINAL_ADMISSION_CONFIRMED');
+ assert.equal(x.review_attempt,1);
  assert.equal(x.independent_qualification_gap_verification_completed,true);
  assert.equal(x.source_backed_inquiries,41);
  assert.equal(x.original_job_claims,0);
@@ -163,4 +164,19 @@ test('SQL repair preserves prior reviewer claim and allows just one next signed 
  assert.match(sql,/'review_attempt',\(select r\.review_attempts/);
  assert.doesNotMatch(sql,/set\s+review_attempts\s*=\s*0/i);
  assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/i);
+});
+
+test('legacy provider failure is eligible for only one source-backed reclaim',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_business_review_legacy_failure_bounded_reentry_v12.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/review_attempts=1/);
+ assert.match(sql,/review_attempts=2/);
+ assert.match(sql,/current_review\.receipt_sha256 is null/);
+ assert.match(sql,/r\.receipt_sha256 is null/);
+ assert.match(sql,/retry_after is null or/);
+ assert.match(sql,/PRIOR_SIGNED_REVIEW_RECEIPT_MISSING_BEFORE_REMEDIATION/);
+ assert.match(sql,/review_failure_history=case/);
+ assert.match(sql,/get diagnostics affected=row_count/);
+ assert.doesNotMatch(sql,/review_attempts=3|cron\.schedule\(/);
 });
