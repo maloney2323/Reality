@@ -89,9 +89,29 @@ export default async function handler(req,res){
      p_intent:INTENT,p_request_id:b.request_id
     })
    });
-  if(!response.ok)return answer(res,
-   'RECOVERY_APPROVAL_PROVIDER_RESULT_UNCERTAIN_CHECK_READBACK',409,{
-    retry_owner_approval:false});
+  if(!response.ok){
+   // The provider may reject the signed owner request before any ledger
+   // mutation. Re-read the exact same owner warrant instead of guessing.
+   // A negative readback NEVER retries approval or authorizes GitHub.
+   const fresh=await shiftRpc(db,
+    'reality_read_general_original_recovery_review_v1',{
+     p_owner_id:session.user_id}).catch(()=>null);
+   if(fresh?.status==='GENERAL_ORIGINAL_EXACT_RECOVERY_PUBLICATION_REVIEW'&&
+      fresh.recovery_publication_id===current.recovery_publication_id&&
+      fresh.original_work_id===current.original_work_id&&
+      fresh.phase==='READY_FOR_EXACT_RECOVERY_APPROVAL'&&
+      fresh.owner_approval_ready===true&&
+      fresh.owner_approval_id===null&&
+      fresh.source_installed===false&&
+      fresh.original_job_completed===false&&
+      fresh.production_changed===false)
+    return answer(res,'EXACT_RECOVERY_APPROVAL_NOT_RECORDED',409,{
+     recovery_publication_id:fresh.recovery_publication_id,
+     approval_recorded:false,retry_owner_approval:false});
+   return answer(res,
+    'RECOVERY_APPROVAL_PROVIDER_RESULT_UNCERTAIN_CHECK_READBACK',409,{
+     retry_owner_approval:false});
+  }
   const receipt=await response.json().catch(()=>null);
   if(receipt?.status!=='ONE_EXACT_RECOVERY_PUBLICATION_OWNER_APPROVED'||
     receipt.recovery_publication_id!==current.recovery_publication_id||
