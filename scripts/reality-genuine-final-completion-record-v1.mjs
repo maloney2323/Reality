@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Separately signed, provider-readback final receipt recorder.
 // No owner action, install, source modification or replay is performed.
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
@@ -5,7 +7,7 @@ const e=process.env,REPO='maloney2323/Reality';
 const fail=x=>{throw Error('REALITY_FINAL_RECEIPT_RECORDER_'+x)};
 if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_EVENT_NAME!=='push'||
  e.GITHUB_REPOSITORY!==REPO||
- e.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101'||
+ !isSignedRealityCapabilityPreviewRef(e.GITHUB_REF||'')||
  !/^[a-f0-9]{40}$/.test(e.GITHUB_SHA||'')||
  typeof e.GH_TOKEN!=='string'||e.GH_TOKEN.length<20||
  !e.ACTIONS_ID_TOKEN_REQUEST_TOKEN||!e.ACTIONS_ID_TOKEN_REQUEST_URL)
