@@ -1,0 +1,53 @@
+/* Owner-only, ledger-backed operational incidents inside Reality Chat.
+   Not a normal assistant reply, job authorization, or customer notification. */
+#realityOwnerIncidentChat{
+ border:1px solid #47617c;border-radius:14px;
+ padding:15px;margin:12px 0;background:#101e2e;color:#e9f3ff
+}
+#realityOwnerIncidentChat .rx-owner-incidents-head{
+ display:flex;justify-content:space-between;gap:12px;align-items:center
+}
+#realityOwnerIncidentChat .rx-owner-incidents-head strong{font-size:15px}
+#realityOwnerIncidentChat .rx-owner-incidents-refresh{
+ border:1px solid #607b96;background:#1a2a3c;color:#eaf5ff;
+ border-radius:9px;padding:9px 12px;cursor:pointer;font-size:12px
+}
+#realityOwnerIncidentChat .rx-owner-incidents-status,
+#realityOwnerIncidentChat .rx-owner-incidents-caption{
+ font-size:12px;line-height:1.6;color:#aec5d9;margin:10px 0
+}
+#realityOwnerIncidentChat .rx-owner-incident{
+ border:1px solid #375571;background:#142336;border-radius:12px;
+ padding:14px;margin:12px 0;overflow-wrap:anywhere
+}
+#realityOwnerIncidentChat .rx-owner-incident>strong{font-size:14px}
+#realityOwnerIncidentChat .rx-owner-incident p{
+ font-size:12px;line-height:1.6;margin:8px 0;color:#c0d6e8
+}
+#realityOwnerIncidentChat .rx-owner-incident .rx-owner-incident-phase{
+ color:#e5f1fa;font-weight:650
+}
+#realityOwnerIncidentChat .rx-owner-incident .rx-owner-incident-next{
+ color:#c2e3eb;font-weight:550
+}
+#realityOwnerIncidentChat .rx-owner-incident .rx-owner-incident-proof{
+ color:#b7d5cb
+}
+#realityOwnerIncidentChat .rx-owner-incident-details{
+ font-size:12px;border-top:1px solid #3a5066;padding-top:10px;
+ margin-top:12px;color:#cedded
+}
+#realityOwnerIncidentChat .rx-owner-incident-details summary{
+ cursor:pointer;font-weight:650
+}
+#realityOwnerIncidentChat .rx-owner-incident-discuss{
+ background:#183d5b;color:#e9f6ff;border:1px solid #5b8aab;
+ border-radius:9px;padding:10px 13px;margin-top:12px;cursor:pointer
+}
+@media(max-width:640px){
+ #realityOwnerIncidentChat .rx-owner-incidents-head{
+  flex-direction:column;align-items:stretch
+ }
+ #realityOwnerIncidentChat .rx-owner-incidents-refresh,
+ #realityOwnerIncidentChat .rx-owner-incident-discuss{width:100%}
+}
