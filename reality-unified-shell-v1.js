@@ -59,9 +59,12 @@
   const eyebrow=n('span','rx-top-section',hub);
   top.insertBefore(eyebrow,top.querySelector('#accountShortcut'));
  }
- // Same timeline across the app: the evidence is read from existing
- // independently verified owner ledgers, not mirrored local state or guesses.
- if(top&&main){
+ // The full Past/Present/Future Matrix is the HOME command perspective.
+ // Other pages may read the SAME evidence through their own role-specific UI,
+ // but do not render an identical full-size timeline on every destination.
+ // This changes presentation only: owner ledgers, worker discovery and
+ // governance remain shared and unchanged.
+ if(route==='home'&&top&&main){
   const timeline=n('section','rx-time-horizon');
   timeline.id='realityTimeHorizon';
   timeline.setAttribute('aria-label','Reality Past Present Future');
