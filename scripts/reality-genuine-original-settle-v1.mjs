@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Independent settlement worker: only runs after prior original-job execution succeeded.
 // Provider's job status and artifact are independently re-read by the trusted broker.
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
@@ -5,7 +7,7 @@ const env=process.env,repo='maloney2323/Reality';
 const fail=x=>{throw Error('REALITY_ORIGINAL_SETTLEMENT_'+x)};
 if(env.GITHUB_ACTIONS!=='true'||!['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
  env.GITHUB_REPOSITORY!==repo||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  fail('EXACT_ISOLATED_WORKFLOW_REQUIRED');
 const jwtUrl=new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL||'');
 jwtUrl.searchParams.set('audience','reality-genuine-capability-auto-admit-v1');
