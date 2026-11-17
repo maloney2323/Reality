@@ -121,6 +121,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   const allowed=new Set([
    'PATCH_APPLIED_AWAITING_WORKER',
    'WORKER_ATTESTED_AWAITING_ORIGINAL',
+   'WORKER_RESTORED_NO_ORIGINAL_TO_RESUME',
    'INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED',
    'BLOCKED_UNRECOGNIZED_SCOPE',
    'BLOCKED_EVIDENCE_OR_WORKER_MISSING'
@@ -230,6 +231,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    'Reality automatically corrected the exact preview scheduler permission defect. Independent receipts confirm the signed worker actually ran and the same previously scheduled owner investigation produced a source-backed result. This proves only the bounded preview repair class, not arbitrary production self-repair.':
    previewRepairItem?.phase==='PATCH_APPLIED_AWAITING_WORKER'?
    'Reality applied its reviewed preview-only scheduler correction. The signed worker and original job have not yet independently verified resumption.':
+   previewRepairItem?.phase==='WORKER_RESTORED_NO_ORIGINAL_TO_RESUME'?
+   'Reality automatically corrected the preview scheduler defect and independently observed the signed worker running again. No earlier original job was waiting, so it cannot claim original-work resumption.':
    previewRepairItem?.phase==='WORKER_ATTESTED_AWAITING_ORIGINAL'?
    'The signed worker resumed after Reality’s preview correction. The original assigned work is not yet independently verified.':
    recovered?
