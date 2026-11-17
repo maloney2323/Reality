@@ -52,7 +52,7 @@ async function askRealityToRepair({env,work,source,failedObservation,fetchImpl})
   type:'object',additionalProperties:false,
   properties:{
    operation:{type:'string',enum:['add','multiply']},
-   operand:{type:'integer',minimum:0,maximum:20}
+   operand:{type:'integer'}
   },required:['operation','operand']
  };
  const prompt={
@@ -101,7 +101,7 @@ export async function runIsolatedOwnerRepairDemo({
  matchWarrant(grant,owner);
  const dir=await mkdtemp(path.join(tmpdir(),'reality-owner-repair-demo-'));
  const target=path.join(dir,'isolated-original-work-config.json');
- let failureEvidenceCache=null;
+ let failureEvidenceCache=null,resumedEvidenceCache=null;
  let candidate=null,failureReceiptId=null,
   candidateReceiptId=null,resumedReceiptId=null,
   modelResponseId=null;
@@ -219,6 +219,7 @@ export async function runIsolatedOwnerRepairDemo({
      input.original_execution.verification?.independent!==true)
      throw Error('ISOLATED_DEMO_ORIGINAL_EXECUTION_NOT_VERIFIED');
     resumedReceiptId=randomUUID();
+    resumedEvidenceCache=digest(JSON.stringify(input.original_execution.verification));
     return {
      status:'SAME_ORIGINAL_JOB_INDEPENDENTLY_RESUMED',
      owner_id:owner,original_work_id:work,
@@ -227,7 +228,7 @@ export async function runIsolatedOwnerRepairDemo({
      independent:true,verified:true,
      external_action_performed:false,
      receipt_id:resumedReceiptId,
-     evidence_sha256:digest(JSON.stringify(input.original_execution.verification))
+     evidence_sha256:resumedEvidenceCache
     };
    },
    settleOriginal:async data=>{
@@ -251,7 +252,7 @@ export async function runIsolatedOwnerRepairDemo({
      p_original_work_id:work,
      p_failure_hash:failureEvidenceCache,
      p_candidate_hash:data.candidate_sha256,
-     p_resumed_hash:digest(JSON.stringify(data.original_resumption||resumedReceiptId)),
+     p_resumed_hash:resumedEvidenceCache,
      p_final_receipt_sha256:finalHash,
      p_model_response_id:modelResponseId
     },{fetchImpl});
