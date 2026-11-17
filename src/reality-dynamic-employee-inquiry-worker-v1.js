@@ -65,23 +65,24 @@ export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=
  const x=await result.json().catch(()=>null);
  if(!x||Array.isArray(x)||x.number!==Number(n)||
   x.html_url!==ref||x.state!=='open'||
-  x.repository_url!==api||
-  (kind==='issues'&&x.pull_request)||
+  (kind==='issues'?x.repository_url!==api||Boolean(x.pull_request):
+   x.base?.repo?.full_name!==owner+'/'+repo)||
   !Number.isFinite(Date.parse(x.updated_at||''))||
   Date.parse(x.updated_at)>Date.now()+120000||
   typeof x.title!=='string'||!x.title.trim()||x.title.length>500||
-  typeof x.body!=='string'||x.body.length>120000)
+  (x.body!==null&&typeof x.body!=='string')||
+  String(x.body||'').length>120000)
   fail('EXACT_CURRENT_SOURCE_PROOF_MISSING');
  const checkedAt=new Date().toISOString();
  const evidence={
   source_ref:ref,source_title:x.title,
   current_state:x.state,provider_updated_at:x.updated_at,
-  source_body:x.body.slice(0,9000)
+  source_body:String(x.body||'').slice(0,9000)
  };
  return Object.freeze({
   ...evidence,checked_at:checkedAt,
   provider_proof_sha256:hash(JSON.stringify(evidence)),
-  body_truncated:x.body.length>9000
+  body_truncated:String(x.body||'').length>9000
  });
 }
 export async function generateOneEmployeeTemporalInquiry({
