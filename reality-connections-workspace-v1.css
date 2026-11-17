@@ -1,6 +1,6 @@
 /* Reality Connections · one page, one owner-scoped read-only source. */
 body.reality-unified-ui[data-reality-route="connections"]
- main>:not(.top):not(#realityUnifiedView){display:none!important}
+ main>:not(.top):not(#realityUnifiedView):not(#realityTimeHorizon){display:none!important}
 body.reality-unified-ui[data-reality-route="connections"]
  #realityUnifiedView{width:100%;box-sizing:border-box}
 body.reality-unified-ui .rx-connections-area{margin-top:22px}
