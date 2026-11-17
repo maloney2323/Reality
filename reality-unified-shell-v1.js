@@ -59,6 +59,15 @@
   const eyebrow=n('span','rx-top-section',hub);
   top.insertBefore(eyebrow,top.querySelector('#accountShortcut'));
  }
+ // Same timeline across the app: the evidence is read from existing
+ // independently verified owner ledgers, not mirrored local state or guesses.
+ if(top&&main){
+  const timeline=n('section','rx-time-horizon');
+  timeline.id='realityTimeHorizon';
+  timeline.setAttribute('aria-label','Reality Past Present Future');
+  timeline.hidden=true; // Visible only after the timeline controller mounts.
+  top.insertAdjacentElement('afterend',timeline);
+ }
  if(route==='employees'){
   const team=get('realityHomeEmployees');
   const directory=team?.closest('.rc-role-directory');
