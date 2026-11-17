@@ -31,6 +31,15 @@ export const CONTINUITY_SELF_INQUIRY_QUESTIONS=Object.freeze([
 const classifyInvestigationFailure=(error,stage)=>{
  if(stage!=='MODEL_PROOF_UNAVAILABLE')return 'INDEPENDENT_SOURCE_UNAVAILABLE';
  const message=String(error?.message||'');
+ if(error?.name==='TimeoutError'||error?.name==='AbortError'||
+  message.includes('MODEL_PROVIDER_TIMEOUT'))
+  return 'MODEL_PROVIDER_TIMEOUT';
+ if(message.includes('MODEL_PROVIDER_UNVERIFIED'))
+  return 'MODEL_PROVIDER_CONFIG_UNVERIFIED';
+ if(message.includes('EMPLOYEE_ROLE_DIRECTORY_UNVERIFIED'))
+  return 'ROLE_DIRECTORY_UNVERIFIED';
+ if(/(fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|MODEL_PROVIDER_TRANSPORT_UNVERIFIED)/i.test(message))
+  return 'MODEL_PROVIDER_TRANSPORT_UNVERIFIED';
  for(const code of ['MODEL_PROVIDER_AUTH_REJECTED','MODEL_RATE_LIMITED',
   'MODEL_PROVIDER_TEMPORARY_FAILURE','MODEL_PROVIDER_REJECTED'])
   if(message.includes(code))return code;
@@ -200,10 +209,11 @@ export async function investigateOneSignedShiftContinuityIncident({
     method:'POST',cache:'no-store',redirect:'error',
     headers:{authorization:'Bearer '+key,'content-type':'application/json',
      'x-client-request-id':claim.lease_id},
-    body:JSON.stringify(payload),signal:AbortSignal.timeout(18000)
+    body:JSON.stringify(payload),signal:AbortSignal.timeout(30000)
    });
    if(!result?.ok){
     if([401,403].includes(result?.status))fail('MODEL_PROVIDER_AUTH_REJECTED');
+    if([408,504].includes(result?.status))fail('MODEL_PROVIDER_TIMEOUT');
     if(result?.status===429)fail('MODEL_RATE_LIMITED');
     if(Number(result?.status)>=500)fail('MODEL_PROVIDER_TEMPORARY_FAILURE');
     fail('MODEL_PROVIDER_REJECTED');
