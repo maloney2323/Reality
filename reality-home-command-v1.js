@@ -53,11 +53,30 @@
  for(const text of ['Source-backed discovery','Governed review','Independent receipts'])
   assurances.append(el('span','',text));
  copy.append(assurances);
- // Home is for discovery and understanding. Execution remains in the
- // existing governed Shifts workflow; there is deliberately no Start CTA.
- const heroFoot=el('p','rc-hero-foot',
-  'Proposed work is separate from qualified jobs, active execution and verified outcomes.');
- copy.append(heroFoot);
+ // The owner can manually refresh source discovery without navigating
+ // the older Work Center controls. The action uses the existing GET-only
+ // reader, NOT new job authorization, shift creation or installation.
+ const heroActions=el('div','rc-home-work-actions');
+ const findWorkNow=el('button','rc-outline rc-home-find-work','Find work');
+ findWorkNow.type='button';
+ const findWorkNote=el('p','rc-hero-foot',
+  'Manual refresh uses existing read-only discovery. This does not fill or authorize the employee schedule.');
+ findWorkNow.addEventListener('click',()=>{
+  const existing=$('findWork');
+  if(!existing){
+   findWorkNote.textContent='Work discovery is unavailable here. No job was dispatched.';
+   return;
+  }
+  reveal('findWork');
+  if(existing.disabled){
+   findWorkNote.textContent='Discovery is already running. No duplicate request sent.';
+   return;
+  }
+  findWorkNote.textContent='Refreshing source observations in the existing Work Center. No shift is authorized or started.';
+  existing.click();
+ });
+ heroActions.append(findWorkNow,findWorkNote);
+ copy.append(heroActions);
  hero.append(copy);stage.append(hero);
  const stats=el('div','rc-stats'),metrics={};
  stats.setAttribute('aria-label','Operational evidence states');
