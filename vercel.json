@@ -28,6 +28,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/connections",
+      "destination": "/index.html"
+    },
+    {
       "source": "/employees",
       "destination": "/index.html"
     },
