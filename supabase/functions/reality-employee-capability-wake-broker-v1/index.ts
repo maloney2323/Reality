@@ -4,7 +4,7 @@
 // This is NOT the approved-upgrade broker, a model agent, or an installer.
 const PROJECT='hvkfreoagbrphwghjajw';
 const REPO='maloney2323/Reality';
-const BRANCH='feature/reality-general-capability-engine-20261101';
+const SAFE_BRANCH=/^reality\/[a-z0-9][a-z0-9_/-]{8,109}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -73,10 +73,14 @@ Deno.serve(async req=>{
   const request=JSON.parse(raw);
   if(!request||Array.isArray(request)||typeof request!=='object'||
    Object.keys(request).sort().join(',')!==
-    'original_work_id,shift_id,source_proof_sha256,source_ref,trigger_id'||
+    'base_branch,base_sha,original_work_id,shift_id,source_proof_sha256,source_ref,trigger_id'||
    !UUID.test(request.shift_id)||!UUID.test(request.trigger_id)||
    !WORK.test(request.original_work_id)||
-   !PROOF.test(request.source_proof_sha256)||!ISSUE.test(request.source_ref))
+   !PROOF.test(request.source_proof_sha256)||!ISSUE.test(request.source_ref)||
+   !SAFE_BRANCH.test(request.base_branch||'')||
+   String(request.base_branch).includes('//')||
+   String(request.base_branch).split('/').includes('production')||
+   !SHA.test(request.base_sha||''))
    return respond(400,{ok:false,...facts,status:'BROKER_SOURCE_SCOPE_REJECTED'});
   const item=await rpc({
    p_shift_id:request.shift_id,p_original_work_id:request.original_work_id,
@@ -104,9 +108,14 @@ Deno.serve(async req=>{
   const bytes=JSON.stringify({trigger_id:id,
    source_event_id:item.source_event_id,
    original_work_id:item.original_work_id},null,2)+'\n';
+  // Branch & commit come from the signed Vercel preview, not a browser.
+  // Independently verify both against GitHub before writing even inert
+  // trigger JSON; a stale worker cannot dispatch to a newer release.
+  const BRANCH=String(request.base_branch);
   const branch=await github('/git/ref/heads/'+BRANCH,configValue.token);
-  if(!SHA.test(String(branch?.object?.sha||'')))
-   refuse('PINNED_ISOLATED_WORKER_BRANCH_INVALID');
+  if(!SHA.test(String(branch?.object?.sha||''))||
+     branch.object.sha!==request.base_sha)
+   refuse('SIGNED_CURRENT_PREVIEW_SOURCE_HEAD_MISMATCH');
   const check=async()=>{
    const x=await github('/contents/'+path+'?ref='+encodeURIComponent(BRANCH),
     configValue.token);
