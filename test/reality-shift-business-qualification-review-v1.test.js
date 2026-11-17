@@ -123,6 +123,8 @@ test('signed reviewer SQL verifies original claims, never evidence job count as 
  assert.match(sql,/run\.started_at>inc\.investigated_at/);
  assert.match(sql,/for update of inc skip locked/);
  assert.match(sql,/NO_ORIGINAL_ADMISSION_CONFIRMED/);
+ assert.match(sql,/BUSINESS_QUALIFICATION_LEASES_FENCED_/);
+ assert.match(sql,/status='PROVIDER_PROOF_UNAVAILABLE'/);
  assert.match(sql,/r\.owner_id/);
  assert.match(sql,/check\(original_job_completed=false\)/);
  assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
