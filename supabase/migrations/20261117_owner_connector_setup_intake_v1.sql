@@ -26,8 +26,8 @@ BEGIN
  IF current_user<>'service_role' OR p_owner_id IS NULL OR p_provider_id IS NULL
   OR p_provider_id NOT IN('github','supabase','vercel','stripe','paypal','gmail','google-calendar','quickbooks','slack','square','shopify','google-drive','microsoft-365','notion','hubspot','mailchimp','xero','zoom','meta-business','google-analytics','asana','trello','jobber','housecall-pro','servicetitan','airtable')
  THEN RAISE EXCEPTION 'REALITY_CONNECTION_SETUP_SCOPE_DENIED';END IF;
- IF NOT EXISTS(SELECT 1 FROM auth.users u WHERE u.id=p_owner_id)
- THEN RAISE EXCEPTION 'REALITY_CONNECTION_SETUP_OWNER_UNKNOWN';END IF;
+ -- The server supplies p_owner_id exclusively from its authenticated
+ -- Reality session. Service-role access is required; no client UUID accepted.
  INSERT INTO reality_internal.owner_connector_setup_requests_v1(
   owner_id,provider_id,last_requested_at)
  VALUES(p_owner_id,p_provider_id,v_now)
