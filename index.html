@@ -554,14 +554,36 @@ body[data-reality-route="chat"] .reality-chat-close{
  position:static;float:none;width:auto;height:auto;border-radius:10px;
  padding:9px 14px;margin:0 0 15px;font-size:13px;
 }
-body[data-reality-route="chat"] #privateTranscript{max-height:min(60vh,720px)!important}
+/* The live receipt is a conversation event: on mobile this must be an
+   actual touch-scrollable pane, not a 35-42vh clipping window. */
+body[data-reality-route="chat"] #privateTranscript{
+ max-height:min(66dvh,760px)!important;min-height:280px;
+ overflow-y:auto!important;overscroll-behavior-y:contain;
+ -webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-gutter:stable
+}
+#generalizedOriginalInstallReviewPanel{
+ scroll-margin-top:10px;min-width:0;max-width:100%
+}
+#generalizedOriginalInstallReviewPanel #generalizedOriginalInstallRecoveryUpdate{
+ font-size:15px;line-height:1.65;white-space:normal
+}
+#generalizedOriginalInstallReviewPanel details summary{
+ padding:10px 0;cursor:pointer;color:#b9deef;line-height:1.45
+}
+#generalizedOriginalInstallReviewPanel button:not([hidden]){
+ min-height:49px;max-width:100%;white-space:normal
+}
 body[data-reality-route="chat"] .reality-chat-composer{position:relative}
 body[data-reality-route="chat"] main{max-width:1200px}
 @media(max-width:700px){
  .reality-page-tabs{gap:5px;margin:0}
  .reality-page-tabs a{padding:9px 12px;font-size:13px}
  body[data-reality-route="chat"] #privateChat{min-height:calc(100dvh - 120px);padding:12px!important;border-radius:12px!important}
- body[data-reality-route="chat"] #privateTranscript{max-height:42vh!important}
+ body[data-reality-route="chat"] #privateTranscript{
+  max-height:min(66dvh,700px)!important;min-height:300px;
+  overflow-y:auto!important;overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y
+ }
 }
 
 @media(max-width:850px){.business-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-home-header{flex-direction:column;gap:3px}}
