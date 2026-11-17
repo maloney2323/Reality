@@ -65,7 +65,9 @@ export async function investigateOneSignedShiftContinuityIncident({
   !UUID.test(claim.owner_id||'')||claim.shift_id!==shiftId||
   !UUID.test(claim.incident_id||'')||!UUID.test(claim.lease_id||'')||
   !HASH.test(claim.evidence_sha256||'')||
-  !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE'].includes(claim.kind)||
+  !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
+    'QUALIFIED_EVIDENCE_JOB_BLOCKED',
+    'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'].includes(claim.kind)||
   claim.scope!=='SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY'||
   claim.model_inquiry_authorized!==true||
   claim.new_original_jobs_created!==0||
