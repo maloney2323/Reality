@@ -104,7 +104,7 @@ import {advanceExistingOwnerIncidentOriginal}
  from '../../src/reality-incident-existing-original-handoff-v1.js';
 import {advanceOneScheduledCapabilityInquiry}
  from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
-import {investigateOneSignedShiftContinuityIncident}
+import {investigateOneSignedShiftContinuityIncident,classifySignedContinuityClaimTransportError}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
@@ -185,12 +185,7 @@ export default async function handler(req,res){
      db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
     }).catch(error=>({
      status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
-     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
-      'SIGNED_INVESTIGATION_DATABASE_RPC_REJECTED':
-      error?.message==='SHIFT_RPC_NOT_ALLOWLISTED'?
-       'INVESTIGATION_RPC_TRANSPORT_NOT_CONNECTED':
-       String(error?.message||'').startsWith('SHIFT_CONTINUITY_')?
-        'SIGNED_INVESTIGATION_CLAIM_INVALID':'INVESTIGATION_RUNTIME_UNVERIFIED',
+     failure_code:classifySignedContinuityClaimTransportError(error),
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false
     })):
