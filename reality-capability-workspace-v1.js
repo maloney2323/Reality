@@ -125,6 +125,13 @@
    }else if(health.incidents.some(i=>i.phase==='LEASED_FOR_INVESTIGATION')){
     progressState.textContent='INVESTIGATING · Reality has claimed an operational failure and is checking what recovery it needs.';
     progressNext.textContent='Next: record employee diagnosis and independent proof requirement. A repair is not authorized merely by this claim.';
+   }else if(grant.today_reserved>=grant.max_daily_inquiries){
+    progressState.textContent='DAILY RESEARCH LIMIT REACHED · '+
+     grant.today_reserved+' / '+grant.max_daily_inquiries+
+     ' bounded investigation reservations used. '+scheduled+
+     ' capability investigation'+(scheduled===1?' is':'s are')+
+     ' already scheduled.';
+    progressNext.textContent='Next: Reality automatically regains its evidence-only investigation allowance when the database day resets (UTC). No additional authorization or Start button is needed. Existing schedules still require independent proof; this is not a completed repair or shift.';
    }else if(scheduled>0){
     progressState.textContent='ADVANCING · '+scheduled+
      ' capability investigation'+(scheduled===1?' is':'s are')+
