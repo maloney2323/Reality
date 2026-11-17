@@ -17,9 +17,11 @@
   'Sign in to Reality to inspect your business connections.');
  state.setAttribute('role','status');
  state.setAttribute('aria-live','polite');
+ const signinLink=create('a','rx-connection-signin','Sign in to Reality');
+ signinLink.href='/';
  const check=create('button','rx-connection-refresh','Check connections');
  check.type='button';
- head.append(state,check);section.append(head);
+ head.append(state,signinLink,check);section.append(head);
  const grid=create('div','rx-connections-grid');section.append(grid);
  root.append(section);
  let loading=false,epoch=0;
@@ -42,6 +44,7 @@
  function clear(message){
   epoch++;grid.replaceChildren();
   state.textContent=message;
+  signinLink.hidden=ownerSigned();check.hidden=!ownerSigned();
  }
  function valid(d){
   if(d?.ok!==true||
@@ -129,6 +132,7 @@
   }
   if(loading)return;
   loading=true;const thisLoad=++epoch;
+  signinLink.hidden=true;check.hidden=false;
   grid.replaceChildren();
   check.disabled=true;state.textContent='Checking Reality-owned connection evidence…';
   try{
