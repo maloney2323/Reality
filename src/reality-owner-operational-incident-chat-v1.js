@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -167,6 +167,60 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    historical_external_correction_not_reclassified:true
   };
  }
+ const continuityItems=[];
+ let continuityReadStatus='OWNER_SHIFT_CONTINUITY_EVIDENCE_UNAVAILABLE';
+ if(continuity!==null){
+  if(continuity?.status!=='OWNER_SHIFT_CONTINUITY_INCIDENTS_READ_ONLY'||
+   continuity.owner_id!==ownerId||continuity.owner_scope_verified!==true||
+   continuity.read_only!==true||
+   continuity.execution_authorized!==false||
+   continuity.installation_authorized!==false||
+   continuity.production_changed!==false||
+   continuity.self_repair_proven!==false||
+   !Array.isArray(continuity.items)||continuity.items.length>8||
+   continuity.count!==continuity.items.length)fail();
+  const types=new Set(['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE']);
+  const phases=new Set(['DETECTED','INVESTIGATION_CLAIMED',
+   'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
+   'BLOCKED_NEEDS_EVIDENCE','RECOVERED_AFTER_OBSERVATION']);
+  for(const x of continuity.items){
+   if(!UUID.test(x.incident_id||'')||!UUID.test(x.shift_id||'')||
+    !types.has(x.kind)||!phases.has(x.phase)||
+    !HASH.test(x.evidence_sha256||'')||
+    !validDate(x.first_detected_at)||
+    typeof x.error_summary!=='string'||x.error_summary.length>280||
+    typeof x.next_action!=='string'||x.next_action.length>700||
+    x.repair_executed!==false||
+    x.installation_authorized!==false||x.production_changed!==false||
+    (x.investigation_receipt_sha256!==null&&
+     !HASH.test(x.investigation_receipt_sha256))||
+    (x.phase==='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'&&
+     (!HASH.test(x.investigation_receipt_sha256||'')||
+      !x.assigned_employee||!x.independent_reviewer||
+      x.assigned_employee===x.independent_reviewer)))
+    fail();
+   continuityItems.push(Object.freeze({
+    incident_id:x.incident_id,
+    shift_id:x.shift_id,kind:x.kind,phase:x.phase,
+    source_ref:'reality:shift-continuity-incident:'+x.incident_id,
+    evidence_sha256:x.evidence_sha256,
+    observed_at:x.last_observed_at,
+    error_summary:trim(x.error_summary,280),
+    assigned_employee:trim(x.assigned_employee,100)||null,
+    independent_reviewer:trim(x.independent_reviewer,100)||null,
+    diagnosis:trim(x.diagnosis,1500)||null,
+    proposed_upgrade:trim(x.proposed_upgrade,1600)||null,
+    independent_test_requirement:trim(x.independent_test_requirement,1600)||null,
+    investigation_receipt_sha256:x.investigation_receipt_sha256,
+    next_action:trim(x.next_action,700),
+    repair_executed:false,installation_authorized:false,
+    production_changed:false,
+    self_repair_proven:false,
+    customer_job_completed:false,owner_chat_only:true
+   }));
+  }
+  continuityReadStatus='OWNER_SHIFT_CONTINUITY_INCIDENTS_VERIFIED_READ_ONLY';
+ }
  const handoffById=new Map();
  if(handoff!==null){
   if(handoff?.status!=='OWNER_INCIDENT_ORIGINAL_REPAIR_HANDOFF_READ_ONLY'||
@@ -305,6 +359,9 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   scheduler_status:source.last_scheduler_status,
   signed_worker_delivery:Object.freeze(workerDelivery),
   bounded_preview_auto_repair:Object.freeze(previewRepair),
+  shift_continuity_read_status:continuityReadStatus,
+  shift_continuity_incidents:Object.freeze(continuityItems),
+  shift_continuity_count:continuityItems.length,
   reported_next_action:trim(source.next_action,500),
   external_actions_authorized:false,production_changed:false,
   original_job_authorized_by_chat:false,installation_authorized:false
@@ -319,7 +376,7 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const [source,handoff,delivery,autoRepair]=await Promise.all([
+ const [source,handoff,delivery,autoRepair,continuity]=await Promise.all([
   call(db,'reality_read_owner_worker_recovery_status_v1',{
    p_owner_id:owner
   },{fetchImpl}),
@@ -333,10 +390,13 @@ export async function readOwnerOperationalIncidentChatBriefing({
   },{fetchImpl}).catch(()=>null),
   call(db,'reality_read_owner_preview_worker_auto_repair_v1',{
    p_owner_id:owner
+  },{fetchImpl}).catch(()=>null),
+  call(db,'reality_read_owner_shift_continuity_incidents_v1',{
+   p_owner_id:owner
   },{fetchImpl}).catch(()=>null)
  ]);
  return projectOwnerIncidentChatBriefing({
-  ownerId:owner,source,handoff,delivery,autoRepair
+  ownerId:owner,source,handoff,delivery,autoRepair,continuity
  });
 }
 export function incidentChatUniverseObservations(briefing){
@@ -346,7 +406,7 @@ export function incidentChatUniverseObservations(briefing){
   briefing.installation_authorized!==false||
   !Array.isArray(briefing.items)||briefing.items.length>5)
   return [];
- return briefing.items.slice(0,3).map(item=>Object.freeze({
+ const legacy=briefing.items.slice(0,3).map(item=>Object.freeze({
   entry_id:item.source_ref,
   event_kind:'reality_owner_operational_failure_recovery_briefing',
   source_kind:'AUTHENTICATED_OWNER_OPERATIONAL_INCIDENT_LEDGER',
@@ -376,4 +436,25 @@ export function incidentChatUniverseObservations(briefing){
   installation_authorized:false,
   production_changed:false
  }));
+ const stalls=Array.isArray(briefing.shift_continuity_incidents)?
+  briefing.shift_continuity_incidents.slice(0,3):[];
+ return [...legacy,...stalls.map(x=>Object.freeze({
+  entry_id:x.source_ref,
+  event_kind:'reality_owner_shift_continuity_stall_investigation',
+  source_kind:'AUTHENTICATED_OWNER_SHIFT_CONTINUITY_LEDGER',
+  source_ref:x.source_ref,assertion_time:x.observed_at,
+  epistemic_status:'RECORDED_STALL_NOT_INDEPENDENTLY_REPAIRED',
+  summary:'Reality detected signed-shift stall '+x.incident_id+
+   '; phase '+x.phase+'; source evidence '+x.evidence_sha256+
+   '; model-assigned employee '+(x.assigned_employee||'not assigned')+
+   '; reviewer '+(x.independent_reviewer||'not assigned')+
+   '; diagnosis is a PROPOSAL, not verified root cause: '+
+   (x.diagnosis||'not yet investigated')+
+   '; proposed capability upgrade: '+(x.proposed_upgrade||'none yet')+
+   '; independent test required: '+(x.independent_test_requirement||'not yet specified')+
+   '; next action '+x.next_action,
+  independent_investigation_receipt:x.investigation_receipt_sha256,
+  original_job_completed:false,self_repair_proven:false,
+  installation_authorized:false,production_changed:false
+ }))];
 }
