@@ -60,6 +60,12 @@ jobs:
             test/reality-same-original-frozen-attestation-v1.test.js \
             test/reality-same-original-recovery-ci-v2.test.js \
             test/reality-same-original-gateway-failure-only-v2.test.js
+      - name: Independently regress self-inquiry recovery without new authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/reality-shift-continuity-auto-investigation-v1.js
+          node --test test/reality-shift-continuity-autonomous-v1.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |
