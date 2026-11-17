@@ -191,6 +191,8 @@
      'Qualified and waiting for signed execution':
      item.phase==='SUBMITTED_AWAITING_INDEPENDENT_RECHECK'?
      'Evidence deliverable submitted · Independent source recheck pending':
+     item.phase==='REQUALIFICATION_CLAIMED'?
+      'Changed GitHub source · Same job being safely requalified':
      item.phase),
    node('p','','Current work: '+item.objective));
   if(item.current_source_title)
@@ -211,6 +213,14 @@
   if(item.blocker)
    article.append(node('p','rx-owner-incident-next',
     'Execution blocker: '+item.blocker));
+  if(item.recovery_receipt_sha256)
+   article.append(node('p','rx-owner-incident-proof',
+    'Same-job recovery attempt '+item.recovery_attempts+
+    ' · Original failure preserved · Receipt: '+item.recovery_receipt_sha256+
+    ' · This is NOT a code repair'));
+  if(item.last_failure_reason)
+   article.append(node('p','rx-owner-incident-next',
+    'Previous verified blocker: '+item.last_failure_reason));
   article.append(node('p','rx-owner-incidents-caption',
    'Read-only source deliverable. Not a code installation or settled customer job.'));
   return article;
