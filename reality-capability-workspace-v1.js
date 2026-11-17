@@ -58,12 +58,100 @@
  const progressIncidents=make('div','rc-cap-incident-list');
  progress.append(progressHeading,progressState,progressNext,progressIncidents);
  section.append(progress);
+ // Separate demonstration warrant: this is intentionally NOT the standing
+ // research grant and NOT a customer/production repair authorization.
+ const demo=make('section','rc-cap-demo');
+ demo.setAttribute('aria-label','Isolated self-repair demonstration');
+ demo.append(make('strong','','Self-repair demonstration'),
+  make('p','',
+   'Run one safe, isolated test: Reality’s AI proposes a repair to a disposable internal fixture, the existing governed engine applies it, and separate checks verify the SAME original job resumes. No repository, customer, production, or payment changes.'));
+ const demoButton=make('button','rc-outline rc-cap-demo-run',
+  'Run isolated self-repair demo');
+ demoButton.type='button';
+ const demoStatus=make('p','rc-cap-demo-state',
+  'Ready to inspect the last owner-scoped demonstration receipt.');
+ const demoReceipt=make('p','rc-cap-demo-receipt','');
+ demo.append(demoButton,demoStatus,demoReceipt);
+ section.append(demo);
  const list=make('div','rc-cap-list');
  const notice=make('p','rc-cap-notice','Checking verified capability evidence…');
  section.append(notice,list);
  const queue=stage.querySelector('.rc-queue');
  if(queue)stage.insertBefore(section,queue);else stage.append(section);
- let latest=null,loading=false;
+ let latest=null,loading=false,demoBusy=false;
+ const readDemo=async()=>{
+  try{
+   const response=await fetch('/api/reality/personal-self-repair-demo',{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(20000)
+   });
+   const read=await response.json().catch(()=>null);
+   if(!response.ok||read?.ok!==true||
+    read.status!=='OWNER_ISOLATED_SELF_REPAIR_DEMO_READ_ONLY'||
+    read.owner_scope_verified!==true||
+    read.demo_only!==true||
+    read.customer_job_completed!==false||
+    read.installation_authorized!==false||
+    read.production_changed!==false)
+    throw Error('SELF_REPAIR_DEMO_READBACK_UNVERIFIED');
+   if(read.phase==='VERIFIED'&&
+    /^sha256:[a-f0-9]{64}$/.test(read.final_receipt_sha256||'')){
+    demoStatus.textContent='ISOLATED DEMO VERIFIED · The governed executor completed the temporary repair and the original job passed its independent checks.';
+    demoReceipt.textContent='Durable demonstration receipt: '+read.final_receipt_sha256+
+     '. This does not prove an autonomous production repair.';
+   }else if(read.phase==='FAILED'){
+    demoStatus.textContent='DEMO BLOCKED · The attempted repair did not produce a verified final receipt.';
+    demoReceipt.textContent='Next: '+(read.failure_code||'Independent proof unavailable')+
+     '. No live repair was authorized.';
+   }else if(read.phase==='CLAIMED'){
+    demoStatus.textContent='DEMO UNCERTAIN · The owner grant was consumed, but no final verification is recorded.';
+    demoReceipt.textContent='Next: use Check work progress or inspect the owner receipt; do not start a duplicate run to guess the outcome.';
+   }else{
+    demoStatus.textContent='No isolated self-repair demonstration has been recorded yet.';
+    demoReceipt.textContent='One authenticated Start authorizes only this disposable demonstration, not real customer work.';
+   }
+  }catch{
+   demoStatus.textContent='Demo status readback unavailable; no success is assumed.';
+   demoReceipt.textContent='Next: check Reality’s authenticated status again.';
+  }
+ };
+ demoButton.addEventListener('click',async()=>{
+  if(demoBusy||loading)return;
+  if(!window.confirm(
+   'Run one isolated, temporary self-repair demonstration with AI? It may use a model call and records one owner-scoped test receipt. It CANNOT deploy, spend money, message customers, or modify your business records.'
+  ))return;
+  demoBusy=true;demoButton.disabled=true;
+  demoStatus.textContent='AUTHORIZED · Reality is reproducing an isolated failure, requesting a bounded model patch, and verifying the original job.';
+  demoReceipt.textContent='Next: await the returned independent receipt or a specific blocker. No additional approval is required within this exact test.';
+  try{
+   const response=await fetch('/api/reality/personal-self-repair-demo',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({action:'RUN_ONE_ISOLATED_SELF_REPAIR_DEMO'}),
+    signal:AbortSignal.timeout(58000)
+   });
+   const receipt=await response.json().catch(()=>null);
+   if(!response.ok||receipt?.ok!==true||
+    receipt.status!=='EXACT_ORIGINAL_ISOLATED_SELF_REPAIR_VERIFIED'||
+    receipt.independent_final_receipt_verified!==true||
+    receipt.existing_governed_executor_used!==true||
+    receipt.original_work_resumed!==true||
+    receipt.demo_only!==true||
+    receipt.customer_job_completed!==false||
+    receipt.production_changed!==false||
+    !/^sha256:[a-f0-9]{64}$/.test(receipt.final_receipt_sha256||''))
+    throw Error('SELF_REPAIR_DEMO_FINAL_PROOF_REQUIRED');
+   demoStatus.textContent='VERIFIED ISOLATED TEST · Repair applied through the existing governor, independently checked, and the same original job resumed.';
+   demoReceipt.textContent='Receipt: '+receipt.final_receipt_sha256+
+    '. Next: a real autonomous customer repair requires a current independently reproduced original defect and an existing execution warrant.';
+  }catch{
+   demoStatus.textContent='UNVERIFIED · This demo did not return a complete independent receipt.';
+   demoReceipt.textContent='Next: inspect the owner-scoped recorded status. No live repair or production action is assumed.';
+  }finally{
+   demoBusy=false;demoButton.disabled=false;
+   void readDemo();
+  }
+ });
  const formatDate=s=>{
   if(!s)return 'Not active';
   const d=new Date(s);
@@ -291,4 +379,5 @@
    void refreshUI();
  },30000);
  void refreshUI();
+ void readDemo();
 })();
