@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {parseContinuityModelInvestigation,investigateOneSignedShiftContinuityIncident,
- CONTINUITY_SELF_INQUIRY_QUESTIONS}
+ CONTINUITY_SELF_INQUIRY_QUESTIONS,classifySignedContinuityClaimTransportError}
  from '../src/reality-shift-continuity-auto-investigation-v1.js';
 import {projectOwnerIncidentChatBriefing,incidentChatUniverseObservations}
  from '../src/reality-owner-operational-incident-chat-v1.js';
@@ -733,4 +733,30 @@ test('qualification watchdog counts ORIGINAL claims not evidence-only jobs',()=>
  assert.doesNotMatch(migration,/not exists\(\s*select 1 from reality_internal\.owner_qualified_employee_evidence_jobs_v1/);
  assert.doesNotMatch(migration,/insert into reality_internal\.governed_employee_original_claims_v1/i);
  assert.doesNotMatch(migration,/cron\.alter_job|cron\.schedule\(/i);
+});
+
+test('signed investigation claim errors have distinct safe diagnostics without exposing raw provider detail',()=>{
+ assert.equal(classifySignedContinuityClaimTransportError(
+  new Error('SHIFT_DATABASE_RPC_reality_claim_next_shift_continuity_investigation_v1_UNAVAILABLE')),
+  'SIGNED_INVESTIGATION_DATABASE_RPC_REJECTED');
+ assert.equal(classifySignedContinuityClaimTransportError(
+  new Error('SHIFT_RPC_NOT_ALLOWLISTED')),
+  'INVESTIGATION_RPC_TRANSPORT_NOT_CONNECTED');
+ assert.equal(classifySignedContinuityClaimTransportError(
+  new Error('SHIFT_CONTINUITY_SOURCE_BOUND_INCIDENT_LEASE_UNVERIFIED')),
+  'SIGNED_INVESTIGATION_CLAIM_INVALID');
+ assert.equal(classifySignedContinuityClaimTransportError(
+  new Error('Unauthorized credential: secret-text')),
+  'INVESTIGATION_RUNTIME_UNVERIFIED');
+});
+test('signed source-claim coalesce SQL is executable and not schema-qualified',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_qualification_incident_source_claim_coalesce_v9.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/'failed_source_ref',coalesce\(/);
+ assert.doesNotMatch(sql,/'failed_source_ref',pg_catalog\.coalesce\(/);
+ assert.match(sql,/t\.claim_id=i\.source_claim_id/);
+ assert.match(sql,/t\.owner_id=i\.owner_id/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.doesNotMatch(sql,/cron\.schedule\(|cron\.alter_job/);
 });
