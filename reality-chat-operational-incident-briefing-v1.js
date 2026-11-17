@@ -23,10 +23,12 @@
  header.append(refresh);
  const status=node('p','rx-owner-incidents-status',
   'Checking Reality’s existing owner-scoped incident ledger…');
+ const workerReceipt=node('p','rx-owner-worker-receipt',
+  'Checking independent signed-worker execution receipts…');
  const cards=node('div','rx-owner-incidents-items');
  const description=node('p','rx-owner-incidents-caption',
   'For this signed-in owner only. Incident evidence is not a customer message, original-job authorization or independent repair receipt.');
- root.append(header,status,cards,description);
+ root.append(header,status,workerReceipt,cards,description);
  thread.parentNode.insertBefore(root,thread);
  let busy=false,seen=null;
  const isChat=()=>document.body?.dataset?.realityRoute==='chat'||
@@ -133,6 +135,24 @@
       x.install_authorized_by_chat!==false||
       x.customer_notified!==false))
     throw Error('OWNER_OPERATIONAL_BRIEFING_READBACK_UNVERIFIED');
+   const actual=feed.signed_worker_delivery;
+   if(!actual||typeof actual!=='object'||
+    actual.scheduler_success_alone_proves_execution!==false||
+    actual.actual_worker_process_attested!==true&&
+      actual.actual_worker_process_attested!==false||
+    typeof actual.next_action!=='string')
+     throw Error('SIGNED_WORKER_ACTUAL_EXECUTION_EVIDENCE_UNVERIFIED');
+   const stageText={
+    SIGNED_WORKER_PROCESS_COMPLETED:'Signed worker process finished',
+    SIGNED_WORKER_FAILURE_RECORDED:'Signed worker process failed',
+    SIGNED_WORKER_STARTED_NO_FINAL_RECEIPT:'Signed worker started · final receipt pending',
+    SIGNED_WORKER_STALLED_OR_FINAL_RECEIPT_MISSING:
+      'Signed worker start observed · final receipt missing beyond the bounded window',
+    SIGNED_WORKER_PROCESS_NOT_YET_ATTESTED:
+      'Scheduler dispatch is not proof that the signed worker started'
+   }[actual.phase]||'Signed worker process status not independently verified';
+   workerReceipt.textContent='Actual worker: '+stageText+
+    '. '+actual.next_action;
    const snapshot=JSON.stringify(feed.items);
    if(snapshot!==seen){
     cards.replaceChildren(...feed.items.map(render));
@@ -146,6 +166,7 @@
    if(!feed.count)cards.replaceChildren();
   }catch{
    status.textContent='Reality cannot independently read its current operational incident status. No recovery or repair is assumed.';
+   workerReceipt.textContent='Worker execution evidence unavailable. A successful cron dispatch alone never proves completed work.';
   }finally{busy=false;refresh.disabled=false;}
  };
  refresh.addEventListener('click',()=>{void update()});
