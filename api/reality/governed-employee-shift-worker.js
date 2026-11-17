@@ -98,7 +98,7 @@ import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
 import {runOneStandingEmployeeDiscovery}
  from '../../src/reality-standing-employee-discovery-v1.js';
-import {scheduleOneStandingCapability}
+import {scheduleOneStandingCapability,scheduleOneStandingOperationalRecovery}
  from '../../src/reality-capability-role-schedule-worker-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
@@ -152,8 +152,24 @@ export default async function handler(req,res){
   // evidence-only delegation. A grant does not start a shift or install code.
   // No owner, source, or grant can arrive from the HTTP request.
   workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
-  const capabilityScheduleResult=
+  // Reality's own watchdog captures signed-worker failures before they reach
+  // this handler. Give incident investigation first claim on an already
+  // delegated evidence-only wake; never auto-approve the actual repair.
+  const operationalRecoveryResult=
    wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'?
+    await scheduleOneStandingOperationalRecovery({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_WORKER_INCIDENT_INVESTIGATION_UNVERIFIED',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_RECOVERY',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  const capabilityScheduleResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'?
     await scheduleOneStandingCapability({
      db,env:process.env,fetchImpl:fetch
     }).catch(()=>({
@@ -169,6 +185,7 @@ export default async function handler(req,res){
   // ordinary source investigation. Existing signed shift work is unaffected.
   const standingDiscoveryResult=
    wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'&&
    capabilityScheduleResult.status===
     'NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'?
     await runOneStandingEmployeeDiscovery({
@@ -1415,6 +1432,7 @@ export default async function handler(req,res){
     employee_time_inquiry_receipt:employeeTemporalInquiry,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
+    operational_self_recovery_investigation:operationalRecoveryResult,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
