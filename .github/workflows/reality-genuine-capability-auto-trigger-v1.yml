@@ -2,7 +2,7 @@ name: Reality governed automatic capability discovery — original frozen failur
 on:
   push:
     branches:
-      - 'reality/**'
+      - 'reality/chat-direct-work-handoff-20261115'
     # A verified capability trigger is a data-only file from Reality's
     # source-bound signed broker; ordinary code pushes must NOT auto-build.
     paths:
