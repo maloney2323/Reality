@@ -124,11 +124,27 @@ export default async function handler(req,res){
     Array.isArray(req.body)||Object.keys(req.body).length>0)))
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  let activePulseDb=null,activePulseShiftId=null;
+ let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
  let workerStage='SHIFT_DB_BOUNDARY';
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
+  // Cron SQL success is only queued HTTP; this durable receipt proves the
+  // authenticated server worker actually entered its lifecycle.
+  actualWorkerRunId=crypto.randomUUID();
+  const realRun=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
+   p_run_id:actualWorkerRunId,
+   p_status:'STARTED',p_stage:'SHIFT_DB_BOUNDARY'
+  });
+  if(realRun?.status!=='SIGNED_WORKER_RUN_STARTED'||
+     realRun.run_id!==actualWorkerRunId||
+     realRun.actual_worker_process_seen!==true||
+     realRun.original_job_completed!==false||
+     realRun.repair_executed!==false||
+     realRun.installation_authorized!==false||
+     realRun.production_changed!==false)
+    throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
   // Existing owner-shift continuation, never another start or approval:
   // independently verify same installed Git/Vercel commit and TWO distinct
   // source+original acceptance CI runs before recording the final receipt.
@@ -1529,5 +1545,20 @@ export default async function handler(req,res){
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
    work_completed:false,installation_authorized:false,
    production_changed:false});
+ }finally{
+  // Independently attest actual completion or failure even when a worker
+  // response has already been sent. No false 'successful job' claim.
+  if(actualWorkerRunId&&activePulseDb){
+   const result=res.statusCode>=500?'FAILED':'COMPLETED';
+   const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
+    workerStage:'UNCLASSIFIED_STAGE';
+   try{
+    await shiftRpc(activePulseDb,'reality_record_signed_worker_actual_run_v1',{
+     p_run_id:actualWorkerRunId,p_status:result,p_stage:stage
+    });
+   }catch{
+    console.warn('REALITY_SIGNED_WORKER_FINAL_ATTESTATION_UNAVAILABLE');
+   }
+  }
  }
 }
