@@ -194,6 +194,13 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     x.installation_authorized!==false||x.production_changed!==false||
     (x.investigation_receipt_sha256!==null&&
      !HASH.test(x.investigation_receipt_sha256))||
+    (x.phase==='RECOVERED_AFTER_OBSERVATION'&&
+     (!HASH.test(x.recovery_receipt_sha256||'')||
+      !UUID.test(x.resolved_worker_run_id||'')||
+      !UUID.test(x.resolved_inquiry_claim_id||'')||
+      !validDate(x.recovered_at)||
+      x.recovery_attribution!==
+       'WORK_RESUMED_AFTER_OBSERVATION_SELF_REPAIR_UNPROVEN'))||
     (x.phase==='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'&&
      (!HASH.test(x.investigation_receipt_sha256||'')||
       !x.assigned_employee||!x.independent_reviewer||
@@ -212,6 +219,16 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     proposed_upgrade:trim(x.proposed_upgrade,1600)||null,
     independent_test_requirement:trim(x.independent_test_requirement,1600)||null,
     investigation_receipt_sha256:x.investigation_receipt_sha256,
+    work_resumption_verified:x.phase==='RECOVERED_AFTER_OBSERVATION',
+    independent_resumption_receipt_sha256:
+     x.phase==='RECOVERED_AFTER_OBSERVATION'?
+       x.recovery_receipt_sha256:null,
+    verified_worker_run_id:
+     x.phase==='RECOVERED_AFTER_OBSERVATION'?
+       x.resolved_worker_run_id:null,
+    verified_original_inquiry_claim_id:
+     x.phase==='RECOVERED_AFTER_OBSERVATION'?
+       x.resolved_inquiry_claim_id:null,
     next_action:trim(x.next_action,700),
     repair_executed:false,installation_authorized:false,
     production_changed:false,
@@ -443,7 +460,9 @@ export function incidentChatUniverseObservations(briefing){
   event_kind:'reality_owner_shift_continuity_stall_investigation',
   source_kind:'AUTHENTICATED_OWNER_SHIFT_CONTINUITY_LEDGER',
   source_ref:x.source_ref,assertion_time:x.observed_at,
-  epistemic_status:'RECORDED_STALL_NOT_INDEPENDENTLY_REPAIRED',
+  epistemic_status:x.work_resumption_verified?
+   'SIGNED_WORKER_AND_SOURCE_RESUMPTION_VERIFIED_SELF_REPAIR_UNPROVEN':
+   'RECORDED_STALL_NOT_INDEPENDENTLY_REPAIRED',
   summary:'Reality detected signed-shift stall '+x.incident_id+
    '; phase '+x.phase+'; source evidence '+x.evidence_sha256+
    '; model-assigned employee '+(x.assigned_employee||'not assigned')+
@@ -452,6 +471,9 @@ export function incidentChatUniverseObservations(briefing){
    (x.diagnosis||'not yet investigated')+
    '; proposed capability upgrade: '+(x.proposed_upgrade||'none yet')+
    '; independent test required: '+(x.independent_test_requirement||'not yet specified')+
+   '; source-bound work resumption independently verified '+x.work_resumption_verified+
+   '; resumption receipt '+(x.independent_resumption_receipt_sha256||'not yet available')+
+   '; root-cause patch independently verified FALSE'+
    '; next action '+x.next_action,
   independent_investigation_receipt:x.investigation_receipt_sha256,
   original_job_completed:false,self_repair_proven:false,
