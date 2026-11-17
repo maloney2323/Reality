@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -35,6 +35,39 @@ export function projectOwnerIncidentChatBriefing({ownerId,source}={}){
    source.incident_count!==source.incidents.length||
    typeof source.next_action!=='string'||source.next_action.length>650)
   fail();
+ const handoffById=new Map();
+ if(handoff!==null){
+  if(handoff?.status!=='OWNER_INCIDENT_ORIGINAL_REPAIR_HANDOFF_READ_ONLY'||
+   handoff.owner_id!==ownerId||handoff.owner_scope_verified!==true||
+   handoff.read_only!==true||handoff.original_job_created!==false||
+   handoff.repair_executed!==false||handoff.installation_authorized!==false||
+   handoff.production_changed!==false||
+   !Array.isArray(handoff.items)||handoff.items.length>8||
+   handoff.count!==handoff.items.length)fail();
+  const statuses=new Set([
+   'UNASSESSED','RECOVERED_PREVIOUSLY_NO_REPLAY',
+   'WAITING_FOR_CURRENT_INDEPENDENT_FAILURE',
+   'ORIGINAL_WARRANT_AND_FROZEN_PROOF_REQUIRED',
+   'EXISTING_ORIGINAL_RECOVERY_ELIGIBLE',
+   'EXISTING_ORIGINAL_RECOVERY_CLAIMED',
+   'EXISTING_ORIGINAL_OBLIGATION_PRESERVED',
+   'ORIGINAL_RECOVERY_PROOF_FAILED_NEEDS_REVIEW'
+  ]);
+  for(const item of handoff.items){
+   if(!UUID.test(item.incident_id||'')||
+    !statuses.has(item.handoff_status)||
+    item.original_created_by_handoff!==false||
+    item.repair_executed_by_handoff!==false||
+    item.installation_authorized!==false||
+    item.production_changed!==false||
+    (item.original_work_id!=null&&
+     !/^work:[a-f0-9]{32}$/.test(item.original_work_id))||
+    (item.original_handoff_receipt_sha256!=null&&
+     !HASH.test(item.original_handoff_receipt_sha256))||
+    handoffById.has(item.incident_id))fail();
+   handoffById.set(item.incident_id,item);
+  }
+ }
  const items=source.incidents.slice(0,5).map(x=>{
   if(!UUID.test(x.incident_id||'')||!phases.has(x.phase)||
     typeof x.error_summary!=='string'||x.error_summary.length<4||
@@ -52,6 +85,11 @@ export function projectOwnerIncidentChatBriefing({ownerId,source}={}){
       x.operational_continuity_verified===true))
    fail();
   const recovered=x.phase==='OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX';
+  const handoffItem=handoffById.get(x.incident_id)||null;
+  const handoffStatus=handoffItem?.handoff_status||'HANDOFF_READBACK_UNAVAILABLE';
+  if(recovered&&
+   handoffItem&&handoffStatus!=='RECOVERED_PREVIOUSLY_NO_REPLAY')
+   fail();
   const employee=trim(x.assigned_employee,85)||null;
   const reviewer=trim(x.independent_reviewer,85)||null;
   const summary=recovered?
@@ -70,6 +108,10 @@ export function projectOwnerIncidentChatBriefing({ownerId,source}={}){
    x.phase==='EMPLOYEE_INVESTIGATION_SCHEDULED'?
    'Verify a CURRENT missing capability against independent evidence; bind a qualifying original job to the EXISTING repair governor only when its warrant permits execution.':
    'Investigate the observed failure, preserve exact receipts, and schedule independent review; do not wait for a manual restart if delegated investigation is permitted.';
+  const governedNext=handoffItem?.next_action;
+  const meaningfulNext=typeof governedNext==='string'&&
+    governedNext.length>=10&&governedNext.length<=500?
+    governedNext:next;
   return Object.freeze({
    incident_id:x.incident_id,
    source_ref:'reality:operational-incident:'+x.incident_id,
@@ -80,7 +122,12 @@ export function projectOwnerIncidentChatBriefing({ownerId,source}={}){
    assigned_employee:employee,independent_reviewer:reviewer,
    investigation_scope:trim(x.investigation_scope,900)||null,
    independent_test_requirement:trim(x.independent_test_requirement,900)||null,
-   outcome:summary,next_action:next,
+   outcome:summary,next_action:meaningfulNext,
+   governed_original_handoff_status:handoffStatus,
+   linked_existing_original_work_id:handoffItem?.original_work_id||null,
+   existing_original_handoff_receipt_sha256:
+    handoffItem?.original_handoff_receipt_sha256||null,
+   repair_executed_by_handoff:false,
    operational_continuity_verified:recovered,
    operational_recovery_receipt_sha256:recovered?
     x.operational_recovery_receipt_sha256:null,
@@ -114,10 +161,17 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const source=await call(db,'reality_read_owner_worker_recovery_status_v1',{
-  p_owner_id:owner
- },{fetchImpl});
- return projectOwnerIncidentChatBriefing({ownerId:owner,source});
+ const [source,handoff]=await Promise.all([
+  call(db,'reality_read_owner_worker_recovery_status_v1',{
+   p_owner_id:owner
+  },{fetchImpl}),
+  // If this optional proof reader is temporarily unavailable, preserve the
+  // authenticated incident without fabricating an original-job authorization.
+  call(db,'reality_read_owner_incident_original_handoff_v1',{
+   p_owner_id:owner
+  },{fetchImpl}).catch(()=>null)
+ ]);
+ return projectOwnerIncidentChatBriefing({ownerId:owner,source,handoff});
 }
 export function incidentChatUniverseObservations(briefing){
  if(briefing?.status!=='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'||
@@ -141,6 +195,8 @@ export function incidentChatUniverseObservations(briefing){
    '; assigned employee '+(item.assigned_employee||'not yet assigned')+
    '; reviewer '+(item.independent_reviewer||'not yet assigned')+
    '; outcome '+item.outcome+
+   '; governed original handoff '+item.governed_original_handoff_status+
+   '; existing original '+(item.linked_existing_original_work_id||'not verified')+
    '; NEXT '+item.next_action,
   independent_recovery_receipt:item.operational_recovery_receipt_sha256,
   original_job_completed:false,
