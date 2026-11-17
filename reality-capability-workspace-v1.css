@@ -57,3 +57,24 @@
  #realityCapabilities .rc-cap-head{flex-direction:column}
  #realityCapabilities .rc-cap-refresh{width:100%}
 }
+
+/* Evidence-based continuity feedback: never leave an owner at a silent switch. */
+#realityCapabilities .rc-cap-progress{
+ border:1px solid #3c5c73;border-radius:14px;background:#101f2f;
+ padding:15px;margin:0 0 16px;overflow-wrap:anywhere
+}
+#realityCapabilities .rc-cap-progress>strong{font-size:15px}
+#realityCapabilities .rc-cap-progress-state{
+ font-size:13px;color:#e1edf7;line-height:1.55;margin:9px 0
+}
+#realityCapabilities .rc-cap-progress-next{
+ font-size:13px;color:#b7d6e8;line-height:1.6;margin:8px 0 2px
+}
+#realityCapabilities .rc-cap-incident{
+ margin-top:12px;padding:12px;border-radius:11px;
+ background:#172b3a;border:1px solid #557188
+}
+#realityCapabilities .rc-cap-incident strong{font-size:12px}
+#realityCapabilities .rc-cap-incident p{
+ font-size:12px;color:#c0d7e7;line-height:1.55;margin:7px 0 0
+}
