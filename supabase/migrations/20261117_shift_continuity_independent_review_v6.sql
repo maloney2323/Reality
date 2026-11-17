@@ -151,3 +151,17 @@ grant execute on function public.reality_record_shift_continuity_independent_rev
  to service_role;
 revoke execute on function reality_internal.reconcile_stale_continuity_reviews_v1()
  from public,anon,authenticated;
+
+-- Extend the existing watchdog; do not create another scheduler.
+do $watch$
+declare j_id bigint; cmd text;
+begin
+ select jobid,command into strict j_id,cmd from cron.job
+ where jobname='reality-governed-wake-watchdog-v1'
+  and schedule='* * * * *' and active=true
+  and command like '%reconcile_shift_continuity_investigation_claims_v1%';
+ if position('reconcile_stale_continuity_reviews_v1' in cmd)=0 then
+  perform cron.alter_job(j_id,command=>cmd||
+   E'\nSELECT reality_internal.reconcile_stale_continuity_reviews_v1();');
+ end if;
+end $watch$;
