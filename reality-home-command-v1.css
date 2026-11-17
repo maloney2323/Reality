@@ -152,6 +152,11 @@ body[data-reality-route="home"] .rc-heading h2{
  font-size:clamp(17px,1.7vw,21px);line-height:1.25;
  color:#f7fbff;margin:0;
 }
+body[data-reality-route="home"] .rc-discovery-summary{
+ margin:10px 0 7px;padding:10px 12px;border:1px solid #316b93;
+ border-radius:10px;background:#0b2c4c;color:#c6eafd;
+ font-size:12px;line-height:1.65;overflow-wrap:anywhere
+}
 body[data-reality-route="home"] .rc-capacity{
  font-size:12px;line-height:1.55;color:#b6cfe2;margin:10px 0;
 }
