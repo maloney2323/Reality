@@ -85,6 +85,7 @@ jobs:
           node --test test/reality-eight-role-source-discovery-v1.test.js
           node --test test/reality-employee-pr-role-discovery-v1.test.js
           node --test test/reality-owner-connections-workspace-v1.test.js
+          node --test test/reality-owner-connection-auto-discovery-catalog-v1.test.js
           node --check api/reality/personal-connections.js
           node --check reality-connections-workspace-v1.js
           node --check reality-unified-shell-v1.js
