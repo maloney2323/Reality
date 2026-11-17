@@ -148,6 +148,9 @@ export async function investigateOneSignedShiftContinuityIncident({
   }
   const payload={
    model,store:false,tool_choice:'none',max_output_tokens:1100,
+   // GPT-5.4 supports no reasoning effort for short evidence-grounded triage.
+   // Keep the configured frontier model and do not alter other model families.
+   ...(model==='gpt-5.4'?{reasoning:{effort:'none'}}:{}),
    text:{format:{type:'json_schema',
     name:'reality_signed_shift_continuity_incident_triage',
     strict:true,schema:{type:'object',additionalProperties:false,
