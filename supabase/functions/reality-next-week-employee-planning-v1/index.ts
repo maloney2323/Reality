@@ -26,7 +26,8 @@ async function rpc(name:string,args:Record<string,unknown>,
   'reality_authenticate_employee_shift_wake_v1',
   'reality_store_next_week_source_snapshot_v1',
   'reality_read_next_week_source_snapshot_v1',
-  'reality_read_current_shift_execution_graph_v1']);
+  'reality_read_current_shift_execution_graph_v1',
+  'reality_refresh_employee_discovery_v1']);
  if(!allowed.has(name))deny('SERVICE_RPC_NOT_ALLOWED');
  const r=await fetch(env.url+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -36,7 +37,8 @@ async function rpc(name:string,args:Record<string,unknown>,
  const x=await r.json().catch(()=>null);
  if(!r.ok||!x||Array.isArray(x)||typeof x!=='object'){
   const phase=name==='reality_authenticate_employee_shift_wake_v1'?'AUTH':
-   name==='reality_store_next_week_source_snapshot_v1'?'STORE':'READ';
+   name==='reality_store_next_week_source_snapshot_v1'?'STORE':
+   name==='reality_refresh_employee_discovery_v1'?'EMPLOYEE_DISCOVERY':'READ';
   // Only stable RPC stage, HTTP code and PostgREST error class; no tokens,
   // raw provider responses or user data ever appear in logs.
   const errorClass=typeof x?.code==='string'&&/^[A-Z0-9_]{3,10}$/.test(x.code)?
@@ -215,6 +217,23 @@ Deno.serve(async req=>{
    read.installation_authorized!==false||
    read.production_changed!==false)
    deny('INDEPENDENT_NEXT_WEEK_READBACK_MISMATCH');
+  // The SAME existing six-hour cron wake now refreshes all eight role
+  // evidence inventories, drawing on the new GitHub source snapshot and
+  // independently saved market/capability records. No new cron or model.
+  // Failure cannot become a claimed successful eight-role discovery pass.
+  const discovery=await rpc('reality_refresh_employee_discovery_v1',{},env);
+  if(discovery.status!=='EMPLOYEE_DISCOVERY_OBSERVATIONS_SAVED'||
+   !/^[a-f0-9-]{36}$/.test(String(discovery.scan_id||''))||
+   !Number.isSafeInteger(discovery.owners_scanned)||
+   discovery.owners_scanned<1||discovery.owners_scanned>20||
+   discovery.source_issues_inspected!==issues.length||
+   discovery.owner_issue_observations!==
+    issues.length*discovery.owners_scanned||
+   discovery.qualified_executable_jobs!==0||
+   discovery.shift_authorized!==false||
+   discovery.installation_authorized!==false||
+   discovery.production_changed!==false)
+   deny('EMPLOYEE_DISCOVERY_READBACK_UNVERIFIED');
   return response(200,{ok:true,
    status:'NEXT_WEEK_SOURCE_SNAPSHOT_INDEPENDENTLY_READ_BACK',
    week_start:weekStart,
@@ -227,6 +246,10 @@ Deno.serve(async req=>{
    qualified_executable_originals_created:0,
    source_sha256:digest,
    background_prepared_at:read.prepared_at,
+   employee_discovery_status:discovery.status,
+   employee_discovery_scan_id:discovery.scan_id,
+   employee_roles_scanned:8*discovery.owners_scanned,
+   qualified_executable_originals_created:0,
    ...facts});
  }catch(e){
   const code=String(e instanceof Error?e.message:'UNVERIFIED_FAILURE');
