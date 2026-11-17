@@ -96,6 +96,7 @@ export async function reviewOneSignedBusinessQualificationStall({
  return safe(r.status,{
   incident_id:claim.incident_id,owner_id:claim.owner_id,
   shift_id:shiftId,reviewer:claim.reviewer,
+  review_attempt:claim.review_attempt,
   independent_receipt_sha256:r.independent_receipt_sha256,
   source_backed_inquiries:r.source_backed_inquiries,
   original_job_claims:r.original_job_claims,
