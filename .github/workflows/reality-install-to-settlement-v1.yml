@@ -83,6 +83,7 @@ jobs:
           node --test test/reality-owner-fresh-shift-queue-v1.test.js
           node --test test/reality-owner-settled-source-inventory-v1.test.js
           node --test test/reality-eight-role-source-discovery-v1.test.js
+          node --test test/reality-employee-pr-role-discovery-v1.test.js
           node --test test/reality-home-command-v1.test.js
           node --check api/reality/personal-employee-roster.js
           node --check reality-home-employee-brief-v1.js
