@@ -146,7 +146,7 @@ body.reality-unified-ui[data-reality-route="home"]
 /* Employees uses the SAME authenticated roster and weekly source plan as Home:
    no second employee board, API, team roster or schedule state. */
 body.reality-unified-ui[data-reality-route="employees"]
- main>:not(.top):not(#realitySimpleHome):not(#privateChat){display:none!important}
+ main>:not(.top):not(#realitySimpleHome):not(#privateChat):not(#realityTimeHorizon){display:none!important}
 body.reality-unified-ui[data-reality-route="employees"] #realitySimpleHome{
  max-width:none!important;margin:0;padding:0!important;
  background:transparent!important;border:0!important;
@@ -170,7 +170,7 @@ body.reality-unified-ui[data-reality-route="employees"] .rc-capacity{
 }
 /* Work: reuse its original discovery, unfinished-job and receipt controls. */
 body.reality-unified-ui[data-reality-route="work"]
- main>:not(.top):not(#realityUnifiedView):not(#workCenter):not(#privateChat){display:none!important}
+ main>:not(.top):not(#realityUnifiedView):not(#workCenter):not(#privateChat):not(#realityTimeHorizon){display:none!important}
 body.reality-unified-ui[data-reality-route="work"] #workCenter{
  display:block!important;max-width:none;min-width:0;
  border:1px solid #286b9b;background:linear-gradient(145deg,#082345,#05182f);
@@ -193,7 +193,7 @@ body.reality-unified-ui[data-reality-route="work"] #workCenter button:not(:disab
 }
 /* Shifts shows the SAME governed planner in a dedicated destination. */
 body.reality-unified-ui[data-reality-route="shifts"]
- main>:not(.top):not(#realityUnifiedView):not(#privateChat){display:none!important}
+ main>:not(.top):not(#realityUnifiedView):not(#privateChat):not(#realityTimeHorizon){display:none!important}
 body.reality-unified-ui[data-reality-route="shifts"] .rx-shift-card
  :is(h2,h3,h4){color:#e6f5ff}
 body.reality-unified-ui[data-reality-route="shifts"] .rx-shift-card
