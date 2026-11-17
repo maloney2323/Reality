@@ -25,10 +25,12 @@
   'Checking Reality’s existing owner-scoped incident ledger…');
  const workerReceipt=node('p','rx-owner-worker-receipt',
   'Checking independent signed-worker execution receipts…');
+ const repairReceipt=node('p','rx-owner-preview-repair-status',
+  'Checking automatic preview repair and independently resumed work…');
  const cards=node('div','rx-owner-incidents-items');
  const description=node('p','rx-owner-incidents-caption',
   'For this signed-in owner only. Incident evidence is not a customer message, original-job authorization or independent repair receipt.');
- root.append(header,status,workerReceipt,cards,description);
+ root.append(header,status,workerReceipt,repairReceipt,cards,description);
  thread.parentNode.insertBefore(root,thread);
  let busy=false,seen=null;
  const isChat=()=>document.body?.dataset?.realityRoute==='chat'||
@@ -153,6 +155,34 @@
    }[actual.phase]||'Signed worker process status not independently verified';
    workerReceipt.textContent='Actual worker: '+stageText+
     '. '+actual.next_action;
+   const repair=feed.bounded_preview_auto_repair;
+   if(!repair||typeof repair!=='object'||
+    !Array.isArray(repair.items)||repair.items.length>6||
+    repair.count!==repair.items.length||
+    repair.historical_external_correction_not_reclassified!==true)
+    throw Error('OWNER_PREVIEW_AUTONOMOUS_REPAIR_STATUS_UNVERIFIED');
+   if(repair.count){
+    const r=repair.items[0];
+    const label={
+     PATCH_APPLIED_AWAITING_WORKER:
+      'Known preview fault corrected; waiting for the actual signed worker',
+     WORKER_ATTESTED_AWAITING_ORIGINAL:
+      'Signed worker recovered; original authorized work still needs independent verification',
+     INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED:
+      'Automatic preview repair, signed worker and resumed original work independently verified',
+     BLOCKED_UNRECOGNIZED_SCOPE:
+      'Blocked: the failure does not match an approved safe repair recipe',
+     BLOCKED_EVIDENCE_OR_WORKER_MISSING:
+      'Blocked: required independent repair evidence is missing'
+    }[r.phase]||'Unverified repair state';
+    repairReceipt.textContent='Automatic preview recovery: '+label+
+     '. '+r.next_action+
+     ' · Receipt: '+r.receipt_sha256;
+   }else{
+    repairReceipt.textContent=
+     'Automatic preview recovery: no current self-repair attempt recorded. '+
+     'The historical scheduler correction was external and remains classified that way.';
+   }
    const snapshot=JSON.stringify(feed.items);
    if(snapshot!==seen){
     cards.replaceChildren(...feed.items.map(render));
@@ -167,6 +197,7 @@
   }catch{
    status.textContent='Reality cannot independently read its current operational incident status. No recovery or repair is assumed.';
    workerReceipt.textContent='Worker execution evidence unavailable. A successful cron dispatch alone never proves completed work.';
+   repairReceipt.textContent='Automatic repair receipt unavailable. No completed repair or resumed original job is assumed.';
   }finally{busy=false;refresh.disabled=false;}
  };
  refresh.addEventListener('click',()=>{void update()});
