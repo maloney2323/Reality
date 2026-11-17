@@ -54,22 +54,27 @@ export function validateCapabilityRoleProposal({response,claim,roles}={}){
 }
 export async function scheduleOneStandingCapability({
  db,env=process.env,call=shiftRpc,fetchImpl=fetch,invokeModel=null,
- rolesBuilder=buildRealityProposedEmployeeRoleDiscussionContext
+ rolesBuilder=buildRealityProposedEmployeeRoleDiscussionContext,
+ claimRpc='reality_claim_next_standing_capability_schedule_v1',
+ recordRpc='reality_record_owner_capability_role_schedule_v1',
+ blockRpc='reality_block_owner_capability_role_schedule_v1',
+ claimStatus='STANDING_CAPABILITY_ROLE_TRIAGE_CLAIMED',
+ emptyStatus='NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'
 }={}){
  if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||!db.secretKey||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
   typeof call!=='function'||typeof fetchImpl!=='function')
   fail('TRUSTED_ISOLATED_SIGNED_WORKER_REQUIRED');
- const claimed=await call(db,'reality_claim_next_standing_capability_schedule_v1',{},
+ const claimed=await call(db,claimRpc,{},
   {fetchImpl});
- if(claimed?.status==='NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'&&
+ if(claimed?.status===emptyStatus&&
    claimed.model_triage_authorized===false&&
    claimed.execution_authorized===false&&
    claimed.new_original_jobs_created===0&&
    claimed.installation_authorized===false&&
    claimed.production_changed===false)
   return denied(claimed.status,{model_calls_completed:0});
- if(claimed?.status!=='STANDING_CAPABILITY_ROLE_TRIAGE_CLAIMED'||
+ if(claimed?.status!==claimStatus||
    !UUID.test(claimed.owner_id||'')||!UUID.test(claimed.claim_id||'')||
    !HASH.test(claimed.evidence_fingerprint||'')||
    claimed.scope!=='EVIDENCE_ONLY_EMPLOYEE_DISCOVERY_V1'||
@@ -183,7 +188,7 @@ export async function scheduleOneStandingCapability({
   }
   const result=validateCapabilityRoleProposal({response,claim:claimed,roles});
   stage='INDEPENDENT_DATABASE_AND_OWNER_READBACK_UNVERIFIED';
-  const receipt=await call(db,'reality_record_owner_capability_role_schedule_v1',{
+  const receipt=await call(db,recordRpc,{
    p_owner_id:claimed.owner_id,p_claim_id:claimed.claim_id,
    p_evidence_fingerprint:claimed.evidence_fingerprint,
    p_function_id:result.employee_function_id,p_employee:result.employee,
@@ -223,7 +228,7 @@ export async function scheduleOneStandingCapability({
    existing_governed_worker_required:true
   });
  }catch{
-  try{await call(db,'reality_block_owner_capability_role_schedule_v1',{
+  try{await call(db,blockRpc,{
    p_owner_id:claimed.owner_id,p_claim_id:claimed.claim_id
   },{fetchImpl})}catch{}
   return denied('CAPABILITY_ROLE_TRIAGE_FENCED_NO_AUTOMATIC_REPLAY',{
@@ -231,4 +236,18 @@ export async function scheduleOneStandingCapability({
    model_calls_completed:0
   });
  }
+}
+
+/** Reuse the SAME dynamic model, existing employee roster, and standing grant
+ * to investigate a signed-worker failure discovered by the existing watchdog.
+ * This can only schedule investigation; it cannot patch or deploy by itself. */
+export function scheduleOneStandingOperationalRecovery(options={}){
+ return scheduleOneStandingCapability({
+  ...options,
+  claimRpc:'reality_claim_next_standing_worker_recovery_v1',
+  recordRpc:'reality_record_owner_worker_recovery_plan_v1',
+  blockRpc:'reality_block_owner_worker_recovery_plan_v1',
+  claimStatus:'STANDING_OWNER_WORKER_INCIDENT_CLAIMED',
+  emptyStatus:'NO_STANDING_WORKER_INCIDENT'
+ });
 }
