@@ -5,6 +5,8 @@ on:
       - 'reality/**'
     paths:
       - 'src/**'
+      - 'supabase/migrations/**'
+      - 'test/reality-verified-candidate-receipt-release-v1.test.js'
   # Additional independent CI path for isolated, same-repository source PRs.
   # This is CI evidence only: no owner approval, installation, or settlement.
   pull_request:
@@ -13,6 +15,8 @@ on:
       - 'reality/**'
     paths:
       - 'src/**'
+      - 'supabase/migrations/**'
+      - 'test/reality-verified-candidate-receipt-release-v1.test.js'
 permissions:
   contents: read
 jobs:
