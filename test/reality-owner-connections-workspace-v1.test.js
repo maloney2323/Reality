@@ -25,7 +25,7 @@ test('Connection inventory is authenticated, owner-scoped and read-only',()=>{
  assert.match(api,/privateChatConfig\(\)/);
  assert.match(api,/authenticatedChatSession\(req,res\)/);
  assert.match(api,/VERCEL_ENV!=='preview'/);
- assert.match(api,/req\.method!=='GET'/);
+ assert.match(api,/!\['GET','POST'\]\.includes\(req\.method\)/);
  assert.match(api,/Object\.keys\(req\.query\|\|\{\}\)\.length/);
  assert.match(api,/db\.url!==session\.config\?\.url/);
  assert.match(api,/reality_read_owner_employee_discovery_v1/);
