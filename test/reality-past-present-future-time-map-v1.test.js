@@ -46,7 +46,8 @@ test('owner-time endpoint is only a read from three existing evidence ledgers',(
   'reality_read_owner_employee_shifts_v1',
   'reality_read_owner_employee_discovery_v1'])
   assert.match(api,new RegExp("'"+fn+"'"));
- assert.match(api,/p_owner_id:session\.user_id/);
+ assert.match(api,/p_owner_id:ownerId/);
+ assert.match(api,/readOwnerTimeHorizonEvidence\(\{/);
  assert.match(api,/assertShiftReadback\(value\)/);
  assert.match(boundary,/read_owner_final_receipts_v1/);
  assert.match(boundary,/read_owner_employee_shifts_v1/);
