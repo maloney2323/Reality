@@ -550,3 +550,64 @@ test('output diagnostics remain bounded and do not reset the exhausted lease or 
  assert.doesNotMatch(migration,/cron\.schedule\(/);
  assert.doesNotMatch(migration,/grant execute[^;]+to (anon|authenticated)/is);
 });
+
+test('one externally independently reviewed remediation can resume the SAME incident at attempt four',async()=>{
+ const prior=[
+  {attempt:1,failure_reason:'MODEL_PROOF_UNAVAILABLE'},
+  {attempt:2,failure_reason:'MODEL_PROOF_UNAVAILABLE'},
+  {attempt:3,failure_reason:'MODEL_OUTPUT_UNVERIFIED'}
+ ];
+ const remediated={...claim,investigation_attempt:4,failure_history:prior,
+  remediation_release_commit:'a'.repeat(40),
+  remediation_ci_run_id:44151280693,
+  remediation_receipt_sha256:hash('f')
+ };
+ const f=fixture({claimed:remediated});
+ let input=null;
+ const result=await investigateOneSignedShiftContinuityIncident({
+  db,env,shiftId:shift,call:f.call,
+  invokeModel:async payload=>{
+   input=JSON.parse(payload.input[1].content[0].text);
+   return modelResponse();
+  },fetchImpl:async()=>{throw Error('NO_PROVIDER')},rolesBuilder:()=>({roles})
+ });
+ assert.equal(result.status,'SHIFT_CONTINUITY_INVESTIGATION_RECORDED');
+ assert.equal(result.investigation_attempt,4);
+ assert.equal(input.prior_failure_history.length,3);
+ assert.equal(input.independently_reviewed_remediation.release_commit,'a'.repeat(40));
+ assert.equal(input.independently_reviewed_remediation.receipt_sha256,hash('f'));
+ assert.equal(result.original_job_created,false);
+ assert.equal(result.installation_authorized,false);
+});
+test('fourth attempt with unverified or missing remediation proof cannot reach the model',async()=>{
+ for(const bad of [
+  {...claim,investigation_attempt:4},
+  {...claim,investigation_attempt:4,remediation_release_commit:'invalid',
+   remediation_receipt_sha256:hash('f'),remediation_ci_run_id:44151280693},
+  {...claim,investigation_attempt:4,remediation_release_commit:'a'.repeat(40),
+   remediation_receipt_sha256:hash('f')},
+  {...claim,investigation_attempt:5}
+ ]){
+  const f=fixture({claimed:bad});
+  await assert.rejects(investigateOneSignedShiftContinuityIncident({
+   db,env,shiftId:shift,call:f.call,
+   invokeModel:async()=>{throw Error('FORGED_RETRY')},
+   fetchImpl:async()=>{throw Error('FORGED_RETRY')},rolesBuilder:()=>({roles})
+  }),/SHIFT_CONTINUITY_SOURCE_BOUND_INCIDENT_LEASE_UNVERIFIED/);
+  assert.equal(f.calls.length,1);
+ }
+});
+test('database consumes exactly one reviewed remediation attempt and never resets prior failed evidence',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_continuity_reviewed_remediation_retry_v5.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/investigation_attempts between 0 and 4/);
+ assert.match(sql,/investigation_attempts=3\s+and remediation_granted_at is not null/);
+ assert.match(sql,/remediation_used_at=case when i.investigation_attempts=3/);
+ assert.match(sql,/and remediation_used_at is null/);
+ assert.match(sql,/remediation_receipt_sha256/);
+ assert.match(sql,/for update skip locked/);
+ assert.doesNotMatch(sql,/set\s+investigation_attempts\s*=\s*0/i);
+ assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
+ assert.doesNotMatch(sql,/grant execute[^;]+to (anon|authenticated)/is);
+});

@@ -121,9 +121,13 @@ export async function investigateOneSignedShiftContinuityIncident({
   typeof claim.error_summary!=='string'||claim.error_summary.length>280||
   (claim.investigation_attempt!==undefined&&
    (!Number.isInteger(claim.investigation_attempt)||
-    claim.investigation_attempt<1||claim.investigation_attempt>3))||
+    claim.investigation_attempt<1||claim.investigation_attempt>4))||
+  (claim.investigation_attempt===4&&
+   (!/^[a-f0-9]{40}$/.test(claim.remediation_release_commit||'')||
+    !HASH.test(claim.remediation_receipt_sha256||'')||
+    !Number.isSafeInteger(claim.remediation_ci_run_id)))||
   (claim.failure_history!==undefined&&
-   (!Array.isArray(claim.failure_history)||claim.failure_history.length>3)))
+   (!Array.isArray(claim.failure_history)||claim.failure_history.length>4)))
   fail('SOURCE_BOUND_INCIDENT_LEASE_UNVERIFIED');
  let stage='MODEL_PROOF_UNAVAILABLE';
  try{
@@ -203,6 +207,10 @@ export async function investigateOneSignedShiftContinuityIncident({
      claim_id:claim.source_claim_id||null,
      observed_at:claim.first_detected_at,
      investigation_attempt:claim.investigation_attempt||1,
+     independently_reviewed_remediation:claim.investigation_attempt===4?{
+      release_commit:claim.remediation_release_commit,
+      receipt_sha256:claim.remediation_receipt_sha256,
+      ci_run_id:claim.remediation_ci_run_id}:null,
      previous_failure_reason:claim.previous_failure_reason||null,
      prior_failure_history:claim.failure_history||[],
      failed_job:{job_id:claim.qualified_job_id||null,
