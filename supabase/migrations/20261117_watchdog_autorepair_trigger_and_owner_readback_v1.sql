@@ -74,16 +74,16 @@ grant execute on function public.reality_read_owner_preview_worker_auto_repair_v
  to service_role;
 
 do $watch$
-declare job_id bigint;command text;v_new text;
+declare job_id bigint;v_command text;v_new text;
 begin
- select jobid,command into strict job_id,command from cron.job
+ select j.jobid,j.command into strict job_id,v_command from cron.job j
  where jobname='reality-governed-wake-watchdog-v1'
   and active=true and schedule='* * * * *'
   and command like '%observe_owner_worker_cron_failures_v1%'
   and command like '%reconcile_incident_existing_original_handoff_v1%'
   and command like '%reconcile_stalled_scheduled_capability_inquiries_v1%';
- if position('watchdog_guarded_preview_self_repair_v1' in command)=0 then
-  v_new:=command||
+ if position('watchdog_guarded_preview_self_repair_v1' in v_command)=0 then
+  v_new:=v_command||
    E'\nSELECT reality_internal.watchdog_guarded_preview_self_repair_v1();';
   perform cron.alter_job(job_id,command=>v_new);
  end if;
@@ -93,7 +93,7 @@ end $watch$;
 -- scheduling gate, even when there are temporarily zero eligible customer
 -- or investigation jobs. This is a read-only health check (not job settlement).
 do $wake$
-declare job_id bigint;command text;v_new text;
+declare job_id bigint;v_command text;v_new text;
  anchor text:='where (eligible_shift.permitted';
  extra text:=$extra$
  or exists(
@@ -105,7 +105,7 @@ declare job_id bigint;command text;v_new text;
  )
 $extra$;
 begin
- select jobid,command into strict job_id,command from cron.job
+ select j.jobid,j.command into strict job_id,v_command from cron.job j
  where jobname='reality-riley-preview-original-execution-wake-v1'
   and active=true and schedule='* * * * *'
   and command like '%credential.worker_token%'
@@ -114,11 +114,11 @@ begin
   and command like '%INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF%'
   and command like '%owner_routine_delegations_v1%'
   and command like '%eligible_shift.permitted%';
- if position('preview_worker_auto_repairs_v1' in command)=0 then
-  if length(command)-length(replace(command,anchor,''))<>length(anchor)
+ if position('preview_worker_auto_repairs_v1' in v_command)=0 then
+  if length(v_command)-length(replace(v_command,anchor,''))<>length(anchor)
   then raise exception 'EXACT_SIGNED_PREVIEW_WORKER_GATE_NOT_UNIQUE';end if;
-  v_new:=replace(command,anchor,anchor||E'\n'||extra);
-  if length(v_new)<=length(command) or
+  v_new:=replace(v_command,anchor,anchor||E'\n'||extra);
+  if length(v_new)<=length(v_command) or
     position('credential.worker_token' in v_new)=0 or
     position('credential.vercel_bypass' in v_new)=0 or
     position('public.reality_read_owner_capability_gap_feed_v1' in v_new)>0
