@@ -173,3 +173,29 @@ grant execute on function public.reality_claim_shift_business_qualification_revi
  to service_role;
 grant execute on function public.reality_record_shift_business_qualification_review_v1(uuid,uuid,uuid,text,text,timestamptz)
  to service_role;
+
+-- Reuse the EXISTING every-minute watchdog: expired reviewer leases become
+-- a durable unknown outcome, never an unverified completed original job.
+CREATE OR REPLACE FUNCTION reality_internal.reconcile_stale_continuity_reviews_v1()
+ RETURNS text
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare n integer; m integer;
+begin
+ if current_user<>'postgres' then raise exception 'REVIEW_WATCHDOG_REQUIRED';end if;
+ update reality_internal.shift_continuity_independent_reviews_v1
+ set status='PROVIDER_PROOF_UNAVAILABLE',completed_at=clock_timestamp()
+ where status='REVIEW_CLAIMED' and claimed_at<clock_timestamp()-interval '5 minutes';
+ get diagnostics n=row_count;
+ update reality_internal.shift_business_qualification_reviews_v1
+ set status='PROVIDER_PROOF_UNAVAILABLE',completed_at=clock_timestamp()
+ where status='REVIEW_CLAIMED'
+  and claimed_at<clock_timestamp()-interval '5 minutes';
+ get diagnostics m=row_count;
+ return 'STALE_CONTINUITY_REVIEW_LEASES_FENCED_'||n||
+  '_BUSINESS_QUALIFICATION_LEASES_FENCED_'||m;
+end $function$
+;
+revoke execute on function reality_internal.reconcile_stale_continuity_reviews_v1()
+ from public,anon,authenticated;
