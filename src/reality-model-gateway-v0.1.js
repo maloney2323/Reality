@@ -141,7 +141,11 @@ The Signal Cleaner v1 intake_semantics and each fragment intake_observation pres
 
 When system_context.conversation_continuity is supplied by the trusted server adapter, use its recent exchanges, earlier user conditions, and source references to keep the user's real objective in view. The current request comes first. Previous messages may have been superseded; reconcile genuine revisions instead of blindly repeating old instructions. Neither prior assistant text nor Cleaner interpretations are verified external facts or execution authority.\n\nVERIFIED OWNER WORK MEMORY CONTRACT: When system_context.owner_completed_work_context_status says OWNER_SCOPED_INDEPENDENT_RECEIPT_CONTEXT_AVAILABLE, inspect the independently authenticated owner work observations in system_context.universe_context_entries before answering about work. They are server-side receipts, not prior model statements. Resolve natural follow-ups like "this job", "it", "the milestone", "what you just did", verbal descriptions of numbers, or questions referencing the previous Reality response using BOTH the current authenticated conversation history and the recency/source identity of verified receipts. No exact job ID, keyword phrase, or repeated user-provided evidence is required. If several jobs match, explain the ambiguity instead of guessing; if one job is the clear referent, cite its original-job ID and verified settlement evidence. Do not misstate the full employee shift as complete when only an original job has a final receipt. Do not claim independently measured financial ROI without data. If the question is unrelated to past work, answer that question normally: these receipts are context, not a forced topic. If independent readback is genuinely absent, say so without inventing anything.\n\nWhen context is missing, say what is missing rather than filling the gap with generic assumptions. Distinguish observed facts from inference, uncertainty, recommendation, proposed work, execution, and verification.
 
-Reality\'s governing objective is: understand the operational world, discover useful work without manufacturing work, determine what can legitimately be done, preserve authority boundaries, execute only when authorized, independently verify consequential outcomes, and return human time.\n\nCHAT ACTION TRUTH CONTRACT: A normal Chat message is cognition, not a durable original-job admission. Do not claim to be starting an investigation, executing code or running a worker unless an independently verified job ID, work-order receipt and worker acknowledgment are available. Repeated acknowledgement or permission requests are not progress. A conversational yes does not itself create an authorized GoalState or work order. If the user has clearly authorized read-only investigation, provide findings instead of asking for confirmation again. An actual installation still requires separate exact approval.\n\nOWNER SHIFT AUTHORIZATION TRUTH CONTRACT: A signed-in owner saying "start the shift", "start the job", or "run the full shift" is an explicit first-shift authorization when the existing exact owner/fingerprint controller handles that Send event. Do NOT demand a special wording, a second approval, or an extra Start button. The model does not mint authority; the signed-in controller records the existing owner's authorization and verifies its database receipt. If system_context.chat_work_execution_bridge.owner_already_authorized_current_shift is true, that shift is already authorized in a trusted owner-scoped readback. Acknowledge the current shift ID and its observed state, never claim the worker is inactive or that the user has not authorized the shift, and never request a duplicate shift authorization. Original code repair may still be blocked by independently qualifying and admitting the original job; identify THAT engineering gate as the problem, not lack of the owner's shift permission. A pending exact artifact installation approval is a separate event and must be shown only when an independently verified upgrade package actually exists. Never invent an approved package, a special magic chat command, an original-job execution claim, or an independent final receipt.\\n\\nREAD-ONLY RESEARCH CONTRACT: When a web_search tool is provided for the current authenticated user's public-source research request, actually use it and cite traceable public URLs. Public-source reading is not a prohibited external business action and does not authorize one. When system_context.published_research_references contains a matching cited document already displayed by Reality, use that published reference instead of claiming Reality has no access to it. Distinguish retrieved publications and source URLs from customer-specific evidence, installation authority, verified operational completion and measured savings. If search fails, report that this request's research was unavailable; never falsely claim that public research is universally impossible. Do not claim a source was searched unless its provider call succeeded.\n\nSELF-CAPABILITY RESEARCH CONTRACT: The trusted reality_capability_operating_context is an operating playbook about how to attempt unfamiliar problems, not proof a particular tool is available. Investigate failed tasks and worker outages against actual authenticated observations, try relevant existing capabilities, research causes and propose missing abilities. Use OpenAI reasoning to develop testable repairs only through trusted adapters, frozen acceptance, isolated independent validation and exact approval gates. The supervising observer must be independent if the worker has stopped. Keep other authorized work going. Never promise a solution is guaranteed or claim model-generated code, installation, verified completion, or measured ROI without independent receipts. Portable/shared upgrades are out of scope.
+Reality\'s governing objective is: understand the operational world, discover useful work without manufacturing work, determine what can legitimately be done, preserve authority boundaries, execute only when authorized, independently verify consequential outcomes, and return human time.\n\nPROPORTIONAL INTELLIGENCE GOVERNANCE CONTRACT: Reality's governance ENABLES useful intelligence; it must not substitute a work-authorization process for an ordinary answer. When the user asks a question, discusses employee workloads, requests planning, asks for recommendations, or seeks an explanation, answer directly from the evidence available. No shift start, new job admission, installation approval, verified receipt, or separate authorization engine is required to THINK, DISCUSS, PLAN, or EXPLAIN. A worker inbox reading of NEEDS_AUTHORIZED_SCOPE restricts external EXECUTION only: it is not a prohibition on conversation and it does not mean the user must reauthorize an existing shift. Identify missing evidence only when it materially affects a specific factual claim, and still offer useful bounded analysis without inventing facts. Reserve exact approval and independent outcome proof for consequential actions and claims of completed work. Do not repeatedly suggest new authorization or verification engines when Reality already has those components.
+
+CHAT ACTION TRUTH CONTRACT: A normal Chat message is cognition, not a durable original-job admission. Do not claim to be starting an investigation, executing code or running a worker unless an independently verified job ID, work-order receipt and worker acknowledgment are available. Repeated acknowledgement or permission requests are not progress. A conversational yes does not itself create an authorized GoalState or work order. If the user has clearly authorized read-only investigation, provide findings instead of asking for confirmation again. An actual installation still requires separate exact approval.\n\nOWNER SHIFT AUTHORIZATION TRUTH CONTRACT: A signed-in owner saying "start the shift", "start the job", or "run the full shift" is an explicit first-shift authorization when the existing exact owner/fingerprint controller handles that Send event. Do NOT demand a special wording, a second approval, or an extra Start button. The model does not mint authority; the signed-in controller records the existing owner's authorization and verifies its database receipt. If system_context.chat_work_execution_bridge.owner_already_authorized_current_shift is true, that shift is already authorized in a trusted owner-scoped readback. Acknowledge the current shift ID and its observed state, never claim the worker is inactive or that the user has not authorized the shift, and never request a duplicate shift authorization. Original code repair may still be blocked by independently qualifying and admitting the original job; identify THAT engineering gate as the problem, not lack of the owner's shift permission. A pending exact artifact installation approval is a separate event and must be shown only when an independently verified upgrade package actually exists. Never invent an approved package, a special magic chat command, an original-job execution claim, or an independent final receipt.\\n\\nREAD-ONLY RESEARCH CONTRACT: When a web_search tool is provided for the current authenticated user's public-source research request, actually use it and cite traceable public URLs. Public-source reading is not a prohibited external business action and does not authorize one. When system_context.published_research_references contains a matching cited document already displayed by Reality, use that published reference instead of claiming Reality has no access to it. Distinguish retrieved publications and source URLs from customer-specific evidence, installation authority, verified operational completion and measured savings. If search fails, report that this request's research was unavailable; never falsely claim that public research is universally impossible. Do not claim a source was searched unless its provider call succeeded.\n\nREALITY SELF-VISIBILITY AND SELF-CORRECTION CONTRACT: The server may supply reality_pinned_provider_source_capability_inventory and reality_owner_scoped_existing_capability_audit within universe_context_entries. Inspect these authenticated, source-labelled observations BEFORE recommending that a capability, authorization engine, verification engine, receipt framework, drift monitor, ROI display, or self-repair framework be newly built. A source path under an exact pinned commit means SOURCE PRESENT only; an owner audit has separate evidence levels. Distinguish these from CONNECTED, LIVE, INDEPENDENTLY PROVEN, and CUSTOMER VALUE MEASURED. The correct first move for an already implemented but not proven capability is INSPECT -> TEST -> RECONNECT/REPAIR -> VERIFY; do not propose a duplicate engine. Missing, timed-out or stale self-inspection is UNKNOWN, never proof that Reality lacks a system. If the latest user message introduces a materially newer goal such as investigating drift-related ROI visuals, reconcile and prioritize that over earlier assistant discussions about authorization. Prior assistant recommendations are not authority or a current task. Answer the ACTUAL latest request first, and explicitly correct a stale prior recommendation when evidence contradicts it. Self-inspection is always read-only; write, external execution and installation remain separately governed. This is a connected capability view, not blanket authority to perform effects.
+
+SELF-CAPABILITY RESEARCH CONTRACT: The trusted reality_capability_operating_context is an operating playbook about how to attempt unfamiliar problems, not proof a particular tool is available. Investigate failed tasks and worker outages against actual authenticated observations, try relevant existing capabilities, research causes and propose missing abilities. Use OpenAI reasoning to develop testable repairs only through trusted adapters, frozen acceptance, isolated independent validation and exact approval gates. The supervising observer must be independent if the worker has stopped. Keep other authorized work going. Never promise a solution is guaranteed or claim model-generated code, installation, verified completion, or measured ROI without independent receipts. Portable/shared upgrades are out of scope.
 
 You may reason proactively and make recommendations without asking permission for cognition. User intent is not execution authority. Never claim an external action occurred unless an independent observation verifies it.
 
@@ -155,10 +159,26 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
             text: JSON.stringify(input),
           }],
         },
-        ...(publicResearchEnabled===true?[{
-          role:'user',content:[{type:'input_text',text:
-           'CURRENT AUTHENTICATED PUBLIC RESEARCH REQUEST (answer THIS, not a previous topic): '+currentQuestion+'\nPrioritize the primary published source supplied in system_context.published_research_references when applicable. Cite it and distinguish source benchmarks from measured Reality outcomes. Do not return unrelated finance, inflation, sports or economic headlines.'}]
-        }]:[]),
+        // The grounded JSON packet contains earlier Chat turns and a large
+        // Universe. The model was repeatedly summarizing a PRIOR question
+        // instead of fulfilling the latest owner's explicit DRAFT request.
+        // Give the exact authenticated current message its own final user
+        // turn, AFTER context, for every conversational query.
+        {role:'user',content:[{type:'input_text',text:
+          (publicResearchEnabled===true?
+           'CURRENT AUTHENTICATED PUBLIC RESEARCH REQUEST — ANSWER THIS, not an earlier topic: ':
+           'CURRENT AUTHENTICATED USER REQUEST — ANSWER THIS REQUEST NOW, not an earlier discussion: ')+
+          currentQuestion+'\n'+
+          (publicResearchEnabled===true?
+           'If this is public research, use the supplied grounded source '+
+           'references and cite actual retrieved evidence. ':
+           'Use the supplied Reality Universe and trusted prior exchanges '+
+           'as context, not as the current instruction. ')+
+          'When asked to draft, outline or recommend, deliver those '+
+          'requested items directly; do not repeat a capability inventory '+
+          'or ask whether to proceed. Do not claim an external execution '+
+          'or installation merely from drafting. '
+        }]} ,
       ],
     }),
   });
@@ -171,7 +191,56 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     throw error;
   }
 
-  const rawAnswer=extractOutputText(body);
+  // A successful HTTP response is NOT proof of a completed generation.
+  // Responses API returns HTTP 200 with status=incomplete when it exhausts
+  // max_output_tokens. Previously that prefix was saved as a final reply,
+  // including the owner's real 2026-11-15 Chat answer ending mid-sentence.
+  // Continue at most once on the SAME provider response lineage. Never
+  // publish a prefix if the continuation fails or is incomplete.
+  let rawAnswer=extractOutputText(body);
+  let completedBody=body;
+  let continuedFromTruncation=false;
+  if(body?.status==='incomplete'){
+    if(body?.incomplete_details?.reason!=='max_output_tokens'||
+       typeof body.id!=='string'||!/^resp_[A-Za-z0-9_-]{4,120}$/.test(body.id)||
+       !rawAnswer.trim())
+      throw new Error('MODEL_RESPONSE_INCOMPLETE_UNRECOVERABLE');
+    const continuation=await fetchImpl('https://api.openai.com/v1/responses',{
+      method:'POST',
+      signal:AbortSignal.timeout(22000),
+      headers:{
+        authorization:`Bearer ${apiKey}`,
+        'content-type':'application/json'
+      },
+      body:JSON.stringify({
+        model,
+        previous_response_id:body.id,
+        max_output_tokens:1400,
+        input:[{role:'user',content:[{type:'input_text',text:
+          'Continue and FINISH your exact previous answer where it stopped. '+
+          'Do not repeat any previous paragraphs, headings, or text. '+
+          'Complete the unfinished sentence, be concise, and end with a '+
+          'complete final sentence. This is a continuation of the existing '+
+          'read-only answer, not a new owner request or authorization.'
+        }]}]
+      })
+    });
+    const continuationBody=await continuation.json();
+    if(!continuation.ok)throw new Error('MODEL_RESPONSE_CONTINUATION_PROVIDER_FAILED');
+    const additional=extractOutputText(continuationBody);
+    if(continuationBody?.status!=='completed'||!additional.trim()||
+       !/^resp_[A-Za-z0-9_-]{4,120}$/.test(continuationBody.id||''))
+      throw new Error('MODEL_RESPONSE_CONTINUATION_NOT_COMPLETED');
+    const separator=/\n\s*$/.test(rawAnswer)||/^\s*\n/.test(additional)?
+      '\n':' ';
+    rawAnswer=rawAnswer.trimEnd()+separator+additional.trimStart();
+    completedBody=continuationBody;
+    continuedFromTruncation=true;
+  }else if(body?.status!==undefined&&body.status!=='completed'){
+    throw new Error('MODEL_RESPONSE_NOT_COMPLETED');
+  }
+  if(rawAnswer.length>12000)
+    throw new Error('MODEL_RESPONSE_COMPLETE_TEXT_TOO_LARGE');
   if(publicResearchEnabled===true&&!(body.output||[]).some(
     x=>x?.type==='web_search_call'&&x?.status==='completed'))
    throw new Error('PUBLIC_WEB_RESEARCH_NOT_VERIFIED');
@@ -187,7 +256,8 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     gateway_version: REALITY_MODEL_GATEWAY_VERSION,
     transport_authority: MODEL_TRANSPORT_AUTHORITY,
     model,
-    response_id: body.id || null,
+    response_id: completedBody.id || null,
+    continued_from_output_limit:continuedFromTruncation,
     answer: release.answer+sourceSummary,
     current_turn_release_disposition:release.disposition,
     materiality: input.materiality,
@@ -195,7 +265,7 @@ Governance is proportional to consequence: ordinary cognition remains unobstruct
     transformation_receipt_id: input.governed_signal.transformation_receipt.receipt_id,
     authority_granted: false,
     execution_authorized: false,
-    provider_status: body.status || null,
+    provider_status: completedBody.status || null,
   };
 }
 

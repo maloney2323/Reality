@@ -33,7 +33,7 @@ test('normal read-only employee planning generates ONE model call, with no keywo
  });
  assert.equal(requests.length,1,'Normal conversational planning is one model response');
  assert.equal(requests[0].url,'https://api.openai.com/v1/responses');
- assert.equal(requests[0].payload.max_output_tokens,950);
+ assert.equal(requests[0].payload.max_output_tokens,1700);
  assert.equal(r.mode,'FAST');
  assert.equal(r.authority_granted,false);
  assert.equal(r.execution_authorized,false);

@@ -1,0 +1,13 @@
+{
+  "schema": "reality-isolated-original-source-write-canary-v1",
+  "original_work_id": "work:45206a326ddf406b1c083a819da24aaa",
+  "shift_id": "9460cfff-937a-4105-9093-2e41ab39a950",
+  "attempt_id": "788beab4-34e0-44ba-9577-1062ca459643",
+  "preexisting_preview_head_sha": "4f37e55058ba27faf99d0032162d19d767d35eab",
+  "unchanged_original_file_blob": "9da6da3aa0698bdd70e48865924054129994ca08",
+  "original_file_unchanged": true,
+  "owner_installation_approved": false,
+  "candidate_installed": false,
+  "production_changed": false,
+  "original_job_completed": false
+}

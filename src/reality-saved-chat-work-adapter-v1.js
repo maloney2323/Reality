@@ -6,6 +6,11 @@ import {readOwnerGovernedBuild,queueOwnerGovernedBuild}
 import {shiftDatabase,shiftRpc,assertShiftReadback}
  from './reality-governed-shift-boundary-v1.js';
 import {classifyChatWorkIntent} from './reality-chat-work-intent-v1.js';
+import {readOwnerChatWorkHandoff} from './reality-private-chat-work-readback-v1.js';
+import {continueRileyCorrectiveModelIntoIndependentCI}
+ from './reality-riley-auto-corrective-ci-bridge-v1.js';
+import {admitOwnerNewDevelopment,readOwnerNewDevelopment}
+ from './reality-chat-new-development-adapter-v1.js';
 
 const workId=x=>/^work:[a-f0-9]{32}$/.test(String(x||''));
 const SOURCE=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
@@ -18,6 +23,12 @@ export const CHAT_WORK_CAPABILITIES=Object.freeze([
  Object.freeze({id:'governed-original-discovery',
   description:'Queue discovery of an independently eligible existing original development job tied to the signed-in confirmed user goal. Does not install or settle.',
   effect:'owner-scoped investigation',authorizes_installation:false}),
+ Object.freeze({id:'governed-original-engineering',
+  description:'Build or repair source code for an explicitly referenced, already admitted and owner-authorized original software-engineering job. Reuse Reality\'s existing model-written corrective candidate and independently tested isolated GitHub CI. No new feature outside the original warrant, no installation.',
+  effect:'isolated source candidate and independent CI',authorizes_installation:false}),
+ Object.freeze({id:'governed-chat-new-development',
+  description:'Create a genuinely new isolated Reality code development task from the currently saved explicit owner build instruction. No prior job or shift borrowed. Model code generation and independent verification are separate; production installation never authorized.',
+  effect:'new isolated development admission only',authorizes_installation:false}),
  Object.freeze({id:'owner-employee-shift-briefing',
   description:'Read actual employee shift authorization, current work and steps from the owner-scoped independent ledger. Read only.',
   effect:'read only',authorizes_installation:false}),
@@ -56,8 +67,8 @@ async function readOwnerEmployeeShift({
 export async function inspectSavedChatWork({
  session,conversationId,requestId,messages,
  readBuild=readOwnerGovernedBuild,
- readShift=readOwnerEmployeeShift,
- classify=classifyChatWorkIntent
+ readShift=readOwnerEmployeeShift,readWork=readOwnerChatWorkHandoff,
+ readNew=readOwnerNewDevelopment,classify=classifyChatWorkIntent
 }={}){
  const verified=sourceTurn({session,conversationId,requestId,messages});
  let intent;
@@ -69,9 +80,22 @@ export async function inspectSavedChatWork({
    action_eligible:false,execution_started:false,
    installation_authorized:false,production_changed:false});
  }
+ // A literal, signed request to code an exact GitHub issue or original work
+ // identity wins over a vague "discover existing work" classification. This
+ // narrows the destination; it cannot add an original or mint an authority.
+ if(intent.kind==='WORK_REQUEST'&&intent.explicit_request===true&&
+    typeof intent.source_quote==='string'&&
+    verified.text.includes(intent.source_quote)&&
+    /\b(?:build|code|implement|repair|fix|develop|upgrade)\b/i.test(verified.text)&&
+    (/(?:https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*|\b(?:issue|job|repair)\s*#?[1-9]\d*\b|work:[a-f0-9]{32})/i)
+      .test(verified.text)){
+  intent={...intent,capability_id:'governed-original-engineering',
+   action_eligible:true};
+ }
  const common={
   request_id:requestId,source_ref:verified.source_ref,
   intent_kind:intent.kind,objective:intent.objective||null,
+  source_quote:intent.source_quote||null,
   capability_id:intent.capability_id||null,
   action_eligible:false,execution_started:false,
   installation_authorized:false,production_changed:false
@@ -79,6 +103,92 @@ export async function inspectSavedChatWork({
  if(intent.kind==='CONVERSATION'||intent.kind==='UNCERTAIN')
   return Object.freeze({...common,status:intent.status==='CONVERSATION_ONLY'?
    'CHAT_WORK_CONVERSATION_ONLY':'CHAT_WORK_INTENT_NEEDS_CLARIFICATION'});
+ if(intent.capability_id==='governed-chat-new-development'&&
+    intent.kind==='WORK_REQUEST'&&intent.explicit_request===true&&
+    intent.action_eligible===true){
+  // Fresh signed Chat wording admits its OWN new source. No automatic
+  // assignment of an unrelated prior repair or an existing shift warrant.
+  let prior=null;
+  try{prior=await readNew({session,conversationId})}catch{
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_READBACK_UNAVAILABLE'});
+  }
+  if(prior?.status!=='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'||
+     prior.owner_id!==session.user_id||
+     prior.conversation_id!==conversationId||
+     !Array.isArray(prior.items))
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_READBACK_UNAVAILABLE'});
+  const matched=prior.items.filter(x=>
+    x.request_id===requestId&&x.source_ref===verified.source_ref);
+  if(matched.length>1)
+   return Object.freeze({...common,status:'CHAT_WORK_NEW_DEVELOPMENT_DUPLICATE_SOURCE'});
+  if(matched.length===1)return Object.freeze({...common,
+   status:'CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED',
+   original_work_id:matched[0].original_work_id,
+   development_phase:matched[0].phase,
+   development_evidence:matched[0].evidence||null});
+  return Object.freeze({...common,
+   status:'CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE',
+   action_eligible:true,
+   original_work_id:null,
+   development_phase:'NOT_YET_ADMITTED',
+   new_shift_started:false});
+ }
+ if(intent.capability_id==='governed-original-engineering'&&
+    intent.kind==='WORK_REQUEST'&&intent.action_eligible===true){
+  let read=null;
+  try{read=await readWork({session,conversationId})}catch{}
+  if(read?.status!=='OWNER_CHAT_WORK_INTAKE_READBACK'||
+     read.owner_id!==session.user_id||read.conversation_id!==conversationId||
+     read.installation_authorized!==false||
+     read.production_changed!==false||
+     !Array.isArray(read.items))
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_READBACK_UNAVAILABLE'});
+  const entries=read.items.filter(x=>x.request_id===requestId&&
+    x.source_ref===verified.source_ref);
+  if(entries.length!==1)
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_INTAKE_PENDING'});
+  const item=entries[0];
+  if(item.status!=='INVESTIGATED_SCOPED')
+   return Object.freeze({...common,status:item.status==='PENDING'||item.status==='CLAIMED'?
+    'CHAT_WORK_ENGINEERING_INVESTIGATION_PENDING':'CHAT_WORK_ENGINEERING_SOURCE_UNQUALIFIED',
+    handoff_status:item.status});
+  const selected=Array.isArray(item.selected_source_refs)?
+   item.selected_source_refs:[];
+  const chains=Array.isArray(item.work_chain)?item.work_chain:[];
+  if(selected.length!==1||chains.length!==1||
+     chains[0].source_ref!==selected[0]||
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(selected[0])||
+     !workId(chains[0].original_work_id)||
+     chains[0].shift_id!==item.shift_id)
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_SOURCE_UNQUALIFIED'});
+  // Avoid attaching a new, unrelated Chat feature request to an older
+  // authorized repair merely because both contain the word "build".
+  const exactSource=verified.text.includes(selected[0])||
+    verified.text.includes(chains[0].original_work_id)||
+    new RegExp('\\b(?:issue|job|repair)\\s*#?'+selected[0].split('/').at(-1)+'\\b','i')
+     .test(verified.text);
+  if(!exactSource)
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_SOURCE_NOT_EXPLICIT',
+    capability_gap:true,diagnosed_source_ref:selected[0],
+    message:'This build request does not identify the current admitted original. Reality must not reuse an unrelated repair.'});
+  const stage=chains[0].current_evidence_stage;
+  if(stage==='ORIGINAL_SETTLEMENT_RECEIPT_PRESENT')
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_ALREADY_SETTLED',
+    original_work_id:chains[0].original_work_id,stage});
+  if(stage==='CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE')
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_TESTED_AWAITING_EXACT_APPROVAL',
+    original_work_id:chains[0].original_work_id,stage,
+    independent_run_url:chains[0].corrective_ci_url||null});
+  if(!['CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+        'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING']
+       .includes(stage))
+   return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_PREPARING_DRAFT',
+    original_work_id:chains[0].original_work_id,stage});
+  return Object.freeze({...common,status:'CHAT_WORK_ENGINEERING_SCOPED_CI_READY',
+    action_eligible:true,original_work_id:chains[0].original_work_id,
+    shift_id:item.shift_id,source_ref:verified.source_ref,
+    original_source_ref:selected[0],stage});
+ }
  if(!intent.capability_id)
   return Object.freeze({...common,status:'CHAT_WORK_CAPABILITY_GAP',
    capability_gap:true,reviewed_not_executed:true});
@@ -135,4 +245,103 @@ export async function authorizeSavedChatExistingOriginal({
   dispatch_requested:response.worker_dispatch_started===true,
   worker_execution_verified:false,execution_started:false,
   installation_authorized:false,production_changed:false});
+}
+
+
+// Explicit saved owner build instruction -> SAME already-governed original's
+// pre-existing corrective CI broker. This endpoint never creates a job or
+// shift, writes production, or installs a candidate. The broker performs its
+// own independent service-role/current-source/one-shot provider checks.
+export async function continueVerifiedChatEngineering({
+ session,conversationId,requestId,messages,
+ inspect=inspectSavedChatWork,
+ dbFactory=shiftDatabase,callRpc=shiftRpc,
+ continueCI=continueRileyCorrectiveModelIntoIndependentCI,
+ env=process.env,fetchImpl=fetch
+}={}){
+ sourceTurn({session,conversationId,requestId,messages});
+ const eligibility=await inspect({session,conversationId,requestId,messages});
+ if(eligibility?.status!=='CHAT_WORK_ENGINEERING_SCOPED_CI_READY'||
+    eligibility.action_eligible!==true||
+    eligibility.capability_id!=='governed-original-engineering'||
+    !workId(eligibility.original_work_id)||!validUuid(eligibility.shift_id)||
+    eligibility.source_ref!==messages.find(x=>x.role==='user'&&
+      x.request_id===requestId)?.source_ref)
+  fail('CHAT_WORK_ENGINEERING_NO_VERIFIED_CURRENT_ORIGINAL',409);
+ if(env.VERCEL_ENV!=='preview')fail('CHAT_WORK_ENGINEERING_PREVIEW_ONLY',403);
+ const db=dbFactory(env);
+ if(!db?.strictSecrets||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    db.url!==session.config?.url)
+  fail('CHAT_WORK_ENGINEERING_OWNER_PROJECT_MISMATCH',403);
+ // Check the specific existing source against the current owner-warranted
+ // graph BEFORE invoking a broker which is already independently fenced.
+ const graph=await callRpc(db,'reality_read_current_shift_execution_graph_v1',
+  {},{fetchImpl});
+ const engineering=graph?.jobs?.filter(j=>
+   j.original_kind==='REAL_ENGINEERING_REPAIR_ORIGINAL'&&
+   !['SETTLED','ALREADY_SETTLED'].includes(j.phase))||[];
+ const same=engineering.filter(j=>
+   j.original_work_id===eligibility.original_work_id&&
+   j.source_ref===eligibility.original_source_ref);
+ if(graph?.status!=='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'||
+    graph.owner_id!==session.user_id||
+    graph.shift_id!==eligibility.shift_id||
+    graph.installation_authorized!==false||
+    graph.production_changed!==false||
+    engineering.length!==1||same.length!==1)
+  fail('CHAT_WORK_ENGINEERING_CURRENT_WARRANT_DRIFT',409);
+ const result=await continueCI({db,env,fetchImpl});
+ if(result?.installation_authorized!==false||
+    result.original_job_completed!==false||
+    result.production_changed!==false||
+    result.new_shift_started!==false||
+    result.original_work_id!=null&&result.original_work_id!==eligibility.original_work_id)
+  fail('CHAT_WORK_ENGINEERING_PROVIDER_ORIGINAL_MISMATCH',503);
+ const candidateStarted=result?.status==='CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI'||
+   result?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED';
+ return Object.freeze({
+  status:candidateStarted?'CHAT_WORK_ENGINEERING_CI_DISPATCH_VERIFIED':
+   'CHAT_WORK_ENGINEERING_CI_NOT_YET_VERIFIED',
+  broker_status:result?.status||'UNVERIFIED',
+  original_work_id:eligibility.original_work_id,
+  shift_id:eligibility.shift_id,
+  request_id:requestId,source_ref:eligibility.source_ref,
+  candidate_started:result?.status==='CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
+  independent_ci_verified:result?.independent_ci_verified===true,
+  independent_run_url:result?.independent_run_url||null,
+  execution_started:candidateStarted,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false
+ });
+}
+
+// A signed, direct Chat request is sufficient for isolated build admission.
+export async function authorizeSavedChatNewDevelopment({
+ session,conversationId,requestId,messages,
+ inspect=inspectSavedChatWork,admit=admitOwnerNewDevelopment
+}={}){
+ const source=sourceTurn({session,conversationId,requestId,messages});
+ const review=await inspect({session,conversationId,requestId,messages});
+ if(review?.status==='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'&&
+    workId(review.original_work_id))
+  return Object.freeze({...review,request_id:requestId,
+   source_ref:source.source_ref,execution_started:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false});
+ if(review?.status!=='CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE'||
+    review.action_eligible!==true||
+    review.capability_id!=='governed-chat-new-development'||
+    typeof review.source_quote!=='string'||
+    typeof review.objective!=='string')
+  fail('CHAT_WORK_NEW_DEVELOPMENT_NO_SIGNED_INSTRUCTION',409);
+ const result=await admit({session,conversationId,requestId,messages,
+  sourceQuote:review.source_quote,expectedObjective:review.objective});
+ if(result?.status!=='CHAT_WORK_NEW_DEVELOPMENT_DURABLY_ADMITTED'||
+    result.request_id!==requestId||
+    result.source_ref!==source.source_ref||
+    !workId(result.original_work_id)||
+    result.installation_authorized!==false||
+    result.production_changed!==false||result.new_shift_started!==false)
+  fail('CHAT_WORK_NEW_DEVELOPMENT_ADMISSION_RECEIPT_UNVERIFIED',503);
+ return result;
 }

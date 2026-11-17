@@ -39,6 +39,18 @@ function provider(){
     return new Response(JSON.stringify({id:user,email:'test@example.com'}),{status:200});
    }
    if(u.pathname==='/auth/v1/logout')return new Response('{}',{status:200});
+   if(u.pathname==='/rest/v1/rpc/reality_read_execution_epoch'){
+    const params=JSON.parse(opts.body||'{}');
+    const ownerTurns=messages.filter(m=>m.user_id===params.p_user_id&&
+     m.conversation_id===params.p_conversation_id&&m.role==='user');
+    if(params.p_user_id!==user||!ownerTurns.length)
+     return new Response(JSON.stringify([]),{status:200});
+    return new Response(JSON.stringify([{
+     goal_revision:0,goal_transition_event_id:null,
+     user_message_revision:ownerTurns.length,
+     latest_user_request_id:ownerTurns.at(-1).request_id
+    }]),{status:200});
+   }
    if(u.pathname==='/rest/v1/rpc/reality_publish_assistant_if_goal_current'){
     const params=JSON.parse(opts.body||'{}');
     // Matches the signed-in user's saved request and atomically stores exactly
@@ -46,8 +58,12 @@ function provider(){
     const matching=messages.find(m=>m.user_id===params.p_user_id&&
      m.conversation_id===params.p_conversation_id&&
      m.request_id===params.p_request_id&&m.role==='user');
-    if(!matching||params.p_user_id!==user||
-       !Number.isSafeInteger(params.p_expected_goal_revision))
+    const newest=messages.filter(m=>m.user_id===params.p_user_id&&
+     m.conversation_id===params.p_conversation_id&&m.role==='user').at(-1);
+    if(!matching||newest?.request_id!==params.p_request_id||
+       params.p_expected_goal_revision!==0||
+       params.p_expected_last_goal_event_id!==null||
+       params.p_user_id!==user)
      return new Response(JSON.stringify({message:'CHAT_GOAL_CHANGED_DURING_COGNITION_RETRY_NEW_TURN'}),{status:409});
     const id=crypto.randomUUID();
     messages.push({id,user_id:user,conversation_id:params.p_conversation_id,
@@ -76,7 +92,9 @@ function provider(){
     if(method==='GET'){
      const id=u.searchParams.get('conversation_id')?.slice(3);
      const uid=u.searchParams.get('user_id')?.slice(3);
-     const out=messages.filter(m=>(!id||m.conversation_id===id)&&m.user_id===uid)
+     const exactRequest=u.searchParams.get('request_id')?.slice(3);
+     const out=messages.filter(m=>(!id||m.conversation_id===id)&&
+      m.user_id===uid&&(!exactRequest||m.request_id===exactRequest))
       .slice().reverse().slice(0,Number(u.searchParams.get('limit')||241));
      return new Response(JSON.stringify(out),{status:200});
     }
@@ -171,9 +189,12 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
   assert.equal(first.status,200,JSON.stringify(first.payload));
   assert.equal(first.payload.answer,'First answer saved.');
   assert.equal(first.payload.continuity.current_answer_persisted,true);
-  assert.equal(first.payload.reliability.canonical_epistemic_state.status,'PERSISTED_AND_READBACK_VERIFIED');
+  assert.equal(first.payload.reliability.canonical_epistemic_state.status,'NOT_ASSERTED_FOR_READ_ONLY_CHAT');
+  assert.equal(first.payload.reliability.chat_lane,'PROPORTIONAL_READ_ONLY');
+  assert.equal(first.payload.reliability.business_outcome_verified,false);
   assert.equal(first.payload.reliability.independently_verified_semantic_correctness,false);
-  assert.ok(p.ledger.some(x=>x.payload?.event_type==='CANONICAL_EPISTEMIC_FRAME'));
+  assert.equal(p.ledger.some(x=>x.payload?.event_type==='CANONICAL_EPISTEMIC_FRAME'),false,
+   'read-only discussion is not a business outcome certification');
   const second=await call(chatApi,'POST',{
    conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'What did we ask first?'},cookie);
   assert.equal(second.status,200,JSON.stringify(second.payload));

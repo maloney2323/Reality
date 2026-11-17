@@ -2,11 +2,14 @@
 // the saved human turn entered the EXISTING signed shift worker inbox.
 // A model answer or text in the browser cannot forge a work receipt.
 import {shiftDatabase,shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {readOwnerNewDevelopment}
+ from './reality-chat-new-development-adapter-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SRC=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
 export async function readOwnerChatWorkHandoff({
  session,conversationId,env=process.env,fetchImpl=fetch,
- callRpc=shiftRpc,dbFactory=shiftDatabase
+ callRpc=shiftRpc,dbFactory=shiftDatabase,
+ readDevelopment=readOwnerNewDevelopment
 }={}){
  if(env.VERCEL_ENV!=='preview'||!UUID.test(session?.user_id||'')||
     !UUID.test(conversationId||'')||
@@ -41,8 +44,36 @@ export async function readOwnerChatWorkHandoff({
      x.installation_authorized!==false||
      x.production_changed!==false))
   return null;
+ let admitted=null;
+ try{
+  admitted=await readDevelopment({session,conversationId,env,
+   dbFactory,callRpc,fetchImpl});
+ }catch{/* Development status cannot override the verified Chat inbox. */}
+ const developmentByRequest=new Map();
+ if(admitted?.status==='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'&&
+    admitted.owner_id===session.user_id&&
+    admitted.conversation_id===conversationId&&
+    admitted.installation_authorized===false&&
+    admitted.production_changed===false&&
+    Array.isArray(admitted.items)){
+  for(const item of admitted.items){
+   if(!UUID.test(item.request_id||'')||
+      !UUID.test(item.message_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(item.original_work_id||'')||
+      item.installation_authorized!==false||
+      item.production_changed!==false)continue;
+   developmentByRequest.set(item.request_id,item);
+  }
+ }
+ const verifiedItems=read.items.map(item=>{
+  const d=developmentByRequest.get(item.request_id);
+  return Object.freeze({...item,
+   development:d&&d.source_ref===item.source_ref?d:null});
+ });
  return Object.freeze({
-  ...read,
+  ...read,items:verifiedItems,
+  new_development_readback_verified:admitted?.status===
+   'OWNER_CHAT_NEW_DEVELOPMENT_READBACK',
   source:'AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK',
   code_execution_by_chat:false,
   independent_repair_verified:false,

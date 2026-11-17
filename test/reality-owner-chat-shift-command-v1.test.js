@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
  interpretSignedInChatShiftCommand,safeShiftReadbackState,
+ resolveExistingSignedInChatShift,
 } from '../reality-owner-chat-shift-command-v1.js';
 
 const commands=[
@@ -196,4 +197,74 @@ test('completion-bound owner UI uses exact signed-in start and never asks for ho
  assert.match(sql,/current_user<>'service_role'/);
  assert.match(sql,/planned_end_at='infinity'::timestamptz/);
  assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
+});
+
+
+test('main Chat restores old explicit command routing after saved authenticated intake',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const saved=html.indexOf('intakeVerified=true;');
+ const route=html.indexOf('resolveExistingSignedInChatShift(exactOwnerCommand,');
+ const model=html.indexOf("const r=await fetch('/api/reality/personal-chat',{method:'POST',");
+ assert.ok(saved>0&&route>saved&&model>route);
+ assert.match(html,/interpretSignedInChatShiftCommand\(value\)/);
+ assert.match(html,/EXISTING_SIGNED_IN_SHIFT_ALREADY_AUTHORIZED/);
+ assert.match(html,/NOT A MODEL ANSWER/);
+ const frame=html.slice(saved,model);
+ assert.doesNotMatch(frame,/api\/reality\/governed-employee-shift-worker|installation_authorized:true|production_changed:true/);
+});
+test('repeated explicit Start uses exact existing shift GET only, never mints or dispatches',async()=>{
+ const id='9460cfff-937a-4105-9093-2e41ab39a950';
+ const conversationId='d7117f6a-b00a-4ec1-9d18-e83ab66c31b5';
+ const req=interpretSignedInChatShiftCommand('Start the jobs');
+ const seen=[];
+ const out=await resolveExistingSignedInChatShift(req,{
+  conversationId,now:Date.parse('2026-11-14T16:40:00Z'),
+  fetchImpl:async(url,opts)=>{
+   seen.push([url,opts.method]);
+   return {ok:true,json:async()=>({ok:true,shifts:[{
+    shift_id:id,status:'AWAITING_EXACT_ORIGINAL_WORK',
+    planned_start_at:'2026-11-08T13:34:27.493Z',
+    planned_end_at:'infinity'
+   }]})};
+  }
+ });
+ assert.deepEqual(seen,[['/api/reality/personal-governed-employee-shift','GET']]);
+ assert.equal(out.status,'EXISTING_SIGNED_IN_SHIFT_ALREADY_AUTHORIZED');
+ assert.equal(out.shift_id,id);
+ assert.equal(out.owner_authorization_reused,true);
+ assert.equal(out.new_shift_started,false);
+ assert.equal(out.installation_authorized,false);
+ assert.equal(out.worker_execution_verified,false);
+});
+test('without a valid frozen source draft, a new shift is never authorized',async()=>{
+ const conversationId='d7117f6a-b00a-4ec1-9d18-e83ab66c31b5';
+ const seen=[];
+ await assert.rejects(
+  ()=>resolveExistingSignedInChatShift(
+   interpretSignedInChatShiftCommand('Start the jobs'),{
+    conversationId,fetchImpl:async(url,opts)=>{
+     seen.push([url,opts.method]);
+     return {ok:true,json:async()=>url.endsWith('?hours=8')?
+      {ok:true,requested_shift_draft:{status:'NOT_VERIFIED'}}:
+      {ok:true,shifts:[]}};
+    }
+   }),/CHAT_SHIFT_FROZEN_OWNER_DRAFT_NOT_READY/
+ );
+ assert.deepEqual(seen,[
+  ['/api/reality/personal-governed-employee-shift','GET'],
+  ['/api/reality/personal-governed-employee-shift?hours=8','GET']
+ ]);
+});
+test('passive questions and hypothetical starts cannot issue new authorization',async()=>{
+ const conversationId='d7117f6a-b00a-4ec1-9d18-e83ab66c31b5';
+ for(const message of ['Can you start the shift?','Start the shift tomorrow',
+  'What if I start the jobs?','Do not start the jobs']){
+  const command=interpretSignedInChatShiftCommand(message);
+  assert.equal(command,null,message);
+ }
+ await assert.rejects(
+  ()=>resolveExistingSignedInChatShift({intent:'START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'},{
+   conversationId,fetchImpl:async()=>{throw Error('must not fetch')}
+  }),/CHAT_SHIFT_EXPLICIT_OWNER_COMMAND_REQUIRED/
+ );
 });

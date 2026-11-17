@@ -5,7 +5,7 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {readPrivateChat,validUuid}
  from '../../src/reality-private-chat-store-v0.1.js';
-import {inspectSavedChatWork,authorizeSavedChatExistingOriginal}
+import {inspectSavedChatWork,authorizeSavedChatExistingOriginal,continueVerifiedChatEngineering,authorizeSavedChatNewDevelopment}
  from '../../src/reality-saved-chat-work-adapter-v1.js';
 export const maxDuration=60;
 export default async function handler(req,res){
@@ -29,13 +29,18 @@ export default async function handler(req,res){
   const {action,conversation_id:conversationId,request_id:requestId}=body;
   if(!validUuid(conversationId)||!validUuid(requestId))
    return res.status(400).json({ok:false,error:'CHAT_WORK_EXACT_SOURCE_INVALID'});
-  if(!['INSPECT_VERIFIED_WORK','AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY'].includes(action))
+  if(!['INSPECT_VERIFIED_WORK','AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY',
+      'CONTINUE_VERIFIED_SCOPED_ENGINEERING','ADMIT_SIGNED_NEW_DEVELOPMENT'].includes(action))
    return res.status(400).json({ok:false,error:'CHAT_WORK_ACTION_UNSUPPORTED'});
   const {messages}=await readPrivateChat(session,conversationId);
   const args={session,conversationId,requestId,messages};
   const result=action==='INSPECT_VERIFIED_WORK'?
    await inspectSavedChatWork(args):
-   await authorizeSavedChatExistingOriginal(args);
+   action==='AUTHORIZE_VERIFIED_ORIGINAL_DISCOVERY'?
+   await authorizeSavedChatExistingOriginal(args):
+   action==='CONTINUE_VERIFIED_SCOPED_ENGINEERING'?
+   await continueVerifiedChatEngineering(args):
+   await authorizeSavedChatNewDevelopment(args);
   return res.status(action==='INSPECT_VERIFIED_WORK'?200:202).json({ok:true,...result});
  }catch(error){
   const code=String(error?.message||'CHAT_WORK_UNAVAILABLE');

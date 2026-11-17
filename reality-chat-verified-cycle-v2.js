@@ -18,11 +18,12 @@
  };
  const headline=div('section','reality-cycle-headline');
  headline.id='realityCycleHeadline';
+ headline.hidden=true;
  headline.setAttribute('aria-label','Reality verified operational state');
  const signal=div('span','reality-cycle-headline-text',
    'Checking saved conversation and governed work…');
  signal.id='realityCycleStateText';
- const show=div('button','reality-cycle-open','View steps');
+ const show=div('button','reality-cycle-open','View work');
  show.type='button';
  show.addEventListener('click',()=>{
   const button=byId('realityChatOpenInspector');
@@ -108,6 +109,8 @@
  }
  const empty=()=>Object.fromEntries(stages.map(s=>[s.key,result()]));
  function displayError(error){
+  headline.hidden=true;
+  stagesBox.replaceChildren();
   banner.textContent='Live verification unavailable. A model reply cannot stand in for a job receipt.';
   signal.textContent='Work status could not be verified';
   const steps=empty();
@@ -209,19 +212,24 @@
    }
    const independentlyExecuting=states.dispatched.state==='dispatched';
    if(states.receipt.state==='verified'){
+    headline.hidden=true;
     signal.textContent='Original job completed and independently verified';
     banner.textContent='The same original job has a verified final receipt.';
    }else if(independentlyExecuting){
+    headline.hidden=false;
     signal.textContent='Worker dispatched · completion not verified';
     banner.textContent='Reality has a recorded worker dispatch. Open the stages for proof; do not assume execution is still running.';
    }else if(states.admitted.state==='verified'){
+    headline.hidden=true;
     signal.textContent='Job queued · worker not verified';
     banner.textContent='A governed job is recorded, but no authorized worker dispatch was independently verified.';
    }else{
+    headline.hidden=true;
     signal.textContent='No running development job verified';
     banner.textContent='Reality may have answered in Chat, but this conversation has no independently verified development worker execution.';
    }
-   draw(states);
+   if(independentlyExecuting)draw(states);
+   else stagesBox.replaceChildren();
    checked.textContent='Evidence checked '+new Date().toLocaleTimeString([],{
     hour:'numeric',minute:'2-digit'})+
     ' · Read-only · No model execution or authorization granted by viewing.';
@@ -232,14 +240,12 @@
  document.addEventListener('visibilitychange',()=>{
   if(!document.hidden)void refresh(true);
  });
- const obs=new MutationObserver(()=>{if(ready.style.display==='block')void refresh()});
- obs.observe(ready,{attributes:true,attributeFilter:['style']});
- let debounce=null;
- new MutationObserver(()=>{
-  clearTimeout(debounce);
-  debounce=setTimeout(()=>void refresh(true),1400);
- }).observe(transcript,{childList:true});
- draw(empty());
- void refresh();
- setInterval(()=>{if(!document.hidden)void refresh(true)},45000);
+ // The full operational readback belongs to Work, not every normal Chat
+ // message. Don't run four unrelated dashboard requests each time a user
+ // speaks or the saved history reloads.
+ const workIsOpen=()=>document.body.dataset.realityChatPanel==='work';
+ document.getElementById('realityChatOpenInspector')
+  ?.addEventListener('click',()=>{if(!document.hidden)void refresh(true)});
+ if(workIsOpen())void refresh();
+ setInterval(()=>{if(!document.hidden&&workIsOpen())void refresh(true)},45000);
 })();

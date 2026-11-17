@@ -1,0 +1,35 @@
+name: Reality signed Chat new development isolated source acceptance
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - 'reality/**'
+    paths:
+      - 'evidence/reality-chat-development/**.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-new-chat-development-source:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref,'reality/chat-development/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact PR candidate with no persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up sandbox Node for parsing only
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Independently validate inert source candidate and syntax
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_BRANCH: ${{ github.head_ref }}
+        run: node test/ci/reality-chat-new-development-syntax-proof-v1.mjs
+      - name: Confirm no code execution or installation receipt from this candidate
+        run: echo 'Only source identity and syntax checked; functional acceptance and installation remain unverified.'

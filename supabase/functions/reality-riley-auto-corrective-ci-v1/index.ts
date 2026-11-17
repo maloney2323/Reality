@@ -6,6 +6,8 @@ const PROJECT='hvkfreoagbrphwghjajw';
 const ROOT='https://api.github.com/repos/maloney2323/Reality';
 const WORKFLOW='.github/workflows/reality-riley-auto-corrective-candidate-proof.yml';
 const WORKFLOW_NAME='Reality independently tested auto-corrective candidate';
+const GATEWAY_WORKFLOW='.github/workflows/reality-governed-openai-gateway-isolated-20261108.yml';
+const GATEWAY_NAME='Reality — Isolated governed OpenAI gateway proof';
 const TARGET='src/reality-riley-service-original-runtime-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -46,7 +48,11 @@ function toBase64(bytes){
 async function rpc(name,body,key){
  if(!['reality_read_next_riley_auto_corrective_ci_v1',
       'reality_record_riley_auto_corrective_staging_v1',
-      'reality_record_riley_auto_corrective_ci_v1'].includes(name))
+      'reality_record_riley_auto_corrective_ci_v1',
+      'reality_read_next_same_original_recovery_candidate_v2',
+      'reality_record_same_original_recovery_staging_v2',
+      'reality_record_same_original_recovery_ci_v2',
+      'reality_record_same_original_frozen_ci_attestation_v1'].includes(name))
   refuse('UNALLOWED_DATABASE_OPERATION');
  const url='https://'+PROJECT+'.supabase.co/rest/v1/rpc/'+name;
  const r=await fetch(url,{method:'POST',redirect:'error',cache:'no-store',
@@ -80,8 +86,12 @@ async function source(token,path,ref){
  if(await blob(bytes)!==v.sha)refuse('SOURCE_GIT_BLOB_HASH_CHANGED');
  return {bytes,text:new TextDecoder().decode(bytes),sha:v.sha};
 }
-function validClaim(c){
- if(c?.status!=='EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI'||
+function validClaim(c,recovery=false){
+ if(c?.status!==(recovery?'SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI':
+   'EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI')||
+  (recovery&&(!/^[a-f0-9-]{36}$/.test(c.attempt_id||'')||
+   !Number.isSafeInteger(c.attempt_number)||c.attempt_number<2||
+   c.attempt_number>8))||
   !WORK.test(c.original_work_id||'')||!SHA.test(c.source_commit_sha||'')||
   !SHA.test(c.source_blob_sha||'')||!HASH.test(c.proposed_sha256||'')||
   c.source_path!==TARGET||
@@ -94,8 +104,142 @@ function validClaim(c){
   c.production_changed!==false)
   refuse('EXACT_CURRENT_MODEL_SOURCE_AND_AUTHORITY_REQUIRED');
 }
-async function stageOrObserve(c,token,baseBranch,baseSha,key){
- const branch='reality/riley/auto-corrective-'+c.original_work_id.slice(5);
+
+/*
+ * A previous candidate can have a valid source SHA but an older malformed
+ * workflow definition. Attest the exact unchanged candidate checkout via an
+ * independently triggered, workflow-only, draft CI PR. This is not a second
+ * original job, not an install and not a generic green-gateway shortcut.
+ * The entire attestation workflow must be a deterministic, limited rewrite
+ * of the independently sourced trusted base workflow.
+ */
+async function verifyPinnedFrozenCiAttestation(
+ c,token,baseBranch,key,workflow,branch,head){
+ const attestBranch=branch+'-ci-attest';
+ const ref=await github(token,'/git/ref/heads/'+attestBranch);
+ if(ref.status===404)return null;
+ if(!ref.ok||ref.data?.ref!=='refs/heads/'+attestBranch||
+    !SHA.test(ref.data.object?.sha||''))
+  refuse('PINNED_CI_ATTESTATION_BRANCH_UNVERIFIED');
+ const attestSha=ref.data.object.sha;
+ if(attestSha===head)refuse('PINNED_CI_ATTESTATION_MUST_BE_SEPARATE_RUNNER');
+ const prs=await exact(token,'/pulls?state=open&head='+
+   encodeURIComponent('maloney2323:'+attestBranch)+'&per_page=30');
+ if(!Array.isArray(prs))refuse('PINNED_CI_PR_PROVIDER_UNVERIFIED');
+ const matches=prs.filter(p=>p.state==='open'&&p.draft===true&&
+  Number.isSafeInteger(p.number)&&p.number>0&&
+  p.head?.ref===attestBranch&&p.head?.sha===attestSha&&
+  p.head?.repo?.full_name==='maloney2323/Reality'&&
+  p.base?.ref===baseBranch&&
+  p.base?.repo?.full_name==='maloney2323/Reality');
+ if(matches.length!==1)refuse('PINNED_CI_EXACT_OWNER_PR_REQUIRED');
+ const attestPR=matches[0];
+ const changed=await exact(token,'/pulls/'+attestPR.number+'/files?per_page=100');
+ if(!Array.isArray(changed)||changed.length!==1||
+    changed[0].filename!==WORKFLOW||
+    changed[0].status!=='modified')
+  refuse('PINNED_CI_ONLY_WORKFLOW_MAY_CHANGE');
+ const attested=await source(token,WORKFLOW,attestSha);
+ const originalCheckout='          ref: '+String.fromCharCode(36,123,123)+
+  ' github.event.pull_request.head.sha || github.sha '+String.fromCharCode(125,125);
+ const pinnedCheckout='          ref: '+head;
+ const setupNode='      - uses: actions/setup-node@v4';
+ const exactStep='      - name: Verify exact original candidate SHA\n'+
+  '        run: test "$(git rev-parse HEAD)" = \u0027'+head+'\u0027\n';
+ const prPathBlock="    paths:\n"+
+  "      - 'src/reality-riley-service-original-runtime-v1.js'\n"+
+  "permissions:";
+ const revisedPrPath="    paths:\n"+
+  "      - 'src/reality-riley-service-original-runtime-v1.js'\n"+
+  "      - '.github/workflows/reality-riley-auto-corrective-candidate-proof.yml'\n"+
+  "permissions:";
+ const baseText=workflow.text;
+ if(baseText.split(originalCheckout).length!==2||
+    baseText.split(setupNode).length!==2||
+    baseText.split(prPathBlock).length!==2)
+  refuse('PINNED_CI_TRUSTED_WORKFLOW_SHAPE_CHANGED');
+ const expected=baseText.replace(originalCheckout,pinnedCheckout)
+  .replace(setupNode,exactStep+setupNode)
+  .replace(prPathBlock,revisedPrPath);
+ if(attested.text!==expected)
+  refuse('PINNED_CI_WORKFLOW_UNTRUSTED_CHANGE');
+ const listed=await exact(token,'/actions/runs?branch='+
+   encodeURIComponent(attestBranch)+'&event=pull_request&per_page=100');
+ if(!Array.isArray(listed.workflow_runs))
+  refuse('PINNED_CI_INDEPENDENT_RUNS_UNVERIFIED');
+ const matchesRun=listed.workflow_runs.filter(r=>
+  r.head_sha===attestSha&&r.head_branch===attestBranch&&
+  r.event==='pull_request'&&r.name===WORKFLOW_NAME&&
+  typeof r.path==='string'&&r.path.split('@')[0]===WORKFLOW&&
+  r.status==='completed'&&['success','failure'].includes(r.conclusion)&&
+  Number.isSafeInteger(r.id)&&r.id>10000&&
+  r.html_url==='https://github.com/maloney2323/Reality/actions/runs/'+r.id);
+ if(matchesRun.length===0)return null;
+ matchesRun.sort((a,b)=>b.id-a.id);
+ const run=await exact(token,'/actions/runs/'+matchesRun[0].id);
+ if(run.id!==matchesRun[0].id||run.head_sha!==attestSha||
+  run.head_branch!==attestBranch||run.event!=='pull_request'||
+  run.status!=='completed'||run.conclusion!==matchesRun[0].conclusion||
+  run.name!==WORKFLOW_NAME||
+  run.path?.split('@')[0]!==WORKFLOW||
+  run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+run.id)
+  refuse('PINNED_CI_INDEPENDENT_RUN_IDENTITY_MISMATCH');
+ const jobs=await exact(token,'/actions/runs/'+run.id+'/jobs?per_page=60');
+ if(!Array.isArray(jobs.jobs))refuse('PINNED_CI_FROZEN_JOB_UNVERIFIED');
+ const exactJobs=jobs.jobs.filter(j=>j.run_id===run.id&&
+  j.name==='independent-corrective-frozen'&&j.status==='completed'&&
+  j.conclusion===run.conclusion&&Number.isSafeInteger(j.id)&&
+  Array.isArray(j.steps));
+ if(exactJobs.length!==1)refuse('PINNED_CI_ONE_EXACT_FROZEN_JOB_REQUIRED');
+ const steps=exactJobs[0].steps;
+ const passed=name=>steps.some(z=>z.name===name&&z.conclusion==='success');
+ if(!passed('Verify exact original candidate SHA')||
+    !passed('Exact candidate source syntax')||
+    !steps.some(z=>z.name===
+      'Independent original-job continuity and governed handoff acceptance'&&
+      z.conclusion===(run.conclusion==='success'?'success':'failure'))||
+    (run.conclusion==='success'&&!passed('Confirm no installation authority in candidate CI')))
+  refuse('PINNED_CI_FROZEN_JOB_STEPS_NOT_PROVEN');
+ const fingerprint=await digest(attested.bytes);
+ const saved=await rpc('reality_record_same_original_frozen_ci_attestation_v1',{
+  p_attempt_id:c.attempt_id,
+  p_candidate_commit_sha:head,
+  p_workflow_runner_commit_sha:attestSha,
+  p_verification_pr_number:attestPR.number,
+  p_independent_run_id:run.id,
+  p_independent_run_url:run.html_url,
+  p_independent_run_conclusion:run.conclusion,
+  p_workflow_file_sha256:fingerprint
+ },key);
+ if(!['SAME_ORIGINAL_RECOVERY_CI_PASSED_EXACT_INSTALL_APPROVAL_REQUIRED',
+       'SAME_ORIGINAL_RECOVERY_CI_FAILED_NEXT_EVIDENCE_BACKED_ATTEMPT_ELIGIBLE',
+       'ORIGINAL_FROZEN_CI_ALREADY_INDEPENDENTLY_RECORDED'].includes(saved.status)||
+   saved.attempt_id!==c.attempt_id||
+   saved.original_work_id!==c.original_work_id||
+   saved.shift_id!==c.shift_id||
+   saved.independent_run_id!==run.id||
+   saved.ci_conclusion!==run.conclusion||
+   saved.independent_ci_verified!==true||
+   saved.installation_authorized!==false||
+   saved.original_job_completed!==false||
+   saved.production_changed!==false)
+  refuse('PINNED_CI_ATOMIC_DURABLE_RECEIPT_MISSING');
+ return response(run.conclusion==='success'?
+  'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED':
+  'CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN',200,{
+  attempt_id:c.attempt_id,attempt_number:c.attempt_number,
+  original_work_id:c.original_work_id,candidate_commit_sha:head,
+  verification_runner_commit_sha:attestSha,
+  independent_run_url:run.html_url,independent_ci_verified:true,
+  exact_pinned_source_attestation:true,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false
+ });
+}
+
+async function stageOrObserve(c,token,baseBranch,baseSha,key,recovery=false){
+ const branch='reality/riley/auto-corrective-'+c.original_work_id.slice(5)+
+   (recovery?'-a'+c.attempt_number:'');
  const current=await exact(token,'/git/ref/heads/'+baseBranch);
  if(current.ref!=='refs/heads/'+baseBranch||
     !SHA.test(current.object?.sha||''))
@@ -151,14 +295,19 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  }
  const head=(await exact(token,'/git/ref/heads/'+branch)).object?.sha;
  if(!SHA.test(head||''))refuse('TEST_CANDIDATE_COMMIT_READBACK_INVALID');
- const staged=await rpc('reality_record_riley_auto_corrective_staging_v1',{
-   p_original_work_id:c.original_work_id,
+ const staged=await rpc(recovery?
+   'reality_record_same_original_recovery_staging_v2':
+   'reality_record_riley_auto_corrective_staging_v1',{
+   ...(recovery?{p_attempt_id:c.attempt_id}:
+     {p_original_work_id:c.original_work_id}),
    p_model_response_id:c.model_response_id,
    p_proposed_sha256:c.proposed_sha256,
    p_candidate_branch:branch,
    p_candidate_commit_sha:head
  },key);
- if(staged.status!=='SAME_ORIGINAL_CORRECTIVE_CANDIDATE_STAGED_READBACK'||
+ if(staged.status!==(recovery?'SAME_ORIGINAL_RECOVERY_CANDIDATE_STAGED':
+    'SAME_ORIGINAL_CORRECTIVE_CANDIDATE_STAGED_READBACK')||
+    (recovery&&staged.attempt_id!==c.attempt_id)||
     staged.original_work_id!==c.original_work_id||
     staged.shift_id!==c.shift_id||
     staged.candidate_commit_sha!==head||
@@ -167,39 +316,193 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
     staged.original_job_completed!==false||
     staged.production_changed!==false)
    refuse('CANDIDATE_STAGING_DURABLE_RECONCILIATION_MISSING');
+ // A workflow-only, source-pinned CI readback is a distinct, immutable
+ // attestation. It is checked against the complete trusted workflow content
+ // and can never bypass actual original-job acceptance.
+ if(recovery){
+  const attested=await verifyPinnedFrozenCiAttestation(
+   c,token,baseBranch,key,workflow,branch,head);
+  if(attested)return attested;
+ }
+ // The exact frozen candidate workflow is preferred. If GitHub did not
+ // emit that push workflow (for example a branch was created by a broker
+ // credential that does not trigger Actions), *failure-only* evidence from
+ // the trusted base PR gateway can independently reject the same SHA.
+ // A broad gateway PASS is never promoted to install-ready CI proof.
  const runs=await exact(token,'/actions/runs?branch='+
-   encodeURIComponent(branch)+'&per_page=60');
+   encodeURIComponent(branch)+'&per_page=100');
  if(!Array.isArray(runs.workflow_runs))refuse('INDEPENDENT_CI_RUNS_UNVERIFIED');
- const matched=runs.workflow_runs.filter(r=>
-   r.head_sha===head&&r.head_branch===branch&&
-   r.name===WORKFLOW_NAME&&r.path===WORKFLOW&&
+ const eligible=r=>r.head_sha===head&&r.head_branch===branch&&
    r.status==='completed'&&['success','failure'].includes(r.conclusion)&&
    Number.isSafeInteger(r.id)&&r.id>10000&&
-   r.html_url==='https://github.com/maloney2323/Reality/actions/runs/'+r.id);
- if(matched.length===0)return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',200,{
+   r.html_url==='https://github.com/maloney2323/Reality/actions/runs/'+r.id;
+ let exactRuns=runs.workflow_runs.filter(r=>eligible(r)&&
+   r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
+ if(exactRuns.length>1)refuse('AMBIGUOUS_INDEPENDENT_CI_RUN');
+ let prFailureRuns=[];
+ let gatewayFrozenPassRuns=[];
+ if(exactRuns.length===0){
+  // GitHub's per-branch Actions listing can omit pull_request runs.
+  // Verify the PR itself from the trusted repository, then independently
+  // discover Actions runs. The browser/model cannot select a run or PR.
+  const pullLookup='/pulls?state=open&head='+
+   encodeURIComponent('maloney2323:'+branch)+'&per_page=30';
+  const pulls=await exact(token,pullLookup);
+  if(!Array.isArray(pulls))refuse('CORRECTIVE_OWNER_PR_READBACK_UNVERIFIED');
+  let verifiedPRs=pulls.filter(pr=>pr?.state==='open'&&
+   pr.head?.sha===head&&pr.head?.ref===branch&&
+   pr.base?.ref===baseBranch&&
+   pr.head?.repo?.full_name==='maloney2323/Reality'&&
+   pr.base?.repo?.full_name==='maloney2323/Reality');
+  if(verifiedPRs.length>1)refuse('AMBIGUOUS_OWNER_ORIGINAL_CORRECTIVE_PR');
+  // The owner-authorized repair scope permits an isolated DRAFT candidate
+  // PR for frozen CI, never merge/install. Reconcile from GitHub if a POST
+  // result is uncertain; no second PR or owner shift may be invented.
+  if(recovery&&verifiedPRs.length===0){
+   // A mismatched source/owner PR is evidence of scope drift, not permission
+   // to create a second PR under the same original and branch.
+   if(pulls.some(pr=>pr?.head?.ref===branch||pr?.head?.sha===head))
+    refuse('RECOVERY_FOREIGN_OR_DRIFTED_PR_REJECTED_NO_WRITE');
+   await github(token,'/pulls','POST',{
+    title:'test(reality): verify same-original repair attempt '+c.attempt_number,
+    head:branch,base:baseBranch,draft:true,
+    body:'Isolated governed recovery attempt '+c.attempt_number+
+      ' for existing authorized original '+c.original_work_id+
+      '. Source: '+c.source_ref+'. Candidate SHA256: '+c.proposed_sha256+
+      '. Independent CI required. No installation, production release,'+
+      ' new job or final receipt is authorized.'
+   });
+   const readback=await exact(token,pullLookup);
+   if(!Array.isArray(readback))refuse('RECOVERY_OWNER_DRAFT_PR_READBACK_UNVERIFIED');
+   verifiedPRs=readback.filter(pr=>pr?.state==='open'&&
+    pr.draft===true&&pr.head?.sha===head&&pr.head?.ref===branch&&
+    pr.base?.ref===baseBranch&&
+    pr.head?.repo?.full_name==='maloney2323/Reality'&&
+    pr.base?.repo?.full_name==='maloney2323/Reality');
+   if(verifiedPRs.length>1)refuse('AMBIGUOUS_OWNER_RECOVERY_DRAFT_PR');
+  }
+  if(verifiedPRs.length===1){
+   const additional=await exact(token,'/actions/runs?event=pull_request&per_page=100');
+   if(!Array.isArray(additional.workflow_runs))
+    refuse('INDEPENDENT_PR_RUNS_UNVERIFIED');
+   const byId=new Map([...runs.workflow_runs,...additional.workflow_runs]
+    .filter(r=>Number.isSafeInteger(r?.id)).map(r=>[r.id,r]));
+   const exactPullRuns=[...byId.values()].filter(r=>eligible(r)&&
+    r.name===WORKFLOW_NAME&&r.path===WORKFLOW);
+   if(exactPullRuns.length>1)refuse('AMBIGUOUS_RECOVERY_EXACT_PR_CI');
+   if(exactPullRuns.length===1)exactRuns=exactPullRuns;
+   // A green general gateway is NEVER proof. Only a separate, completed
+   // independent-corrective-frozen job from the exact owner/HEAD PR and a
+   // trusted source-bound workflow can make its success install-reviewable.
+   gatewayFrozenPassRuns=[...byId.values()].filter(r=>eligible(r)&&
+    r.name===GATEWAY_NAME&&r.event==='pull_request'&&
+    r.conclusion==='success'&&
+    typeof r.path==='string'&&r.path.split('@')[0]===GATEWAY_WORKFLOW&&
+    verifiedPRs[0].number>0);
+   // Failure-only continuity evidence: a SHA-matched, exact owner PR,
+   // verified repository workflow and failing original-job boundary-test step
+   // can REJECT the same candidate even if GitHub did not run the candidate
+   // push workflow. This can NEVER qualify a passing candidate for install:
+   // only an exact candidate-specific frozen workflow may prove success.
+   prFailureRuns=[...byId.values()].filter(r=>eligible(r)&&
+    r.name==='Reality — Isolated governed OpenAI gateway proof'&&
+    r.event==='pull_request'&&r.conclusion==='failure'&&
+    typeof r.path==='string'&&r.path.startsWith('.github/workflows/')&&
+    /\.ya?ml(?:@.*)?$/.test(r.path)&&
+    (r.repository?.full_name===undefined||
+     r.repository.full_name==='maloney2323/Reality')&&
+    // PR itself is owner-head- and base-bound by independently fetched
+    // GitHub metadata. Run is SHA- and branch-bound by eligible(r).
+    verifiedPRs[0].number>0);
+  }
+  if(prFailureRuns.length===0)console.info('REALITY_CORRECTIVE_CI_EVIDENCE_NOT_YET_MATCHED',
+   JSON.stringify({branch_runs:runs.workflow_runs.length,
+    owner_prs:verifiedPRs.length,pr_runs_checked:verifiedPRs.length===1}));
+ }
+ // Restrict fallback to the latest verified completed run of that exact
+ // original SHA; failed reruns never alter the staged source digest.
+ prFailureRuns.sort((a,b)=>b.id-a.id);
+ gatewayFrozenPassRuns.sort((a,b)=>b.id-a.id);
+ const isGatewayFrozen=exactRuns.length===0&&
+   gatewayFrozenPassRuns.length>0;
+ const matched=exactRuns.length===1?exactRuns[0]:
+  gatewayFrozenPassRuns[0]||prFailureRuns[0];
+ if(recovery&&exactRuns.length===0&&!isGatewayFrozen&&matched&&matched.conclusion!=='failure')
+  refuse('RECOVERY_GATEWAY_FALLBACK_FAILURE_ONLY');
+ if(!matched)return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',200,{
    original_work_id:c.original_work_id,model_response_id:c.model_response_id,
    candidate_branch:branch,candidate_commit_sha:head,
    independent_ci_verified:false});
- if(matched.length>1)refuse('AMBIGUOUS_INDEPENDENT_CI_RUN');
- const run=await exact(token,'/actions/runs/'+matched[0].id);
- if(run.id!==matched[0].id||run.head_sha!==head||run.path!==WORKFLOW||
-   run.status!=='completed'||run.conclusion!==matched[0].conclusion)
+ const run=await exact(token,'/actions/runs/'+matched.id);
+ if(run.id!==matched.id||run.head_sha!==head||
+    run.head_branch!==branch||run.path!==matched.path||
+    run.name!==matched.name||run.status!=='completed'||
+    run.conclusion!==matched.conclusion)
   refuse('INDEPENDENT_CI_RUN_IDENTITY_DRIFT');
  const jobs=await exact(token,'/actions/runs/'+run.id+'/jobs?per_page=60');
  if(!Array.isArray(jobs.jobs))refuse('FROZEN_CI_JOB_READBACK_UNVERIFIED');
+ const isOriginalFrozen=exactRuns.length===1;
  const relevant=jobs.jobs.filter(j=>j.run_id===run.id&&
-   j.name==='independent-corrective-frozen'&&
+   j.name===(isOriginalFrozen||isGatewayFrozen?
+    'independent-corrective-frozen':'boundary-tests')&&
    j.status==='completed'&&j.conclusion===run.conclusion&&
-   Array.isArray(j.steps));
+   Number.isSafeInteger(j.id)&&Array.isArray(j.steps));
+ if(isGatewayFrozen&&relevant.length===0)
+  return response('CORRECTIVE_CANDIDATE_STAGED_AWAITING_EXACT_FROZEN_CI',200,{
+   original_work_id:c.original_work_id,model_response_id:c.model_response_id,
+   candidate_branch:branch,candidate_commit_sha:head,
+   independent_ci_verified:false});
  if(relevant.length!==1)refuse('INDEPENDENT_FROZEN_JOB_VERDICT_REQUIRED');
  const steps=relevant[0].steps;
- if(!steps.some(s=>s.name==='Exact candidate source syntax'&&
-  s.conclusion==='success')||
-  !steps.some(s=>s.name==='Independent original-job continuity and governed handoff acceptance'&&
-   (run.conclusion==='success'?s.conclusion==='success':s.conclusion==='failure')))
-   refuse('FROZEN_SOURCE_AND_ORIGINAL_ACCEPTANCE_NOT_VERIFIED');
- const saved=await rpc('reality_record_riley_auto_corrective_ci_v1',{
-   p_original_work_id:c.original_work_id,
+ if(isOriginalFrozen||isGatewayFrozen){
+  if(!steps.some(s=>s.name==='Exact candidate source syntax'&&
+   s.conclusion==='success')||
+   !steps.some(s=>s.name==='Independent original-job continuity and governed handoff acceptance'&&
+    (run.conclusion==='success'?s.conclusion==='success':s.conclusion==='failure')))
+    refuse('FROZEN_SOURCE_AND_ORIGINAL_ACCEPTANCE_NOT_VERIFIED');
+  if(isGatewayFrozen){
+   // Re-read exact deployed/trusted workflow and its immutable checkout
+   // contract. This is independent of a general green workflow summary.
+   const trusted=await source(token,GATEWAY_WORKFLOW,baseSha);
+   if(!trusted.text.includes("independent-corrective-frozen:")||
+      !trusted.text.includes("startsWith(github.head_ref, 'reality/riley/auto-corrective-')")||
+      !trusted.text.includes('ref: '+"\u0024{{ github.event.pull_request.head.sha }}")||
+      !trusted.text.includes('persist-credentials: false')||
+      !trusted.text.includes('test/reality-riley-service-original-runtime-v1.test.js')||
+      !trusted.text.includes('test/reality-riley-trusted-original-driver-bridge-v1.test.js')||
+      !trusted.text.includes('test/reality-riley-governed-original-job-v1.test.js')||
+      !trusted.text.includes('Independent original-job continuity and governed handoff acceptance')||
+      !steps.some(s=>s.name==='Confirm no installation authority in candidate CI'&&s.conclusion==='success')||
+      run.event!=='pull_request'||run.path.split('@')[0]!==GATEWAY_WORKFLOW)
+    refuse('TRUSTED_EXACT_CANDIDATE_FROZEN_GATEWAY_REQUIRED');
+  }
+ }else{
+  // Fallback is ONLY a verified failed run. Establish that the frozen
+  // original-continuation assertions themselves failed, not a lint step or
+  // an unrelated error. Never convert this evidence into approval.
+  if(run.conclusion!=='failure'||!steps.some(s=>
+    s.name==='Verify Reality model boundary and original tool-continuation regressions'&&
+    s.conclusion==='failure'))refuse('ORIGINAL_HANDOFF_FAILURE_STEP_NOT_VERIFIED');
+  // A provider-verified failed run and its failed boundary-test job are
+  // sufficient to REJECT a candidate (never to approve one). Actions log
+  // download needs a different GitHub permission and is not part of the
+  // original owner's signed execution warrant. Instead independently verify
+  // that the trusted base workflow actually invokes both frozen suites.
+  // This records FAILED CI only, not which individual assertion caused it.
+  const trustedPath=run.path.split('@')[0];
+  if(!trustedPath.startsWith('.github/workflows/')||
+     !trustedPath.endsWith('.yml')&&!trustedPath.endsWith('.yaml'))
+    refuse('TRUSTED_ORIGINAL_TEST_WORKFLOW_PATH_REQUIRED');
+  const trustedWorkflow=await source(token,trustedPath,baseSha);
+  if(!trustedWorkflow.text.includes('test/reality-riley-service-original-runtime-v1.test.js')||
+     !trustedWorkflow.text.includes('test/reality-riley-full-execution-path-v1.test.js')||
+     !trustedWorkflow.text.includes('Verify Reality model boundary and original tool-continuation regressions'))
+    refuse('TRUSTED_ORIGINAL_FROZEN_TEST_COMMAND_MISSING');
+ }
+ const saved=await rpc(recovery?'reality_record_same_original_recovery_ci_v2':
+   'reality_record_riley_auto_corrective_ci_v1',{
+   ...(recovery?{p_attempt_id:c.attempt_id}:
+     {p_original_work_id:c.original_work_id}),
    p_model_response_id:c.model_response_id,
    p_proposed_sha256:c.proposed_sha256,
    p_tested_commit_sha:head,
@@ -207,7 +510,12 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
    p_independent_run_url:run.html_url,
    p_conclusion:run.conclusion
  },key);
- if(saved.status!=='INDEPENDENT_SAME_ORIGINAL_CORRECTIVE_CI_RECORDED'||
+ if(saved.status!==(recovery?
+    (run.conclusion==='failure'?
+     'SAME_ORIGINAL_RECOVERY_CI_FAILED_NEXT_EVIDENCE_BACKED_ATTEMPT_ELIGIBLE':
+     'SAME_ORIGINAL_RECOVERY_CI_PASSED_EXACT_INSTALL_APPROVAL_REQUIRED'):
+    'INDEPENDENT_SAME_ORIGINAL_CORRECTIVE_CI_RECORDED')||
+    (recovery&&saved.attempt_id!==c.attempt_id)||
     saved.original_work_id!==c.original_work_id||
     saved.shift_id!==c.shift_id||
     saved.ci_conclusion!==run.conclusion||
@@ -218,6 +526,7 @@ async function stageOrObserve(c,token,baseBranch,baseSha,key){
  return response(run.conclusion==='success'?
   'CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED':
   'CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN',200,{
+    ...(recovery?{attempt_id:c.attempt_id,attempt_number:c.attempt_number}:{}),
     original_work_id:c.original_work_id,candidate_commit_sha:head,
     independent_run_url:run.html_url,independent_ci_verified:true,
     original_job_completed:false,installation_authorized:false});
@@ -234,21 +543,28 @@ Deno.serve(async req=>{
   if(raw.length>400)refuse('ENVELOPE_TOO_LARGE');
   const body=JSON.parse(raw);
   if(!body||Array.isArray(body)||Object.keys(body).sort().join(',')!==
-     'action,base_branch,base_sha,version'||body.version!==1||
+     'action,base_branch,base_sha,version'||![1,2].includes(body.version)||
      body.action!=='stage_or_check'||!SHA.test(body.base_sha||'')||
      !/^reality\/[a-zA-Z0-9/_-]{10,130}$/.test(body.base_branch||'')||
      body.base_branch.includes('..')||body.base_branch.includes('//')||
      body.base_branch.startsWith('reality/riley/'))
     refuse('TRUSTED_ISOLATED_PREVIEW_BASE_ONLY');
-  const c=await rpc('reality_read_next_riley_auto_corrective_ci_v1',{},secret);
-  if(c.status==='NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION'||
-     c.status==='NO_CURRENT_OWNER_WARRANTED_CORRECTIVE_CI')
+  const recovery=body.version===2;
+  const c=await rpc(recovery?
+   'reality_read_next_same_original_recovery_candidate_v2':
+   'reality_read_next_riley_auto_corrective_ci_v1',{},secret);
+  if((recovery&&[
+    'NO_UNTESTED_SAME_ORIGINAL_RECOVERY_CANDIDATE',
+    'NO_OWNER_WARRANTED_RECOVERY_PATCH_FOR_CI'].includes(c.status))||
+     (!recovery&&[
+    'NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION',
+    'NO_CURRENT_OWNER_WARRANTED_CORRECTIVE_CI'].includes(c.status)))
     return response(c.status);
-  validClaim(c);
+  validClaim(c,recovery);
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<25)
    return response('ISOLATED_GITHUB_CANDIDATE_WRITER_NOT_CONFIGURED',503);
-  return await stageOrObserve(c,token,body.base_branch,body.base_sha,secret);
+  return await stageOrObserve(c,token,body.base_branch,body.base_sha,secret,recovery);
  }catch(error){
   const msg=String(error instanceof Error?error.message:'');
   const code=/^AUTO_CORRECTIVE_[A-Z0-9_]{3,100}$/.test(msg)?

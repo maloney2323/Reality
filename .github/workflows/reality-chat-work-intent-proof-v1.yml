@@ -7,9 +7,31 @@ on:
       - 'api/reality/personal-chat-work.js'
       - 'test/reality-chat-work-intent-v1.test.js'
       - 'test/reality-saved-chat-work-adapter-v1.test.js'
+      - 'test/reality-chat-scoped-engineering-continuation-v1.test.js'
+      - 'test/reality-chat-new-development-v1.test.js'
+      - 'src/reality-chat-new-development-adapter-v1.js'
+      - 'src/reality-chat-new-development-worker-v1.js'
+      - 'src/reality-chat-new-development-publisher-v1.js'
+      - 'supabase/functions/reality-chat-new-development-broker-v1/index.ts'
+      - 'supabase/migrations/20261115010000_chat_new_development_admission_v1.sql'
+      - 'supabase/migrations/20261115010100_chat_new_development_model_draft_v1.sql'
+      - 'supabase/migrations/20261115010200_chat_new_development_governed_candidate_v1.sql'
+      - 'test/ci/reality-chat-new-development-syntax-proof-v1.mjs'
+      - '.github/workflows/reality-chat-new-development-candidate-v1.yml'
       - 'src/reality-owner-original-work-chat-readback-v1.js'
       - 'test/reality-owner-original-work-chat-readback-v1.test.js'
       - 'api/reality/personal-chat.js'
+      - 'src/reality-chat-optional-evidence-v1.js'
+      - 'src/reality-continuity-universe-projection-v1.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
+      - 'test/reality-continuity-universe-projection-v1.test.js'
+      - 'test/reality-chat-optional-evidence-v1.test.js'
+      - 'reality-chat-recover-unanswered-v1.js'
+      - 'test/reality-chat-recover-unanswered-v1.test.js'
+      - 'src/reality-private-chat-store-v0.1.js'
+      - 'reality-chat-request-status-v1.js'
+      - 'test/reality-chat-exact-reply-readback-v1.test.js'
+      - 'index.html'
       - '.github/workflows/reality-chat-work-intent-proof-v1.yml'
   workflow_dispatch:
 permissions:
@@ -28,7 +50,22 @@ jobs:
         run: |
           node --test test/reality-chat-work-intent-v1.test.js
           node --test test/reality-saved-chat-work-adapter-v1.test.js
+          node --test test/reality-chat-scoped-engineering-continuation-v1.test.js
+          node --test test/reality-chat-new-development-v1.test.js
           node --test test/reality-owner-original-work-chat-readback-v1.test.js
           node --test test/reality-personal-chat-durable-intake-v1.test.js
-      - name: Check authenticated Chat route syntax
-        run: node --check api/reality/personal-chat-work.js
+          node --test test/reality-chat-optional-evidence-v1.test.js
+          node --test test/reality-chat-recover-unanswered-v1.test.js
+          node --test test/reality-chat-exact-reply-readback-v1.test.js
+          node --test test/reality-continuity-universe-projection-v1.test.js
+      - name: Check authenticated Chat route and live status syntax
+        run: |
+          node --check api/reality/personal-chat-work.js
+          node --check src/reality-saved-chat-work-adapter-v1.js
+          node --check reality-chat-request-status-v1.js
+          node --check src/reality-chat-new-development-adapter-v1.js
+          node --check src/reality-chat-new-development-worker-v1.js
+          node --check src/reality-chat-new-development-publisher-v1.js
+          node --check supabase/functions/reality-chat-new-development-broker-v1/index.ts
+          node --check test/ci/reality-chat-new-development-syntax-proof-v1.mjs
+          node --check api/reality/governed-employee-shift-worker.js

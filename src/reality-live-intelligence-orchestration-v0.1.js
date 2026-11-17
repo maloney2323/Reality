@@ -7,6 +7,7 @@ import {projectAuthoritativeGoalRelationshipGraph} from './reality-authoritative
 import {projectAssistantTrajectoryBoundary,resolveAmbiguousGoalReturn,ambiguousGoalReturnQuestion} from './reality-assistant-trajectory-boundary-v0.1.js';
 import { buildGovernedChatSignal } from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import { buildNativeUniverseContext, mergeCurrentAndDurableUniverseForCognition } from './reality-native-universe-v1.0.js';
+import {projectCanonicalContinuityIntoUniverse} from './reality-continuity-universe-projection-v1.js';
 import { retrievePersistedUniverse, retrieveDormantContinuitySummaries, persistContinuityEvent } from './reality-native-universe-persistence-v1.0.js';
 import { discoverDormantContinuity } from './reality-continuity-discovery-v1.0.js';
 import { buildContinuityEvent, buildContinuityRehydration, deriveContinuityRootId } from './reality-continuous-continuity-v1.0.js';
@@ -37,9 +38,19 @@ import { readGroundedEvidence } from './reality-reliability-evidence-v0.1.js';
 import { extractReliabilityClaims } from './reality-reliability-claim-extraction-v0.1.js';
 import { createOperationalSituation, transitionOperationalSituation } from './operational-situation-v1.0.js';
 
-async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
+export async function loadUniverseContext({ systemContext = null, continuityRootId = null, fetchImpl } = {}) {
   const requestContext = buildNativeUniverseContext({ systemContext });
   if (process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED !== 'true') return requestContext;
+  // In a trusted authenticated Chat root, the canonical Spine is the
+  // authoritative Universe source. The old separate native entry table
+  // is stale and must not block every reply merely to be read again.
+  // The verified projection of the SAME root is joined before cognition.
+  if(systemContext?.canonical_continuity_is_universe_source===true &&
+     typeof continuityRootId==='string'&&continuityRootId.trim())
+   return Object.freeze({...requestContext,
+    status:'AWAIT_CANONICAL_SPINE_UNIVERSE_REENTRY',
+    persistence:'SAME_ROOT_CONTINUITY_SPINE',
+   });
 
   const durable = await retrievePersistedUniverse({ continuityRootId, limit: 100, fetchImpl });
   return Object.freeze({
@@ -171,7 +182,7 @@ export async function runLiveIntelligenceOrchestration({
     conversationId: systemContext?.conversation_id,
     workstreamId: systemContext?.workstream_id,
   });
-  const universeContext = await loadUniverseContext({ systemContext, continuityRootId: explicitContinuityRootId, fetchImpl });
+  let universeContext = await loadUniverseContext({ systemContext, continuityRootId: explicitContinuityRootId, fetchImpl });
   const suppliedUniverseCount =
     (Array.isArray(systemContext?.universe_entries) ? systemContext.universe_entries.length : 0) +
     (Array.isArray(systemContext?.connected_world_observations) ? systemContext.connected_world_observations.length : 0);
@@ -227,13 +238,19 @@ export async function runLiveIntelligenceOrchestration({
     const discoveredUniverse = await retrievePersistedUniverse({ continuityRootId: discoveredContinuityRootId, limit: 100, fetchImpl });
     persistedContinuity = buildContinuityRehydration({ continuityRootId: discoveredContinuityRootId, entries: discoveredUniverse.entries, trigger: 'ROOT_INDEPENDENT_NEW_EVIDENCE' });
   }
+  // The entire pre-cognition alignment, source-fact grounding and
+  // authoritative user-goal reconciliation use ONE hash-verified Spine
+  // snapshot. Avoid reconstructing the same entire history three times.
+  // Final publication still independently re-reads current goal authority.
+  const preCognitionSpineHistory=continuityRuntime?.enabled?
+    await continuityRuntime.readback():[];
   // Align the current task BEFORE generation, from the SAME existing source
   // readback as Continuity. This is a projection, not new memory or authority.
   let preCognitionAlignment = null;
   if (process.env.VERCEL_ENV === 'preview' &&
       process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
       continuityRuntime?.enabled && systemContext?.world_id) {
-    const history = await continuityRuntime.readback();
+    const history = preCognitionSpineHistory;
     const grounded = readGroundedEvidence(history,{worldId:systemContext.world_id,
       asOf:observedAt||new Date().toISOString()});
     if (grounded.source_receipt_ids.length) {
@@ -270,7 +287,7 @@ export async function runLiveIntelligenceOrchestration({
   if (process.env.VERCEL_ENV === 'preview' &&
       process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED === 'true' &&
       continuityRuntime?.enabled && systemContext?.world_id) {
-    const evidenceHistory = await continuityRuntime.readback();
+    const evidenceHistory = preCognitionSpineHistory;
     const grounded = readGroundedEvidence(evidenceHistory,{worldId:systemContext.world_id});
     sourceAttestedFrameSnapshot = grounded;
     if (grounded.source_receipt_ids.length) {
@@ -297,8 +314,31 @@ export async function runLiveIntelligenceOrchestration({
   // No assistant suggestion or inferred pivot can silently rewrite it.
   const normalizedContinuityRoot=continuityRuntime?.spine?.continuity_root_id||
     effectiveContinuityRootId||('turn:'+governedSignal.packet.packet_id);
-  const priorGoalContinuityHistory=continuityRuntime?.enabled?
-    await continuityRuntime.readback():[];
+  const priorGoalContinuityHistory=preCognitionSpineHistory;
+  // Close the loop without duplicating the canonical append-only ledger.
+  // The same hash-verified, root-bound Spine used for goal reconciliation
+  // becomes the next Universe read model. This includes prior recorded
+  // outcomes and learning, but never promotes a model claim to truth.
+  const canonicalSpineUniverse=continuityRuntime?.enabled?
+    projectCanonicalContinuityIntoUniverse({
+     history:priorGoalContinuityHistory,
+     rootId:continuityRuntime.spine.continuity_root_id,
+     worldlineId:continuityRuntime.spine.worldline_id,
+     limit:24
+    }):null;
+  if(canonicalSpineUniverse?.entries.length){
+   const merged=mergeCurrentAndDurableUniverseForCognition({
+    current:[...buildNativeUniverseContext({systemContext}).entries,
+     ...canonicalSpineUniverse.entries],
+    durable:universeContext.entries,limit:100,
+   });
+   universeContext=Object.freeze({...universeContext,
+    status:'VERIFIED_CANONICAL_SPINE_UNIVERSE_REENTRY',
+    canonical_source:'HASH_VERIFIED_CONTINUITY_SPINE_OWNER_SCOPE',
+    canonical_continuity_event_count:canonicalSpineUniverse.verified_history_event_count,
+    count:merged.length,entries:merged,
+   });
+  }
   // This is the ONLY authoritative active-goal relationship. It is read from
   // authenticated user-command events in the SAME append-only Continuity root.
   // The semantic reviewer and prior assistant messages cannot mutate it.

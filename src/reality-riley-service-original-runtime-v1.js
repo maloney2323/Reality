@@ -129,7 +129,6 @@ export function createRileyServiceOriginalRuntime({
    loaded.work_item?.work_item_id!==ctx.original_work_id||
    loaded.work_item.connector!==null||
    loaded.work_item.consequential!==false||
-   typeof loaded.connector?.execute!=='function'||
    typeof loaded.independent_verifier?.verify!=='function')
    fail('CURRENT_CONTINUITY_ORIGINAL_PRECLAIM_MISMATCH');
   const observed=await loaded.independent_verifier.verify({
@@ -209,9 +208,17 @@ export function createRileyServiceOriginalRuntime({
    outcome.new_job_created!==false||
    outcome.production_changed!==false)
    fail('GOVERNED_EXECUTOR_ORIGINAL_OUTCOME_UNTRUSTED');
+  // The trusted genuine capability runner exposes the independently
+  // recorded queue result as a status STRING. It deliberately does not
+  // expose its internal self_repair object to this worker adapter.
+  // Require the actual durable-queue outcome; an arbitrary truthy value,
+  // unrelated status or failed reconciliation is not a valid handoff.
+  const validQueuedHandoff=
+   outcome.execution_status==='UNRESOLVED'&&
+   outcome.capability_response==='GENUINE_CAPABILITY_GAP_DURABLY_QUEUED';
   const status=outcome.execution_status==='BLOCKED'?
    'ORIGINAL_JOB_AUTHORIZATION_BLOCKED':
-   outcome.capability_response?
+   validQueuedHandoff?
     'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF':
    outcome.execution_status==='VERIFIED'?
     'ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT':

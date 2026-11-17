@@ -86,3 +86,132 @@ export function safeShiftReadbackState(data,{requestedHours=null,now=Date.now()}
  }
  return Object.freeze({hasActive:false,expired_unclosed_shifts});
 }
+
+
+// Restore the already-existing Chat -> authenticated shift-controller path to
+// the main /chat page. The first GET is an independent owner-scoped readback.
+// An active shift is *never* authorized again or re-intaken by this helper.
+// A new shift only starts on a direct, explicit, signed-in Send action,
+// using the same frozen draft fingerprint and existing batch-intake endpoint.
+// No model-generated instructions, inferred intent, or install permissions.
+export async function resolveExistingSignedInChatShift(command,{
+ conversationId,fetchImpl=fetch,now=Date.now()
+}={}){
+ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+ const HASH=/^sha256:[a-f0-9]{64}$/;
+ if(command?.intent!=='START_ONE_OWNER_AUTHORIZED_EMPLOYEE_SHIFT'||
+    command.authorization_source!=='EXPLICIT_SIGNED_IN_CHAT_SEND_ACTION'||
+    command.installation_authorized!==false||
+    command.production_changed!==false||
+    !Number.isSafeInteger(command.duration_hours)||
+    command.duration_hours<1||command.duration_hours>12||
+    !UUID.test(conversationId||'')||typeof fetchImpl!=='function')
+  throw Error('CHAT_SHIFT_EXPLICIT_OWNER_COMMAND_REQUIRED');
+ const SHIFT='/api/reality/personal-governed-employee-shift';
+ const fetchJSON=async(path,options={})=>{
+  const response=await fetchImpl(path,{
+   method:'GET',credentials:'same-origin',cache:'no-store',
+   signal:AbortSignal.timeout(12000),...options
+  });
+  const data=await response.json().catch(()=>null);
+  if(!response.ok||data?.ok!==true)
+   throw Error('CHAT_SHIFT_AUTHENTICATED_CONTROLLER_UNAVAILABLE');
+  return data;
+ };
+ const existing=await fetchJSON(SHIFT);
+ const current=safeShiftReadbackState(existing,{now,
+  requestedHours:command.duration_hours});
+ if(current.hasActive){
+  return Object.freeze({
+   status:'EXISTING_SIGNED_IN_SHIFT_ALREADY_AUTHORIZED',
+   shift_id:current.shift_id,shift_status:current.status,
+   completion_bound:current.completion_bound,
+   new_shift_started:false,owner_authorization_reused:true,
+   installation_authorized:false,production_changed:false,
+   worker_execution_verified:false,
+  });
+ }
+ // The old controller, not the model or message text, owns source choice.
+ const draftReply=await fetchJSON(SHIFT+'?hours='+command.duration_hours,
+  {signal:AbortSignal.timeout(30000)});
+ const draft=draftReply.requested_shift_draft;
+ const orders=draft?.combined_employee_work_orders;
+ if(draft?.status!=='DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED'||
+    draft.shift_duration_hours!==command.duration_hours||
+    draft.shift_duration_minutes!==command.duration_hours*60||
+    !HASH.test(draft.expected_fingerprint||'')||
+    draft.job_started!==false||draft.installation_authorized!==false||
+    draft.read_only!==true||draft.production_changed!==false||
+    orders?.version!=='reality-riley-taylor-combined-work-orders-v1'||
+    orders.plan_fingerprint!==draft.expected_fingerprint||
+    !Number.isSafeInteger(orders.task_count)||orders.task_count<1||
+    orders.task_count>4||orders.execution_started!==false||
+    orders.installation_authorized!==false||
+    orders.production_changed!==false)
+  throw Error('CHAT_SHIFT_FROZEN_OWNER_DRAFT_NOT_READY');
+ const created=await fetchJSON(SHIFT,{
+  method:'POST',
+  headers:{'content-type':'application/json'},
+  body:JSON.stringify({
+   action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
+   requested_hours:command.duration_hours,
+   ...(command.completion_bound?{completion_bound:true}:{}),
+   expected_fingerprint:draft.expected_fingerprint,
+   planned_start_at:new Date(now+10000).toISOString()
+  }),signal:AbortSignal.timeout(50000)
+ });
+ if(!['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(created.status)||
+    !UUID.test(created.shift_id||'')||
+    created.initial_authorization_recorded!==true||
+    created.installation_authorized!==false||
+    created.production_changed!==false||
+    created.worker_dispatch_verified!==false||
+    created.start_confirmation?.status!=='OWNER_WORK_BATCH_AUTHORIZATION_CONFIRMED'||
+    created.start_confirmation.shift_id!==created.shift_id||
+    !Number.isFinite(Date.parse(created.start_confirmation.authorized_at||''))||
+    created.start_confirmation.worker_execution_verified!==false||
+    created.start_confirmation.original_job_completed!==false||
+    !Array.isArray(created.start_confirmation.selected_sources))
+  throw Error('CHAT_SHIFT_OWNER_AUTHORIZATION_RECEIPT_NOT_VERIFIED');
+ // Re-read the database before any next-stage intake. An uncertain effect
+ // can never turn into an automatic second Start or model authorization.
+ const checked=await fetchJSON(SHIFT);
+ const record=(checked.shifts||[]).find(s=>s.shift_id===created.shift_id);
+ if(!record||record.plan_fingerprint!==draft.expected_fingerprint||
+    (command.completion_bound?
+      record.planned_end_at!=='infinity':
+      Date.parse(record.planned_end_at)-Date.parse(record.planned_start_at)!==
+       command.duration_hours*3600000))
+  throw Error('CHAT_SHIFT_CREATED_BUT_READBACK_UNVERIFIED_NO_REPEAT');
+ let batch_verified=false,batch_status='BATCH_INTAKE_REQUIRES_READBACK';
+ try{
+  const admitted=await fetchJSON('/api/reality/personal-riley-full-shift-batch',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    action:'ADMIT_QUALIFIED_WORK_IN_EXACT_AUTHORIZED_RILEY_SHIFT',
+    conversation_id:conversationId,shift_id:created.shift_id,
+    expected_fingerprint:draft.expected_fingerprint
+   }),signal:AbortSignal.timeout(110000)
+  });
+  batch_verified=admitted.shift_id===created.shift_id&&
+   admitted.shift_fingerprint===draft.expected_fingerprint&&
+   admitted.one_authorization_for_exact_shift===true&&
+   admitted.no_per_job_buttons_required===true&&
+   admitted.installation_authorized===false&&
+   admitted.original_job_completed===false&&
+   admitted.final_receipt_recorded===false&&
+   admitted.production_changed===false&&
+   Array.isArray(admitted.outcomes)&&admitted.outcomes.length<=4;
+  batch_status=batch_verified?'EXACT_AUTHORIZED_SHIFT_BATCH_INTAKE_VERIFIED':
+   'BATCH_INTAKE_REQUIRES_READBACK';
+ }catch{/* An uncertain batch effect must not trigger a duplicate shift. */}
+ return Object.freeze({
+  status:'EXACT_SHIFT_OWNER_AUTHORIZATION_DURABLY_VERIFIED',
+  shift_id:created.shift_id,shift_status:record.status,
+  completion_bound:command.completion_bound===true,
+  new_shift_started:true,owner_authorization_reused:false,
+  batch_status,batch_verified,
+  installation_authorized:false,production_changed:false,
+  worker_execution_verified:false,
+ });
+}

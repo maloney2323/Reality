@@ -19,8 +19,11 @@ test('the live Chat request ID belongs to the real submit and exact persisted me
 test('read-only provider evidence, no invented internal cognition or worker effects',()=>{
  assert.match(js,/\/api\/reality\/personal-chat\?conversation_id=/);
  assert.match(js,/method:'GET',credentials:'same-origin',cache:'no-store'/);
- assert.match(js,/Internal model reasoning and verification stages are not streamed/);
- assert.match(js,/No development worker was started/);
+ assert.match(js,/Reality is replying/);
+ assert.match(js,/actualWork/);
+ assert.match(js,/state\.answer&&!actualWork/);
+ assert.doesNotMatch(js,/Show verified response stages/);
+ assert.doesNotMatch(js,/steps\.append/);
  assert.doesNotMatch(js,/method:\s*['"]POST['"]|\/api\/reality\/shift|\/api\/reality\/personal-governed-build/);
  assert.doesNotMatch(js,/innerHTML\s*=|insertAdjacentHTML/);
 });
@@ -44,5 +47,5 @@ test('browser JS compiles without replacing the existing Reality handler',()=>{
  assert.doesNotThrow(()=>new Script(js));
  assert.match(html,/el\('privateSend'\)\.onclick=async/);
  assert.match(html,/await loadSaved\(\);await loadConversations\(\);/);
- assert.match(html,/const sentConversation=conversationId\(\),sentRequest=crypto\.randomUUID\(\)/);
+ assert.match(html,/const sentConversation=conversationId\(\);\s*let sentRequest=crypto\.randomUUID\(\)/);
 });

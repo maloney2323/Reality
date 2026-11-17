@@ -6468,7 +6468,11 @@ setInterval(refreshSavedShiftHome,300000);
 
 (function(){
  const el=id=>document.getElementById(id);
- const status=s=>{el('privateStatus').textContent=typeof s==='string'&&s.trim()?s:'';};
+ const status=s=>{
+  const clean=typeof s==='string'?s.trim():'';
+  el('privateStatus').textContent=clean&&
+   !['null','undefined','[object object]'].includes(clean.toLowerCase())?clean:'';
+ };
  const endpoint='/api/reality/personal-session';
  function conversationId(){
   let id=localStorage.getItem('reality.private.chat.conversation.v1');
@@ -6822,15 +6826,34 @@ setInterval(refreshSavedShiftHome,300000);
     item.installation_authorized===false
    ).map(item=>[item.source_ref,item]):[]);
   for(const message of data.messages||[]){
-   bubble(message.role,message.text);
+   const savedBubble=bubble(message.role,message.text);
+   savedBubble.dataset.requestId=message.request_id;
    const handed=message.role==='user'?workBySource.get(message.source_ref):null;
-   if(handed&&handed.request_id===message.request_id){
+   // Normal conversation is not a worker shift. Do not attach a huge
+   // governance card to questions, brainstorming or a saved advisory
+   // merely because every Chat turn also enters the signed worker inbox.
+   const explicitWorkRequest=message.role==='user'&&
+    /\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install)\b/i.test(message.text||'');
+   const actualDevelopment=handed?.development&&
+    /^work:[a-f0-9]{32}$/.test(handed.development.original_work_id||'')&&
+    handed.development.installation_authorized===false&&
+    handed.development.production_changed===false;
+   const actualOriginalWork=handed?.work_chain?.some(x=>
+    /^work:[a-f0-9]{32}$/.test(x?.original_work_id||'')&&
+    ['MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+     'CORRECTIVE_MODEL_DRAFT_AWAITING_INDEPENDENT_CI',
+     'CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING',
+     'CORRECTIVE_CI_PASSED_AWAITING_EXACT_INSTALL_GATE']
+      .includes(x.current_evidence_stage));
+   if(handed&&handed.request_id===message.request_id&&
+      (actualDevelopment||actualOriginalWork||explicitWorkRequest)){
     const card=document.createElement('div');
     card.className='bubble reality-chat-signed-work-card';
     card.setAttribute('role','status');
     const heading=document.createElement('div');
     heading.className='label';
-    heading.textContent='GOVERNED WORK · AUTHENTICATED RECEIPT';
+    heading.textContent=(actualDevelopment||actualOriginalWork)?
+     'REALITY · VERIFIED WORK':'REALITY · WORK REQUEST';
     const details=document.createElement('div');
     const descriptions={
      PENDING:'Saved instruction is in Reality’s durable worker inbox. Awaiting the existing signed shift worker.',
@@ -6842,9 +6865,32 @@ setInterval(refreshSavedShiftHome,300000);
     };
     const suffix=typeof handed.diagnosis==='string'&&handed.diagnosis?
      ' Verified worker record (model advisory): '+handed.diagnosis.slice(0,700):'';
-    details.textContent=(descriptions[handed.status]||
-     'This request has no verified work disposition.')+suffix;
+    details.textContent=(actualDevelopment||actualOriginalWork)?
+     (descriptions[handed.status]||
+      'Verified source-backed engineering work identified.')+suffix:
+     'You can ask Reality to perform this work. Execution has not been verified.';
     card.append(heading,details);
+    const development=handed.development;
+    if(development&&
+       /^work:[a-f0-9]{32}$/.test(development.original_work_id||'')&&
+       development.installation_authorized===false&&
+       development.production_changed===false){
+      const stage=document.createElement('div');
+      stage.className='reality-chat-signed-work-stage';
+      stage.textContent='NEW DEVELOPMENT · '+development.original_work_id+
+        ' · '+String(development.phase||'QUEUED').replaceAll('_',' ')+
+        '. Separate signed build request; no other shift or repair borrowed.';
+      card.append(stage);
+      const receipt=development.evidence||{};
+      if(typeof receipt.ci_url==='string'&&
+         /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(receipt.ci_url)){
+        const link=document.createElement('a');
+        link.href=receipt.ci_url;link.target='_blank';
+        link.rel='noopener noreferrer';
+        link.textContent='Independent development CI receipt';
+        card.append(link);
+      }
+    }
     // Server-attested original work stages only. A Chat model diagnosis is
     // NOT a tested patch or a source-installation approval.
     const verifiedStages=new Set([
@@ -6936,7 +6982,41 @@ setInterval(refreshSavedShiftHome,300000);
       report.textContent='Checking the existing job controller and original-work authorization…';
       try{
        const state=await postWork('INSPECT_VERIFIED_WORK');
-       if(state.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
+       if(state.status==='CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE'){
+        report.textContent='This is a new, explicit development request. Reality can admit it as its own isolated work, without borrowing a prior job or shift.';
+        const admit=document.createElement('button');
+        admit.type='button';
+        admit.textContent='Start this new build';
+        const admitNow=async()=>{
+         admit.disabled=true;
+         report.textContent='Admitting this exact saved build instruction into Reality’s existing work inbox…';
+         try{
+          const accepted=await postWork('ADMIT_SIGNED_NEW_DEVELOPMENT');
+          if(accepted.status!=='CHAT_WORK_NEW_DEVELOPMENT_DURABLY_ADMITTED'&&
+             accepted.status!=='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED')
+           throw Error('DEVELOPMENT_ADMISSION_NOT_VERIFIED');
+          report.textContent='New Reality development admitted: '+accepted.original_work_id+
+           '. Source: saved Chat request. Building is queued; model generation, independent tests and installation have NOT yet been verified. This is not another employee shift.';
+          void loadSaved();
+         }catch(e){
+          report.textContent='New development was not verified: '+
+           String(e.message||'UNKNOWN').slice(0,140)+
+           '. Check the existing request before retrying.';
+          admit.disabled=false;
+         }
+        };
+        controls.append(admit);
+        // The owner just pressed Send on this explicit new build request.
+        // That is sufficient to admit non-production development; no second
+        // "approve" click, no new shift and no production install.
+        if(justSaved?.conversation_id===conversationId()&&
+           justSaved.request_id===message.request_id)void admitNow();
+        else admit.onclick=admitNow;
+       }else if(state.status==='CHAT_WORK_NEW_DEVELOPMENT_ALREADY_ADMITTED'){
+        report.textContent='New development '+state.original_work_id+
+         ' · '+String(state.development_phase||'QUEUED')+
+         '. The original signed instruction is already admitted; do not create another job.';
+       }else if(state.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
           /^work:[a-f0-9]{32}$/.test(state.original_work_id||'')){
         report.textContent='Verified unfinished original job '+state.original_work_id+
          ' is eligible for an existing governed discovery worker. This is not installation approval.';
@@ -6958,7 +7038,51 @@ setInterval(refreshSavedShiftHome,300000);
          }
         };
         controls.append(authorize);
-       }else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
+       }else if(state.status==='CHAT_WORK_ENGINEERING_SCOPED_CI_READY'&&
+          /^work:[a-f0-9]{32}$/.test(state.original_work_id||'')){
+        report.textContent='Original '+state.original_work_id+
+         ' is independently scoped to this signed build instruction. Reality can continue its existing isolated candidate and CI broker. No installation authorization.';
+        const go=document.createElement('button');
+        go.type='button';
+        go.textContent='Continue verified engineering now';
+        go.onclick=async()=>{
+         go.disabled=true;
+         report.textContent='Checking the owner warrant and existing corrective CI broker…';
+         try{
+          const run=await postWork('CONTINUE_VERIFIED_SCOPED_ENGINEERING');
+          const proof=typeof run.independent_run_url==='string'&&
+            /^https:\/\/github\.com\/maloney2323\/Reality\/actions\/runs\/[1-9]\d*$/.test(run.independent_run_url)?
+             ' · Independent evidence: '+run.independent_run_url:'';
+          report.textContent='Reality engineering · '+run.status+
+           ' · '+String(run.broker_status||'UNVERIFIED')+proof+
+           '. No production change or new shift.';
+         }catch(e){
+          report.textContent='Reality could not verify the original engineering continuation: '+
+           String(e.message||'UNVERIFIED').slice(0,120)+
+           '. Do not replay an uncertain provider write.';
+         }
+        };
+        controls.append(go);
+       }else if(state.status==='CHAT_WORK_ENGINEERING_TESTED_AWAITING_EXACT_APPROVAL')
+        report.textContent='Reality already has independently tested source for original '+
+         state.original_work_id+'. Only the existing separate exact installation gate remains.';
+       else if(state.status==='CHAT_WORK_ENGINEERING_SOURCE_NOT_EXPLICIT')
+        report.textContent='This build request does not identify the authorized original. '+
+         'Reality will not change an unrelated job. Reference the exact existing source, '+
+         'or qualify a separate governed development task.';
+       else if(state.status==='CHAT_WORK_ENGINEERING_PREPARING_DRAFT')
+        report.textContent='Reality’s existing engineering worker is preparing source for original '+
+         state.original_work_id+' · verified stage: '+String(state.stage||'SOURCE_REVIEW')+
+         '. A model diagnosis is not a tested source change.';
+       else if(['CHAT_WORK_ENGINEERING_INVESTIGATION_PENDING',
+                'CHAT_WORK_ENGINEERING_INTAKE_PENDING',
+                'CHAT_WORK_ENGINEERING_READBACK_UNAVAILABLE'].includes(state.status))
+        report.textContent='The authenticated build instruction is saved. '+
+         'Reality is awaiting its independent scoped work readback; no code write is claimed.';
+       else if(state.status==='CHAT_WORK_ENGINEERING_SOURCE_UNQUALIFIED')
+        report.textContent='Reality found no matching authorized engineering original for this build. '+
+         'It cannot substitute an unrelated repair or claim work was started.';
+       else if(state.status==='ORIGINAL_JOB_ALREADY_QUEUED')
         report.textContent='Original job '+state.original_work_id+
          ' is already queued. Inspect its ongoing evidence; do not authorize it again.';
        else if(state.status==='CHAT_WORK_READ_ONLY_EVIDENCE_AVAILABLE'){
@@ -7009,6 +7133,7 @@ setInterval(refreshSavedShiftHome,300000);
     const retry=document.createElement('button');
     retry.type='button';
     retry.textContent='Retry this saved reply — do not send again';
+    retry.dataset.recoverRequestId=message.request_id;
     retry.onclick=async()=>{
      retry.disabled=true;
      explanation.textContent='Retrying the exact saved request ID; no additional user message or job authorization…';
@@ -7051,6 +7176,14 @@ setInterval(refreshSavedShiftHome,300000);
   // scrolling through earlier conversation history.
   thread.scrollTop=atBottom?thread.scrollHeight:
    Math.max(0,previousTop+(thread.scrollHeight-previousHeight));
+  // Only authentic saved-history metadata may nominate the latest unanswered
+  // turn for an idempotent, bounded, single-attempt reply recovery.
+  window.dispatchEvent(new CustomEvent('reality:saved-chat-readback',{
+   detail:{conversation_id:data.conversation_id,
+    messages:(data.messages||[]).map(x=>({role:x.role,
+     request_id:x.request_id,source_ref:x.source_ref,created_at:x.created_at})),
+    unanswered_requests:replyReadback?.unanswered_requests||[]}
+  }));
   await loadGoals();
  }
  async function init(){
@@ -7115,7 +7248,11 @@ setInterval(refreshSavedShiftHome,300000);
   localStorage.setItem('reality.private.chat.conversation.v1',crypto.randomUUID());
   el('privateTranscript').replaceChildren();await loadConversations();void wcLoadCompletionReports();status('New conversation ready.');
  };
+ let privateChatSending=false;
  el('privateSend').onclick=async()=>{
+  // A disabled control is not enough to prevent a second Enter/click event
+  // from racing the first request's immutable source identity.
+  if(privateChatSending)return;
   const value=el('privatePrompt').value.trim();if(!value)return;
   // A second click/paste must not create a second original work request
   // when this EXACT text is already durably saved and awaiting a reply.
@@ -7126,8 +7263,10 @@ setInterval(refreshSavedShiftHome,300000);
    status('This exact instruction is already saved in Reality. Use Retry this saved reply underneath the original message; no duplicate was submitted.');
    return;
   }
+  privateChatSending=true;
   const goalCommand=el('privateGoalCommand').value||null;
-  const sentConversation=conversationId(),sentRequest=crypto.randomUUID();
+  const sentConversation=conversationId();
+  let sentRequest=crypto.randomUUID();
   // Present the owner's typed words immediately in their conversation.
   // This is a LOCAL delivery candidate until the authenticated RLS readback
   // verifies it; no synthetic saved history, model response or job event.
@@ -7138,30 +7277,125 @@ setInterval(refreshSavedShiftHome,300000);
   el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
   el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
   window.dispatchEvent(new CustomEvent('reality:chat-request-started',{
-   detail:{conversation_id:sentConversation,request_id:sentRequest}
+   detail:{conversation_id:sentConversation,request_id:sentRequest,
+    // UI dispatch hint only; the server re-reads the signed user message,
+    // current original and source warrant independently before any write.
+    explicit_scoped_build:/\b(?:build|implement|code|repair|fix|develop|upgrade)\b/i.test(value)&&
+      (/https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*/.test(value)||
+       /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
+       /work:[a-f0-9]{32}/i.test(value)),
+    // Presentation hint only: don't poll a worker inbox on normal Chat.
+    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install)\b/i.test(value)}
   }));
   el('privateSend').disabled=true;
-  let intakeVerified=false;
+  let intakeVerified=false,responseFailureStage=null;
   status('Sending your message. Reality will show independently verified delivery and response stages below it.');
   try{
    // A conversation is durably accepted before model/reliability processing.
    // Even if cognition times out, the exact signed-in turn can be resumed.
-   const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
-    credentials:'same-origin',signal:AbortSignal.timeout(14000),
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
-      message:value})});
-   const saved=await accepted.json().catch(()=>null);
-   if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
-      !String(saved.source_ref||'').startsWith('supabase:reality_chat_messages:')){
-    const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
-    throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+   let saved=null;
+   try{
+    const accepted=await fetch('/api/reality/personal-chat-intake',{method:'POST',
+     credentials:'same-origin',signal:AbortSignal.timeout(22000),
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
+       message:value})});
+    saved=await accepted.json().catch(()=>null);
+    if(typeof saved?.stage==='string'&&
+       /^[A-Z][A-Z0-9_]{3,80}$/.test(saved.stage))
+     responseFailureStage=saved.stage;
+    if(!accepted.ok||saved?.ok!==true||saved.saved!==true||
+       !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(saved.request_id||'')||
+       !/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(saved.source_ref||'')){
+     const code=String(saved?.error||'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:
+      'CHAT_USER_SAVE_READBACK_UNVERIFIED');
+    }
+   }catch(intakeError){
+    // An HTTP timeout is NOT evidence that the INSERT failed. Confirm the
+    // exact saved owner turn before declaring failure; do not POST intake a
+    // second time or mint another request. If saved, continue cognition.
+    try{
+     const verify=await fetch('/api/reality/personal-chat?conversation_id='+
+      encodeURIComponent(sentConversation)+'&reply_readback=1&request_id='+
+      encodeURIComponent(sentRequest),{
+       method:'GET',credentials:'same-origin',cache:'no-store',
+       signal:AbortSignal.timeout(8500)});
+     const proof=verify.ok?await verify.json().catch(()=>null):null;
+     const exact=proof?.ok===true&&
+      proof.conversation_id===sentConversation&&
+      Array.isArray(proof.messages)?proof.messages.filter(x=>
+       x.role==='user'&&x.request_id===sentRequest&&x.text===value&&
+       /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(x.source_ref||'')):[];
+     if(exact.length===1){
+      saved={ok:true,saved:true,conversation_id:sentConversation,
+       request_id:sentRequest,source_ref:exact[0].source_ref,
+       recovered_from_exact_owner_readback:true};
+     }
+    }catch{/* A readback problem never proves that the saved row is absent. */}
+    if(!saved?.ok||saved.saved!==true)throw intakeError;
+   }
+   // The server may have recovered an earlier saved, unanswered request
+   // after the old HTTP acknowledgment was lost. Use the original request
+   // ID for cognition, status and recovery; NEVER insert another message.
+   if(saved.request_id!==sentRequest){
+    const previousRequestId=sentRequest;
+    sentRequest=saved.request_id;
+    pendingBubble.dataset.requestId=sentRequest;
+    window.dispatchEvent(new CustomEvent('reality:chat-request-rebound',{
+     detail:{conversation_id:sentConversation,previous_request_id:previousRequestId,
+      request_id:sentRequest,source_ref:saved.source_ref}
+    }));
    }
    intakeVerified=true;
+   window.dispatchEvent(new CustomEvent('reality:chat-intake-saved',{
+    detail:{conversation_id:sentConversation,request_id:sentRequest,
+     source_ref:saved.source_ref,duplicate_content:saved.duplicate_content===true}
+   }));
    if(pendingBubble.isConnected)
     pendingBubble.querySelector('.label').textContent='YOU · SAVED AND VERIFIED';
    window.realityJustSavedWorkRequest={conversation_id:sentConversation,
     request_id:sentRequest};
+   // Restore the PRE-EXISTING explicit owner Chat command. The prior simple
+   // Chat checked the authenticated shift controller before any new Start.
+   // No broad LLM intent inference, no duplicate shift, no worker dispatch
+   // from this UI, and no new installation authority. Ordinary Chat remains
+   // on its original saved-request cognition path.
+   if(!goalCommand){
+    const {interpretSignedInChatShiftCommand,
+     resolveExistingSignedInChatShift}=await import(
+      '/reality-owner-chat-shift-command-v1.js');
+    const exactOwnerCommand=interpretSignedInChatShiftCommand(value);
+    if(exactOwnerCommand){
+     try{
+      const verified=await resolveExistingSignedInChatShift(exactOwnerCommand,{
+       conversationId:sentConversation});
+      if(!['EXISTING_SIGNED_IN_SHIFT_ALREADY_AUTHORIZED',
+            'EXACT_SHIFT_OWNER_AUTHORIZATION_DURABLY_VERIFIED']
+        .includes(verified.status)||
+        !/^[a-f0-9-]{36}$/i.test(verified.shift_id||'')||
+        verified.installation_authorized!==false||
+        verified.production_changed!==false||
+        verified.worker_execution_verified!==false)
+       throw Error('CHAT_SHIFT_OWNER_READBACK_UNVERIFIED');
+      const proof=bubble('assistant',
+       verified.new_shift_started?
+        'SIGNED-IN SHIFT AUTHORIZATION VERIFIED · Batch '+
+        verified.shift_id+' · '+verified.shift_status+
+        ' · '+String(verified.batch_status||'INTAKE_NOT_VERIFIED')+
+        '. Worker execution and completion still require independent receipts.':
+        'EXISTING SHIFT VERIFIED · '+verified.shift_id+' · '+
+        verified.shift_status+
+        '. Authorization already recorded. No second shift or Start was issued.');
+      proof.querySelector('.label').textContent=
+       'REALITY · AUTHENTICATED SHIFT READBACK · NOT A MODEL ANSWER';
+      status('Owner command matched the existing governed shift controller. The same Chat request continues to its saved reply.');
+     }catch{
+      // An uncertain first-Start effect is never automatically replayed.
+      status('Shift authorization/readback uncertain. Reality kept your saved message; check the owner shift record before repeating Start.');
+     }
+    }
+   }
    status('Your message is saved in Reality. Preparing the conversation answer.');
    const r=await fetch('/api/reality/personal-chat',{method:'POST',
     credentials:'same-origin',signal:AbortSignal.timeout(95000),
@@ -7169,6 +7403,8 @@ setInterval(refreshSavedShiftHome,300000);
     body:JSON.stringify({conversation_id:sentConversation,request_id:sentRequest,
       message:value,...(goalCommand?{goal_command:goalCommand}:{})})});
    const data=await r.json().catch(()=>null);
+   if(typeof data?.stage==='string'&&/^[A-Z][A-Z0-9_]{3,80}$/.test(data.stage))
+    responseFailureStage=data.stage;
    if(!r.ok||data?.ok!==true){
     const code=String(data?.error||'CHAT_RESPONSE_UNAVAILABLE');
     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_RESPONSE_UNAVAILABLE');
@@ -7194,6 +7430,13 @@ setInterval(refreshSavedShiftHome,300000);
    // Refresh Reality's independently observed improvement queue after chat.
    // This request remains GET-only and cannot start a model or authorize work.
    void refreshRealitySelfImprovement();
+   // Ordinary conversational replies finish like Chat. Detailed governance
+   // diagnostics belong to Work, not a giant status string after each answer.
+   if(data.read_only_conversation===true&&
+      data.reliability?.chat_lane==='PROPORTIONAL_READ_ONLY'){
+    status('Reply saved.');
+    return;
+   }
    const reliability=data.reliability||{};
    const verifiedFrame=reliability.canonical_epistemic_state?.status==='PERSISTED_AND_READBACK_VERIFIED';
    const issues=reliability.semantic_issue_candidates?.length||0;
@@ -7314,7 +7557,8 @@ setInterval(refreshSavedShiftHome,300000);
    let savedUser=null,savedAnswer=null;
    try{
     const readback=await fetch('/api/reality/personal-chat?conversation_id='+
-     encodeURIComponent(sentConversation),{method:'GET',
+     encodeURIComponent(sentConversation)+'&reply_readback=1&request_id='+
+     encodeURIComponent(sentRequest),{method:'GET',
      credentials:'same-origin',cache:'no-store',
      signal:AbortSignal.timeout(7500)});
     if(readback.ok){
@@ -7349,13 +7593,55 @@ setInterval(refreshSavedShiftHome,300000);
     el('privatePrompt').dispatchEvent(new Event('input',{bubbles:true}));
    }
    window.dispatchEvent(new CustomEvent('reality:chat-request-failed',{
-    detail:{request_id:sentRequest,code:safeCode}
+    detail:{request_id:sentRequest,code:safeCode,
+     ...(responseFailureStage?{stage:responseFailureStage}:{})}
    }));
    status((savedUser||intakeVerified)?
     'Your message is saved in Reality. Its reply was not verified ('+safeCode+'). Retry that saved reply; do not send a new request or assume execution.':
     'Reality could not verify this Chat turn ('+safeCode+'). Your draft is preserved. Check saved history before sending again.');
-  }finally{el('privateSend').disabled=false}
+  }finally{
+   privateChatSending=false;
+   el('privateSend').disabled=false;
+  }
  };
+ // The Send action is the only client-side owner source for a draft-build
+ // continuation. The status panel observes evidence and emits a read-only
+ // notification, never a provider POST. The server independently checks the
+ // persisted human turn, scoped original and current warrant before dispatch.
+ const autoBuildSubmitted=new Set();
+ window.addEventListener('reality:chat-engineering-ready',async event=>{
+  const d=event.detail||{};
+  if(el('privateReady').style.display!=='block'||
+     d.conversation_id!==conversationId()||
+     !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(d.request_id||'')||
+     !/^work:[a-f0-9]{32}$/.test(d.original_work_id||''))return;
+  const key=d.conversation_id+'|'+d.request_id;
+  if(autoBuildSubmitted.has(key))return;
+  autoBuildSubmitted.add(key);
+  let result={status:'CHAT_WORK_ENGINEERING_EFFECT_UNVERIFIED',
+   execution_started:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false};
+  try{
+   const response=await fetch('/api/reality/personal-chat-work',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(45000),
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({action:'CONTINUE_VERIFIED_SCOPED_ENGINEERING',
+     conversation_id:d.conversation_id,request_id:d.request_id})
+   });
+   const body=await response.json().catch(()=>null);
+   if(response.ok&&body?.ok===true&&
+      body.request_id===d.request_id&&
+      body.original_work_id===d.original_work_id&&
+      body.installation_authorized===false&&
+      body.production_changed===false&&body.new_shift_started===false)
+    result=body;
+   else result.status=String(body?.error||'CHAT_WORK_ENGINEERING_SCOPE_OR_PROVIDER_UNVERIFIED');
+  }catch{/* An uncertain write is never automatically replayed. */}
+  window.dispatchEvent(new CustomEvent('reality:chat-engineering-result',{
+   detail:{conversation_id:d.conversation_id,request_id:d.request_id,result}
+  }));
+ });
  window.realityChatRefreshTranscript=async()=>{await loadSaved();await loadConversations();};
  init();
 })();
@@ -7367,6 +7653,7 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>
 <script defer src="/reality-chat-request-status-v1.js"></script>
+<script type="module" src="/reality-chat-recover-unanswered-v1.js"></script>
 <script defer src="/reality-riley-source-work-v1.js"></script>
 <script defer src="/one-button-full-loop-v1.js"></script>
 <script defer src="/reality-full-loop-chat-diagnostic-v1.js"></script>
@@ -7385,5 +7672,6 @@ setInterval(refreshSavedShiftHome,300000);
 <script defer src="/reality-category-economic-bridge-v1.js"></script>
 <script defer src="/reality-past-jobs-receipts-v1.js"></script>
 <script type="module" src="/reality-native263-install-approval-ui-v1.js"></script>
+<script type="module" src="/reality-generalized-install-review-ui-v1.js"></script>
 </body>
 </html>

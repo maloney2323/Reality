@@ -112,7 +112,7 @@ export async function runRealityCognitiveRuntime({
       model,
       apiKey,
       fetchImpl,
-      maxOutputTokens:cognitionEffort==='CONVERSATION'?950:300,
+      maxOutputTokens:cognitionEffort==='CONVERSATION'?1700:300,
     });
     return {
       runtime_version: REALITY_COGNITIVE_RUNTIME_VERSION,

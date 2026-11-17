@@ -10,6 +10,7 @@ on:
     types: [opened, reopened, synchronize, edited]
     branches:
       - 'reality/native*'
+      - 'reality/**'
     paths:
       - 'src/reality-riley-service-original-runtime-v1.js'
 permissions:
@@ -36,4 +37,5 @@ jobs:
             test/reality-riley-trusted-original-driver-bridge-v1.test.js \
             test/reality-riley-governed-original-job-v1.test.js
       - name: Confirm no installation authority in candidate CI
-        run: echo "Candidate only: zero installation, approval or settlement effects"
+        run: |
+          echo "Candidate only: zero installation, approval or settlement effects"

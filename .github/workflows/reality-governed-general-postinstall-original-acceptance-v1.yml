@@ -1,0 +1,70 @@
+name: Reality independently accepted governed original post-install
+on:
+  push:
+    branches:
+      - 'reality/**'
+    paths:
+      - 'src/**'
+  # Additional independent CI path for isolated, same-repository source PRs.
+  # This is CI evidence only: no owner approval, installation, or settlement.
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - 'reality/**'
+    paths:
+      - 'src/**'
+permissions:
+  contents: read
+jobs:
+  independent-original-acceptance:
+    if: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'reality/')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact installed source commit with credentials disabled
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Verify isolated preview commit and source tree identity
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          case "$EXPECTED_BRANCH" in reality/*) ;; *) exit 1 ;; esac
+          echo "INDEPENDENT_ACCEPTANCE_EVENT=$GITHUB_EVENT_NAME"
+          echo "INDEPENDENT_ACCEPTANCE_SOURCE_SHA=$EXPECTED_SHA"
+          git status --porcelain | tee /tmp/reality-original-worktree
+          test ! -s /tmp/reality-original-worktree
+      - name: Prepare pinned Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Independently accept original-job runtime and governed handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/reality-riley-service-original-runtime-v1.js
+          node --test test/reality-riley-service-original-runtime-v1.test.js test/reality-riley-trusted-original-driver-bridge-v1.test.js test/reality-riley-governed-original-job-v1.test.js
+      # Historical intentionally-red extension fixtures are NOT this original
+      # candidate's frozen test manifest. Those contracts remain unchanged and
+      # must never be interpreted as an installed-source regression.
+      - name: Independently verify same-original frozen-CI and recovery safeguards
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            test/reality-same-original-frozen-attestation-v1.test.js \
+            test/reality-same-original-recovery-ci-v2.test.js \
+            test/reality-same-original-gateway-failure-only-v2.test.js
+      - name: Confirm no upgrade installation or customer settlement from CI
+        shell: bash
+        run: |
+          echo "CI_IS_INDEPENDENT_PROVIDER_ORIGINAL_ACCEPTANCE_ONLY"
+          echo "NO_NEW_OWNER_APPROVAL"
+          echo "NO_DEPLOYMENT_CLAIM_FROM_GREEN_TEST"
+          echo "NO_ORIGINAL_SETTLEMENT_UNTIL_DURABLE_PROVIDER_READBACK"
+          echo "NO_PRODUCTION_EFFECT"

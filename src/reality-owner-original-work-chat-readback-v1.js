@@ -173,3 +173,21 @@ export function weeklyQueueObservation(readback){
   installation_authorized:false,production_changed:false,
  })];
 }
+
+
+export function scopeOwnerOriginalWorkToShift(readback,shiftId){
+ if(readback?.status!=='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK')
+  return null;
+ if(shiftId===null)return readback;
+ if(!UUID.test(shiftId||''))throw Error('CHAT_ORIGINAL_WORK_SHIFT_SCOPE_INVALID');
+ // Narrow only already authenticated original-job readback; do NOT insert
+ // any inferred work or treat absent results as proof of an empty real queue.
+ const matching=readback.all_recent_jobs.filter(j=>j.shift_id===shiftId);
+ return Object.freeze({...readback,current_shift_id:shiftId,
+  jobs:Object.freeze(matching),
+  observed_original_count:matching.length,
+  observed_unfinished_count:matching.filter(j=>!j.independently_settled).length,
+  current_shift_has_unfinished_originals:matching.some(j=>!j.independently_settled),
+  readback_bounded_to_recent_originals:true,
+  grants_execution_authority:false});
+}
