@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Owner-approved capability installation. This worker may write only a NEW
 // isolated preview branch. It never writes main, changes production, or runs
 // untrusted generated code outside a secret-free sandbox.
@@ -7,7 +9,7 @@ const env=process.env;
 const fail=x=>{throw Error('REALITY_PREVIEW_INSTALL_'+x)};
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const repo='maloney2323/Reality';
-const BRANCH='feature/reality-general-capability-engine-20261101';
+const BRANCH=String(env.GITHUB_REF||'').slice('refs/heads/'.length);
 const HASH=/^[a-f0-9]{64}$/,COMMIT=/^[a-f0-9]{40}$/;
 const sorted=x=>x===null||typeof x!=='object'?x:Array.isArray(x)?x.map(sorted):
  Object.fromEntries(Object.keys(x).sort().map(k=>[k,sorted(x[k])]));
@@ -46,7 +48,7 @@ async function signedBroker(body){
 }
 if(env.GITHUB_ACTIONS!=='true'||!['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
  env.GITHUB_REPOSITORY!==repo||
- env.GITHUB_REF!=='refs/heads/'+BRANCH||!COMMIT.test(env.GITHUB_SHA))
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||!COMMIT.test(env.GITHUB_SHA))
  fail('EXACT_ISOLATED_WORKFLOW_IDENTITY_REQUIRED');
 const prepared=await signedBroker({action:'installer_prepare',
  scope:{repository_sha:env.GITHUB_SHA}});
