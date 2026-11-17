@@ -12,6 +12,7 @@ on:
       - reality-capability-workspace-v1.css
       - reality-home-command-v1.js
       - supabase/migrations/20261117_standing_routine_discovery_delegation_v1.sql
+      - supabase/migrations/20261117_standing_discovery_existing_worker_cron_v1.sql
       - api/reality/personal-employee-inquiry.js
       - supabase/migrations/20261117_dynamic_employee_temporal_inquiries_v1.sql
       - api/reality/governed-employee-shift-worker.js
