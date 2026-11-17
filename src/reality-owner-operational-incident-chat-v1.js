@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null,repairGates=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -167,6 +167,74 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    historical_external_correction_not_reclassified:true
   };
  }
+ const gateByIncident=new Map();
+ let installGateReadStatus='EXACT_REPAIR_INSTALL_GATE_READBACK_UNAVAILABLE';
+ if(repairGates!==null){
+  if(repairGates?.status!=='OWNER_SHIFT_REPAIR_INSTALL_GATES_READ_ONLY'||
+   repairGates.owner_id!==ownerId||
+   repairGates.owner_scope_verified!==true||repairGates.read_only!==true||
+   repairGates.new_original_job_created!==false||
+   repairGates.installation_authorized_by_read!==false||
+   repairGates.production_changed!==false||
+   repairGates.new_self_repair_proven!==false||
+   !Array.isArray(repairGates.items)||repairGates.items.length>8||
+   repairGates.count!==repairGates.items.length)fail();
+  const statuses=new Set([
+   'WORK_RESUMED_CODE_SELF_REPAIR_NOT_PROVEN',
+   'INCIDENT_REQUIRES_SOURCE_BACKED_DIAGNOSIS',
+   'INCIDENT_INVESTIGATION_EVIDENCE_BLOCKED',
+   'EXACT_ORIGINAL_REPAIR_WARRANT_REQUIRED',
+   'CURRENT_EXACT_COMPLETION_WARRANT_REQUIRED',
+   'INDEPENDENT_REPAIR_CI_NOT_YET_PASSED',
+   'INDEPENDENT_INTEGRATION_AND_FROZEN_REVIEW_REQUIRED',
+   'OWNER_EXACT_TESTED_ARTIFACT_APPROVAL_REQUIRED',
+   'EXACT_OWNER_APPROVED_INSTALL_CONTINUATION_ELIGIBLE',
+   'INSTALLED_ORIGINAL_INDEPENDENT_SETTLEMENT_PENDING',
+   'EXACT_ORIGINAL_SETTLED_AFTER_TESTED_INSTALL',
+   'EXACT_REPAIR_APPROVAL_OR_PROVIDER_EVIDENCE_UNVERIFIED'
+  ]);
+  for(const gate of repairGates.items){
+   if(!UUID.test(gate.incident_id||'')||!UUID.test(gate.shift_id||'')||
+    !HASH.test(gate.incident_evidence_sha256||'')||
+    !statuses.has(gate.gate_status)||
+    gate.read_only!==true||
+    gate.new_job_authorized!==false||
+    gate.installation_authorized_by_read!==false||
+    gate.production_changed!==false||
+    gate.new_self_repair_proven!==false||
+    typeof gate.next_action!=='string'||gate.next_action.length>720||
+    (gate.authorized_original_work_id!==null&&
+     !/^work:[a-f0-9]{32}$/.test(gate.authorized_original_work_id))||
+    (gate.candidate_commit_sha!==null&&
+     !/^[a-f0-9]{40}$/.test(gate.candidate_commit_sha))||
+    (gate.candidate_artifact_sha256!==null&&
+     !HASH.test(gate.candidate_artifact_sha256))||
+    (gate.independent_ci_run_id!==null&&
+     (!Number.isSafeInteger(gate.independent_ci_run_id)||
+      gate.independent_ci_run_id<1))||
+    gateByIncident.has(gate.incident_id))
+     fail();
+   gateByIncident.set(gate.incident_id,Object.freeze({
+    incident_id:gate.incident_id,
+    shift_id:gate.shift_id,
+    incident_evidence_sha256:gate.incident_evidence_sha256,
+    status:gate.gate_status,
+    authorized_original_work_id:gate.authorized_original_work_id,
+    current_completion_warrant:gate.current_completion_warrant===true,
+    independent_ci_run_id:gate.independent_ci_run_id,
+    candidate_commit_sha:gate.candidate_commit_sha,
+    candidate_artifact_sha256:gate.candidate_artifact_sha256,
+    integration_ci_run_id:gate.integration_ci_run_id,
+    approval_receipt_id:gate.previous_exact_approval_receipt_id,
+    installed_commit_sha:gate.previous_installed_commit_sha,
+    original_final_receipt_id:gate.original_final_receipt_id,
+    next_action:trim(gate.next_action,720),
+    installation_authorized_by_read:false,
+    new_self_repair_proven:false,production_changed:false
+   }));
+  }
+  installGateReadStatus='OWNER_EXACT_REPAIR_INSTALL_GATE_VERIFIED_READ_ONLY';
+ }
  const continuityItems=[];
  let continuityReadStatus='OWNER_SHIFT_CONTINUITY_EVIDENCE_UNAVAILABLE';
  if(continuity!==null){
@@ -206,10 +274,14 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
       !x.assigned_employee||!x.independent_reviewer||
       x.assigned_employee===x.independent_reviewer)))
     fail();
+   const exactGate=gateByIncident.get(x.incident_id)||null;
+   if(exactGate&&(exactGate.shift_id!==x.shift_id||
+    exactGate.incident_evidence_sha256!==x.evidence_sha256))fail();
    continuityItems.push(Object.freeze({
     incident_id:x.incident_id,
     shift_id:x.shift_id,kind:x.kind,phase:x.phase,
     source_ref:'reality:shift-continuity-incident:'+x.incident_id,
+    exact_code_repair_install_gate:exactGate,
     evidence_sha256:x.evidence_sha256,
     observed_at:x.last_observed_at,
     error_summary:trim(x.error_summary,280),
@@ -379,6 +451,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   shift_continuity_read_status:continuityReadStatus,
   shift_continuity_incidents:Object.freeze(continuityItems),
   shift_continuity_count:continuityItems.length,
+  exact_repair_install_gate_read_status:installGateReadStatus,
+  exact_repair_install_gate_count:gateByIncident.size,
   reported_next_action:trim(source.next_action,500),
   external_actions_authorized:false,production_changed:false,
   original_job_authorized_by_chat:false,installation_authorized:false
@@ -393,7 +467,7 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const [source,handoff,delivery,autoRepair,continuity]=await Promise.all([
+ const [source,handoff,delivery,autoRepair,continuity,repairGates]=await Promise.all([
   call(db,'reality_read_owner_worker_recovery_status_v1',{
    p_owner_id:owner
   },{fetchImpl}),
@@ -410,10 +484,13 @@ export async function readOwnerOperationalIncidentChatBriefing({
   },{fetchImpl}).catch(()=>null),
   call(db,'reality_read_owner_shift_continuity_incidents_v1',{
    p_owner_id:owner
+  },{fetchImpl}).catch(()=>null),
+  call(db,'reality_read_owner_shift_repair_install_gates_v1',{
+   p_owner_id:owner
   },{fetchImpl}).catch(()=>null)
  ]);
  return projectOwnerIncidentChatBriefing({
-  ownerId:owner,source,handoff,delivery,autoRepair,continuity
+  ownerId:owner,source,handoff,delivery,autoRepair,continuity,repairGates
  });
 }
 export function incidentChatUniverseObservations(briefing){
@@ -474,6 +551,12 @@ export function incidentChatUniverseObservations(briefing){
    '; source-bound work resumption independently verified '+x.work_resumption_verified+
    '; resumption receipt '+(x.independent_resumption_receipt_sha256||'not yet available')+
    '; root-cause patch independently verified FALSE'+
+   '; independently tested code install gate '+(
+    x.exact_code_repair_install_gate?.status||
+    'CURRENT_TEST_AND_APPROVAL_GATE_NOT_VERIFIED')+
+   '; exact gate next action '+(
+    x.exact_code_repair_install_gate?.next_action||
+    'Get current original authorization and independent CI proof before modifying code')+
    '; next action '+x.next_action,
   independent_investigation_receipt:x.investigation_receipt_sha256,
   original_job_completed:false,self_repair_proven:false,
