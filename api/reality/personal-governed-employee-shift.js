@@ -83,10 +83,12 @@ export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db
 // old UI strings, model advice or an inference from an issue being open.
 export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}={}){
  if(!UUID.test(ownerId||''))throw Error('SHIFT_OWNER_SETTLED_SCOPE_UNVERIFIED');
- const [reviews,triage,native]=await Promise.all([
+ const [reviews,triage,native,additional]=await Promise.all([
   call(db,'reality_read_owner_riley_pr_review_v1',{p_owner_id:ownerId}),
   call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId}),
-  call(db,'reality_read_owner_riley_repair_original_v1',{p_owner_id:ownerId})
+  call(db,'reality_read_owner_riley_repair_original_v1',{p_owner_id:ownerId}),
+  call(db,'reality_read_owner_additional_settled_shift_sources_v1',{
+   p_owner_id:ownerId})
  ]);
  if(reviews?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
     reviews.production_changed!==false||
@@ -97,7 +99,19 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
     native?.status!=='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'||
     native.production_changed!==false||
     native.does_not_authorize_new_work!==true||
-    !Array.isArray(native.jobs)||native.jobs.length>6)
+    !Array.isArray(native.jobs)||native.jobs.length>6||
+    additional?.status!==
+     'OWNER_ADDITIONAL_SETTLED_SOURCES_INDEPENDENTLY_RECONCILED'||
+    additional.owner_id!==ownerId||
+    additional.work_creation_authorized!==false||
+    additional.shift_authorized!==false||
+    additional.installation_authorized!==false||
+    additional.production_changed!==false||
+    !Array.isArray(additional.source_refs)||
+    additional.source_refs.length>30||
+    additional.settled_source_count!==additional.source_refs.length||
+    additional.source_refs.some(ref=>
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(ref)))
   throw Error('SHIFT_OWNER_SETTLED_ORIGINAL_RECEIPT_READBACK_UNVERIFIED');
  const refs=new Set();
  for(const [kind,data] of [['PR_REVIEW',reviews.jobs],['FAILURE_TRIAGE',triage.jobs]]){
@@ -133,6 +147,10 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
    throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
   refs.add(j.source_ref);
  }
+ // A repository source can remain marked OPEN after Reality completed its
+ // original work. The owner-matched, independently settled ledger wins;
+ // never silently recycle those jobs into a new shift.
+ for(const ref of additional.source_refs)refs.add(ref);
  return Object.freeze([...refs].sort());
 }
 
