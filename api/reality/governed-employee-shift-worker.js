@@ -803,17 +803,77 @@ export default async function handler(req,res){
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
   // It only records source-backed investigation, never admits another job.
-  const employeeTemporalInquiryPromise=
+  // The unified execution graph intentionally requires a completion-bound
+  // original-job warrant. It must NOT silently suppress employee SOURCE
+  // investigations inside an otherwise valid, time-bounded signed shift.
+  // The existing signed wake is independently rebound to an exact owner
+  // and existing discovery inventory by a service-only read-only RPC.
+  workerStage='SIGNED_EMPLOYEE_INQUIRY_SCOPE';
+  let signedEmployeeInquiryScope={
+   status:'NO_CURRENT_SIGNED_EMPLOYEE_INQUIRY_SCOPE',
+   investigation_authorized:false,owner_verified:false,
+   original_job_created:false,execution_authorized:false,
+   installation_authorized:false,production_changed:false
+  };
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+   signedEmployeeInquiryScope=await shiftRpc(db,
+    'reality_read_current_signed_employee_inquiry_scope_v1',{
+     p_shift_id:wakeReceipt.shift_id
+    }).catch(()=>({
+     status:'SIGNED_EMPLOYEE_INQUIRY_SCOPE_READBACK_UNAVAILABLE',
+     investigation_authorized:false,owner_verified:false,
+     original_job_created:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    }));
+  }
+  const signedInquiryValid=(
+   signedEmployeeInquiryScope.status===
+    'OWNER_SIGNED_EMPLOYEE_INQUIRY_SCOPE_ACTIVE'&&
+   signedEmployeeInquiryScope.owner_verified===true&&
+   /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+    signedEmployeeInquiryScope.owner_id||'')&&
+   signedEmployeeInquiryScope.shift_id===wakeReceipt.shift_id&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedEmployeeInquiryScope.plan_fingerprint||'')&&
+   Number.isSafeInteger(signedEmployeeInquiryScope.due_source_count)&&
+   signedEmployeeInquiryScope.due_source_count>0&&
+   signedEmployeeInquiryScope.due_source_count<=1200&&
+   signedEmployeeInquiryScope.investigation_authorized===true&&
+   signedEmployeeInquiryScope.source_only===true&&
+   signedEmployeeInquiryScope.original_job_created===false&&
+   signedEmployeeInquiryScope.execution_authorized===false&&
+   signedEmployeeInquiryScope.installation_authorized===false&&
+   signedEmployeeInquiryScope.production_changed===false
+  );
+  // The old completion-bound graph continues to authorize ORIGINAL work.
+  // Both paths must agree if present; the source-only readback never
+  // broadens original-job or installation authority.
+  if(signedInquiryValid&&
+   unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+   (unifiedGraph.owner_id!==signedEmployeeInquiryScope.owner_id||
+    unifiedGraph.shift_id!==signedEmployeeInquiryScope.shift_id))
+   throw Error('EMPLOYEE_INQUIRY_OWNER_SHIFT_CONFLICT');
+  const inquiryOwnerId=signedInquiryValid?
+   signedEmployeeInquiryScope.owner_id:
    unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
    /^[a-f0-9-]{36}$/i.test(unifiedGraph.owner_id||'')?
-    generateOneEmployeeTemporalInquiry({
-     ownerId:unifiedGraph.owner_id,db,env:process.env,fetchImpl:fetch
-    }).catch(()=>({status:'EMPLOYEE_TIME_INQUIRY_UNVERIFIED',
-     new_original_jobs_created:0,execution_authorized:false,
-     installation_authorized:false,production_changed:false})):
-    Promise.resolve({status:'NO_CURRENT_SIGNED_SHIFT_FOR_EMPLOYEE_INQUIRY',
-     new_original_jobs_created:0,execution_authorized:false,
-     installation_authorized:false,production_changed:false});
+    unifiedGraph.owner_id:null;
+  const employeeTemporalInquiryPromise=inquiryOwnerId?
+   generateOneEmployeeTemporalInquiry({
+    ownerId:inquiryOwnerId,db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'EMPLOYEE_TIME_INQUIRY_UNVERIFIED',
+    new_original_jobs_created:0,execution_authorized:false,
+    installation_authorized:false,production_changed:false
+   })):
+   Promise.resolve({
+    status:signedEmployeeInquiryScope.status===
+      'SIGNED_EMPLOYEE_INQUIRY_SCOPE_READBACK_UNAVAILABLE'?
+      'EMPLOYEE_INQUIRY_WORK_SCOPE_PROOF_UNAVAILABLE':
+      'NO_CURRENT_SIGNED_SHIFT_FOR_EMPLOYEE_INQUIRY',
+    new_original_jobs_created:0,execution_authorized:false,
+    installation_authorized:false,production_changed:false
+   });
   // The worker automatically reconciles native-repair and PR-review receipts
   // against the frozen owner warrant on every pulse. The status is merely
   // a truthful next-work diagnostic: never a new job or installation grant.
@@ -1485,6 +1545,7 @@ export default async function handler(req,res){
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
+    signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
     scheduled_employee_capability_inquiry:scheduledCapabilityInquiryResult,
