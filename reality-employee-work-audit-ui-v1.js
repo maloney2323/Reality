@@ -236,6 +236,49 @@
       card.append(saved);
      }
     }
+    const capability=data.employee_capability_investigations;
+    if(capability?.status===
+       'VERIFIED_EXISTING_EMPLOYEE_CAPABILITY_INQUIRY_SCHEDULE'&&
+       capability.read_only===true&&
+       capability.execution_authorized===false&&
+       capability.original_jobs_created===0&&
+       capability.installation_authorized===false&&
+       Array.isArray(capability.items)){
+     const assigned=capability.items.filter(x=>
+      x.employee===role.employee_name&&
+      x.source_feed_fingerprint_unchanged===true&&
+      x.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&
+      x.execution_authorized_by_schedule===false&&
+      x.original_job_created_by_schedule===false&&
+      x.installation_authorized===false);
+     if(assigned.length){
+      const scheduled=add('details','reality-audit-findings');
+      scheduled.append(add('summary',null,
+       assigned.length+' assigned capability investigation(s)'));
+      for(const assignment of assigned){
+       const line=add('div','reality-audit-work-item');
+       line.append(add('strong',null,
+        assignment.capability_key+' · Independent reviewer: '+assignment.reviewer));
+       line.append(add('p',null,
+        'Scheduled: '+String(assignment.planned_inquiry_at||'Unknown')+
+        ' · Provisional effort: '+
+        (assignment.estimate_minutes_low/60).toFixed(1)+'–'+
+        (assignment.estimate_minutes_high/60).toFixed(1)+
+        ' hours (not measured)'));
+       line.append(add('p',null,
+        'Investigation: '+String(assignment.scope||'Independent scope required')));
+       line.append(add('p',null,
+        'Independent next proof: '+
+        String(assignment.independent_test_requirement||'Not yet verified')));
+       line.append(add('small',null,
+        assignment.independent_current_gap_proven&&assignment.existing_original_work_id?
+         'Existing independently qualified original · Execution remains governed':
+         'Investigation scheduled only · No verified current gap or authorized repair'));
+       scheduled.append(line);
+      }
+      card.append(scheduled);
+     }
+    }
     if(role.additional_business_connections_needed)
      card.append(add('p','reality-audit-warning',
       'Connected GitHub sources do not yet cover this role\'s full business responsibilities.'));
