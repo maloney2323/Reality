@@ -178,6 +178,7 @@ test('owner capabilities UI displays only a modeled preliminary estimate and exi
    source_limitations:output.evidence_limitations,
    estimate_minutes_low:60,estimate_minutes_high:180,
    estimate_is_model_provisional_only:true,
+   source_feed_fingerprint_unchanged:true,
    independent_current_gap_proven:false,
    existing_original_work_id:null,existing_governance_phase:null,
    execution_authorized_by_schedule:false,
