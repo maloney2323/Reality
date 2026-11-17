@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const sql=read('supabase/migrations/20261116_unified_employee_discovery_observations_v1.sql');
+const reconciled=read('supabase/migrations/20261116_employee_discovery_historical_triage_no_replay_v2.sql');
 const edge=read('supabase/functions/reality-next-week-employee-planning-v1/index.ts');
 const roster=read('api/reality/personal-employee-roster.js');
 const rpc=read('src/reality-governed-shift-boundary-v1.js');
@@ -37,6 +38,16 @@ test('discovery is a read-only evidence inventory covering eight roles',()=>{
  assert.match(sql,/'production_changed',false/);
  assert.doesNotMatch(sql,/reality_authorize_employee_(?:completion_)?shift_v1\(/);
  assert.doesNotMatch(sql,/INSERT INTO reality_internal.governed_employee_shifts_v1/);
+});
+test('historically settled failure triage never becomes a fresh assignment',()=>{
+ assert.match(reconciled,/riley_shift_failure_triage_v1/);
+ assert.match(reconciled,/t\.settlement_receipt_id IS NOT NULL/);
+ assert.match(reconciled,/t\.provider_comment_url=v_url/);
+ assert.match(reconciled,/t\.provider_body_sha256~/);
+ assert.match(reconciled,/t\.owner_id=v_owner/);
+ assert.match(reconciled,/'SETTLED_NO_REPLAY'/);
+ assert.match(reconciled,/current_user<>'service_role'/);
+ assert.doesNotMatch(reconciled,/reality_authorize_employee_shift_v1/);
 });
 test('every existing six-hour scheduled planning wake also records employee discovery',()=>{
  assert.match(edge,/'reality_refresh_employee_discovery_v1'/);
