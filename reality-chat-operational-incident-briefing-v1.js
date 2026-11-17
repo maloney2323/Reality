@@ -183,6 +183,8 @@
       'Known preview fault corrected; waiting for the actual signed worker',
      WORKER_ATTESTED_AWAITING_ORIGINAL:
       'Signed worker recovered; original authorized work still needs independent verification',
+     WORKER_RESTORED_NO_ORIGINAL_TO_RESUME:
+      'Signed worker recovered; there was no unfinished authorized original to resume',
      INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED:
       'Automatic preview repair, signed worker and resumed original work independently verified',
      BLOCKED_UNRECOGNIZED_SCOPE:
