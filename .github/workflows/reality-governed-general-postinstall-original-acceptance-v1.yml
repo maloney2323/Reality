@@ -68,6 +68,7 @@ jobs:
           node --test test/reality-shift-continuity-autonomous-v1.test.js
           node --check src/reality-shift-continuity-independent-review-v1.js
           node --test test/reality-shift-continuity-independent-review-v1.test.js
+          node --test test/reality-shift-continuity-rpc-wiring-v1.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |
