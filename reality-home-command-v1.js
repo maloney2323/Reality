@@ -58,10 +58,10 @@
  // the older Work Center controls. The action uses the existing GET-only
  // reader, NOT new job authorization, shift creation or installation.
  const heroActions=el('div','rc-home-work-actions');
- const findWorkNow=el('button','rc-outline rc-home-find-work','Find work');
+ const findWorkNow=el('button','rc-outline rc-home-find-work','Refresh source discoveries');
  findWorkNow.type='button';
  const findWorkNote=el('p','rc-hero-foot',
-  'Manual refresh uses existing read-only discovery. This does not fill or authorize the employee schedule.');
+  'This refreshes evidence only. The existing authorized employee investigation runs automatically; see Capabilities → What Reality is doing for progress and next steps.');
  findWorkNow.addEventListener('click',()=>{
   const existing=$('findWork');
   if(!existing){
