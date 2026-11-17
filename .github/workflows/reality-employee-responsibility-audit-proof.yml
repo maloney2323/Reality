@@ -59,6 +59,10 @@ on:
       - test/reality-dynamic-employee-inquiry-worker-v1.test.js
       - test/reality-signed-shift-employee-inquiry-continuity-v1.test.js
       - test/reality-shift-continuity-autonomous-v1.test.js
+      - test/reality-automatic-qualified-evidence-work-v1.test.js
+      - src/reality-automatic-qualified-evidence-worker-v1.js
+      - supabase/migrations/20261117_automatic_qualified_employee_evidence_work_v1.sql
+      - supabase/migrations/20261117_automatic_qualified_employee_evidence_work_pulse_v2.sql
       - src/reality-shift-continuity-auto-investigation-v1.js
       - src/reality-owner-operational-incident-chat-v1.js
       - reality-chat-operational-incident-briefing-v1.js
@@ -106,6 +110,7 @@ jobs:
           node --check src/reality-employee-time-inquiry-context-v1.js
           node --check src/reality-dynamic-employee-inquiry-worker-v1.js
           node --check src/reality-shift-continuity-auto-investigation-v1.js
+          node --check src/reality-automatic-qualified-evidence-worker-v1.js
           node --check src/reality-standing-employee-discovery-v1.js
           node --check src/reality-capability-role-schedule-worker-v1.js
           node --check src/reality-governed-operational-self-repair-v1.js
@@ -127,7 +132,7 @@ jobs:
           node --check reality-home-employee-brief-v1.js
       - name: Run the actual isolated employee-audit acceptance tests
         run: |
-          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js test/reality-employee-time-inquiry-context-v1.test.js test/reality-past-present-future-time-map-v1.test.js test/reality-dynamic-employee-inquiry-worker-v1.test.js test/reality-signed-shift-employee-inquiry-continuity-v1.test.js test/reality-shift-continuity-autonomous-v1.test.js test/reality-standing-capability-autonomy-v1.test.js test/reality-capability-role-schedule-v1.test.js test/reality-worker-self-recovery-v1.test.js test/reality-worker-operational-continuity-v1.test.js test/reality-governed-operational-self-repair-v1.test.js test/reality-owner-isolated-self-repair-demo-v1.test.js test/reality-owner-operational-incident-chat-v1.test.js test/reality-preview-watchdog-actual-self-repair-v1.test.js test/reality-incident-existing-original-handoff-v1.test.js test/reality-signed-worker-actual-receipts-v1.test.js test/reality-standing-scheduled-capability-inquiry-v1.test.js
+          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js test/reality-employee-time-inquiry-context-v1.test.js test/reality-past-present-future-time-map-v1.test.js test/reality-dynamic-employee-inquiry-worker-v1.test.js test/reality-signed-shift-employee-inquiry-continuity-v1.test.js test/reality-shift-continuity-autonomous-v1.test.js test/reality-automatic-qualified-evidence-work-v1.test.js test/reality-standing-capability-autonomy-v1.test.js test/reality-capability-role-schedule-v1.test.js test/reality-worker-self-recovery-v1.test.js test/reality-worker-operational-continuity-v1.test.js test/reality-governed-operational-self-repair-v1.test.js test/reality-owner-isolated-self-repair-demo-v1.test.js test/reality-owner-operational-incident-chat-v1.test.js test/reality-preview-watchdog-actual-self-repair-v1.test.js test/reality-incident-existing-original-handoff-v1.test.js test/reality-signed-worker-actual-receipts-v1.test.js test/reality-standing-scheduled-capability-inquiry-v1.test.js
       - name: No new shift, installation or production effect
         run: |
           echo 'Read-only responsibility audit proof; no secrets or provider mutations'
