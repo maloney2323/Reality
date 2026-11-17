@@ -71,6 +71,16 @@
   const findings=node('p','',item.outcome);
   const next=node('p','rx-owner-incident-next','Next: '+item.next_action);
   card.append(heading,status,observed,investigation,findings);
+  if(item.self_repair_completed===true&&
+     item.bounded_preview_self_repair_cycle_proven===true){
+   const proof=item.bounded_preview_self_repair;
+   card.append(node('p','rx-owner-incident-proof',
+    'AUTO-REPAIR VERIFIED FOR THIS PREVIEW SCHEDULER DEFECT. '+
+    'Actual signed-worker run: '+proof.worker_run_id+
+    ' · Same original investigation: '+proof.original_capability_claim_id+
+    ' · Independent work receipt: '+proof.original_work_receipt_sha256+
+    ' · No production or customer actions'));
+  }
   const handoffText=makeHandoffText(item);
   if(handoffText)card.append(node('p','rx-owner-incident-handoff',handoffText));
   card.append(next);
@@ -132,7 +142,12 @@
     feed.count!==feed.items.length||
     feed.items.some(x=>
       x.owner_chat_only!==true||
-      x.self_repair_completed!==false||
+      (x.self_repair_completed!==false&&
+       !(x.self_repair_completed===true&&
+         x.bounded_preview_self_repair_cycle_proven===true&&
+         x.self_repair_scope==='KNOWN_SAFE_PREVIEW_SCHEDULER_PERMISSION_GATE_ONLY'))||
+      (x.bounded_preview_self_repair_cycle_proven===true&&
+       x.self_repair_completed!==true)||
       x.original_job_authorized_by_chat!==false||
       x.install_authorized_by_chat!==false||
       x.customer_notified!==false))
