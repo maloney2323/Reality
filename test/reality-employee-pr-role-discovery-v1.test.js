@@ -29,7 +29,7 @@ test('existing owner-scoped PR and missing ROI inputs become evidence jobs not e
  assert.match(sql,/roi_verification_status='NOT_MEASURED'/);
  assert.match(sql,/f\.final_evidence_sha256~/);
  assert.match(sql,/source_identity/);
- assert.match(sql,/GITHUB_PR_DISCOVERY_PROVIDER_ITEMS_UNVERIFIED/);
+ assert.match(sql,/EMPLOYEE_PR_DISCOVERY_PROVIDER_ITEMS_UNVERIFIED/);
  assert.match(sql,/p_scan_id uuid,p_source_sha256 text,p_prs jsonb/);
  assert.match(sql,/v_pr_count>180/);
  assert.match(sql,/WHERE last_scan_id=p_scan_id/);
