@@ -34,7 +34,10 @@ test('separate service broker independently rechecks exact owner original and ga
  assert.doesNotMatch(broker,/OWNER_APPROVE_EXACT|approve_install|original_job_settled:true/);
 });
 test('only broker may write fixed isolated idempotent Reality trigger, never an installation',()=>{
- assert.match(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
+ assert.match(broker,/const SAFE_BRANCH=/);
+ assert.match(broker,/SAFE_BRANCH\.test\(request\.base_branch/);
+ assert.match(broker,/branch\.object\.sha!==request\.base_sha/);
+ assert.doesNotMatch(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
  assert.match(broker,/reality-genuine-triggers\//);
  assert.match(broker,/source_event_id:item\.source_event_id/);
  assert.match(broker,/atob\(String\(x\.content/);
