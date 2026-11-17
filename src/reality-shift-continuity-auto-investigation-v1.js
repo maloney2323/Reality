@@ -55,6 +55,18 @@ const classifyInvestigationFailure=(error,stage)=>{
  if(message.includes('MODEL_'))return 'MODEL_OUTPUT_UNVERIFIED';
  return 'MODEL_PROOF_UNAVAILABLE';
 };
+// A failed database claim must not disappear as an indistinguishable model
+// failure. The code never exports raw provider/SQL error text or credentials.
+export function classifySignedContinuityClaimTransportError(error){
+ const code=String(error?.message||'');
+ if(code==='SHIFT_RPC_NOT_ALLOWLISTED')
+  return 'INVESTIGATION_RPC_TRANSPORT_NOT_CONNECTED';
+ if(code.startsWith('SHIFT_DATABASE_RPC_'))
+  return 'SIGNED_INVESTIGATION_DATABASE_RPC_REJECTED';
+ if(code.startsWith('SHIFT_CONTINUITY_'))
+  return 'SIGNED_INVESTIGATION_CLAIM_INVALID';
+ return 'INVESTIGATION_RUNTIME_UNVERIFIED';
+}
 export function parseContinuityModelInvestigation(response,roles){
  if(response?.status==='incomplete')fail('MODEL_RESPONSE_INCOMPLETE');
  if(response?.status!=='completed')fail('MODEL_NOT_VERIFIED');
