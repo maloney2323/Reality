@@ -136,6 +136,14 @@
    card.append(node('p','rx-owner-incident-proof',
     'Investigation receipt: '+item.investigation_receipt_sha256+
     ' · Repair not yet proven; installation not authorized'));
+  if(item.work_resumption_verified===true&&
+    item.independent_resumption_receipt_sha256)
+   card.append(node('p','rx-owner-incident-proof',
+    'ORIGINAL WORK RESUMPTION VERIFIED · Signed worker '+
+    item.verified_worker_run_id+' · Same source investigation '+
+    item.verified_original_inquiry_claim_id+' · Receipt '+
+    item.independent_resumption_receipt_sha256+
+    ' · This does NOT prove Reality repaired its own code'));
   card.append(node('p','rx-owner-incident-next','Next: '+item.next_action));
   const discuss=node('button','rx-owner-incident-discuss','Discuss this stall in Chat');
   discuss.type='button';
