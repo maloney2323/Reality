@@ -168,10 +168,10 @@ test('qualification engine is dynamic, signed, time bounded and does not grant c
  assert.match(sql,/qualify_owner_employee_evidence_jobs_v1/);
  assert.match(sql,/employee_temporal_inquiries_v1 i/);
  assert.match(sql,/model_response_id ~ '\^resp_/);
- assert.match(sql,/new_/); 
+ assert.match(sql,/EXACT_CURRENT_SOURCE_PROOF/); 
  assert.match(sql,/qualify_owner_employee_evidence_jobs_v1\(\)/);
  assert.match(sql,/original_customer_job_completed boolean not null default false/);
- assert.match(sql,/r\.run_id=q\.execution_worker_run_id/);
+ assert.match(sql,/executed\.run_id=q\.execution_worker_run_id/);
  assert.match(sql,/q\.execution_worker_run_id<>p_worker_run_id/);
  assert.match(sql,/phase='SUBMITTED_AWAITING_INDEPENDENT_RECHECK'/);
  assert.match(sql,/cron\.alter_job/);
