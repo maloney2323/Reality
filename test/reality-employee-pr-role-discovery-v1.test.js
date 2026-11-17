@@ -38,7 +38,7 @@ test('existing owner-scoped PR and missing ROI inputs become evidence jobs not e
  assert.match(sql,/q\.rn<=5/);
  assert.match(sql,/source_observed_at/);
  assert.match(sql,/ON CONFLICT\(owner_id,source_identity\)/);
- assert.match(sql,/GITHUB_PR_DISCOVERY_OWNER_COVERAGE_UNVERIFIED/);
+ assert.match(sql,/EMPLOYEE_PR_DISCOVERY_OWNER_COVERAGE_UNVERIFIED/);
  assert.match(sql,/qualified_jobs_created',0/);
  assert.match(sql,/shift_authorized',false/);
  assert.match(sql,/installation_authorized',false/);
