@@ -192,6 +192,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    fail();
   const phases=new Set(['QUALIFIED_EXECUTABLE','EXECUTION_CLAIMED',
    'SUBMITTED_AWAITING_INDEPENDENT_RECHECK','REVIEW_CLAIMED',
+   'REQUALIFICATION_CLAIMED',
    'COMPLETED_INDEPENDENTLY_VERIFIED','BLOCKED_SOURCE_CHANGED',
    'BLOCKED_PROVIDER_OR_WORKER_EVIDENCE']);
   const jobs=qualifiedWork.items.map(job=>{
@@ -205,6 +206,11 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     typeof job.objective!=='string'||job.objective.length<15||
     job.objective.length>1500||
     !HASH.test(job.qualification_receipt_sha256||'')||
+     (job.recovery_attempts!==undefined&&
+      (!Number.isSafeInteger(job.recovery_attempts)||
+       job.recovery_attempts<0||job.recovery_attempts>1))||
+     (job.recovery_receipt_sha256!=null&&
+      !HASH.test(job.recovery_receipt_sha256))||
     (job.deliverable_receipt_sha256!==null&&
      !HASH.test(job.deliverable_receipt_sha256))||
     (job.independent_receipt_sha256!==null&&
@@ -226,6 +232,9 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     source_ref:job.source_ref,job_type:job.job_type,phase:job.phase,
     objective:trim(job.objective,1500),
     qualification_receipt_sha256:job.qualification_receipt_sha256,
+    recovery_attempts:job.recovery_attempts||0,
+    recovery_receipt_sha256:job.recovery_receipt_sha256||null,
+    last_failure_reason:trim(job.last_failure_reason,280)||null,
     deliverable_receipt_sha256:job.deliverable_receipt_sha256,
     independent_receipt_sha256:job.independent_receipt_sha256,
     execution_worker_run_id:job.execution_worker_run_id,
