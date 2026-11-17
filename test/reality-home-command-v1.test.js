@@ -127,7 +127,7 @@ test('renders verified source signals and final receipts while suppressing readi
  assert.ok(f.ids.realityEmployeeShiftPlanner);
  assert.equal(f.get('realityHomeExistingEvidence').open,false);
 });
-test('Find work appears on Home and reuses existing read-only discovery, not a new shift',()=>{
+test('Refresh source discoveries on Home reuses read-only evidence without starting a shift',()=>{
  const f=fixture();
  const original=new Node('button');original.id='findWork';
  f.ids.simpleEconomicEvidenceDashboard.append(original);
@@ -135,8 +135,8 @@ test('Find work appears on Home and reuses existing read-only discovery, not a n
  const find=root=>root.className?.split(' ').includes('rc-home-find-work')?root:
   root.children.map(find).find(Boolean);
  const button=find(f.get('realityHomeCommand'));
- assert.ok(button,'Find work control is directly visible on Home');
- assert.equal(button.textContent,'Find work');
+ assert.ok(button,'Read-only source refresh is visible on Home');
+ assert.equal(button.textContent,'Refresh source discoveries');
  assert.match(js,/const existing=\$\('findWork'\)/);
  assert.match(js,/existing\.click\(\)/);
  assert.doesNotMatch(js,/AUTHORIZE_EXACT_EMPLOYEE_SHIFT|ADMIT_QUALIFIED_WORK_IN_EXACT_AUTHORIZED_RILEY_SHIFT/);
