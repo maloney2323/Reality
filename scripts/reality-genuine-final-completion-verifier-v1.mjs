@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Independent, post-settlement check of the exact installed model capability.
 // This step does not grant approval, install, resume or settle anything.
 import {readFileSync,writeFileSync,mkdirSync,appendFileSync} from 'node:fs';
@@ -5,11 +7,11 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 const e=process.env,REPO='maloney2323/Reality';
 const SOURCE='src/reality-extensions/reality-general-execution-receipt.mjs';
-const BRANCH='refs/heads/feature/reality-general-capability-engine-20261101';
+const BRANCH=String(process.env.GITHUB_REF||'');
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const fail=x=>{throw Error('REALITY_FINAL_VERIFIER_'+x)};
 if(e.GITHUB_ACTIONS!=='true'||e.GITHUB_EVENT_NAME!=='push'||
- e.GITHUB_REPOSITORY!==REPO||e.GITHUB_REF!==BRANCH||
+ e.GITHUB_REPOSITORY!==REPO||!isSignedRealityCapabilityPreviewRef(e.GITHUB_REF||'')||
  !/^[a-f0-9]{40}$/.test(e.GITHUB_SHA||'')||
  !e.ACTIONS_ID_TOKEN_REQUEST_TOKEN||!e.ACTIONS_ID_TOKEN_REQUEST_URL||
  typeof e.GH_TOKEN!=='string'||e.GH_TOKEN.length<20)

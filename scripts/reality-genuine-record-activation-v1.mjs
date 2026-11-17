@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // This job runs only AFTER a distinct GitHub Action has independently passed
 // post-install offline probation. It cannot grant owner approval or settle.
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -6,7 +8,7 @@ const fail=x=>{throw Error('REALITY_PROBATION_RECORD_'+x)};
 if(env.GITHUB_ACTIONS!=='true'||
  !['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  fail('SIGNED_ORIGINAL_WORKFLOW_REQUIRED');
 const install=JSON.parse(readFileSync(
  'artifact/install/reality-owner-approved-preview-install.json','utf8'));

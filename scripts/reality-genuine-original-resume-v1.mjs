@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Resume the SAME owner-approved customer job in offline isolated execution.
 // GitHub OIDC authorizes broker readback and one-time original-work claim.
 import {readFileSync,writeFileSync,mkdirSync,existsSync,appendFileSync} from 'node:fs';
@@ -12,7 +14,7 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 const output=(v)=>{if(env.GITHUB_OUTPUT)appendFileSync(env.GITHUB_OUTPUT,'performed='+v+'\n')};
 if(env.GITHUB_ACTIONS!=='true'||!['push','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)||
   env.GITHUB_REPOSITORY!==repo||
-  env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101'||
+  !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||
   !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA||''))fail('ISOLATED_SIGNED_WORKFLOW_ONLY');
 const token=env.GH_TOKEN;
 if(typeof token!=='string'||token.length<20)fail('GITHUB_READ_TOKEN_REQUIRED');

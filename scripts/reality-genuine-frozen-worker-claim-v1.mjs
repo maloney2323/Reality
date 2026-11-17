@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // No service credentials in GitHub. Reproduce the exact current frozen RED
 // before obtaining a single-use owner-goal-bound queue claim via signed OIDC.
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
@@ -8,7 +10,7 @@ const fail=x=>{throw Error('GENUINE_FROZEN_WORKER_'+x)};
 const env=process.env;
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  fail('SIGNED_ISOLATED_CI_REQUIRED');
 const source=JSON.parse(readFileSync(
  'artifact/genuine-capability-admitted-queue.json','utf8'));

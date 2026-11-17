@@ -1,11 +1,13 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Safe, source-backed recovery of an already-consumed owner approval.
 // Never retries installation. Only the signed service-side state chooses work.
 import {appendFileSync} from 'node:fs';
 const env=process.env;
 const fail=x=>{throw Error('GENUINE_MONITOR_RECOVERY_PREPARE_'+x)};
-const REPO='maloney2323/Reality',BRANCH='feature/reality-general-capability-engine-20261101';
+const REPO='maloney2323/Reality',BRANCH=String(env.GITHUB_REF||'').slice('refs/heads/'.length);
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
- env.GITHUB_REPOSITORY!==REPO||env.GITHUB_REF!=='refs/heads/'+BRANCH||
+ env.GITHUB_REPOSITORY!==REPO||!isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||
  !/^[a-f0-9]{40}$/.test(String(env.GITHUB_SHA||'')))fail('SIGNED_WORKFLOW_CONTEXT_REQUIRED');
 if(!env.REALITY_INSTALL_READ_TOKEN||!env.ACTIONS_ID_TOKEN_REQUEST_TOKEN)
  fail('SIGNED_PROVIDER_AUTH_MISSING');

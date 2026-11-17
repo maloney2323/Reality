@@ -201,7 +201,8 @@ test('writer stage is isolated from OpenAI keys and independent sandbox secrets'
  const workflow=readFileSync(new URL(
   '../.github/workflows/reality-genuine-capability-auto-trigger-v1.yml',
   import.meta.url),'utf8');
- assert.match(script,/GITHUB_REF!=='refs\/heads\/feature\/reality-general-capability-engine-20261101'/);
+ assert.match(script,/isSignedRealityCapabilityPreviewRef\(env\.GITHUB_REF\|\|''\)/);
+ assert.doesNotMatch(script,/GITHUB_REF!=='refs\/heads\/feature\/reality-general-capability-engine-20261101'/);
  assert.match(script,/authorizeRileyCandidateStage/);
  assert.match(script,/stageRileyVerifiedCandidate/);
  assert.match(script,/owner_installation_pending:true/);

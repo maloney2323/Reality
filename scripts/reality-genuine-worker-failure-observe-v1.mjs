@@ -1,11 +1,12 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Existing Reality signed capability workflow: record failed ORIGINAL worker
 // into one durable owner/goal-bound evidence ledger. Never a second AI agent.
 import {mkdirSync,writeFileSync} from 'node:fs';
 const env=process.env;
-const REF='refs/heads/feature/reality-general-capability-engine-20261101';
 const fail=x=>{throw Error('GENUINE_AUTONOMIC_FEEDBACK_'+x)};
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
-   env.GITHUB_REPOSITORY!=='maloney2323/Reality'||env.GITHUB_REF!==REF||
+   env.GITHUB_REPOSITORY!=='maloney2323/Reality'||!isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||
    !/^[a-f0-9]{40}$/.test(String(env.GITHUB_SHA||''))||
    typeof env.GH_TOKEN!=='string'||env.GH_TOKEN.length<20||
    !env.ACTIONS_ID_TOKEN_REQUEST_TOKEN||!env.ACTIONS_ID_TOKEN_REQUEST_URL)

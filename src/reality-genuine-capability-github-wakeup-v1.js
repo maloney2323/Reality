@@ -2,7 +2,8 @@
 // A trusted Reality server sends this only AFTER Universe + service-role
 // atomic gap queue independently confirm the original customer job.
 const REPO='maloney2323/Reality';
-const BRANCH='feature/reality-general-capability-engine-20261101';
+import {isSignedRealityCapabilityPreviewRef}
+ from './reality-genuine-capability-signed-preview-ref-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -14,8 +15,12 @@ export async function dispatchGenuineCapabilityWake({
  shift_id=null,source_ref=null,source_proof_sha256=null,db=null,
  fetchImpl=fetch,
 }={}){
+ const BRANCH=String(env.VERCEL_GIT_COMMIT_REF||'');
+ const releaseSha=String(env.VERCEL_GIT_COMMIT_SHA||'');
  if(env.VERCEL_ENV!=='preview'||
    env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF!=='hvkfreoagbrphwghjajw'||
+   !isSignedRealityCapabilityPreviewRef('refs/heads/'+BRANCH)||
+   !SHA.test(releaseSha)||
    !UUID.test(trigger_id)||!UUID.test(source_event_id)||
    !WORK.test(original_work_id))
   fail('EXACT_PREVIEW_TRIGGER_REQUIRED');
@@ -42,7 +47,8 @@ export async function dispatchGenuineCapabilityWake({
       authorization:'Bearer '+db.secretKey,
       'content-type':'application/json'},
      body:JSON.stringify({shift_id,original_work_id,trigger_id,
-      source_ref,source_proof_sha256}),
+      source_ref,source_proof_sha256,
+      base_branch:BRANCH,base_sha:releaseSha}),
      signal:AbortSignal.timeout(18000)
     });
   }catch {
@@ -87,7 +93,8 @@ export async function dispatchGenuineCapabilityWake({
  const path='reality-genuine-triggers/'+trigger_id+'.json';
  const branch=await github('/git/ref/heads/'+BRANCH);
  const head=branch?.object?.sha;
- if(!SHA.test(head))fail('PINNED_WORKER_BRANCH_READBACK_REQUIRED');
+ if(!SHA.test(head)||head!==releaseSha)
+  fail('CURRENT_SIGNED_PREVIEW_HEAD_MISMATCH_NO_STALE_WAKE');
  let earlier=null;
  try{earlier=await github('/contents/'+path+'?ref='+encodeURIComponent(BRANCH))}
  catch(e){if(e.status!==404)throw e}
