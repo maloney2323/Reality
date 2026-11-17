@@ -46,6 +46,8 @@ test('owner proof UI exposes evidence and the separately authenticated one-click
  assert.match(ui,/generalizedOriginalRecoveryApproveButton/);
  assert.match(ui,/approveRecoveryFromUserClick/);
  assert.match(ui,/recovery_approval_action_available===true/);
+ assert.match(ui,/EXACT_RECOVERY_APPROVAL_NOT_RECORDED/);
+ assert.match(ui,/this page will not retry automatically/);
  assert.match(ui,/RECOVERY_INTENT/);
  assert.match(ui,/independent_recovery_test_run_id/);
  assert.match(ui,/FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED/);
@@ -84,6 +86,10 @@ test('second recovery owner decision is signed, exact, one-use and never writes 
  assert.match(api,/reality_owner_approve_general_original_recovery_v1/);
  assert.match(api,/owner_approval_ready!==true/);
  assert.match(api,/retry_owner_approval:false/);
+ assert.match(api,/EXACT_RECOVERY_APPROVAL_NOT_RECORDED/);
+ assert.match(api,/fresh.owner_approval_id===null/);
+ assert.match(api,/fresh.recovery_publication_id===current.recovery_publication_id/);
+ assert.match(api,/fresh.phase==='READY_FOR_EXACT_RECOVERY_APPROVAL'/);
  assert.match(api,/ONE_EXACT_FENCED_ORIGINAL_RECOVERY_PUBLICATION/);
  assert.match(api,/session\.access_token/);
  assert.doesNotMatch(api,/\/contents\/|\/git\/refs\/|force:true/);
