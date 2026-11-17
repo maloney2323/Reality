@@ -339,10 +339,15 @@
       const line=document.createElement('p');
       line.textContent=row.title+' · '+
        (row.disposition==='HISTORICAL_REVALIDATION_REQUIRED'?
-        'Historical source · verify freshness':'Current source · verify issue and impact')+
+        'Historical evidence · independently refresh before any work':
+        row.source_family==='GITHUB_PULL_REQUEST'?
+         'Open PR · independently verify relevance and current review status':
+        row.source_family==='ROI_EVIDENCE_GAP'?
+         'Internal verified receipt · measure actual labor and automation costs':
+         'Current source · independently verify issue and impact')+
        ' · NOT an authorized job';
       detail.append(line);
-      if(/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|actions\/runs)\/[1-9][0-9]*$/
+      if(/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9][0-9]*$/
         .test(row.source_ref||'')){
        const link=document.createElement('a');link.href=row.source_ref;
        link.textContent='Open source evidence';link.target='_blank';link.rel='noopener noreferrer';
