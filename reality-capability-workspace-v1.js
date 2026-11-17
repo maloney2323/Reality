@@ -21,7 +21,7 @@
   make('p','rc-cap-description',
    'Existing upgrades and missing capabilities, investigated by your AI workforce. Nothing is assigned or executable until its proof and authority are verified.'));
  head.append(textHead);
- const refresh=make('button','rc-outline rc-cap-refresh','Refresh evidence');
+ const refresh=make('button','rc-outline rc-cap-refresh','Check work progress');
  refresh.type='button';
  head.append(refresh);section.append(head);
  const metrics=make('div','rc-cap-metrics');
@@ -45,6 +45,19 @@
  const toggle=make('button','rc-outline rc-cap-toggle','Enable routine discovery');
  toggle.type='button';toggle.disabled=true;
  autonomy.append(autonomyLeft,toggle);section.append(autonomy);
+ // Progress does not stop at an 'Enabled' switch. Every state names the
+ // underlying observed work, any blocker, and exactly what happens next.
+ const progress=make('div','rc-cap-progress');
+ progress.setAttribute('role','status');
+ progress.setAttribute('aria-live','polite');
+ const progressHeading=make('strong','','What Reality is doing');
+ const progressState=make('p','rc-cap-progress-state',
+  'Checking the authenticated worker and schedule receipts…');
+ const progressNext=make('p','rc-cap-progress-next',
+  'Next: verify the scheduled worker has actually advanced a source-backed investigation.');
+ const progressIncidents=make('div','rc-cap-incident-list');
+ progress.append(progressHeading,progressState,progressNext,progressIncidents);
+ section.append(progress);
  const list=make('div','rc-cap-list');
  const notice=make('p','rc-cap-notice','Checking verified capability evidence…');
  section.append(notice,list);
@@ -89,7 +102,59 @@
     grant.today_reserved+' / '+grant.max_daily_inquiries+
     ' daily reservations · Expires '+formatDate(grant.expires_at):
     'Paused or expired · No background model investigations are delegated';
-   toggle.textContent=grant.active?'Pause routine discovery':'Enable routine discovery';
+   toggle.textContent=grant.active?
+    'Pause automatic investigations':'Authorize automatic investigations';
+   const health=data.worker_progress;
+   if(!health||typeof health!=='object'||
+    !Array.isArray(health.incidents)||health.incidents.length>8||
+    typeof health.next_action!=='string'||
+    health.scheduler_dispatch_success_not_worker_proof!==true||
+    health.execution_authorized_by_read!==false||
+    health.installation_authorized!==false)
+    throw Error('OWNER_WORKER_OPERATIONAL_STATUS_UNVERIFIED');
+   const scheduled=Number(data.scheduled_capability_investigations||0);
+   const schedulerFailed=health.last_scheduler_status==='failed';
+   const recentIncident=health.incidents[0]||null;
+   if(!grant.active){
+    progressState.textContent='PAUSED · No standing research authority currently active.';
+    progressNext.textContent='Next: authorize bounded investigations if you want Reality to continue. Existing separately authorized jobs are unaffected.';
+   }else if(schedulerFailed){
+    progressState.textContent='BLOCKED · Reality recorded a scheduled-worker failure at '+
+     formatDate(health.last_scheduler_check_at)+'. Permission was saved but the worker did not dispatch successfully.';
+    progressNext.textContent='Next: '+health.next_action;
+   }else if(health.incidents.some(i=>i.phase==='LEASED_FOR_INVESTIGATION')){
+    progressState.textContent='INVESTIGATING · Reality has claimed an operational failure and is checking what recovery it needs.';
+    progressNext.textContent='Next: record employee diagnosis and independent proof requirement. A repair is not authorized merely by this claim.';
+   }else if(scheduled>0){
+    progressState.textContent='ADVANCING · '+scheduled+
+     ' capability investigation'+(scheduled===1?' is':'s are')+
+     ' scheduled from verified owner records · '+grant.today_reserved+
+     ' of '+grant.max_daily_inquiries+' daily reservations used.';
+    progressNext.textContent='Next: '+health.next_action;
+   }else if(health.last_scheduler_status==='succeeded'){
+    progressState.textContent='AUTHORIZED · Scheduler dispatch checked. No completed employee investigation is yet independently verified.';
+    progressNext.textContent='Next: Reality should record a real employee assignment or report a source/provider blocker; scheduler success alone is not proof of worker execution.';
+   }else{
+    progressState.textContent='AUTHORIZED · Waiting for independently verifiable worker evidence.';
+    progressNext.textContent='Next: '+health.next_action;
+   }
+   progressIncidents.replaceChildren();
+   if(recentIncident){
+    const issue=make('div','rc-cap-incident');
+    const diagnostic=make('strong','','Detected operational issue');
+    const detail=make('p','',
+     recentIncident.error_summary+' · '+recentIncident.phase.replaceAll('_',' ').toLowerCase());
+    issue.append(diagnostic,detail);
+    if(recentIncident.assigned_employee){
+     issue.append(make('p','','Investigating: '+
+      recentIncident.assigned_employee+' · Independent review: '+
+      (recentIncident.independent_reviewer||'awaiting assignment')));
+    }
+    if(recentIncident.scheduler_dispatched_after_failure)
+     issue.append(make('p','',
+      'A later scheduler dispatch succeeded. The original failure remains in Reality’s history until the work is independently verified.'));
+    progressIncidents.append(issue);
+   }
    notice.textContent=data.candidate_count?
     data.candidate_count+' evidence-backed opportunities · '+
     (data.scheduled_capability_investigations||0)+
@@ -151,6 +216,8 @@
    }
   }catch{
    notice.textContent='Capability or owner delegation readback is unavailable. No authority or job inferred.';
+   progressState.textContent='UNVERIFIED · The latest worker status could not be read.';
+   progressNext.textContent='Next: Check work progress again or inspect Reality Chat for an independent recovery receipt. No completed work is assumed.';
   }finally{
    loading=false;refresh.disabled=false;toggle.disabled=!latest;
   }
@@ -164,6 +231,8 @@
   ))return;
   loading=true;toggle.disabled=true;refresh.disabled=true;
   state.textContent='Checking exact owner grant and independent readback…';
+  progressState.textContent='Saving the exact owner permission—not starting a repair or shift.';
+  progressNext.textContent='Next: the existing signed worker must record an independently verified investigation receipt.';
   try{
    const response=await fetch('/api/reality/personal-capabilities',{
     method:'POST',credentials:'same-origin',cache:'no-store',
@@ -179,7 +248,15 @@
       data.installation_authorized!==false||
       data.production_changed!==false)
     throw Error('STANDING_GRANT_PROOF_REQUIRED');
-   state.textContent=active?'Routine discovery paused.':'Routine discovery enabled within the evidence-only scope.';
+   state.textContent=active?
+    'Routine discovery paused.':
+    'Your existing employee investigation permission is saved.';
+   progressState.textContent=active?
+    'PAUSED · Standing discovery switched off.':
+    'AUTHORIZED · The worker may now investigate source-backed work within the existing daily limit.';
+   progressNext.textContent=active?
+    'Next: existing authorized shifts continue under their separate permissions.':
+    'Next: Reality checks the existing employee and capability backlog, records assignments, and reports any failure here. No second Start button is needed.';
   }catch{
    state.textContent='Could not verify that the setting changed. Check the authenticated readback.';
   }finally{
@@ -187,5 +264,11 @@
    void refreshUI();
   }
  });
+ // Read-only progress polling while this Home view is visible. This does
+ // not trigger work, schedule a worker, or change owner permissions.
+ window.setInterval(()=>{
+  if(document.visibilityState==='visible'&&latest?.standing_delegation?.active&&!loading)
+   void refreshUI();
+ },30000);
  void refreshUI();
 })();
