@@ -64,6 +64,31 @@ test('owner proof UI exposes evidence and the separately authenticated one-click
 });
 
 
+test('signed owner sees durable final receipt as concise mobile Chat event without a new approval',()=>{
+ const receiptReadback=readFileSync(new URL(
+  '../supabase/migrations/20261117_general_original_final_receipt_owner_chat_readback_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(receiptReadback,/current_user<>'service_role'/);
+ assert.match(receiptReadback,/WHERE owner_id=p_owner_id/);
+ assert.match(receiptReadback,/'final_receipt_id'/);
+ assert.match(receiptReadback,/'installed_commit_sha'/);
+ assert.match(receiptReadback,/f\.owner_id=p_owner_id/);
+ assert.match(receiptReadback,/f\.outcome='SUCCEEDED'/);
+ assert.match(receiptReadback,/'roi_status'/);
+ assert.match(receiptReadback,/REVOKE ALL ON FUNCTION public\.reality_read_generalized_original_install_review_v1/);
+ assert.match(ui,/d\.phase==='ORIGINAL_SETTLED'/);
+ assert.match(ui,/UUID\.test\(d\.final_receipt_id\|\|''\)/);
+ assert.match(ui,/d\.roi_status==='NOT_MEASURED'/);
+ assert.match(ui,/Reality · original job completed/);
+ assert.match(ui,/Final receipt:/);
+ assert.match(ui,/No additional approval is needed/);
+ assert.match(ui,/generalizedOriginalInstallTechnicalDetails/);
+ assert.match(ui,/View exact source, independent tests and release evidence/);
+ assert.match(ui,/thread\.scrollTop=Math\.max\(0,top-8\)/);
+ assert.match(html,/overflow-y:auto!important;overscroll-behavior-y:contain/);
+ assert.match(html,/-webkit-overflow-scrolling:touch;touch-action:pan-y/);
+ assert.doesNotMatch(ui,/if\(completed\).*approveRecoveryFromUserClick/);
+});
 test('exact signed owner approval action never writes source, authorizes jobs or permits duplicate prompts',()=>{
  const approval=readFileSync(new URL(
   '../api/reality/generalized-owner-install-approval.js',import.meta.url),'utf8');
