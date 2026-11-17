@@ -16,7 +16,8 @@ test('signed capability builder follows the ACTUAL preview ref without permittin
   'reality/chat-direct-work-handoff-20261115');
  for(const ref of ['refs/heads/main','refs/heads/reality/production',
   'refs/heads/feature/reality-general-capability-engine-20261101',
-  'refs/heads/reality/foo..bar','refs/heads/reality//not-allowed']){
+  'refs/heads/reality/foo..bar','refs/heads/reality//not-allowed',
+  'refs/heads/reality/attacker-custom-feature-20261117']){
   assert.equal(isSignedRealityCapabilityPreviewRef(ref),false,ref);
  }
  for(const e of [
@@ -54,6 +55,7 @@ test('broker independently verifies signed PREVIEW ref, SHA and source-bound own
  assert.match(broker,/SAFE_BRANCH\.test\(BRANCH/);
  assert.match(broker,/signedScheduler=fields/);
  assert.match(broker,/CURRENT_PREVIEW_BRANCH/);
+ assert.match(broker,/BRANCH!==\(Deno\.env\.get\('REALITY_CAPABILITY_PREVIEW_BRANCH'\)/);
  assert.match(broker,/reality_read_shift_capability_wake_v1/);
  assert.match(broker,/source_proof_sha256!==request\.source_proof_sha256/);
  assert.doesNotMatch(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
@@ -62,6 +64,7 @@ test('auto-admission validates signed GitHub OIDC current ref and provider run, 
  const edge=read('supabase/functions/reality-genuine-capability-auto-admit/index.ts');
  assert.match(edge,/c\.workflow_ref!==REPO\+'\/'\+WORKFLOW\+'@'\+c\.ref/);
  assert.match(edge,/signedPreviewRef\(c\.ref\)/);
+ assert.match(edge,/v==='refs\/heads\/'\+APPROVED_PREVIEW_BRANCH/);
  assert.match(edge,/run\.head_branch!==c\.ref\.slice/);
  assert.match(edge,/const HISTORICAL_BRANCH=/);
  assert.match(edge,/validHistoricalRef/);
@@ -69,7 +72,8 @@ test('auto-admission validates signed GitHub OIDC current ref and provider run, 
 });
 test('auto-generation workflow wakes ONLY from signed capability trigger files',()=>{
  const workflow=read('.github/workflows/reality-genuine-capability-auto-trigger-v1.yml');
- assert.match(workflow,/branches:\s*\n\s*- 'reality\/\*\*'/);
+ assert.match(workflow,/branches:\s*\n\s*- 'reality\/chat-direct-work-handoff-20261115'/);
+ assert.doesNotMatch(workflow,/branches:\s*\n\s*- 'reality\/\*\*'/);
  assert.match(workflow,/paths:\s*\n\s*- 'reality-genuine-triggers\/\*\*'/);
  assert.match(workflow,/generate_missing_capability:/);
  assert.match(workflow,/verify_missing_capability:/);
