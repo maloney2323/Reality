@@ -100,6 +100,8 @@ import {runOneStandingEmployeeDiscovery}
  from '../../src/reality-standing-employee-discovery-v1.js';
 import {scheduleOneStandingCapability,scheduleOneStandingOperationalRecovery}
  from '../../src/reality-capability-role-schedule-worker-v1.js';
+import {advanceExistingOwnerIncidentOriginal}
+ from '../../src/reality-incident-existing-original-handoff-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -151,6 +153,19 @@ export default async function handler(req,res){
   // but ONLY after a separately signed owner enables a time-limited standing
   // evidence-only delegation. A grant does not start a shift or install code.
   // No owner, source, or grant can arrive from the HTTP request.
+  workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
+  // The SAME signed worker handles already warranted incident-linked
+  // originals before ordinary discovery. It reuses the existing original
+  // recovery commitment; no new shift, new executor or owner approval.
+  // An unavailable optional lane cannot disable other authorized work.
+  workerStage='INCIDENT_EXISTING_ORIGINAL_GOVERNED_HANDOFF';
+  const incidentOriginalHandoff=await advanceExistingOwnerIncidentOriginal({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'INCIDENT_ORIGINAL_HANDOFF_EVIDENCE_UNAVAILABLE',
+   original_job_created:false,repair_executed:false,
+   installation_authorized:false,production_changed:false
+  }));
   workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
   // Reality's own watchdog captures signed-worker failures before they reach
   // this handler. Give incident investigation first claim on an already
@@ -1433,6 +1448,7 @@ export default async function handler(req,res){
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
     operational_self_recovery_investigation:operationalRecoveryResult,
+    incident_existing_original_handoff:incidentOriginalHandoff,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
