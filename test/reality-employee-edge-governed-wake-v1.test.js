@@ -35,7 +35,9 @@ test('separate service broker independently rechecks exact owner original and ga
 });
 test('only broker may write fixed isolated idempotent Reality trigger, never an installation',()=>{
  assert.match(broker,/const SAFE_BRANCH=/);
- assert.match(broker,/SAFE_BRANCH\.test\(request\.base_branch/);
+ assert.match(broker,/SAFE_BRANCH\.test\(BRANCH/);
+ assert.match(broker,/signedScheduler=fields/);
+ assert.match(broker,/exactRelease=fields/);
  assert.match(broker,/branch\.object\.sha!==request\.base_sha/);
  assert.doesNotMatch(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
  assert.match(broker,/reality-genuine-triggers\//);
