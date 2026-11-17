@@ -43,6 +43,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   last_actual_worker_started_at:null,
   last_actual_worker_finished_at:null,
   last_scheduler_sql_dispatch_at:null,
+  last_scheduler_sql_check_at:null,
+  latest_scheduler_sql_dispatch_result:'NO_SCHEDULER_SQL_CHECK',
   scheduler_success_alone_proves_execution:false,
   next_action:'Verify a signed worker process receipt. A successful scheduler SQL call does not prove the worker executed.'
  };
@@ -80,6 +82,13 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    phase,actual_worker_process_attested:delivery.actual_worker_process_attested,
    latest_worker_status:delivery.latest_worker_status,
    latest_worker_stage:trim(delivery.latest_worker_stage,80)||null,
+   last_scheduler_sql_check_at:delivery.last_scheduler_sql_check_at||null,
+   latest_scheduler_sql_dispatch_result:
+    ['NO_ELIGIBLE_REQUEST_QUEUED',
+     'HTTP_ENQUEUE_ATTEMPTED_NOT_DELIVERY_PROOF',
+     'SCHEDULER_SQL_STATUS_UNCLASSIFIED','FAILED','NO_SCHEDULER_SQL_CHECK']
+    .includes(delivery.latest_scheduler_sql_dispatch_result)?
+     delivery.latest_scheduler_sql_dispatch_result:'DISPATCH_READBACK_UNVERIFIED',
    last_actual_worker_started_at:started?lastStarted:null,
    last_actual_worker_finished_at:finished?lastFinished:null,
    last_scheduler_sql_dispatch_at:delivery.last_scheduler_sql_dispatch_at||null,
@@ -88,6 +97,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     'Signed worker process completion is attested. Continue checking each original job’s independent receipt.':
     phase==='SIGNED_WORKER_FAILURE_RECORDED'?
     'Reality recorded a signed worker failure. Diagnose its last stage and continue other authorized work.':
+    delivery.latest_scheduler_sql_dispatch_result==='NO_ELIGIBLE_REQUEST_QUEUED'?
+    'The scheduler returned zero eligible rows: no HTTP request was queued this check. If assigned work remains, inspect eligibility, quota and recorded inquiry receipts.':
     'The signed worker has not supplied a verified final receipt. Inspect worker delivery and preserve the blocker; do not call scheduler dispatch a completed job.'
   };
  }
