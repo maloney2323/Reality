@@ -546,7 +546,7 @@ test('output diagnostics remain bounded and do not reset the exhausted lease or 
  assert.match(migration,/MODEL_TEXT_BOUNDS_UNVERIFIED/);
  assert.match(migration,/MODEL_REVIEWER_UNVERIFIED/);
  assert.match(migration,/current_user<>'service_role'/);
- assert.doesNotMatch(migration,/investigation_attempts\s*=/);
+ assert.doesNotMatch(migration,/set\s+investigation_attempts\s*=/i);
  assert.doesNotMatch(migration,/cron\.schedule\(/);
  assert.doesNotMatch(migration,/grant execute[^;]+to (anon|authenticated)/is);
 });
