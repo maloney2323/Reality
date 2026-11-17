@@ -5,6 +5,8 @@ on:
       - 'reality/**'
     paths:
       - 'src/**'
+      - 'supabase/migrations/**'
+      - 'test/reality-verified-candidate-receipt-release-v1.test.js'
   # Additional independent CI path for isolated, same-repository source PRs.
   # This is CI evidence only: no owner approval, installation, or settlement.
   pull_request:
@@ -13,6 +15,8 @@ on:
       - 'reality/**'
     paths:
       - 'src/**'
+      - 'supabase/migrations/**'
+      - 'test/reality-verified-candidate-receipt-release-v1.test.js'
 permissions:
   contents: read
 jobs:
@@ -76,6 +80,7 @@ jobs:
           node --check src/reality-genuine-capability-signed-preview-ref-v1.js
           node --test test/reality-genuine-capability-github-wakeup-v1.test.js
           node --test test/reality-genuine-capability-live-preview-ref-v1.test.js
+          node --test test/reality-verified-candidate-receipt-release-v1.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |
