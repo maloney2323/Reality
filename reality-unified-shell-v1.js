@@ -102,7 +102,7 @@
   }
   if(!mounted)view.append(n('p','rx-empty',
    'Original shift readback is unavailable. No active work or completed shift inferred.'));
-  if(top)top.insertAdjacentElement('afterend',view);
+  if(top)(get('realityTimeHorizon')||top).insertAdjacentElement('afterend',view);
  }else if(route==='connections'){
   const view=n('section','rx-route-view rx-connections-view');
   view.id='realityUnifiedView';
@@ -121,7 +121,7 @@
   const caution=n('p','rx-route-lead',
    'Connections shown here are Reality-owned. ChatGPT plugins do not transfer their tokens. Stripe, Gmail and other providers must have a secure Reality-owned setup before their data can be used; no money movement or external message sends are authorized from this screen.');
   view.append(caution);
-  if(top)top.insertAdjacentElement('afterend',view);
+  if(top)(get('realityTimeHorizon')||top).insertAdjacentElement('afterend',view);
  }else if(route==='work'){
   const intro=n('section','rx-route-view rx-work-intro');
   intro.id='realityUnifiedView';
@@ -136,7 +136,7 @@
    ['See independently verified receipts','/value#results']
   ]){const a=n('a','rx-action',text);a.href=url;bar.append(a);}
   intro.append(bar);
-  if(top)top.insertAdjacentElement('afterend',intro);
+  if(top)(get('realityTimeHorizon')||top).insertAdjacentElement('afterend',intro);
  }
  // A single app-wide account state label. Only a verified server response
  // may mark the existing signed-in session as authenticated.
