@@ -20,6 +20,7 @@ create table if not exists reality_internal.owner_shift_continuity_incidents_v1(
  error_summary text not null check(length(error_summary) between 20 and 280),
  evidence_sha256 text not null check(evidence_sha256 ~ '^sha256:[a-f0-9]{64}$'),
  investigation_lease_id uuid,
+ investigation_claimed_at timestamptz,
  model_response_id text,
  assigned_employee text,
  assigned_function_id text,
@@ -198,7 +199,8 @@ begin
   'model_inquiry_authorized',false,'execution_authorized',false,
   'installation_authorized',false,'production_changed',false);end if;
  update reality_internal.owner_shift_continuity_incidents_v1
- set phase='INVESTIGATION_CLAIMED',investigation_lease_id=gen_random_uuid()
+ set phase='INVESTIGATION_CLAIMED',investigation_lease_id=gen_random_uuid(),
+  investigation_claimed_at=clock_timestamp()
  where incident_id=i.incident_id returning * into i;
  return pg_catalog.jsonb_build_object(
   'status','SIGNED_SHIFT_CONTINUITY_INVESTIGATION_CLAIMED',
@@ -303,7 +305,7 @@ begin
  update reality_internal.owner_shift_continuity_incidents_v1
  set phase='BLOCKED_NEEDS_EVIDENCE',limitations='SIGNED_WORKER_OR_MODEL_RECEIPT_MISSING'
  where phase='INVESTIGATION_CLAIMED'
-  and last_observed_at<clock_timestamp()-interval '8 minutes';
+  and investigation_claimed_at<clock_timestamp()-interval '8 minutes';
  get diagnostics n=row_count;
  return 'SHIFT_CONTINUITY_INQUIRY_CLAIMS_FENCED_'||n;
 end $fn$;
