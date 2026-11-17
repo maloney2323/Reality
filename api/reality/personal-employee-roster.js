@@ -18,6 +18,10 @@ import {readOwnerApprovedChatEmployeeAssignments}
  from '../../src/reality-owner-approved-chat-assignments-v1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {readOwnerTimeHorizonEvidence}
+ from './personal-time-horizon.js';
+import {projectRealityEmployeeTimeInquiryContext}
+ from '../../src/reality-employee-time-inquiry-context-v1.js';
 export const maxDuration=45;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -83,6 +87,12 @@ export default async function handler(req,res){
     ...data,read_only:true,qualified_executable_jobs:0,
     employee_discovery_not_actual_shift:true
    };
+  })().catch(()=>null);
+  // The existing Home time view is an owner-scoped read, not a new queue.
+  const timePromise=(async()=>{
+   const db=shiftDatabase(process.env);
+   if(db.url!==session.config?.url)return null;
+   return readOwnerTimeHorizonEvidence({ownerId:session.user_id,db});
   })().catch(()=>null);
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
@@ -252,7 +262,20 @@ export default async function handler(req,res){
   const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
   const saved_chat_employee_proposals=await savedChatPromise;
   const approved_chat_employee_assignments=await approvedAssignmentsPromise;
-  const employee_discovery=await discoveryPromise;
+  const [employee_discovery,timeEvidence]=await Promise.all([
+   discoveryPromise,timePromise
+  ]);
+  let employee_time_inquiry_context=null;
+  if(employee_discovery&&timeEvidence){
+   try{
+    employee_time_inquiry_context=projectRealityEmployeeTimeInquiryContext({
+     ownerId:session.user_id,roster,time:timeEvidence,
+     discovery:employee_discovery
+    });
+   }catch{
+    // A mismatched owner/source is not transformed into an inquiry or job.
+   }
+  }
   return res.status(200).json({ok:true,...roster,value_preview,
    next_week_plan,weekly_workload_insight,single_model_role_routing,saved_chat_employee_proposals,
    approved_chat_employee_assignments,
@@ -265,6 +288,9 @@ export default async function handler(req,res){
    weekly_employee_investigation_receipts:weeklyInvestigationReceipts,
    current_shift_engineering_originals:signedOriginals,
    employee_discovery,
+   employee_time_inquiry_context,
+   employee_time_inquiry_status:employee_time_inquiry_context?.status||
+    'TIME_EVIDENCE_OR_DISCOVERY_NOT_VERIFIED',
    employee_discovery_status:employee_discovery?
     'SIGNED_OWNER_EIGHT_ROLE_DISCOVERY_READBACK':
     'EMPLOYEE_DISCOVERY_READBACK_UNVERIFIED',
