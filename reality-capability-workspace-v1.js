@@ -122,6 +122,12 @@
     progressState.textContent='BLOCKED · Reality recorded a scheduled-worker failure at '+
      formatDate(health.last_scheduler_check_at)+'. Permission was saved but the worker did not dispatch successfully.';
     progressNext.textContent='Next: '+health.next_action;
+   }else if(health.operational_recoveries_verified>0&&
+    health.incidents.some(i=>i.operational_continuity_verified===true)){
+    progressState.textContent='OPERATIONAL RECOVERY VERIFIED · Independent evidence confirms the signed worker resumed. The historical correction was external, not an autonomous self-repair.';
+    progressNext.textContent='Next: '+health.next_action+
+     (grant.today_reserved>=grant.max_daily_inquiries?
+      ' Today’s '+grant.max_daily_inquiries+' research reservations are used; fresh routine investigations can continue when the UTC day resets.':'');
    }else if(health.incidents.some(i=>i.phase==='LEASED_FOR_INVESTIGATION')){
     progressState.textContent='INVESTIGATING · Reality has claimed an operational failure and is checking what recovery it needs.';
     progressNext.textContent='Next: record employee diagnosis and independent proof requirement. A repair is not authorized merely by this claim.';
@@ -157,9 +163,16 @@
       recentIncident.assigned_employee+' · Independent review: '+
       (recentIncident.independent_reviewer||'awaiting assignment')));
     }
-    if(recentIncident.scheduler_dispatched_after_failure)
+    if(recentIncident.operational_continuity_verified){
      issue.append(make('p','',
-      'A later scheduler dispatch succeeded. The original failure remains in Reality’s history until the work is independently verified.'));
+      'Operational continuity independently verified on '+
+      formatDate(recentIncident.operational_recovery_verified_at)+
+      ' with signed-worker evidence. Repair attribution: externally corrected, not self-repaired. Autonomous self-repair is still unproven.'));
+     issue.append(make('p','',
+      'Verification receipt: '+(recentIncident.operational_recovery_receipt_sha256||'Missing')));
+    }else if(recentIncident.scheduler_dispatched_after_failure)
+     issue.append(make('p','',
+      'A later scheduler dispatch succeeded, but the original failure has not yet been independently reconciled.'));
     progressIncidents.append(issue);
    }
    notice.textContent=data.candidate_count?
