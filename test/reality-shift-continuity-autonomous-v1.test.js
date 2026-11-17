@@ -760,3 +760,62 @@ test('signed source-claim coalesce SQL is executable and not schema-qualified',(
  assert.match(sql,/current_user<>'service_role'/);
  assert.doesNotMatch(sql,/cron\.schedule\(|cron\.alter_job/);
 });
+
+test('owner Reality Chat shows independently signed business admission gap, not a completed customer job',()=>{
+ const proof={
+  status:'NO_ORIGINAL_ADMISSION_CONFIRMED',reviewer:'Quinn',
+  worker_run_id:'88888888-9999-4aaa-8bbb-cccccccccccc',
+  source_ref:'https://github.com/maloney2323/Reality/pull/307',
+  source_backed_inquiries:41,original_job_claims:0,
+  source_epoch_changed:false,review_attempts:2,
+  prior_failed_review_attempts:1,
+  receipt_sha256:hash('c'),verified_at:'2026-11-17T23:00:01Z',
+  original_job_completed:false,repair_executed:false,
+  installation_authorized:false,production_changed:false
+ };
+ const base={...readback.items[0],
+  kind:'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
+  independent_business_qualification_review:proof,
+  next_action:'Reality requires a source-backed authorized executable owner business job.'};
+ const live={...readback,items:[base]};
+ const outcome=projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,continuity:live
+ });
+ const item=outcome.shift_continuity_incidents[0];
+ assert.equal(item.independent_business_qualification_review.status,
+  'NO_ORIGINAL_ADMISSION_CONFIRMED');
+ assert.equal(item.independent_business_qualification_review.original_job_claims,0);
+ assert.equal(item.independent_business_qualification_review.source_backed_inquiries,41);
+ assert.equal(item.independent_business_qualification_review.verified_original_admission_blocker,true);
+ assert.equal(item.independent_business_qualification_review.original_customer_job_completed,false);
+ assert.equal(item.independent_business_qualification_review.self_repair_proven,false);
+ assert.equal(item.customer_job_completed,false);
+ for(const forgery of [
+  {...proof,original_job_claims:1},
+  {...proof,reviewer:'Taylor'},
+  {...proof,receipt_sha256:'BAD'},
+  {...proof,review_attempts:3},
+  {...proof,prior_failed_review_attempts:5},
+  {...proof,original_job_completed:true},
+  {...proof,installation_authorized:true},
+  {...proof,status:'ORIGINAL_CLAIM_NOW_EXISTS'}
+ ]){
+  assert.throws(()=>projectOwnerIncidentChatBriefing({
+   ownerId:owner,source,continuity:{...live,items:[
+    {...base,independent_business_qualification_review:forgery}]}
+  }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
+ }
+});
+test('owner business qualification readback matches owner, shift and signed receipt',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_business_qualification_owner_continuity_readback_v13.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/'independent_business_qualification_review'/);
+ assert.match(sql,/r\.incident_id=i\.incident_id and r\.owner_id=i\.owner_id/);
+ assert.match(sql,/r\.shift_id=i\.shift_id/);
+ assert.match(sql,/r\.receipt_sha256~'\^sha256:/);
+ assert.match(sql,/NO_ORIGINAL_ADMISSION_CONFIRMED/);
+ assert.match(sql,/request a missing business connection inside Reality only when necessary/i);
+ assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
+ assert.doesNotMatch(sql,/grant execute[^;]+to (anon|authenticated)/is);
+});
