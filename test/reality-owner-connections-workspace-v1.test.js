@@ -81,7 +81,7 @@ test('No old connection data survives signout or a broken readback',()=>{
 
 test('PayPal appears in the 26-provider catalog without pretending to connect',()=>{
  assert.match(api,/id:'paypal',label:'PayPal'/);
- assert.match(api,/developer\\.paypal\\.com\/api\/rest\//);
+ assert.ok(api.includes('https://developer.paypal.com/api/rest/'));
  assert.match(ui,/Browse all apps/);
  assert.match(ui,/Auto-detect existing sources/);
  assert.match(ui,/Request secure setup/);
