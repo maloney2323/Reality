@@ -152,6 +152,53 @@
      work.append(row);
     }
     details.append(work);card.append(details);
+    // The SAME owner-scoped Past/Present/Future evidence used by Home can
+    // inform role investigations. Source signals are not model questions,
+    // approved jobs, execution or claimed outcomes.
+    const time=data.employee_time_inquiry_context;
+    if(time?.owner_scope_verified===true&&time.read_only===true&&
+       time.execution_authorized===false&&
+       time.new_original_jobs_created===0&&
+       Array.isArray(time.roles)){
+     const perspective=time.roles.find(x=>x.employee_name===role.employee_name);
+     if(perspective&&Array.isArray(perspective.inquiry_sources)&&
+        perspective.execution_authorized===false&&
+        perspective.questions_generated===0){
+      const block=add('details','reality-audit-findings');
+      block.append(add('summary',null,
+       'Past · Present · Future · '+perspective.inquiry_sources.length+
+       ' source signals for investigation'));
+      const phase=add('p','reality-audit-role-description',
+       'Past verified final receipts: '+
+        (perspective.past_verified_receipt_count??'Not verified')+
+       ' · Present active shifts: '+
+        (perspective.present_active_shift_count??'Not verified')+
+       '. These totals do not establish work for this role.');
+      block.append(phase);
+      if(!perspective.future_source_snapshot_verified)
+       block.append(add('p','reality-audit-warning',
+        'Future discovery is stale or unverified. No inquiry signals were admitted.'));
+      else if(!perspective.inquiry_sources.length)
+       block.append(add('p','reality-audit-role-description',
+        'No unresolved, currently verified source observations for this role.'));
+      const lines=add('ul','reality-audit-responsibilities');
+      for(const signal of perspective.inquiry_sources.slice(0,30)){
+       if(signal.employee_name!==role.employee_name||
+          signal.qualified_job!==false||
+          signal.execution_authorized!==false||
+          signal.question_generated!==false)continue;
+       const entry=add('li',null,signal.source_title);
+       entry.append(add('small',null,
+        ' · '+signal.evidence_disposition+
+        ' · Independent source revalidation required'));
+       lines.append(entry);
+      }
+      block.append(lines);
+      block.append(add('p','reality-audit-warning',
+       'These are grounded inputs for Reality to develop new questions. No question has been generated or dispatched as a job by this read-only view.'));
+      card.append(block);
+     }
+    }
     if(role.additional_business_connections_needed)
      card.append(add('p','reality-audit-warning',
       'Connected GitHub sources do not yet cover this role\'s full business responsibilities.'));
