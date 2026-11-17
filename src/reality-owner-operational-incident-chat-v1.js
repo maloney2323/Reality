@@ -218,13 +218,21 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   const recovered=x.phase==='OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX';
   const handoffItem=handoffById.get(x.incident_id)||null;
   const previewRepairItem=repairByIncident.get(x.incident_id)||null;
+  const actualPreviewSelfRepairProven=
+   previewRepairItem?.complete_cycle_proven===true;
   const handoffStatus=handoffItem?.handoff_status||'HANDOFF_READBACK_UNAVAILABLE';
   if(recovered&&
    handoffItem&&handoffStatus!=='RECOVERED_PREVIOUSLY_NO_REPLAY')
    fail();
   const employee=trim(x.assigned_employee,85)||null;
   const reviewer=trim(x.independent_reviewer,85)||null;
-  const summary=recovered?
+  const summary=actualPreviewSelfRepairProven?
+   'Reality automatically corrected the exact preview scheduler permission defect. Independent receipts confirm the signed worker actually ran and the same previously scheduled owner investigation produced a source-backed result. This proves only the bounded preview repair class, not arbitrary production self-repair.':
+   previewRepairItem?.phase==='PATCH_APPLIED_AWAITING_WORKER'?
+   'Reality applied its reviewed preview-only scheduler correction. The signed worker and original job have not yet independently verified resumption.':
+   previewRepairItem?.phase==='WORKER_ATTESTED_AWAITING_ORIGINAL'?
+   'The signed worker resumed after Reality’s preview correction. The original assigned work is not yet independently verified.':
+   recovered?
    'Reality independently verified that the signed worker resumed after an externally applied correction. It did not independently author or install that correction.':
    x.phase==='BLOCKED_NEEDS_EVIDENCE'?
    'Reality recorded an operational failure but cannot verify the next repair step. The blocker must stay visible in Chat.':
@@ -240,14 +248,19 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    x.phase==='EMPLOYEE_INVESTIGATION_SCHEDULED'?
    'Verify a CURRENT missing capability against independent evidence; bind a qualifying original job to the EXISTING repair governor only when its warrant permits execution.':
    'Investigate the observed failure, preserve exact receipts, and schedule independent review; do not wait for a manual restart if delegated investigation is permitted.';
-  const governedNext=handoffItem?.next_action;
+  const governedNext=previewRepairItem?.next_action||handoffItem?.next_action;
   const meaningfulNext=typeof governedNext==='string'&&
     governedNext.length>=10&&governedNext.length<=500?
     governedNext:next;
   return Object.freeze({
    incident_id:x.incident_id,
    source_ref:'reality:operational-incident:'+x.incident_id,
-   phase:x.phase,stage:stage(x.phase),
+   phase:x.phase,
+   stage:actualPreviewSelfRepairProven?
+    'BOUNDED PREVIEW SELF-REPAIR AND ORIGINAL WORK INDEPENDENTLY VERIFIED':
+    previewRepairItem?.phase==='PATCH_APPLIED_AWAITING_WORKER'?
+     'PREVIEW REPAIR APPLIED · Worker verification pending':
+     stage(x.phase),
    observed_at:x.last_observed_at,
    error_summary:trim(x.error_summary,220),
    occurrence_count:x.failure_count,
@@ -267,7 +280,12 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    operational_recovery_receipt_sha256:recovered?
     x.operational_recovery_receipt_sha256:null,
    recovery_attribution:recovered?'EXTERNALLY_CORRECTED_NOT_SELF_REPAIRED':null,
-   self_repair_completed:false,
+   self_repair_completed:actualPreviewSelfRepairProven,
+   self_repair_scope:actualPreviewSelfRepairProven?
+    'KNOWN_SAFE_PREVIEW_SCHEDULER_PERMISSION_GATE_ONLY':null,
+   original_scheduled_inquiry_resumed_and_verified:
+    actualPreviewSelfRepairProven,
+   original_customer_job_completed_by_repair:false,
    original_job_authorized_by_chat:false,
    install_authorized_by_chat:false,
    customer_notified:false,
@@ -345,11 +363,13 @@ export function incidentChatUniverseObservations(briefing){
    '; preview remediation '+(
      item.bounded_preview_self_repair?.phase||'NO_CURRENT_REPAIR_RECEIPT')+
    '; preview remediation fully verified '+item.bounded_preview_self_repair_cycle_proven+
+   '; scoped self repair proven '+item.self_repair_completed+
    '; signed worker process '+(briefing.signed_worker_delivery?.phase||'UNVERIFIED')+
    '; NEXT '+item.next_action,
   independent_recovery_receipt:item.operational_recovery_receipt_sha256,
   original_job_completed:false,
-  self_repair_proven:false,
+  self_repair_proven:item.self_repair_completed===true,
+  self_repair_scope:item.self_repair_scope,
   installation_authorized:false,
   production_changed:false
  }));
