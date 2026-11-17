@@ -112,7 +112,7 @@ test('SQL review requires signed worker and prevents false original settlement',
  assert.match(sql,/run.started_at>inc.investigated_at/);
  assert.match(sql,/for update of inc skip locked/);
  assert.match(sql,/not exists\(select 1 from reality_internal.shift_continuity_independent_reviews_v1/);
- assert.match(sql,/reviewed_source_sha256=p_provider_sha256/);
+ assert.match(sql,/previously_reviewed_sha256=p_provider_sha256/);
  assert.match(sql,/original_job_completed boolean not null default false/);
  assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
  assert.doesNotMatch(sql,/grant execute[^;]*to (anon|authenticated)/is);
