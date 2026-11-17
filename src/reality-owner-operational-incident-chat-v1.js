@@ -381,6 +381,39 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     (sourceReview.status==='SOURCE_MATCHED_NEEDS_FROZEN_TEST'&&
      sourceReview.prior_source_sha256!==sourceReview.current_source_sha256)
    ))fail();
+   const businessReview=x.independent_business_qualification_review||null;
+   if(businessReview!==null&&(
+    !['NO_ORIGINAL_ADMISSION_CONFIRMED','ORIGINAL_CLAIM_NOW_EXISTS',
+      'INSUFFICIENT_LIVE_SOURCE_EVIDENCE'].includes(businessReview.status)||
+    x.kind!=='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'||
+    businessReview.reviewer!==x.independent_reviewer||
+    !UUID.test(businessReview.worker_run_id||'')||
+    !HASH.test(businessReview.receipt_sha256||'')||
+    !validDate(businessReview.verified_at)||
+    !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(businessReview.source_ref||'')||
+    !Number.isSafeInteger(businessReview.source_backed_inquiries)||
+    !Number.isSafeInteger(businessReview.original_job_claims)||
+    businessReview.source_backed_inquiries<0||
+    businessReview.original_job_claims<0||
+    !Number.isSafeInteger(businessReview.review_attempts)||
+    businessReview.review_attempts<1||businessReview.review_attempts>2||
+    !Number.isSafeInteger(businessReview.prior_failed_review_attempts)||
+    businessReview.prior_failed_review_attempts<0||
+    businessReview.prior_failed_review_attempts>2||
+    typeof businessReview.source_epoch_changed!=='boolean'||
+    businessReview.original_job_completed!==false||
+    businessReview.repair_executed!==false||
+    businessReview.installation_authorized!==false||
+    businessReview.production_changed!==false||
+    (businessReview.status==='NO_ORIGINAL_ADMISSION_CONFIRMED'&&
+     (businessReview.original_job_claims!==0||
+      businessReview.source_backed_inquiries<2))||
+    (businessReview.status==='ORIGINAL_CLAIM_NOW_EXISTS'&&
+     businessReview.original_job_claims===0)||
+    (businessReview.status==='INSUFFICIENT_LIVE_SOURCE_EVIDENCE'&&
+     (businessReview.original_job_claims!==0||
+      businessReview.source_backed_inquiries>=2))
+   ))fail();
    const exactGate=gateByIncident.get(x.incident_id)||null;
    if(exactGate&&(exactGate.shift_id!==x.shift_id||
     exactGate.incident_evidence_sha256!==x.evidence_sha256))fail();
@@ -411,6 +444,25 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
      original_customer_job_completed:false,
      installation_authorized:false,production_changed:false
     }):null,
+    independent_business_qualification_review:businessReview?
+     Object.freeze({
+      status:businessReview.status,
+      reviewer:businessReview.reviewer,
+      worker_run_id:businessReview.worker_run_id,
+      source_ref:businessReview.source_ref,
+      source_backed_inquiries:businessReview.source_backed_inquiries,
+      original_job_claims:businessReview.original_job_claims,
+      source_epoch_changed:businessReview.source_epoch_changed,
+      review_attempts:businessReview.review_attempts,
+      prior_failed_review_attempts:businessReview.prior_failed_review_attempts,
+      receipt_sha256:businessReview.receipt_sha256,
+      verified_at:businessReview.verified_at,
+      verified_original_admission_blocker:
+       businessReview.status==='NO_ORIGINAL_ADMISSION_CONFIRMED',
+      original_customer_job_completed:false,
+      self_repair_proven:false,installation_authorized:false,
+      production_changed:false
+     }):null,
     work_resumption_verified:x.phase==='RECOVERED_AFTER_OBSERVATION',
     independent_resumption_receipt_sha256:
      x.phase==='RECOVERED_AFTER_OBSERVATION'?
