@@ -91,7 +91,11 @@
     'Paused or expired · No background model investigations are delegated';
    toggle.textContent=grant.active?'Pause routine discovery':'Enable routine discovery';
    notice.textContent=data.candidate_count?
-    data.candidate_count+' evidence-backed opportunities · No invented effort estimates or automatic installation approval.':
+    data.candidate_count+' evidence-backed opportunities · '+
+    (data.scheduled_capability_investigations||0)+
+    ' employee investigations scheduled · '+(data.existing_independently_proven_originals||0)+
+    ' current gaps independently verified in original-job records. '+
+    'Hours are preliminary proposals, never measured results.':
     'No capability candidates in the current owner ledger.';
    list.replaceChildren();
    for(const item of data.items){
@@ -103,14 +107,40 @@
     if(item.potential_value)
      card.append(make('p','',item.potential_value));
     const info=make('div','rc-cap-meta');
-    info.append(make('span','',
-     'Employee: awaiting evidence-based assignment'),
-     make('span','','Estimated hours: not yet scoped'),
-     make('span','',
+    const scoped=item.assigned_employee&&
+     item.owner_assignment_status===
+      'EMPLOYEE_INQUIRY_SCHEDULED_AWAITING_INDEPENDENT_GAP_TEST'&&
+     item.estimated_hours&&
+     item.estimate_confidence===
+      'MODEL_PLANNING_RANGE_NOT_INDEPENDENTLY_VERIFIED';
+    const minutes=x=>Number(x).toFixed(1);
+    info.append(make('span','',scoped?
+      'Assigned: '+item.assigned_employee+' · Review: '+item.reviewing_employee:
+      'Employee: awaiting evidence-based assignment'),
+     make('span','',scoped?
+      'Provisional investigation: '+minutes(item.estimated_hours.low)+
+      '–'+minutes(item.estimated_hours.high)+' hours (not measured)':
+      'Estimated hours: not yet scoped'),
+     make('span','',scoped?
+      'Scheduled inquiry: '+formatDate(item.planned_inquiry_at):
       'Latest source observation: '+formatDate(item.last_seen_at)));
     card.append(info);
+    if(scoped){
+     card.append(make('p','rc-cap-investigation-stage',
+      item.independent_current_gap_proven&&item.existing_original_work_id?
+       'Independently proven existing original · Governed queue: '+
+       (item.existing_governance_phase||'Readback required')+
+       ' · No new execution authorization':
+       'Employee investigation planned · Independent current-gap test required before any executable job'));
+    }
     const details=make('details','rc-cap-proof');
     details.append(make('summary','','Evidence and next independent proof'));
+    if(scoped){
+     details.append(make('p','','Assigned investigation: '+item.investigation_scope));
+     details.append(make('p','',
+      'Independent verification requirement: '+item.independent_test_requirement));
+     details.append(make('p','','Evidence limitations: '+item.source_limitations));
+    }
     if(item.next_proof)details.append(make('p','',item.next_proof));
     if(item.source_url&&/^https:\/\//.test(item.source_url)){
      const link=make('a','','Open source');
