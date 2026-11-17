@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -35,6 +35,62 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null}={
    source.incident_count!==source.incidents.length||
    typeof source.next_action!=='string'||source.next_action.length>650)
   fail();
+ let workerDelivery={
+  phase:'SIGNED_WORKER_PROCESS_NOT_YET_ATTESTED',
+  actual_worker_process_attested:false,
+  latest_worker_status:'NO_SIGNED_WORKER_RUN_OBSERVED',
+  latest_worker_stage:null,
+  last_actual_worker_started_at:null,
+  last_actual_worker_finished_at:null,
+  last_scheduler_sql_dispatch_at:null,
+  scheduler_success_alone_proves_execution:false,
+  next_action:'Verify a signed worker process receipt. A successful scheduler SQL call does not prove the worker executed.'
+ };
+ if(delivery!==null){
+  if(delivery?.status!=='OWNER_SIGNED_WORKER_ACTUAL_RUN_READ_ONLY'||
+   delivery.owner_id!==ownerId||delivery.owner_scope_verified!==true||
+   delivery.read_only!==true||
+   delivery.scheduler_success_alone_proves_execution!==false||
+   delivery.original_job_completed_by_read!==false||
+   delivery.repair_executed_by_read!==false||
+   delivery.installation_authorized!==false||
+   delivery.production_changed!==false||
+   typeof delivery.actual_worker_process_attested!=='boolean'||
+   !['STARTED','COMPLETED','FAILED',
+      'NO_SIGNED_WORKER_RUN_OBSERVED'].includes(delivery.latest_worker_status))
+   fail();
+  const lastStarted=delivery.last_actual_worker_started_at;
+  const lastFinished=delivery.last_actual_worker_finished_at;
+  const started=typeof lastStarted==='string'&&Number.isFinite(Date.parse(lastStarted));
+  const finished=typeof lastFinished==='string'&&Number.isFinite(Date.parse(lastFinished));
+  if(delivery.actual_worker_process_attested!==started)fail();
+  let phase=delivery.latest_worker_status==='FAILED'?
+   'SIGNED_WORKER_FAILURE_RECORDED':
+   delivery.latest_worker_status==='STARTED'?
+    'SIGNED_WORKER_STARTED_NO_FINAL_RECEIPT':
+   delivery.latest_worker_status==='COMPLETED'?
+    'SIGNED_WORKER_PROCESS_COMPLETED':
+    'SIGNED_WORKER_PROCESS_NOT_YET_ATTESTED';
+  // A worker that started but has not recorded a terminal receipt is not
+  // necessarily failed. After its bounded execution window, mark it unknown.
+  if(phase==='SIGNED_WORKER_STARTED_NO_FINAL_RECEIPT'&&started&&
+   Date.now()-Date.parse(lastStarted)>4*60*1000)
+   phase='SIGNED_WORKER_STALLED_OR_FINAL_RECEIPT_MISSING';
+  workerDelivery={
+   phase,actual_worker_process_attested:delivery.actual_worker_process_attested,
+   latest_worker_status:delivery.latest_worker_status,
+   latest_worker_stage:trim(delivery.latest_worker_stage,80)||null,
+   last_actual_worker_started_at:started?lastStarted:null,
+   last_actual_worker_finished_at:finished?lastFinished:null,
+   last_scheduler_sql_dispatch_at:delivery.last_scheduler_sql_dispatch_at||null,
+   scheduler_success_alone_proves_execution:false,
+   next_action:phase==='SIGNED_WORKER_PROCESS_COMPLETED'?
+    'Signed worker process completion is attested. Continue checking each original job’s independent receipt.':
+    phase==='SIGNED_WORKER_FAILURE_RECORDED'?
+    'Reality recorded a signed worker failure. Diagnose its last stage and continue other authorized work.':
+    'The signed worker has not supplied a verified final receipt. Inspect worker delivery and preserve the blocker; do not call scheduler dispatch a completed job.'
+  };
+ }
  const handoffById=new Map();
  if(handoff!==null){
   if(handoff?.status!=='OWNER_INCIDENT_ORIGINAL_REPAIR_HANDOFF_READ_ONLY'||
@@ -147,6 +203,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null}={
   items:Object.freeze(items),
   count:items.length,
   scheduler_status:source.last_scheduler_status,
+  signed_worker_delivery:Object.freeze(workerDelivery),
   reported_next_action:trim(source.next_action,500),
   external_actions_authorized:false,production_changed:false,
   original_job_authorized_by_chat:false,installation_authorized:false
@@ -161,7 +218,7 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const [source,handoff]=await Promise.all([
+ const [source,handoff,delivery]=await Promise.all([
   call(db,'reality_read_owner_worker_recovery_status_v1',{
    p_owner_id:owner
   },{fetchImpl}),
@@ -169,9 +226,12 @@ export async function readOwnerOperationalIncidentChatBriefing({
   // authenticated incident without fabricating an original-job authorization.
   call(db,'reality_read_owner_incident_original_handoff_v1',{
    p_owner_id:owner
+  },{fetchImpl}).catch(()=>null),
+  call(db,'reality_read_owner_signed_worker_actual_runs_v1',{
+   p_owner_id:owner
   },{fetchImpl}).catch(()=>null)
  ]);
- return projectOwnerIncidentChatBriefing({ownerId:owner,source,handoff});
+ return projectOwnerIncidentChatBriefing({ownerId:owner,source,handoff,delivery});
 }
 export function incidentChatUniverseObservations(briefing){
  if(briefing?.status!=='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'||
@@ -197,6 +257,7 @@ export function incidentChatUniverseObservations(briefing){
    '; outcome '+item.outcome+
    '; governed original handoff '+item.governed_original_handoff_status+
    '; existing original '+(item.linked_existing_original_work_id||'not verified')+
+   '; signed worker process '+(briefing.signed_worker_delivery?.phase||'UNVERIFIED')+
    '; NEXT '+item.next_action,
   independent_recovery_receipt:item.operational_recovery_receipt_sha256,
   original_job_completed:false,
