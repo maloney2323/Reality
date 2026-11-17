@@ -1,7 +1,12 @@
 name: Reality governed automatic capability discovery — original frozen failures
 on:
   push:
-    branches: [feature/reality-general-capability-engine-20261101]
+    branches:
+      - 'reality/**'
+    # A verified capability trigger is a data-only file from Reality's
+    # source-bound signed broker; ordinary code pushes must NOT auto-build.
+    paths:
+      - 'reality-genuine-triggers/**'
   workflow_dispatch:
 permissions:
   contents: read
