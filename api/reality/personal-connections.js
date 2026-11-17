@@ -121,21 +121,26 @@ export default async function handler(req,res){
   }
   // Reuse the independently saved discovery ledger: this verifies data read
   // inside Reality, not possession of a GitHub or Stripe OAuth token.
+  // A new business must be able to request its first connector BEFORE
+  // any employee has discovered work. Missing optional work evidence never
+  // blocks onboarding or becomes a claim of verified provider access.
   const evidence=await shiftRpc(db,'reality_read_owner_employee_discovery_v1',{
-   p_owner_id:session.user_id});
-  if(evidence?.status!=='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'||
-   evidence.owner_id!==session.user_id||
-   evidence.shift_authorized!==false||
-   evidence.installation_authorized!==false||
-   evidence.production_changed!==false||
-   evidence.qualified_jobs!==0||
-   !Array.isArray(evidence.roles)||evidence.roles.length!==8||
-   !Array.isArray(evidence.items)||evidence.items.length>150||
-   !evidence.items.every(x=>
+   p_owner_id:session.user_id}).catch(()=>null);
+  if(evidence?.owner_id&&evidence.owner_id!==session.user_id)
+   throw Error('REALITY_CONNECTIONS_OWNER_SCOPE_MISMATCH');
+  const sourceReadbackVerified=Boolean(
+   evidence?.status==='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'&&
+   evidence.owner_id===session.user_id&&
+   evidence.shift_authorized===false&&
+   evidence.installation_authorized===false&&
+   evidence.production_changed===false&&
+   evidence.qualified_jobs===0&&
+   Array.isArray(evidence.roles)&&evidence.roles.length===8&&
+   Array.isArray(evidence.items)&&evidence.items.length<=150&&
+   evidence.items.every(x=>
     ['GITHUB_ISSUE','GITHUB_PULL_REQUEST','ROI_EVIDENCE_GAP',
      'MARKET_ASSESSMENT','CAPABILITY_AUDIT'].includes(x.source_family)&&
-    x.qualified_job===false&&x.execution_authorized===false))
-   throw Error('REALITY_CONNECTIONS_INDEPENDENT_READBACK_UNVERIFIED');
+    x.qualified_job===false&&x.execution_authorized===false));
   const requested=await shiftRpc(db,'reality_read_owner_connector_setup_v1',{
    p_owner_id:session.user_id});
   if(requested?.status!=='OWNER_CONNECTION_SETUP_REQUESTS_READ'||
@@ -157,7 +162,7 @@ export default async function handler(req,res){
   const requestIds=new Set(requested.requests.map(x=>x.provider_id));
   const registry=new Map(inspectConnectorRegistry(process.env)
    .map(x=>[x.id,x]));
-  const ghObserved=evidence.items.filter(x=>
+  const ghObserved=(sourceReadbackVerified?evidence.items:[]).filter(x=>
    ['GITHUB_ISSUE','GITHUB_PULL_REQUEST'].includes(x.source_family)&&
    /^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9][0-9]*$/
     .test(x.source_ref||'')).length;
@@ -206,7 +211,8 @@ export default async function handler(req,res){
    setup_requests_pending:requestIds.size,
    automatic_discovery_of_existing_sources:true,
    automatic_grant_of_new_provider_access:false,
-   discovery_checked_at:evidence.checked_at,
+   discovery_source_readback_verified:sourceReadbackVerified,
+   discovery_checked_at:sourceReadbackVerified?evidence.checked_at:null,
    source_work_items_not_jobs:true,providers:connectors
   });
  }catch(err){
