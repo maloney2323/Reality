@@ -602,7 +602,7 @@ test('database consumes exactly one reviewed remediation attempt and never reset
   '../supabase/migrations/20261117_continuity_reviewed_remediation_retry_v5.sql',
   import.meta.url),'utf8');
  assert.match(sql,/investigation_attempts between 0 and 4/);
- assert.match(sql,/investigation_attempts=3 and remediation_granted_at is not null/);
+ assert.match(sql,/investigation_attempts=3\s+and remediation_granted_at is not null/);
  assert.match(sql,/remediation_used_at=case when i.investigation_attempts=3/);
  assert.match(sql,/and remediation_used_at is null/);
  assert.match(sql,/remediation_receipt_sha256/);
