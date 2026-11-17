@@ -47,7 +47,8 @@ create or replace function reality_internal.reconcile_owner_worker_recovery_evid
 returns text language plpgsql security invoker set search_path to '' as $fn$
 declare v reality_internal.owner_worker_recovery_incidents_v1%rowtype;
  j cron.job%rowtype;last_success record;inquiry record;
- successes integer;new_failure record;verified_count integer:=0;reopened_count integer:=0;
+ successes integer;last_success_runid bigint;last_success_at timestamptz;
+ new_failure record;verified_count integer:=0;reopened_count integer:=0;
  evidence jsonb;hash text;
 begin
  -- A recurrent failure after previously VERIFIED operation opens a new cycle;
@@ -114,12 +115,12 @@ begin
   if not found then continue;end if;
   select count(*)::integer,max(d.runid) as max_runid,
     max(d.start_time) as last_succeeded_at
-   into successes,last_success
+   into successes,last_success_runid,last_success_at
    from cron.job_run_details d
    where d.jobid=v.cron_jobid and d.status='succeeded'
     and d.runid>v.last_failed_runid
     and d.start_time>v.last_observed_at;
-  if successes<3 or last_success.max_runid is null then continue;end if;
+  if successes<3 or last_success_runid is null then continue;end if;
   if exists(select 1 from cron.job_run_details d
     where d.jobid=v.cron_jobid and d.status='failed'
      and d.runid>v.last_failed_runid)
@@ -129,7 +130,7 @@ begin
    from reality_internal.employee_temporal_inquiries_v1 t
    where t.owner_id=v.owner_id and t.phase='RECORDED'
      and t.finished_at>v.last_observed_at
-     and t.finished_at<=last_success.last_succeeded_at
+     and t.finished_at<=last_success_at
      and t.provider_proof_sha256 ~ '^sha256:[a-f0-9]{64}$'
      and t.model_response_id ~ '^resp_[A-Za-z0-9_-]{4,160}$'
    order by t.finished_at desc limit 1;
@@ -139,7 +140,7 @@ begin
    'incident_id',v.incident_id,'owner_id',v.owner_id,
    'last_failed_runid',v.last_failed_runid,
    'successful_cron_checks',successes,
-   'last_success_runid',last_success.max_runid,
+   'last_success_runid',last_success_runid,
    'signed_worker_inquiry_claim_id',inquiry.claim_id,
    'provider_proof_sha256',inquiry.provider_proof_sha256,
    'employee_inquiry_model_response_id',inquiry.model_response_id,
@@ -152,7 +153,7 @@ begin
   update reality_internal.owner_worker_recovery_incidents_v1
   set phase='OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX',
    continuity_verified_at=clock_timestamp(),
-   continuity_success_runid=last_success.max_runid,
+   continuity_success_runid=last_success_runid,
    continuity_worker_inquiry_claim_id=inquiry.claim_id,
    continuity_receipt_sha256=hash,
    recovery_attribution='EXTERNALLY_CORRECTED_NOT_SELF_REPAIRED',
@@ -164,7 +165,7 @@ begin
    signed_worker_inquiry_claim_id,proof_sha256,observation)
   values(v.incident_id,v.owner_id,
    'CONTINUITY_INDEPENDENTLY_VERIFIED_NO_SELF_REPAIR_CLAIM',
-   v.last_failed_runid,last_success.max_runid,inquiry.claim_id,hash,evidence)
+   v.last_failed_runid,last_success_runid,inquiry.claim_id,hash,evidence)
   on conflict do nothing;
   verified_count:=verified_count+1;
  end loop;
