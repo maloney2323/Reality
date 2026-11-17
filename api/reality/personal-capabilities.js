@@ -97,6 +97,7 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
   last_scheduler_check_at:null,last_scheduler_failure:null,
   last_scheduler_success_at:null,
   current_capability_investigations_scheduled:0,
+  operational_recoveries_verified:0,autonomous_self_repair_proven:false,
   scheduler_dispatch_success_not_worker_proof:true,
   incident_count:0,incidents:[],
   next_action:'Worker health evidence has not been read. Refresh to verify the signed worker.',
@@ -110,6 +111,11 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
     health.installation_authorized!==false||
     health.production_changed!==false||
     health.scheduler_dispatch_success_not_worker_proof!==true||
+    (health.autonomous_self_repair_proven!==undefined&&
+     health.autonomous_self_repair_proven!==false)||
+    (health.operational_recoveries_verified!==undefined&&
+     (!Number.isSafeInteger(health.operational_recoveries_verified)||
+       health.operational_recoveries_verified<0))||
     !Array.isArray(health.incidents)||health.incidents.length>8||
     health.incident_count!==health.incidents.length||
     typeof health.next_action!=='string'||health.next_action.length>450||
@@ -118,7 +124,13 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
       health.last_scheduler_status)||
     health.incidents.some(i=>
       !['DETECTED','LEASED_FOR_INVESTIGATION',
-        'EMPLOYEE_INVESTIGATION_SCHEDULED','BLOCKED_NEEDS_EVIDENCE'].includes(i.phase)||
+        'EMPLOYEE_INVESTIGATION_SCHEDULED','BLOCKED_NEEDS_EVIDENCE',
+        'OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX'].includes(i.phase)||
+      (i.autonomous_self_repair_proven!==undefined&&i.autonomous_self_repair_proven!==false)||
+      (i.phase==='OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX'&&
+       (i.operational_continuity_verified!==true||
+        !/^sha256:[a-f0-9]{64}$/.test(i.operational_recovery_receipt_sha256||'')||
+        i.operational_recovery_attribution!=='EXTERNALLY_CORRECTED_NOT_SELF_REPAIRED'))||
       typeof i.error_summary!=='string'||i.error_summary.length>220||
       i.independently_verified_repaired!==false||
       typeof i.scheduler_dispatched_after_failure!=='boolean'))
@@ -194,6 +206,8 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
    current_capability_investigations_scheduled:
      health.current_capability_investigations_scheduled,
    incident_count:health.incident_count,
+   operational_recoveries_verified:health.operational_recoveries_verified||0,
+   autonomous_self_repair_proven:false,
    incidents:Object.freeze(health.incidents.map(i=>Object.freeze({
     phase:i.phase,error_summary:i.error_summary,
     failure_count:i.failure_count,
@@ -203,6 +217,13 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
     investigation_scope:i.investigation_scope,
     independent_test_requirement:i.independent_test_requirement,
     scheduler_dispatched_after_failure:i.scheduler_dispatched_after_failure,
+    operational_continuity_verified:i.operational_continuity_verified===true,
+    operational_recovery_verified_at:i.operational_recovery_verified_at||null,
+    operational_recovery_receipt_sha256:
+      i.operational_recovery_receipt_sha256||null,
+    operational_recovery_attribution:
+      i.operational_recovery_attribution||null,
+    autonomous_self_repair_proven:false,
     independently_verified_repaired:false
    }))),
    next_action:health.next_action,
