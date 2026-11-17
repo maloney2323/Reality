@@ -66,6 +66,7 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule}={}
      entry.original_job_created_by_schedule!==false||
      entry.installation_authorized!==false||
      entry.estimate_is_model_provisional_only!==true||
+     typeof entry.source_feed_fingerprint_unchanged!=='boolean'||
      typeof entry.independent_current_gap_proven!=='boolean'||
      (entry.independent_current_gap_proven===true&&
       !/^work:[a-f0-9]{32}$/.test(entry.existing_original_work_id||'')))
@@ -100,7 +101,8 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule}={}
    throw Error('CAPABILITY_UNVERIFIED_OR_DUPLICATE');
   seen.add(x.key);
   const active=assignments.get(x.key)||null;
-  const ready=active?.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF';
+  const ready=active?.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&
+    active.source_feed_fingerprint_unchanged===true;
   return Object.freeze({
    key:x.key,title:x.title,kind:x.kind,
    stage:typeof x.stage==='string'?x.stage:'UNVERIFIED',
