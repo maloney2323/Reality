@@ -31,9 +31,9 @@ test('Connection inventory is authenticated, owner-scoped and read-only',()=>{
  assert.match(api,/reality_read_owner_employee_discovery_v1/);
  assert.match(api,/p_owner_id:session\.user_id/);
  assert.match(api,/evidence\.owner_id!==session\.user_id/);
- assert.match(api,/evidence\.qualified_jobs!==0/);
- assert.match(api,/shift_authorized!==false/);
- assert.match(api,/installation_authorized!==false/);
+ assert.match(api,/evidence\.qualified_jobs===0/);
+ assert.match(api,/evidence\.shift_authorized===false/);
+ assert.match(api,/evidence\.installation_authorized===false/);
  assert.match(api,/external_execution_authorized:false/);
  assert.match(api,/owner_billing_authorized:false/);
  assert.match(api,/connection_grants_created:0/);
