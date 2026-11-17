@@ -22,7 +22,8 @@ create table if not exists reality_internal.employee_temporal_inquiries_v1 (
  unique(claim_id),
  check(phase <> 'RECORDED' or
   (question is not null and investigation is not null and next_proof is not null
-   and provider_proof_sha256 is not null and model_response_id is not null))
+   and provider_proof_sha256 is not null and model_response_id is not null
+   and recommendation is not null))
 );
 alter table reality_internal.employee_temporal_inquiries_v1 enable row level security;
 revoke all on reality_internal.employee_temporal_inquiries_v1 from public,anon,authenticated;
@@ -95,7 +96,8 @@ begin
   or length(trim(coalesce(p_question,''))) not between 15 and 900
   or length(trim(coalesce(p_investigation,''))) not between 20 and 2500
   or length(trim(coalesce(p_next_proof,''))) not between 15 and 1500
-  or p_recommendation not in ('INVESTIGATE_MORE','OWNER_REVIEW','NO_NEW_WORK')
+  or p_recommendation is null or
+   p_recommendation not in ('INVESTIGATE_MORE','OWNER_REVIEW','NO_NEW_WORK')
  then raise exception 'TIME_INQUIRY_MODEL_OR_PROVIDER_RESULT_INVALID';end if;
  update reality_internal.employee_temporal_inquiries_v1 t
  set phase='RECORDED',provider_proof_sha256=p_provider_proof_sha256,
