@@ -216,7 +216,7 @@ test('watchdog, worker and Chat use existing signed infrastructure and no new au
  assert.match(schema,/observe_owner_shift_continuity_stalls_v1/);
  assert.match(schema,/reality_claim_next_shift_continuity_investigation_v1/);
  assert.match(schema,/three cron checks queued zero worker requests/);
- assert.match(schema,/clock_timestamp\(\)-interval '4 minutes'/);
+ assert.match(schema,/now_at-interval '4 minutes'/);
  assert.match(schema,/reality_internal\.owner_shift_continuity_incidents_v1/);
  assert.doesNotMatch(schema,/cron\.schedule\(/);
  assert.match(provenance,/verify_owner_shift_stall_resumption_v1/);
