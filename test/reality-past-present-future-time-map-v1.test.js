@@ -7,6 +7,8 @@ const api=read('api/reality/personal-time-horizon.js');
 const ui=read('reality-past-present-future-v1.js');
 const css=read('reality-past-present-future-v1.css');
 const boundary=read('src/reality-governed-shift-boundary-v1.js');
+const shellCss=read('reality-unified-shell-v1.css');
+const connectCss=read('reality-connections-workspace-v1.css');
 const count=(text,match)=>(text.match(match)||[]).length;
 
 test('the ORIGINAL Reality Matrix leads Home, not a duplicated future-looking widget',()=>{
@@ -82,4 +84,15 @@ test('a failed or stale source cannot become a false achievement or active shift
  assert.match(ui,/unknown\('Signed out\. Past, Present and Future have been cleared\.'/);
  assert.match(ui,/cache:'no-store'/);
  assert.match(ui,/credentials:'same-origin'/);
+});
+
+test('original Home and other route visibility gates actually allow the lifted Matrix',()=>{
+ assert.match(html,/main > :not\(\.top\):not\(#realitySimpleHome\):not\(#privateChat\):not\(#realityTimeHorizon\)/);
+ assert.match(html,/main > :not\(\.top\):not\(#privateChat\):not\(#realityTimeHorizon\)/);
+ assert.match(html,/main > :not\(\.top\):not\(#realityValueVerification\):not\(#realityTimeHorizon\)/);
+ assert.match(shellCss,/main>:not\(\.top\):not\(#realitySimpleHome\):not\(#privateChat\):not\(#realityTimeHorizon\)/);
+ assert.match(shellCss,/main>:not\(\.top\):not\(#realityUnifiedView\):not\(#workCenter\):not\(#privateChat\):not\(#realityTimeHorizon\)/);
+ assert.match(shellCss,/main>:not\(\.top\):not\(#realityUnifiedView\):not\(#privateChat\):not\(#realityTimeHorizon\)/);
+ assert.match(connectCss,/main>:not\(\.top\):not\(#realityUnifiedView\):not\(#realityTimeHorizon\)/);
+ assert.match(css,/#realityTimeHorizon\[hidden\]\{display:none!important\}/);
 });
