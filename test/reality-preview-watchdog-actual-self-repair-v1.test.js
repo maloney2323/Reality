@@ -80,6 +80,21 @@ test('an applied patch without real worker and original receipts is NOT complete
  assert.equal(x.items[0].bounded_preview_self_repair_cycle_proven,false);
  assert.match(x.items[0].stage,/pending/);
 });
+test('signed worker recovered with no pending original is not described as full original-job settlement',()=>{
+ const workerOnly={...repair,items:[{
+  ...repairItem,phase:'WORKER_RESTORED_NO_ORIGINAL_TO_RESUME',
+  original_capability_claim_id:null,
+  original_work_receipt_sha256:null,verified_at:null
+ }]};
+ const x=projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,autoRepair:workerOnly
+ });
+ assert.equal(x.items[0].self_repair_completed,false);
+ assert.equal(x.items[0].bounded_preview_self_repair_cycle_proven,false);
+ assert.match(x.items[0].outcome,/No earlier original job was waiting/);
+ assert.equal(x.original_job_authorized_by_chat,false);
+ assert.equal(incidentChatUniverseObservations(x)[0].self_repair_proven,false);
+});
 test('forged owner, receipt and production effects must fail closed',()=>{
  const tampered=[
   {...repair,owner_id:'66666666-7777-4888-8999-aaaaaaaaaaaa'},
