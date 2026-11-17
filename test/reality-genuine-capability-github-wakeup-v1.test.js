@@ -82,7 +82,7 @@ test('source-bound wake targets full governed pipeline, not inert inspection',()
  assert.ok(wake.includes('isSignedRealityCapabilityPreviewRef'));
  assert.ok(wake.includes('CURRENT_SIGNED_PREVIEW_HEAD_MISMATCH_NO_STALE_WAKE'));
  assert.ok(wake.includes('reality-genuine-capability-auto-trigger-v1.yml'));
- assert.ok(full.includes("- 'reality/**'"));
+ assert.ok(full.includes("- 'reality/chat-direct-work-handoff-20261115'"));
  assert.ok(full.includes("- 'reality-genuine-triggers/**'"));
  for(const required of [
   'Signed automatic owner-evidence admission',
