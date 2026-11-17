@@ -15,6 +15,10 @@ import {discoverGovernedCapabilityAudit,saveGovernedCapabilityAudit}
  from '../../src/reality-customer-capability-discovery-audit-v1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {readOwnerTimeHorizonEvidence}
+ from './personal-time-horizon.js';
+import {projectRealityEmployeeTimeInquiryContext}
+ from '../../src/reality-employee-time-inquiry-context-v1.js';
 export const maxDuration=120;
 const SCOPES=new Set(['ALL','Avery','Riley','Quinn','Taylor',
  'Casey','Morgan','Jordan','Sage']);
@@ -50,10 +54,15 @@ export default async function handler(req,res){
    db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
    throw Error('EMPLOYEE_AUDIT_ISOLATED_OWNER_DATABASE_MISMATCH');
   // Fresh catalog includes bounded GitHub issues, PRs and current CI signals.
-  const [catalog,snapshotResult]=await Promise.all([
+  const [catalog,snapshotResult,timeEvidence,discoveryEvidence]=await Promise.all([
    buildRealityWorkCatalog(),
    shiftRpc(db,'reality_read_next_week_source_snapshot_v1',{})
-    .catch(()=>null)
+    .catch(()=>null),
+   readOwnerTimeHorizonEvidence({ownerId:session.user_id,db})
+    .catch(()=>null),
+   shiftRpc(db,'reality_read_owner_employee_discovery_v1',{
+    p_owner_id:session.user_id
+   }).catch(()=>null)
   ]);
   if(!catalog||!['OBSERVED','PARTIAL'].includes(catalog.status))
    throw Error('EMPLOYEE_AUDIT_LIVE_PROVIDER_CATALOG_UNVERIFIED');
@@ -78,8 +87,27 @@ export default async function handler(req,res){
    roster,snapshot:snapshotResult,employee:req.body.employee_name,
    capabilityAudit:savedAudit
   });
+  let employee_time_inquiry_context=null;
+  if(timeEvidence&&discoveryEvidence){
+   try{
+    const context=projectRealityEmployeeTimeInquiryContext({
+     ownerId:session.user_id,roster,time:timeEvidence,
+     discovery:discoveryEvidence
+    });
+    employee_time_inquiry_context={
+     ...context,
+     roles:context.roles.filter(x=>req.body.employee_name==='ALL'||
+      x.employee_name===req.body.employee_name)
+    };
+   }catch{
+    // An unverified owner/source is not an inquiry, assignment or job.
+   }
+  }
   return res.status(200).json({
    ok:true,...audit,
+   employee_time_inquiry_context,
+   employee_time_inquiry_status:employee_time_inquiry_context?.status||
+    'TIME_EVIDENCE_OR_DISCOVERY_NOT_VERIFIED',
    fresh_catalog_observed_at:catalog.observed_at,
    fresh_catalog_status:catalog.status,
    source_coverage:catalog.source_coverage,
