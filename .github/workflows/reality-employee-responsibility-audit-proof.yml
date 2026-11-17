@@ -10,6 +10,7 @@ on:
       - src/reality-capability-role-schedule-worker-v1.js
       - supabase/migrations/20261117_owner_capability_employee_schedule_v1.sql
       - supabase/migrations/20261117_existing_worker_capability_schedule_wake_v1.sql
+      - supabase/migrations/20261117_capability_schedule_proof_readback_v2.sql
       - api/reality/personal-capabilities.js
       - reality-capability-workspace-v1.js
       - reality-capability-workspace-v1.css
