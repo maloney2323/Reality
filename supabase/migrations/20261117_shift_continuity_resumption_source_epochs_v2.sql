@@ -1,6 +1,4 @@
--- Prevent a stale pre-existing claim from being incorrectly excluded
--- from post-stall recovery evidence. Original claim must predate observation;
--- actual source receipt and signed worker completion must postdate it.
+-- Independent post-observation recovery with exact claim/worker provenance.
 create or replace function reality_internal.verify_owner_shift_stall_resumption_v1()
 returns text language plpgsql security invoker set search_path to '' as $fn$
 declare incident reality_internal.owner_shift_continuity_incidents_v1%rowtype;
@@ -29,46 +27,8 @@ begin
   where t.owner_id=incident.owner_id and t.phase='RECORDED'
    and t.source_scan_at<=incident.first_detected_at
    and t.finished_at>=incident.first_detected_at
-   and t.model_response_id ~ '^resp_[A-Za-z0-9_-]{4,160}
-  order by t.finished_at asc limit 1;
-  if not found then continue;end if;
-  hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-   pg_catalog.convert_to(
-    incident.incident_id::text||':'||proof.signed_worker_id::text||
-    ':'||proof.original_inquiry_id::text||
-    ':WORK_RESUMED_BUT_SELF_REPAIR_UNPROVEN','UTF8')),'hex');
-  update reality_internal.owner_shift_continuity_incidents_v1
-  set phase='RECOVERED_AFTER_OBSERVATION',
-   resolved_worker_run_id=proof.signed_worker_id,
-   resolved_inquiry_claim_id=proof.original_inquiry_id,
-   recovery_attribution='WORK_RESUMED_AFTER_OBSERVATION_SELF_REPAIR_UNPROVEN',
-   recovery_receipt_sha256=hash,recovered_at=clock_timestamp()
-  where incident_id=incident.incident_id;
-  count_verified:=count_verified+1;
- end loop;
- return 'SOURCE_BACKED_SHIFT_STALL_WORK_RESUMPTIONS_VERIFIED_'||count_verified;
-end $fn$;
-
-   and t.provider_proof_sha256 ~ '^sha256:[a-f0-9]{64}
-  order by t.finished_at asc limit 1;
-  if not found then continue;end if;
-  hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-   pg_catalog.convert_to(
-    incident.incident_id::text||':'||proof.signed_worker_id::text||
-    ':'||proof.original_inquiry_id::text||
-    ':WORK_RESUMED_BUT_SELF_REPAIR_UNPROVEN','UTF8')),'hex');
-  update reality_internal.owner_shift_continuity_incidents_v1
-  set phase='RECOVERED_AFTER_OBSERVATION',
-   resolved_worker_run_id=proof.signed_worker_id,
-   resolved_inquiry_claim_id=proof.original_inquiry_id,
-   recovery_attribution='WORK_RESUMED_AFTER_OBSERVATION_SELF_REPAIR_UNPROVEN',
-   recovery_receipt_sha256=hash,recovered_at=clock_timestamp()
-  where incident_id=incident.incident_id;
-  count_verified:=count_verified+1;
- end loop;
- return 'SOURCE_BACKED_SHIFT_STALL_WORK_RESUMPTIONS_VERIFIED_'||count_verified;
-end $fn$;
-
+   and t.model_response_id ~ '^resp_[A-Za-z0-9_-]{4,160}$'
+   and t.provider_proof_sha256 ~ '^sha256:[a-f0-9]{64}$'
    and ((incident.kind='ELIGIBLE_WORK_NO_DISPATCH'
        and t.claimed_at>=incident.first_detected_at)
      or (incident.kind='EMPLOYEE_INQUIRY_CLAIM_STALE'
