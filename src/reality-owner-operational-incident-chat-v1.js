@@ -325,7 +325,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    continuity.self_repair_proven!==false||
    !Array.isArray(continuity.items)||continuity.items.length>8||
    continuity.count!==continuity.items.length)fail();
-  const types=new Set(['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE']);
+  const types=new Set(['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
+   'QUALIFIED_EVIDENCE_JOB_BLOCKED','EMPLOYEE_QUALIFICATION_HANDOFF_STALLED']);
   const phases=new Set(['DETECTED','INVESTIGATION_CLAIMED',
    'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
    'BLOCKED_NEEDS_EVIDENCE','RECOVERED_AFTER_OBSERVATION']);
