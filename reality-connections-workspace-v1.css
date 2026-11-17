@@ -81,3 +81,68 @@ body.reality-unified-ui .rx-connection-note{color:#f0d9ae}
  }
  body.reality-unified-ui .rx-connection-refresh{width:100%}
 }
+
+
+/* Catalog is a discovery/owner-request UI; it does not grant OAuth. */
+body.reality-unified-ui .rx-connection-catalog-tools{
+ display:flex;align-items:end;gap:10px;flex-wrap:wrap;
+ border:1px solid #2e638b;border-radius:13px;
+ padding:13px;margin:15px 0;background:#08233f
+}
+body.reality-unified-ui .rx-connection-browse,
+body.reality-unified-ui .rx-connection-request{
+ appearance:none;border:1px solid #4198c8;
+ border-radius:10px;min-height:44px;padding:9px 15px;
+ background:#0b4775;color:#eafaff;font:750 12px/1.25 system-ui,sans-serif;
+ cursor:pointer
+}
+body.reality-unified-ui .rx-connection-search-label{
+ display:flex;flex:1 1 230px;min-width:0;flex-direction:column;
+ gap:5px;color:#b8dcf0;font:750 11px/1.4 system-ui,sans-serif
+}
+body.reality-unified-ui .rx-connection-search,
+body.reality-unified-ui .rx-connection-group-filter{
+ box-sizing:border-box;min-height:44px;min-width:0;width:100%;
+ background:#071a30;border:1px solid #397da8;
+ border-radius:9px;padding:9px 12px;color:#effbff;
+ font:500 13px/1.35 system-ui,sans-serif
+}
+body.reality-unified-ui .rx-connection-group-filter{
+ flex:0 1 175px;width:auto;max-width:100%
+}
+body.reality-unified-ui .rx-connection-setup-actions{
+ display:flex;gap:9px;flex-wrap:wrap;align-items:center
+}
+body.reality-unified-ui .rx-connection-request:disabled{
+ cursor:default;opacity:.7;border-color:#5d8f81;
+ background:#193f39;color:#c2ebd3
+}
+body.reality-unified-ui .rx-connection-docs{
+ color:#b9eaff;text-decoration:underline;font-size:12px;
+ text-underline-offset:3px;padding:8px 2px
+}
+body.reality-unified-ui .rx-connection-empty{
+ color:#d3e6f3;font-size:13px;padding:14px
+}
+body.reality-unified-ui .rx-connection-signin{
+ display:inline-flex;min-height:44px;padding:9px 13px;
+ color:#eaf9ff;background:#0c4974;border-radius:9px;
+ align-items:center;text-decoration:none;font-size:12px;font-weight:750
+}
+body.reality-unified-ui .rx-connection-catalog-tools[hidden],
+body.reality-unified-ui .rx-connection-signin[hidden]{
+ display:none!important
+}
+@media(max-width:600px){
+ body.reality-unified-ui .rx-connection-catalog-tools{
+  flex-direction:column;align-items:stretch;padding:10px
+ }
+ body.reality-unified-ui .rx-connection-browse,
+ body.reality-unified-ui .rx-connection-group-filter,
+ body.reality-unified-ui .rx-connection-search-label{
+  width:100%;max-width:none;flex:auto
+ }
+ body.reality-unified-ui .rx-connection-request{
+  width:100%
+ }
+}
