@@ -146,11 +146,12 @@ BEGIN
    evidence_sha256=excluded.evidence_sha256,title=excluded.title,
    disposition=excluded.disposition,source_observed_at=excluded.source_observed_at,
    last_reconciled_at=excluded.last_reconciled_at,last_scan_id=excluded.last_scan_id;
-  -- Finance discovers a REAL measurement gap in the already settled
-  -- original receipt. No Stripe connection, billing read or cash value inferred.
+  -- Sage: independently settled receipts with ROI=NOT_MEASURED are
+  -- evidence-backed finance investigations, not permission to touch billing.
   INSERT INTO reality_internal.employee_discovery_observations_v1(
    owner_id,source_identity,employee,source_family,source_ref,
-   evidence_sha256,title,disposition,source_observed_at,last_reconciled_at,last_scan_id)
+   evidence_sha256,title,disposition,source_observed_at,
+   last_reconciled_at,last_scan_id)
   SELECT f.owner_id,'roi-gap:'||f.receipt_id::text,'Sage','ROI_EVIDENCE_GAP',
    'supabase:governed_original_independent_final_receipts_v1:'||f.receipt_id::text,
    f.final_evidence_sha256,
@@ -160,49 +161,7 @@ BEGIN
   FROM reality_internal.governed_original_independent_final_receipts_v1 f
   WHERE f.owner_id=v_owner AND f.outcome='SUCCEEDED'
    AND f.roi_verification_status='NOT_MEASURED'
-   AND f.final_evidence_sha256~'^sha256:[a-f0-9]{64}
-  UPDATE reality_internal.employee_discovery_observations_v1 o
-   SET disposition='SOURCE_NO_LONGER_CURRENT',last_reconciled_at=v_now
-   WHERE o.owner_id=v_owner AND o.last_scan_id<>v_scan_id
-    AND o.disposition<>'SOURCE_NO_LONGER_CURRENT';
-  INSERT INTO reality_internal.employee_discovery_role_coverage_v1(
-   owner_id,employee,last_scan_id,checked_at,candidate_source_count,
-   historical_source_count,settled_source_count,coverage_state,last_evidence_at)
-  SELECT v_owner,n.employee,v_scan_id,v_now,
-   count(o.source_identity) FILTER(WHERE o.disposition='NEEDS_CURRENT_VALIDATION'),
-   count(o.source_identity) FILTER(
-    WHERE o.disposition='HISTORICAL_REVALIDATION_REQUIRED'),
-   count(o.source_identity) FILTER(WHERE o.disposition='SETTLED_NO_REPLAY'),
-   CASE WHEN count(o.source_identity) FILTER(
-      WHERE o.disposition='NEEDS_CURRENT_VALIDATION')>0
-      THEN 'CURRENT_PROOF_REQUIRED'
-    WHEN count(o.source_identity) FILTER(
-      WHERE o.disposition='HISTORICAL_REVALIDATION_REQUIRED')>0
-      THEN 'HISTORICAL_SOURCES_REQUIRE_REFRESH'
-    ELSE 'NO_CONNECTED_ROLE_SOURCE_EVIDENCE' END,
-   max(o.source_observed_at) FILTER(
-    WHERE o.disposition<>'SOURCE_NO_LONGER_CURRENT')
-  FROM unnest(ARRAY['Avery','Riley','Quinn','Taylor',
-     'Casey','Morgan','Jordan','Sage']) AS n(employee)
-  LEFT JOIN reality_internal.employee_discovery_observations_v1 o
-   ON o.owner_id=v_owner AND o.employee=n.employee
-    AND o.last_scan_id=v_scan_id
-  GROUP BY n.employee
-  ON CONFLICT(owner_id,employee) DO UPDATE SET
-   last_scan_id=excluded.last_scan_id,checked_at=excluded.checked_at,
-   candidate_source_count=excluded.candidate_source_count,
-   historical_source_count=excluded.historical_source_count,
-   settled_source_count=excluded.settled_source_count,
-   coverage_state=excluded.coverage_state,last_evidence_at=excluded.last_evidence_at;
- END LOOP;
- RETURN jsonb_build_object('status','EMPLOYEE_DISCOVERY_OBSERVATIONS_SAVED',
-  'scan_id',v_scan_id,'owners_scanned',v_owners,
-  'source_issues_inspected',v_snapshot.open_issue_count,
-  'owner_issue_observations',v_count,
-  'qualified_executable_jobs',0,'shift_authorized',false,
-  'installation_authorized',false,'production_changed',false);
-END $function$
-
+   AND f.final_evidence_sha256~'^sha256:[a-f0-9]{64}$'
    AND f.production_changed=false AND f.recorded_at IS NOT NULL
   ORDER BY f.recorded_at DESC LIMIT 10
   ON CONFLICT(owner_id,source_identity) DO UPDATE SET
