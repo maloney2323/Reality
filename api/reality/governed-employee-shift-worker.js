@@ -102,6 +102,8 @@ import {scheduleOneStandingCapability,scheduleOneStandingOperationalRecovery}
  from '../../src/reality-capability-role-schedule-worker-v1.js';
 import {advanceExistingOwnerIncidentOriginal}
  from '../../src/reality-incident-existing-original-handoff-v1.js';
+import {advanceOneScheduledCapabilityInquiry}
+ from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -198,9 +200,29 @@ export default async function handler(req,res){
     {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_RECOVERY',
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false};
-  const capabilityScheduleResult=
+  // Complete previously scheduled employee investigations before generating
+  // more schedules. A scheduled job is not done until a separate durable
+  // inquiry receipt exists; the independent current-gap gate still follows.
+  workerStage='SCHEDULED_CAPABILITY_EMPLOYEE_INQUIRY';
+  const scheduledCapabilityInquiryResult=
    wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
    operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'?
+    await advanceOneScheduledCapabilityInquiry({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SCHEDULED_CAPABILITY_INQUIRY_PROOF_UNAVAILABLE',
+     original_job_created:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'ACTIVE_SIGNED_SHIFT_OR_RECOVERY_CONTROLS_INQUIRY',
+     original_job_created:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
+  const capabilityScheduleResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'&&
+   scheduledCapabilityInquiryResult.status===
+     'NO_STANDING_SCHEDULED_CAPABILITY_INQUIRY_DUE'?
     await scheduleOneStandingCapability({
      db,env:process.env,fetchImpl:fetch
     }).catch(()=>({
@@ -217,7 +239,9 @@ export default async function handler(req,res){
   const standingDiscoveryResult=
    wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
    operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'&&
-   capabilityScheduleResult.status===
+   scheduledCapabilityInquiryResult.status===
+    'NO_STANDING_SCHEDULED_CAPABILITY_INQUIRY_DUE'&&
+   capabilityScheduleResult.status=
     'NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'?
     await runOneStandingEmployeeDiscovery({
      db,env:process.env,fetchImpl:fetch
@@ -1463,6 +1487,7 @@ export default async function handler(req,res){
     employee_time_inquiry_receipt:employeeTemporalInquiry,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
+    scheduled_employee_capability_inquiry:scheduledCapabilityInquiryResult,
     operational_self_recovery_investigation:operationalRecoveryResult,
     incident_existing_original_handoff:incidentOriginalHandoff,
     authenticated_chat_work_handoff:chatWorkHandoff,
