@@ -155,3 +155,17 @@ test('the signed worker retains normal execution gates and the new grant is neve
  assert.match(home,/Capabilities/);
  assert.doesNotMatch(sql,/external_actions_authorized',true/);
 });
+
+test('existing one-minute signed worker cron accepts standing owner grants without replacing original shift gates',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_standing_discovery_existing_worker_cron_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/cron\.alter_job\(v_id,command=>v_new\)/);
+ assert.match(sql,/eligible_shift\.permitted/);
+ assert.match(sql,/owner_routine_delegations_v1/);
+ assert.match(sql,/employee_temporal_inquiries_v1/);
+ assert.match(sql,/max_daily_inquiries/);
+ assert.match(sql,/credential\.worker_token/);
+ assert.match(sql,/credential\.vercel_bypass/);
+ assert.doesNotMatch(sql,/cron\.schedule\(/);
+});
