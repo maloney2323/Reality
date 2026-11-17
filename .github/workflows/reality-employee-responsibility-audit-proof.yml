@@ -60,6 +60,7 @@ on:
       - test/reality-signed-shift-employee-inquiry-continuity-v1.test.js
       - supabase/migrations/20261117_signed_shift_to_all_employee_inquiry_handoff_v1.sql
       - supabase/migrations/20261117_signed_shift_employee_inquiry_continuation_wake_v1.sql
+      - supabase/migrations/20261117_signed_shift_employee_inquiry_continuation_wake_v2.sql
       - test/reality-standing-capability-autonomy-v1.test.js
       - test/reality-capability-role-schedule-v1.test.js
       - test/reality-worker-self-recovery-v1.test.js
