@@ -51,3 +51,9 @@
  #realityOwnerIncidentChat .rx-owner-incidents-refresh,
  #realityOwnerIncidentChat .rx-owner-incident-discuss{width:100%}
 }
+
+#realityOwnerIncidentChat .rx-owner-worker-receipt{
+ background:#172c3e;border:1px solid #45647d;border-radius:10px;
+ padding:11px;margin:10px 0;color:#dbebf8;font-size:12px;
+ line-height:1.6;overflow-wrap:anywhere
+}
