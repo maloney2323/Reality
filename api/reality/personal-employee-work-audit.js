@@ -136,8 +136,51 @@ export default async function handler(req,res){
     };
    }
   }catch{}
+  let employee_capability_investigations=null;
+  // Reuse the same durable role schedule as the Capabilities section.
+  // No shadow assignment queue or newly granted job permission is created.
+  try{
+   const read=await shiftRpc(db,'reality_read_owner_capability_employee_schedule_v1',{
+    p_owner_id:session.user_id
+   });
+   const roles=new Map(roster.proposed_employees.map(x=>[x.function_id,x]));
+   if(read?.status==='OWNER_CAPABILITY_EMPLOYEE_SCHEDULE_READ_ONLY'&&
+      read.owner_id===session.user_id&&read.owner_scope_verified===true&&
+      read.read_only===true&&
+      read.new_original_jobs_created===0&&
+      read.execution_authorized_by_schedule===false&&
+      read.installation_authorized===false&&read.production_changed===false&&
+      Array.isArray(read.items)&&read.items.length<=50&&
+      read.count===read.items.length){
+    const accepted=read.items.filter(x=>
+      x.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&
+      x.source_feed_fingerprint_unchanged===true&&
+      /^\w[^<>]{2,180}$/.test(x.capability_key||'')&&
+      /^[a-f0-9]{64}$/.test(x.evidence_fingerprint||'')&&
+      roles.get(x.function_id)?.display_name===x.employee&&
+      roles.get(x.reviewer_function_id)?.display_name===x.reviewer&&
+      x.function_id!==x.reviewer_function_id&&
+      x.estimate_is_model_provisional_only===true&&
+      Number.isSafeInteger(x.estimate_minutes_low)&&
+      Number.isSafeInteger(x.estimate_minutes_high)&&
+      x.estimate_minutes_low>=15&&
+      x.estimate_minutes_high<=2880&&
+      x.estimate_minutes_low<=x.estimate_minutes_high&&
+      x.execution_authorized_by_schedule===false&&
+      x.original_job_created_by_schedule===false&&
+      x.installation_authorized===false);
+    employee_capability_investigations={
+     status:'VERIFIED_EXISTING_EMPLOYEE_CAPABILITY_INQUIRY_SCHEDULE',
+     read_only:true,execution_authorized:false,
+     original_jobs_created:0,installation_authorized:false,
+     items:accepted.filter(x=>req.body.employee_name==='ALL'||
+      x.employee===req.body.employee_name)
+    };
+   }
+  }catch{}
   return res.status(200).json({
    ok:true,...audit,
+   employee_capability_investigations,
    employee_inquiry_receipts,
    employee_time_inquiry_context,
    employee_time_inquiry_status:employee_time_inquiry_context?.status||
