@@ -39,6 +39,50 @@ export default async function handler(req,res){
   const savedChatPromise=readRealitySavedChatEmployeeProposals(session).catch(()=>null);
   const approvedAssignmentsPromise=
    readOwnerApprovedChatEmployeeAssignments(session).catch(()=>null);
+  const discoveryPromise=(async()=>{
+   const db=shiftDatabase(process.env);
+   if(db.url!==session.config?.url)return null;
+   const data=await shiftRpc(db,'reality_read_owner_employee_discovery_v1',{
+    p_owner_id:session.user_id});
+   const names=new Set(['Avery','Riley','Quinn','Taylor','Casey',
+     'Morgan','Jordan','Sage']);
+   if(data?.status!=='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'||
+    data.owner_id!==session.user_id||
+    data.shift_authorized!==false||
+    data.installation_authorized!==false||
+    data.production_changed!==false||
+    data.qualified_jobs!==0||
+    !Number.isFinite(Date.parse(data.checked_at||''))||
+    !Array.isArray(data.roles)||data.roles.length!==8||
+    new Set(data.roles.map(x=>x.employee)).size!==8||
+    !data.roles.every(x=>
+     names.has(x.employee)&&
+     ['CURRENT_PROOF_REQUIRED','HISTORICAL_SOURCES_REQUIRE_REFRESH',
+      'NO_CONNECTED_ROLE_SOURCE_EVIDENCE'].includes(x.coverage_state)&&
+     Number.isSafeInteger(x.candidate_source_count)&&
+     x.candidate_source_count>=0&&x.candidate_source_count<=150&&
+     Number.isSafeInteger(x.historical_source_count)&&
+     x.historical_source_count>=0&&x.historical_source_count<=150&&
+     Number.isSafeInteger(x.settled_source_count)&&
+     x.settled_source_count>=0&&x.settled_source_count<=150&&
+     x.execution_authorized===false&&x.qualified_jobs===0)||
+    !Array.isArray(data.items)||data.items.length>150||
+    data.source_count!==data.items.length||
+    !data.items.every(x=>
+     names.has(x.employee)&&
+     ['GITHUB_ISSUE','MARKET_ASSESSMENT','CAPABILITY_AUDIT'].includes(x.source_family)&&
+     ['NEEDS_CURRENT_VALIDATION','HISTORICAL_REVALIDATION_REQUIRED',
+      'SETTLED_NO_REPLAY'].includes(x.disposition)&&
+     /^sha256:[a-f0-9]{64}$/.test(x.evidence_sha256||'')&&
+     typeof x.title==='string'&&x.title.length>0&&x.title.length<=240&&
+     typeof x.source_ref==='string'&&x.source_ref.length<=1024&&
+     x.qualified_job===false&&x.execution_authorized===false))
+    return null;
+   return {
+    ...data,read_only:true,qualified_executable_jobs:0,
+    employee_discovery_not_actual_shift:true
+   };
+  })().catch(()=>null);
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const roster=buildRealityNamedEmployeeRoster(brief);
@@ -207,6 +251,7 @@ export default async function handler(req,res){
   const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
   const saved_chat_employee_proposals=await savedChatPromise;
   const approved_chat_employee_assignments=await approvedAssignmentsPromise;
+  const employee_discovery=await discoveryPromise;
   return res.status(200).json({ok:true,...roster,value_preview,
    next_week_plan,weekly_workload_insight,single_model_role_routing,saved_chat_employee_proposals,
    approved_chat_employee_assignments,
@@ -218,6 +263,10 @@ export default async function handler(req,res){
    upstream_source_qualification:qualification,
    weekly_employee_investigation_receipts:weeklyInvestigationReceipts,
    current_shift_engineering_originals:signedOriginals,
+   employee_discovery,
+   employee_discovery_status:employee_discovery?
+    'SIGNED_OWNER_EIGHT_ROLE_DISCOVERY_READBACK':
+    'EMPLOYEE_DISCOVERY_READBACK_UNVERIFIED',
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});
