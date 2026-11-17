@@ -5,6 +5,10 @@
 const PROJECT='hvkfreoagbrphwghjajw';
 const REPO='maloney2323/Reality';
 const SAFE_BRANCH=/^reality\/[a-z0-9][a-z0-9_/-]{8,109}$/;
+// The separate existing SUPABASE employee shift wake has no Vercel env,
+// so the service-only broker may resolve its own configured preview target.
+// A source-bound 7-field request from Vercel must still supply exact SHA.
+const CURRENT_PREVIEW_BRANCH='reality/chat-direct-work-handoff-20261115';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -71,16 +75,22 @@ Deno.serve(async req=>{
   if(raw.length<60||raw.length>700)
    return respond(400,{ok:false,...facts,status:'BROKER_EXACT_SOURCE_REQUIRED'});
   const request=JSON.parse(raw);
+  const fields=Object.keys(request&&typeof request==='object'&&!Array.isArray(request)?
+   request:{}).sort().join(',');
+  const exactRelease=fields===
+   'base_branch,base_sha,original_work_id,shift_id,source_proof_sha256,source_ref,trigger_id';
+  const signedScheduler=fields===
+   'original_work_id,shift_id,source_proof_sha256,source_ref,trigger_id';
+  const BRANCH=exactRelease?request.base_branch:
+   (Deno.env.get('REALITY_CAPABILITY_PREVIEW_BRANCH')||CURRENT_PREVIEW_BRANCH);
   if(!request||Array.isArray(request)||typeof request!=='object'||
-   Object.keys(request).sort().join(',')!==
-    'base_branch,base_sha,original_work_id,shift_id,source_proof_sha256,source_ref,trigger_id'||
+   (!exactRelease&&!signedScheduler)||
    !UUID.test(request.shift_id)||!UUID.test(request.trigger_id)||
    !WORK.test(request.original_work_id)||
    !PROOF.test(request.source_proof_sha256)||!ISSUE.test(request.source_ref)||
-   !SAFE_BRANCH.test(request.base_branch||'')||
-   String(request.base_branch).includes('//')||
-   String(request.base_branch).split('/').includes('production')||
-   !SHA.test(request.base_sha||''))
+   !SAFE_BRANCH.test(BRANCH||'')||String(BRANCH).includes('//')||
+   String(BRANCH).split('/').includes('production')||
+   (exactRelease&&!SHA.test(request.base_sha||'')))
    return respond(400,{ok:false,...facts,status:'BROKER_SOURCE_SCOPE_REJECTED'});
   const item=await rpc({
    p_shift_id:request.shift_id,p_original_work_id:request.original_work_id,
@@ -108,14 +118,10 @@ Deno.serve(async req=>{
   const bytes=JSON.stringify({trigger_id:id,
    source_event_id:item.source_event_id,
    original_work_id:item.original_work_id},null,2)+'\n';
-  // Branch & commit come from the signed Vercel preview, not a browser.
-  // Independently verify both against GitHub before writing even inert
-  // trigger JSON; a stale worker cannot dispatch to a newer release.
-  const BRANCH=String(request.base_branch);
-  const branch=await github('/git/ref/heads/'+BRANCH,configValue.token);
-  if(!SHA.test(String(branch?.object?.sha||''))||
-     branch.object.sha!==request.base_sha)
-   refuse('SIGNED_CURRENT_PREVIEW_SOURCE_HEAD_MISMATCH');
+  // Both sources were service-authenticated and owner/goal-scoped by DB.
+  // Never accept branch names from an unsigned client.
+  // Idempotent provider readback must precede the HEAD mismatch check:
+  // the first trigger commit itself advances HEAD beyond Vercel's code SHA.
   const check=async()=>{
    const x=await github('/contents/'+path+'?ref='+encodeURIComponent(BRANCH),
     configValue.token);
@@ -126,6 +132,10 @@ Deno.serve(async req=>{
   };
   const existing=await check();
   if(!existing){
+   const branch=await github('/git/ref/heads/'+BRANCH,configValue.token);
+   if(!SHA.test(String(branch?.object?.sha||''))||
+      (exactRelease&&branch.object.sha!==request.base_sha))
+    refuse('SIGNED_CURRENT_PREVIEW_SOURCE_HEAD_MISMATCH');
    const c=await github('/contents/'+path,configValue.token,'PUT',{
     branch:BRANCH,content:btoa(bytes),
     message:'Reality: wake exact existing capability '+id});
