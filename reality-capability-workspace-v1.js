@@ -201,6 +201,8 @@
     health.installation_authorized!==false)
     throw Error('OWNER_WORKER_OPERATIONAL_STATUS_UNVERIFIED');
    const scheduled=Number(data.scheduled_capability_investigations||0);
+   const investigated=Number(data.performed_capability_investigations||0);
+   const blocked=Number(data.blocked_capability_investigations||0);
    const schedulerFailed=health.last_scheduler_status==='failed';
    const recentIncident=health.incidents[0]||null;
    if(!grant.active){
@@ -223,8 +225,10 @@
     progressState.textContent='DAILY RESEARCH LIMIT REACHED · '+
      grant.today_reserved+' / '+grant.max_daily_inquiries+
      ' bounded investigation reservations used. '+scheduled+
-     ' capability investigation'+(scheduled===1?' is':'s are')+
-     ' already scheduled.';
+     ' assigned capability investigation'+(scheduled===1?' is':'s are')+
+     ' recorded · '+investigated+' source investigation receipt'+
+     (investigated===1?'':'s')+' · '+blocked+' blocked source investigation'+
+     (blocked===1?'':'s')+'.';
     progressNext.textContent='Next: Reality automatically regains its evidence-only investigation allowance when the database day resets (UTC). No additional authorization or Start button is needed. Existing schedules still require independent proof; this is not a completed repair or shift.';
    }else if(scheduled>0){
     progressState.textContent='ADVANCING · '+scheduled+
@@ -266,7 +270,11 @@
    notice.textContent=data.candidate_count?
     data.candidate_count+' evidence-backed opportunities · '+
     (data.scheduled_capability_investigations||0)+
-    ' employee investigations scheduled · '+(data.existing_independently_proven_originals||0)+
+    ' employee investigations assigned · '+
+    (data.performed_capability_investigations||0)+
+    ' source inquiry receipts · '+
+    (data.blocked_capability_investigations||0)+
+    ' blocked · '+(data.existing_independently_proven_originals||0)+
     ' current gaps independently verified in original-job records. '+
     'Hours are preliminary proposals, never measured results.':
     'No capability candidates in the current owner ledger.';
@@ -281,8 +289,10 @@
      card.append(make('p','',item.potential_value));
     const info=make('div','rc-cap-meta');
     const scoped=item.assigned_employee&&
-     item.owner_assignment_status===
-      'EMPLOYEE_INQUIRY_SCHEDULED_AWAITING_INDEPENDENT_GAP_TEST'&&
+     ['EMPLOYEE_INQUIRY_SCHEDULED_AWAITING_INDEPENDENT_GAP_TEST',
+      'EMPLOYEE_INQUIRY_RECORDED_AWAITING_INDEPENDENT_GAP_TEST',
+      'EMPLOYEE_INQUIRY_BLOCKED_NEEDS_SOURCE_PROOF',
+      'EMPLOYEE_INQUIRY_ACTIVELY_CLAIMED'].includes(item.owner_assignment_status)&&
      item.estimated_hours&&
      item.estimate_confidence===
       'MODEL_PLANNING_RANGE_NOT_INDEPENDENTLY_VERIFIED';
@@ -299,16 +309,31 @@
       'Latest source observation: '+formatDate(item.last_seen_at)));
     card.append(info);
     if(scoped){
+     const done=item.owner_assignment_status===
+      'EMPLOYEE_INQUIRY_RECORDED_AWAITING_INDEPENDENT_GAP_TEST';
+     const blocked=item.owner_assignment_status===
+      'EMPLOYEE_INQUIRY_BLOCKED_NEEDS_SOURCE_PROOF';
+     const active=item.owner_assignment_status==='EMPLOYEE_INQUIRY_ACTIVELY_CLAIMED';
      card.append(make('p','rc-cap-investigation-stage',
       item.independent_current_gap_proven&&item.existing_original_work_id?
-       'Independently proven existing original · Governed queue: '+
-       (item.existing_governance_phase||'Readback required')+
-       ' · No new execution authorization':
-       'Employee investigation planned · Independent current-gap test required before any executable job'));
+       'Existing original independently qualified · Governed execution permission must still be checked':
+      done?'Source investigation recorded · Independent CURRENT internal-gap verification required':
+      blocked?'Investigation blocked · '+(item.inquiry_block_reason||'Provider proof is unavailable'):
+      active?'Investigation claimed · Working toward durable receipt, not completed':
+       'Investigation scheduled · No employee execution receipt yet'));
+     if(done){
+      card.append(make('p','rc-cap-investigation-receipt',
+       'Investigation receipt: '+item.inquiry_receipt_sha256));
+      card.append(make('p','',
+       'Next independent action: '+(item.inquiry_next_evidence_action||'Verify current internal capability gap')));
+     }
     }
     const details=make('details','rc-cap-proof');
     details.append(make('summary','','Evidence and next independent proof'));
     if(scoped){
+     if(item.inquiry_question)details.append(make('p','','Employee question: '+item.inquiry_question));
+     if(item.inquiry_findings)details.append(make('p','','Investigation findings (model assessment, not independent internal gap proof): '+item.inquiry_findings));
+     if(item.inquiry_source_kind)details.append(make('p','','Source proof class: '+item.inquiry_source_kind));
      details.append(make('p','','Assigned investigation: '+item.investigation_scope));
      details.append(make('p','',
       'Independent verification requirement: '+item.independent_test_requirement));
