@@ -668,3 +668,69 @@ test('owner readback SQL joins exact incident, owner, shift and source reviewer 
  assert.match(sql,/r\.receipt_sha256/);
  assert.doesNotMatch(sql,/cron\.schedule\(|cron\.alter_job/);
 });
+
+test('signed shift diagnoses missing original business-job qualification despite source-evidence completions',async()=>{
+ const sourceRef='https://github.com/maloney2323/Reality/pull/308';
+ const auditedClaim={...claim,kind:'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
+  failed_source_ref:sourceRef,qualified_job_id:null,
+  error_summary:'Signed employee evidence exists while original owner business-job claims remain zero.',
+  source_claim_id:'55555555-6666-4777-8888-999999999999'};
+ const f=fixture({claimed:auditedClaim});
+ let observed=null,sourceReads=0;
+ const result=await investigateOneSignedShiftContinuityIncident({
+  db,env,shiftId:shift,call:f.call,
+  readSource:async ref=>{
+   assert.equal(ref,sourceRef);sourceReads++;
+   return {source_ref:sourceRef,
+    provider_proof_sha256:hash('c'),
+    checked_at:'2026-11-17T22:32:00Z',
+    provider_updated_at:'2026-11-17T22:29:00Z',
+    source_title:'Current source',source_body:'Untrusted source data'};
+  },
+  invokeModel:async payload=>{
+   observed=JSON.parse(payload.input[1].content[0].text);
+   return modelResponse();
+  },
+  fetchImpl:async()=>{throw Error('NO_EXTERNAL_PROVIDER')},
+  rolesBuilder:()=>({roles})
+ });
+ assert.equal(sourceReads,1);
+ assert.equal(observed.kind,'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED');
+ assert.equal(observed.independent_current_source_readback.status,
+  'CURRENT_SOURCE_READBACK_VERIFIED');
+ assert.equal(observed.failed_job.source_ref,sourceRef);
+ assert.equal(result.status,'SHIFT_CONTINUITY_INVESTIGATION_RECORDED');
+ assert.equal(result.original_job_created,false);
+ assert.equal(result.installation_authorized,false);
+ assert.equal(result.self_repair_proven,false);
+});
+test('source-less or forged qualification failure never gets a model inquiry',async()=>{
+ for(const invalid of [
+  {...claim,kind:'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'},
+  {...claim,kind:'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
+   source_claim_id:'invalid',failed_source_ref:'https://github.com/maloney2323/Reality/pull/308'},
+  {...claim,kind:'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
+   failed_source_ref:'https://example.com/not-a-signed-source'}
+ ]){
+  const f=fixture({claimed:invalid});
+  await assert.rejects(investigateOneSignedShiftContinuityIncident({
+   db,env,shiftId:shift,call:f.call,
+   invokeModel:async()=>{throw Error('UNAUTHORIZED_MODEL')},
+   fetchImpl:async()=>{throw Error('UNAUTHORIZED_FETCH')},rolesBuilder:()=>({roles})
+  }),/SHIFT_CONTINUITY_SOURCE_BOUND_INCIDENT_LEASE_UNVERIFIED/);
+  assert.equal(f.calls.length,1);
+ }
+});
+test('qualification watchdog counts ORIGINAL claims not evidence-only jobs',()=>{
+ const migration=readFileSync(new URL(
+  '../supabase/migrations/20261117_original_business_work_handoff_stall_observer_v8.sql',
+  import.meta.url),'utf8');
+ assert.match(migration,/reality_internal\.governed_employee_original_claims_v1 original/);
+ assert.match(migration,/NO_ORIGINAL_JOB_CLAIMS/);
+ assert.match(migration,/sample_claim/);
+ assert.match(migration,/i\.finished_at>sh\.authorized_at/);
+ assert.match(migration,/t\.claim_id=i\.source_claim_id and t\.owner_id=i\.owner_id/);
+ assert.doesNotMatch(migration,/not exists\(\s*select 1 from reality_internal\.owner_qualified_employee_evidence_jobs_v1/);
+ assert.doesNotMatch(migration,/insert into reality_internal\.governed_employee_original_claims_v1/i);
+ assert.doesNotMatch(migration,/cron\.alter_job|cron\.schedule\(/i);
+});
