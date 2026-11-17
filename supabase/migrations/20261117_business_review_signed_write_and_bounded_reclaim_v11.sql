@@ -130,7 +130,7 @@ begin
   'original_job_completed',false,'installation_authorized',false,
   'production_changed',false);end if;
  claim:=gen_random_uuid();
- insert into reality_internal.shift_business_qualification_reviews_v1(
+ insert into reality_internal.shift_business_qualification_reviews_v1 as current_review(
   incident_id,owner_id,shift_id,source_claim_id,claim_id,worker_run_id,
   reviewer,reviewer_function_id,source_ref,prior_source_sha256,
   investigation_receipt_sha256)
@@ -144,9 +144,9 @@ begin
   reviewer_function_id=excluded.reviewer_function_id,
   claimed_at=clock_timestamp(),completed_at=null,
   status='REVIEW_CLAIMED',review_attempts=2,retry_after=null
- where reality_internal.shift_business_qualification_reviews_v1.status='PROVIDER_PROOF_UNAVAILABLE'
-  and reality_internal.shift_business_qualification_reviews_v1.review_attempts=1
-  and reality_internal.shift_business_qualification_reviews_v1.retry_after<=clock_timestamp();
+ where current_review.status='PROVIDER_PROOF_UNAVAILABLE'
+  and current_review.review_attempts=1
+  and current_review.retry_after<=clock_timestamp();
  get diagnostics affected=row_count;
  if affected<>1 then return pg_catalog.jsonb_build_object(
   'status','NO_SIGNED_BUSINESS_QUALIFICATION_REVIEW_READY',
