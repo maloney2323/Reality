@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {projectOwnerIncidentChatBriefing}
+ from '../src/reality-owner-operational-incident-chat-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../src/reality-automatic-qualified-evidence-worker-v1.js';
 const owner='11111111-2222-4333-8444-555555555555';
@@ -158,6 +160,67 @@ test('source changes are not independently verified as a successful original job
  });
  assert.equal(x.evidence_job_independently_completed,false);
  assert.equal(x.status,'QUALIFIED_SOURCE_EVIDENCE_SOURCE_CHANGED_NO_COMPLETION');
+});
+test('owner Chat shows a true qualified executable job and independent proof without calling it a customer repair',()=>{
+ const work={
+  status:'OWNER_SOURCE_QUALIFIED_EMPLOYEE_WORK_READ_ONLY',
+  owner_id:owner,owner_scope_verified:true,read_only:true,
+  installation_authorized_by_read:false,
+  original_customer_job_completed_by_read:false,production_changed:false,
+  counts:{total:2,qualified_executable:1,executing:0,
+   pending_independent_verification:0,independently_completed:1,blocked:0},
+  items:[{
+   job_id:job,shift_id:shift,employee:'Casey',
+   source_ref:ref,job_type:'CURRENT_SOURCE_EVIDENCE_PACK',
+   phase:'COMPLETED_INDEPENDENTLY_VERIFIED',
+   objective:'Independently recheck real code source evidence without approving external changes.',
+   qualification_receipt_sha256:digest('a'),
+   deliverable_receipt_sha256:digest('b'),
+   independent_receipt_sha256:digest('c'),
+   execution_worker_run_id:execRun,review_worker_run_id:reviewRun,
+   verified_at:'2026-11-17T16:29:01Z',
+   deliverable:{source_title:'Evidence report - ready',
+    next_evidence_required:'Authenticate the owner and run final acceptance.'},
+   evidence_job_completed:true,original_customer_job_completed:false,
+   code_repair_installed:false,production_changed:false
+  },{
+   job_id:'88888888-9999-4aaa-8bbb-cccccccccccc',
+   shift_id:shift,employee:'Riley',source_ref:ref,
+   job_type:'CURRENT_SOURCE_EVIDENCE_PACK',
+   phase:'QUALIFIED_EXECUTABLE',
+   objective:'Read the current provider source and prepare an immutable independent evidence pack.',
+   qualification_receipt_sha256:digest('d'),
+   deliverable_receipt_sha256:null,independent_receipt_sha256:null,
+   execution_worker_run_id:null,review_worker_run_id:null,
+   verified_at:null,deliverable:null,evidence_job_completed:false,
+   original_customer_job_completed:false,
+   code_repair_installed:false,production_changed:false
+  }]
+ };
+ const legacy={
+  status:'OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY',
+  owner_id:owner,owner_scope_verified:true,read_only:true,
+  execution_authorized_by_read:false,installation_authorized:false,
+  production_changed:false,scheduler_dispatch_success_not_worker_proof:true,
+  autonomous_self_repair_proven:false,incident_count:0,
+  next_action:'Continue the current shift.',last_scheduler_status:'succeeded',
+  incidents:[]
+ };
+ const info=projectOwnerIncidentChatBriefing({
+  ownerId:owner,source:legacy,qualifiedWork:work
+ });
+ assert.equal(info.qualified_employee_evidence_work.counts.total,2);
+ assert.equal(info.qualified_employee_evidence_work.items[0].evidence_job_completed,true);
+ assert.equal(info.qualified_employee_evidence_work.items[0].original_customer_job_completed,false);
+ assert.ok(info.qualified_employee_evidence_work.items[0].followup_proof_still_required);
+ for(const bad of [
+  {...work,owner_id:shift},
+  {...work,counts:{...work.counts,total:3}},
+  {...work,items:[{...work.items[0],review_worker_run_id:execRun}]},
+  {...work,items:[{...work.items[0],original_customer_job_completed:true}]}
+ ])assert.throws(()=>projectOwnerIncidentChatBriefing({
+  ownerId:owner,source:legacy,qualifiedWork:bad
+ }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
 });
 test('qualification engine is dynamic, signed, time bounded and does not grant code installation',()=>{
  const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
