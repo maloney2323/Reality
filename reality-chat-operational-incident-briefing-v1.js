@@ -37,6 +37,22 @@
   const d=new Date(s);return Number.isFinite(d.getTime())?
    d.toLocaleString():'time not verified';
  };
+ const makeHandoffText=item=>{
+  const status=item?.governed_original_handoff_status;
+  if(!status||status==='HANDOFF_READBACK_UNAVAILABLE')
+   return 'Governed original handoff: not yet verified. No repair permission is inferred.';
+  const display={
+   UNASSESSED:'Checking current evidence and existing original authority',
+   RECOVERED_PREVIOUSLY_NO_REPLAY:'Previously recovered · no duplicate repair',
+   WAITING_FOR_CURRENT_INDEPENDENT_FAILURE:'Verify the worker has truly recovered before taking another action',
+   ORIGINAL_WARRANT_AND_FROZEN_PROOF_REQUIRED:'Blocked · current independent failure and exact original authorization required',
+   EXISTING_ORIGINAL_RECOVERY_ELIGIBLE:'Existing authorized original found · eligible for guarded continuation',
+   EXISTING_ORIGINAL_RECOVERY_CLAIMED:'Exact original recovery claim is in progress',
+   EXISTING_ORIGINAL_OBLIGATION_PRESERVED:'Original recovery obligation preserved · existing governor controls further execution',
+   ORIGINAL_RECOVERY_PROOF_FAILED_NEEDS_REVIEW:'Blocked · independent original recovery proof failed'
+  }[status];
+  return 'Governed original handoff: '+(display||'Unverified');
+ };
  const render=(item)=>{
   const card=node('article','rx-owner-incident');
   const heading=node('strong','','Reality detected an operational issue');
@@ -50,7 +66,10 @@
    ' · Independent review: '+(item.independent_reviewer||'not yet assigned'));
   const findings=node('p','',item.outcome);
   const next=node('p','rx-owner-incident-next','Next: '+item.next_action);
-  card.append(heading,status,observed,investigation,findings,next);
+  card.append(heading,status,observed,investigation,findings);
+  const handoffText=makeHandoffText(item);
+  if(handoffText)card.append(node('p','rx-owner-incident-handoff',handoffText));
+  card.append(next);
   if(item.operational_continuity_verified&&item.operational_recovery_receipt_sha256){
    card.append(node('p','rx-owner-incident-proof',
     'Independent operational continuity receipt: '+
