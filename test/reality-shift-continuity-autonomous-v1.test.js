@@ -237,6 +237,62 @@ test('same-source signed worker resumption is recorded without claiming a code s
   }]}
  }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
 });
+test('independent CI and exact install authority is a read-only, source-bound gate in owner Chat',()=>{
+ const gate={
+  status:'OWNER_SHIFT_REPAIR_INSTALL_GATES_READ_ONLY',
+  owner_id:owner,owner_scope_verified:true,read_only:true,count:1,
+  new_original_job_created:false,installation_authorized_by_read:false,
+  production_changed:false,new_self_repair_proven:false,
+  items:[{
+   incident_id:incident,shift_id:shift,
+   incident_evidence_sha256:hash('a'),
+   gate_status:'EXACT_ORIGINAL_REPAIR_WARRANT_REQUIRED',
+   stalled_source_ref:null,
+   authorized_original_work_id:null,current_completion_warrant:false,
+   independent_ci_run_id:null,candidate_commit_sha:null,
+   candidate_artifact_sha256:null,integration_ci_run_id:null,
+   previous_exact_approval_receipt_id:null,
+   previous_installed_commit_sha:null,original_final_receipt_id:null,
+   next_action:'No exact original job is authorized for this source-backed incident.',
+   read_only:true,new_job_authorized:false,
+   installation_authorized_by_read:false,
+   production_changed:false,new_self_repair_proven:false
+  }]
+ };
+ const b=projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,continuity:readback,repairGates:gate
+ });
+ assert.equal(b.shift_continuity_incidents[0].exact_code_repair_install_gate.status,
+  'EXACT_ORIGINAL_REPAIR_WARRANT_REQUIRED');
+ assert.equal(b.exact_repair_install_gate_count,1);
+ assert.equal(b.installation_authorized,false);
+ const universe=incidentChatUniverseObservations(b);
+ assert.match(universe[0].summary,/EXACT_ORIGINAL_REPAIR_WARRANT_REQUIRED/);
+ assert.equal(universe[0].self_repair_proven,false);
+ for(const forged of [
+  {...gate,owner_id:shift},
+  {...gate,installation_authorized_by_read:true},
+  {...gate,items:[{...gate.items[0],installation_authorized_by_read:true}]},
+  {...gate,items:[{...gate.items[0],incident_evidence_sha256:hash('f')}]},
+  {...gate,items:[{...gate.items[0],candidate_commit_sha:'INVALID'}]}
+ ]){
+  assert.throws(()=>projectOwnerIncidentChatBriefing({
+   ownerId:owner,source,continuity:readback,repairGates:forged
+  }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
+ }
+ const code=readFileSync(new URL(
+  '../supabase/migrations/20261117_shift_incident_exact_repair_install_readiness_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(code,/governed_employee_completion_warrants_v1/);
+ assert.match(code,/governed_original_install_reviews_v1/);
+ assert.match(code,/riley_same_original_recovery_attempts_v2/);
+ assert.match(code,/w.state='ACTIVE'/);
+ assert.match(code,/e.ci_conclusion<>'success'/);
+ assert.match(code,/OWNER_EXACT_TESTED_ARTIFACT_APPROVAL_REQUIRED/);
+ assert.match(code,/EXACT_OWNER_APPROVED_INSTALL_CONTINUATION_ELIGIBLE/);
+ assert.match(code,/installation_authorized_by_read',false/);
+ assert.doesNotMatch(code,/cron\\.schedule\\(/);
+});
 test('watchdog, worker and Chat use existing signed infrastructure and no new authority',()=>{
  const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const schema=read('supabase/migrations/20261117_owner_shift_continuity_stall_incidents_v1.sql');
