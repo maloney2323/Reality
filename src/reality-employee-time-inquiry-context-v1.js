@@ -47,7 +47,9 @@ export function projectRealityEmployeeTimeInquiryContext({
   !['NEEDS_CURRENT_VALIDATION','HISTORICAL_REVALIDATION_REQUIRED',
    'SETTLED_NO_REPLAY'].includes(x.disposition)||
   typeof x.title!=='string'||!x.title.trim()||x.title.length>240||
-  typeof x.source_ref!=='string'||x.source_ref.length>1024||
+  typeof x.source_family!=='string'||!x.source_family.trim()||
+  typeof x.source_ref!=='string'||!x.source_ref.trim()||
+  x.source_ref.length>1024||
   !HASH.test(x.evidence_sha256||'')||
   x.qualified_job!==false||x.execution_authorized!==false))
   fail('UNTRUSTED_SOURCE_ITEM');
