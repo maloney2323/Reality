@@ -26,7 +26,7 @@ test('Connection inventory is authenticated, owner-scoped and read-only',()=>{
  assert.match(api,/authenticatedChatSession\(req,res\)/);
  assert.match(api,/VERCEL_ENV!=='preview'/);
  assert.match(api,/REALITY_CONNECTION_SETUP_EXPLICIT_OWNER_SCOPE_REQUIRED/);
- assert.match(api,/origin!=='https:\/\/'+host/);
+ assert.ok(api.includes("origin!=='https://'+host"));
  assert.match(api,/reality_request_owner_connector_setup_v1/);
  assert.match(api,/reality_read_owner_connector_setup_v1/);
  assert.match(api,/!\['GET','POST'\]\.includes\(req\.method\)/);
