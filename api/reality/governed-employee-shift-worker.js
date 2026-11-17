@@ -241,7 +241,7 @@ export default async function handler(req,res){
    operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'&&
    scheduledCapabilityInquiryResult.status===
     'NO_STANDING_SCHEDULED_CAPABILITY_INQUIRY_DUE'&&
-   capabilityScheduleResult.status=
+   capabilityScheduleResult.status===
     'NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'?
     await runOneStandingEmployeeDiscovery({
      db,env:process.env,fetchImpl:fetch
