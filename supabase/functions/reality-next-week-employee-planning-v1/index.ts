@@ -27,7 +27,8 @@ async function rpc(name:string,args:Record<string,unknown>,
   'reality_store_next_week_source_snapshot_v1',
   'reality_read_next_week_source_snapshot_v1',
   'reality_read_current_shift_execution_graph_v1',
-  'reality_refresh_employee_discovery_v1']);
+  'reality_refresh_employee_discovery_v1',
+  'reality_record_employee_pr_discovery_v1']);
  if(!allowed.has(name))deny('SERVICE_RPC_NOT_ALLOWED');
  const r=await fetch(env.url+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -38,7 +39,8 @@ async function rpc(name:string,args:Record<string,unknown>,
  if(!r.ok||!x||Array.isArray(x)||typeof x!=='object'){
   const phase=name==='reality_authenticate_employee_shift_wake_v1'?'AUTH':
    name==='reality_store_next_week_source_snapshot_v1'?'STORE':
-   name==='reality_refresh_employee_discovery_v1'?'EMPLOYEE_DISCOVERY':'READ';
+   name==='reality_refresh_employee_discovery_v1'?'EMPLOYEE_DISCOVERY':
+   name==='reality_record_employee_pr_discovery_v1'?'EMPLOYEE_PR_SCOPE':'READ';
   // Only stable RPC stage, HTTP code and PostgREST error class; no tokens,
   // raw provider responses or user data ever appear in logs.
   const errorClass=typeof x?.code==='string'&&/^[A-Z0-9_]{3,10}$/.test(x.code)?
@@ -95,6 +97,48 @@ async function githubOpenIssues(){
  }
  if(!complete)deny('SOURCE_PAGINATION_NOT_COMPLETE');
  return out.sort((a,b)=>a.issue_number-b.issue_number);
+}
+
+// Cross-functional employees investigate EXISTING open PR evidence.
+// This is source observation, not merge/release authority or qualified work.
+async function githubOpenPullRequests(){
+ const found=new Set<number>();
+ const out:Array<{
+  number:number;html_url:string;title:string;state:'open';
+  draft:boolean;updated_at:string
+ }>=[];
+ let complete=false;
+ for(let page=1;page<=3;page++){
+  const url='https://api.github.com/repos/'+REPO+
+   '/pulls?state=open&per_page=100&page='+page;
+  const r=await fetch(url,{
+   method:'GET',cache:'no-store',redirect:'error',
+   headers:{accept:'application/vnd.github+json',
+    'user-agent':'Reality-Employee-PR-Discovery-v1',
+    'x-github-api-version':'2022-11-28'},
+   signal:AbortSignal.timeout(12000)});
+  if(!r.ok)deny('GITHUB_PR_SOURCE_READBACK_UNAVAILABLE');
+  const list=await r.json().catch(()=>null);
+  if(!Array.isArray(list)||list.length>100)deny('GITHUB_PR_PAGE_INVALID');
+  for(const pr of list){
+   if(pr?.state!=='open'||!Number.isSafeInteger(pr.number)||
+    pr.number<1||pr.number>99999999||
+    pr.html_url!=='https://github.com/'+REPO+'/pull/'+pr.number||
+    typeof pr.title!=='string'||!pr.title.trim()||
+    pr.title.length>220||typeof pr.draft!=='boolean'||
+    typeof pr.updated_at!=='string'||
+    !/^20\d{2}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\dZ$/.test(
+     pr.updated_at)||found.has(pr.number))
+    deny('GITHUB_PR_SOURCE_IDENTITY_UNVERIFIED');
+   found.add(pr.number);
+   out.push({number:pr.number,html_url:pr.html_url,title:pr.title,
+    state:'open',draft:pr.draft,updated_at:pr.updated_at});
+   if(out.length>180)deny('GITHUB_PR_DISCOVERY_LIMIT');
+  }
+  if(list.length<100){complete=true;break}
+ }
+ if(!complete)deny('GITHUB_PR_PAGINATION_INCOMPLETE');
+ return out.sort((a,b)=>a.number-b.number);
 }
 
 // Automatic SOURCE qualification happens INSIDE the scheduled provider audit,
@@ -181,6 +225,9 @@ Deno.serve(async req=>{
    auth.production_changed!==false)
    return response(403,{ok:false,status:'NEXT_WEEK_WAKE_AUTH_FAILED',...facts});
   const now=new Date(),weekStart=nextMonday(now);
+  // An unavailable PR provider must not erase the verified GitHub issue
+  // inventory. Separate failure evidence from a successful scheduled scan.
+  const prPromise=githubOpenPullRequests().catch(()=>null);
   const rawIssues=await githubOpenIssues();
   let graph:Record<string,unknown>|null=null;
   try{
@@ -234,6 +281,30 @@ Deno.serve(async req=>{
    discovery.installation_authorized!==false||
    discovery.production_changed!==false)
    deny('EMPLOYEE_DISCOVERY_READBACK_UNVERIFIED');
+  const prs=await prPromise;
+  let prDiscoveryStatus='GITHUB_PR_DISCOVERY_UNAVAILABLE_NO_WORK_INFERRED';
+  let prLenses=0;
+  if(prs){
+   const prDigest=await sha256(JSON.stringify(prs));
+   const saved=await rpc('reality_record_employee_pr_discovery_v1',{
+    p_scan_id:discovery.scan_id,p_source_sha256:prDigest,
+    p_prs:prs},env).catch(()=>null);
+   if(saved?.status==='EMPLOYEE_PR_ROLE_INVESTIGATIONS_SAVED'&&
+    saved.scan_id===discovery.scan_id&&
+    saved.provider_open_prs_inspected===prs.length&&
+    saved.owners_scanned===discovery.owners_scanned&&
+    Number.isSafeInteger(saved.owner_role_lenses_saved)&&
+    saved.owner_role_lenses_saved>=0&&
+    saved.owner_role_lenses_saved<=40*discovery.owners_scanned&&
+    saved.qualified_jobs_created===0&&
+    saved.shift_authorized===false&&
+    saved.installation_authorized===false&&
+    saved.production_changed===false&&
+    saved.billing_connection_modified===false){
+    prDiscoveryStatus=saved.status;
+    prLenses=saved.owner_role_lenses_saved;
+   }
+  }
   return response(200,{ok:true,
    status:'NEXT_WEEK_SOURCE_SNAPSHOT_INDEPENDENTLY_READ_BACK',
    week_start:weekStart,
@@ -249,6 +320,9 @@ Deno.serve(async req=>{
    employee_discovery_status:discovery.status,
    employee_discovery_scan_id:discovery.scan_id,
    employee_roles_scanned:8*discovery.owners_scanned,
+   cross_functional_pr_discovery_status:prDiscoveryStatus,
+   role_specific_pr_investigations_saved:prLenses,
+   billing_connection_modified:false,
    qualified_executable_originals_created:0,
    ...facts});
  }catch(e){
