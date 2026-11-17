@@ -7,7 +7,9 @@ const trigger='11111111-1111-4111-8111-111111111111';
 const event='22222222-2222-4222-8222-222222222222';
 const work='work:'+'a'.repeat(32);
 const env={VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw',
- REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:'isolated-preview-only-test-token-abcdefghijklmnopqrstuvwxyz'};
+ REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:'isolated-preview-only-test-token-abcdefghijklmnopqrstuvwxyz',
+ VERCEL_GIT_COMMIT_REF:'reality/chat-direct-work-handoff-20261115',
+ VERCEL_GIT_COMMIT_SHA:'a'.repeat(40)};
 const path='reality-genuine-triggers/'+trigger+'.json';
 const original=JSON.stringify({trigger_id:trigger,source_event_id:event,original_work_id:work},null,2)+'\n';
 function mock({existing=false,tamper=false}={}){
@@ -17,7 +19,7 @@ function mock({existing=false,tamper=false}={}){
   const pathInfo=new URL(url).pathname;
   calls.push({path:pathInfo,method:options.method,body:options.body});
   let body,status=200;
-  if(pathInfo.endsWith('/git/ref/heads/feature/reality-general-capability-engine-20261101')){
+  if(pathInfo.endsWith('/git/ref/heads/reality/chat-direct-work-handoff-20261115')){
    body={object:{sha:base}};
   }else if(pathInfo.includes('/contents/reality-genuine-triggers/')){
    if(options.method==='PUT'){
@@ -42,7 +44,7 @@ test('real source-bound gap performs exactly one isolated GitHub wake write',asy
  const writes=m.calls.filter(c=>c.method==='PUT');
  assert.equal(writes.length,1);
  const submitted=JSON.parse(writes[0].body);
- assert.equal(submitted.branch,'feature/reality-general-capability-engine-20261101');
+ assert.equal(submitted.branch,env.VERCEL_GIT_COMMIT_REF);
  assert.equal(Buffer.from(submitted.content,'base64').toString('utf8'),original);
 });
 test('identical existing wake is idempotent; changed source fails closed',async()=>{
@@ -77,9 +79,11 @@ test('no production, missing credential, unrelated work, or forged scope can wak
 test('source-bound wake targets full governed pipeline, not inert inspection',()=>{
  const full=readFileSync(new URL('../.github/workflows/reality-genuine-capability-auto-trigger-v1.yml',import.meta.url),'utf8');
  const wake=readFileSync(new URL('../src/reality-genuine-capability-github-wakeup-v1.js',import.meta.url),'utf8');
- assert.ok(wake.includes("const BRANCH='feature/reality-general-capability-engine-20261101';"));
+ assert.ok(wake.includes('isSignedRealityCapabilityPreviewRef'));
+ assert.ok(wake.includes('CURRENT_SIGNED_PREVIEW_HEAD_MISMATCH_NO_STALE_WAKE'));
  assert.ok(wake.includes('reality-genuine-capability-auto-trigger-v1.yml'));
- assert.ok(full.includes('branches: [feature/reality-general-capability-engine-20261101]'));
+ assert.ok(full.includes("- 'reality/**'"));
+ assert.ok(full.includes("- 'reality-genuine-triggers/**'"));
  for(const required of [
   'Signed automatic owner-evidence admission',
   'Reconcile signed original frozen failure',
@@ -106,6 +110,8 @@ const scoped={trigger_id:trigger,source_event_id:event,original_work_id:work,
  shift_id:shiftId,source_ref:issue,source_proof_sha256:sourceProof,
  db:isolatedDb,
  env:{VERCEL_ENV:'preview',
+  VERCEL_GIT_COMMIT_REF:'reality/chat-direct-work-handoff-20261115',
+  VERCEL_GIT_COMMIT_SHA:'a'.repeat(40),
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'hvkfreoagbrphwghjajw'}
 };
 test('existing service-authenticated Supabase broker replaces a separate preview GitHub token',async()=>{
@@ -131,7 +137,9 @@ test('existing service-authenticated Supabase broker replaces a separate preview
  assert.equal(calls[0].options.method,'POST');
  assert.deepEqual(JSON.parse(calls[0].options.body),{
   shift_id:shiftId,original_work_id:work,trigger_id:trigger,
-  source_ref:issue,source_proof_sha256:sourceProof});
+  source_ref:issue,source_proof_sha256:sourceProof,
+  base_branch:scoped.env.VERCEL_GIT_COMMIT_REF,
+  base_sha:scoped.env.VERCEL_GIT_COMMIT_SHA});
  assert.equal(calls[0].options.headers.apikey,isolatedDb.secretKey);
  assert.equal(calls[0].options.headers.authorization,
   'Bearer '+isolatedDb.secretKey);
