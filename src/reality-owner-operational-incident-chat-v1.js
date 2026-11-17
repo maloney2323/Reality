@@ -362,6 +362,25 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
       !x.assigned_employee||!x.independent_reviewer||
       x.assigned_employee===x.independent_reviewer)))
     fail();
+   const sourceReview=x.independent_source_review||null;
+   if(sourceReview!==null&&(
+    !['SOURCE_CHANGED_NEEDS_FROZEN_TEST',
+      'SOURCE_MATCHED_NEEDS_FROZEN_TEST'].includes(sourceReview.status)||
+    sourceReview.reviewer!==x.independent_reviewer||
+    !UUID.test(sourceReview.worker_run_id||'')||
+    !HASH.test(sourceReview.prior_source_sha256||'')||
+    !HASH.test(sourceReview.current_source_sha256||'')||
+    !HASH.test(sourceReview.receipt_sha256||'')||
+    !validDate(sourceReview.verified_at)||
+    sourceReview.original_job_completed!==false||
+    sourceReview.repair_executed!==false||
+    sourceReview.installation_authorized!==false||
+    sourceReview.production_changed!==false||
+    (sourceReview.status==='SOURCE_CHANGED_NEEDS_FROZEN_TEST'&&
+     sourceReview.prior_source_sha256===sourceReview.current_source_sha256)||
+    (sourceReview.status==='SOURCE_MATCHED_NEEDS_FROZEN_TEST'&&
+     sourceReview.prior_source_sha256!==sourceReview.current_source_sha256)
+   ))fail();
    const exactGate=gateByIncident.get(x.incident_id)||null;
    if(exactGate&&(exactGate.shift_id!==x.shift_id||
     exactGate.incident_evidence_sha256!==x.evidence_sha256))fail();
@@ -379,6 +398,19 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     proposed_upgrade:trim(x.proposed_upgrade,1600)||null,
     independent_test_requirement:trim(x.independent_test_requirement,1600)||null,
     investigation_receipt_sha256:x.investigation_receipt_sha256,
+    independent_source_review:sourceReview?Object.freeze({
+     status:sourceReview.status,reviewer:sourceReview.reviewer,
+     worker_run_id:sourceReview.worker_run_id,
+     prior_source_sha256:sourceReview.prior_source_sha256,
+     current_source_sha256:sourceReview.current_source_sha256,
+     receipt_sha256:sourceReview.receipt_sha256,
+     verified_at:sourceReview.verified_at,
+     source_change_independently_verified:
+      sourceReview.status==='SOURCE_CHANGED_NEEDS_FROZEN_TEST',
+     independent_repair_test_completed:false,
+     original_customer_job_completed:false,
+     installation_authorized:false,production_changed:false
+    }):null,
     work_resumption_verified:x.phase==='RECOVERED_AFTER_OBSERVATION',
     independent_resumption_receipt_sha256:
      x.phase==='RECOVERED_AFTER_OBSERVATION'?
