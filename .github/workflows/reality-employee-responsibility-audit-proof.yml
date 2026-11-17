@@ -4,6 +4,8 @@ on:
     branches: [reality/native263-temporal-chat-proof-20261113, reality/chat-direct-work-handoff-20261115]
     paths:
       - src/reality-employee-responsibility-audit-v1.js
+      - src/reality-employee-time-inquiry-context-v1.js
+      - api/reality/personal-time-horizon.js
       - src/reality-governed-shift-boundary-v1.js
       - api/reality/personal-employee-work-audit.js
       - api/reality/personal-employee-roster.js
@@ -11,6 +13,8 @@ on:
       - reality-employee-work-audit-ui-v1.js
       - index.html
       - test/reality-employee-responsibility-audit-v1.test.js
+      - test/reality-employee-time-inquiry-context-v1.test.js
+      - test/reality-past-present-future-time-map-v1.test.js
       - test/reality-home-live-employees-v1.test.js
       - src/reality-active-weekly-source-investigator-v1.js
       - api/reality/governed-employee-shift-worker.js
@@ -32,6 +36,8 @@ jobs:
       - name: Syntax check the new owner audit boundary and Home buttons
         run: |
           node --check src/reality-employee-responsibility-audit-v1.js
+          node --check src/reality-employee-time-inquiry-context-v1.js
+          node --check api/reality/personal-time-horizon.js
           node --check api/reality/personal-employee-work-audit.js
           node --check reality-employee-work-audit-ui-v1.js
           node --check src/reality-active-weekly-source-investigator-v1.js
@@ -40,7 +46,7 @@ jobs:
           node --check reality-home-employee-brief-v1.js
       - name: Run the actual isolated employee-audit acceptance tests
         run: |
-          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js
+          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js test/reality-employee-time-inquiry-context-v1.test.js test/reality-past-present-future-time-map-v1.test.js
       - name: No new shift, installation or production effect
         run: |
           echo 'Read-only responsibility audit proof; no secrets or provider mutations'
