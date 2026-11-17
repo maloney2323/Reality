@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {scheduleOneStandingOperationalRecovery}
  from '../src/reality-capability-role-schedule-worker-v1.js';
-import {projectOwnerCapabilityWorkspace}
+import {projectOwnerCapabilityWorkspace as project}
  from '../api/reality/personal-capabilities.js';
 const owner='11111111-2222-4333-8444-555555555555';
 const id='22222222-3333-4444-8555-666666666666';
