@@ -586,6 +586,9 @@ test('fourth attempt with unverified or missing remediation proof cannot reach t
    remediation_receipt_sha256:hash('f'),remediation_ci_run_id:44151280693},
   {...claim,investigation_attempt:4,remediation_release_commit:'a'.repeat(40),
    remediation_receipt_sha256:hash('f')},
+  {...claim,investigation_attempt:4,remediation_release_commit:'a'.repeat(40),
+   remediation_receipt_sha256:hash('f'),remediation_ci_run_id:44151280693,
+   failure_history:[{attempt:1,failure_reason:'MODEL_PROOF_UNAVAILABLE'}]},
   {...claim,investigation_attempt:5}
  ]){
   const f=fixture({claimed:bad});
