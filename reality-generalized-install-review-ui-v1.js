@@ -136,6 +136,12 @@ async function approveRecoveryFromUserClick(){
     d.approval_recorded===true&&UUID.test(d.approval_id||'')&&
     d.no_third_confirmation===true&&d.original_job_completed===false){
    status.textContent='Exact one-use recovery approved. Reality will publish the same verified original repair and independently verify the original job. The receipt is not complete yet.';
+  }else if(response.status===409&&
+      d?.status==='EXACT_RECOVERY_APPROVAL_NOT_RECORDED'&&
+      d.recovery_publication_id===r.recovery_publication_id&&
+      d.approval_recorded===false&&d.original_job_completed===false&&
+      d.production_changed===false){
+   status.textContent='Reality verified that this recovery approval was NOT recorded. No installation was authorized. Reopen the current Chat preview and review the exact decision again; this page will not retry automatically.';
   }else{
    status.textContent='Recovery approval readback is uncertain. Inspect the saved owner receipt; do not approve again.';
   }
