@@ -5,12 +5,14 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {buildRealityProposedEmployeeRoleDiscussionContext}
+ from '../../src/reality-employee-identity-roster-v1.js';
 export const maxDuration=45;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const kinds=new Set(['RESEARCH_OPPORTUNITY','INDEPENDENTLY_TESTED_CANDIDATE',
  'FROZEN_UNBOUND_SOURCE','VERIFIED_SOURCE_CANDIDATE']);
 const actions=new Set(['ENABLE_ROUTINE_DISCOVERY','PAUSE_ROUTINE_DISCOVERY']);
-export function projectOwnerCapabilityWorkspace({ownerId,feed,grant}={}){
+export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule}={}){
  if(!UUID.test(ownerId||'')||
   feed?.status!=='OWNER_GAP_INTAKE_RECONCILED'||
   feed.ok!==true||feed.owner_id!==ownerId||
@@ -31,6 +33,61 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant}={}){
   grant.shift_execution_authorized!==false||
   grant.production_changed!==false)
   throw Error('CAPABILITIES_OWNER_SOURCE_OR_DELEGATION_NOT_VERIFIED');
+ const trustedSchedule=schedule||{
+  status:'OWNER_CAPABILITY_EMPLOYEE_SCHEDULE_READ_ONLY',
+  owner_id:ownerId,owner_scope_verified:true,read_only:true,
+  count:0,items:[],new_original_jobs_created:0,
+  execution_authorized_by_schedule:false,
+  installation_authorized:false,production_changed:false
+ };
+ if(trustedSchedule.status!=='OWNER_CAPABILITY_EMPLOYEE_SCHEDULE_READ_ONLY'||
+   trustedSchedule.owner_id!==ownerId||
+   trustedSchedule.owner_scope_verified!==true||
+   trustedSchedule.read_only!==true||
+   trustedSchedule.execution_authorized_by_schedule!==false||
+   trustedSchedule.new_original_jobs_created!==0||
+   trustedSchedule.installation_authorized!==false||
+   trustedSchedule.production_changed!==false||
+   !Array.isArray(trustedSchedule.items)||
+   trustedSchedule.items.length>50||
+   trustedSchedule.count!==trustedSchedule.items.length)
+  throw Error('CAPABILITY_SCHEDULE_OWNER_READBACK_UNVERIFIED');
+ const validRoles=new Map(
+  buildRealityProposedEmployeeRoleDiscussionContext({observedAt:new Date()})
+   .roles.map(x=>[x.function_id,x]));
+ const assignments=new Map();
+ for(const entry of trustedSchedule.items){
+  if(typeof entry.capability_key!=='string'||!entry.capability_key||
+     !/^[a-f0-9]{64}$/.test(entry.evidence_fingerprint||'')||
+     !['CLAIMED_FOR_ROLE_TRIAGE',
+       'INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF',
+       'BLOCKED_UNVERIFIED'].includes(entry.phase)||
+     entry.execution_authorized_by_schedule!==false||
+     entry.original_job_created_by_schedule!==false||
+     entry.installation_authorized!==false||
+     entry.estimate_is_model_provisional_only!==true||
+     typeof entry.independent_current_gap_proven!=='boolean'||
+     (entry.independent_current_gap_proven===true&&
+      !/^work:[a-f0-9]{32}$/.test(entry.existing_original_work_id||'')))
+   throw Error('CAPABILITY_SCHEDULE_PROOF_OR_PHASE_UNVERIFIED');
+  if(entry.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&(
+     !validRoles.has(entry.function_id)||
+     !validRoles.has(entry.reviewer_function_id)||
+     entry.function_id===entry.reviewer_function_id||
+     validRoles.get(entry.function_id).employee_name!==entry.employee||
+     validRoles.get(entry.reviewer_function_id).employee_name!==entry.reviewer||
+     !Number.isSafeInteger(entry.estimate_minutes_low)||
+     !Number.isSafeInteger(entry.estimate_minutes_high)||
+     entry.estimate_minutes_low<15||
+     entry.estimate_minutes_high>2880||
+     entry.estimate_minutes_low>entry.estimate_minutes_high||
+     !Number.isFinite(Date.parse(entry.planned_inquiry_at||''))))
+   throw Error('CAPABILITY_SCHEDULE_EMPLOYEE_ESTIMATE_UNVERIFIED');
+  if(!assignments.has(entry.capability_key)||
+   Date.parse(entry.assigned_at||'1970-01-01')>
+    Date.parse(assignments.get(entry.capability_key).assigned_at||'1970-01-01'))
+   assignments.set(entry.capability_key,entry);
+ }
  const seen=new Set();
  const items=feed.items.map(x=>{
   if(!kinds.has(x?.kind)||
@@ -42,6 +99,8 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant}={}){
    (x.source_url!=null&&!/^https:\/\//.test(x.source_url)))
    throw Error('CAPABILITY_UNVERIFIED_OR_DUPLICATE');
   seen.add(x.key);
+  const active=assignments.get(x.key)||null;
+  const ready=active?.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF';
   return Object.freeze({
    key:x.key,title:x.title,kind:x.kind,
    stage:typeof x.stage==='string'?x.stage:'UNVERIFIED',
@@ -51,10 +110,27 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant}={}){
     x.potential_value.slice(0,500):null,
    last_seen_at:x.last_seen_at||null,
    source_url:x.source_url||null,
-   assigned_employee:null,
-   owner_assignment_status:'AWAITING_EMPLOYEE_OWNED_QUALIFICATION',
-   estimated_hours:null,
-   estimate_confidence:'NOT_SCOPED_NO_FABRICATED_HOURS',
+   assigned_employee:ready?active.employee:null,
+   reviewing_employee:ready?active.reviewer:null,
+   owner_assignment_status:ready?
+     'EMPLOYEE_INQUIRY_SCHEDULED_AWAITING_INDEPENDENT_GAP_TEST':
+     active?.phase||'AWAITING_EMPLOYEE_OWNED_QUALIFICATION',
+   planned_inquiry_at:ready?active.planned_inquiry_at:null,
+   investigation_scope:ready?active.scope:null,
+   independent_test_requirement:ready?active.independent_test_requirement:null,
+   source_limitations:ready?active.source_limitations:null,
+   estimated_hours:ready?
+    {low:active.estimate_minutes_low/60,
+     high:active.estimate_minutes_high/60}:null,
+   estimate_confidence:ready?
+    'MODEL_PLANNING_RANGE_NOT_INDEPENDENTLY_VERIFIED':
+    'NOT_SCOPED_NO_FABRICATED_HOURS',
+   independent_current_gap_proven:ready?
+    active.independent_current_gap_proven:false,
+   existing_original_work_id:ready?
+    active.existing_original_work_id||null:null,
+   existing_governance_phase:ready?
+    active.existing_governance_phase||null:null,
    executable_job:false,
    execution_authorized:false,
    installation_authorized:false
@@ -69,6 +145,10 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant}={}){
   active_capability_queue:feed.counts.governed_active_queue,
   independently_tested_candidates:feed.counts.independently_tested_candidates,
   items:Object.freeze(items),
+  scheduled_capability_investigations:items.filter(
+   x=>x.assigned_employee!==null).length,
+  existing_independently_proven_originals:items.filter(
+   x=>x.independent_current_gap_proven===true).length,
   standing_delegation:Object.freeze({
    enabled:grant.enabled===true,active:grant.currently_active===true,
    scope:grant.scope,expires_at:grant.expires_at,
@@ -132,16 +212,19 @@ export default async function handler(req,res){
     execution_authorized:false,installation_authorized:false,
     production_changed:false});
   }
-  const [feed,grant]=await Promise.all([
+  const [feed,grant,schedule]=await Promise.all([
    shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
     p_owner_id:session.user_id
    }),
    shiftRpc(db,'reality_read_owner_routine_delegation_v1',{
     p_owner_id:session.user_id
+   }),
+   shiftRpc(db,'reality_read_owner_capability_employee_schedule_v1',{
+    p_owner_id:session.user_id
    })
   ]);
   return res.status(200).json({ok:true,
-   ...projectOwnerCapabilityWorkspace({ownerId:session.user_id,feed,grant})});
+   ...projectOwnerCapabilityWorkspace({ownerId:session.user_id,feed,grant,schedule})});
  }catch{
   return res.status(503).json({ok:false,
    error:'OWNER_CAPABILITIES_OR_DELEGATION_PROOF_UNAVAILABLE',
