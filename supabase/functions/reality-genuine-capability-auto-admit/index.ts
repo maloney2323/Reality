@@ -6,9 +6,12 @@
 const PROJECT='hvkfreoagbrphwghjajw';
 const REPO='maloney2323/Reality';
 const SIGNED_PREVIEW_REF=/^refs\/heads\/reality\/[a-z0-9][a-z0-9_/-]{8,109}$/;
+const APPROVED_PREVIEW_BRANCH=Deno.env.get('REALITY_CAPABILITY_PREVIEW_BRANCH')||
+ 'reality/chat-direct-work-handoff-20261115';
 const HISTORICAL_BRANCH='refs/heads/feature/reality-general-capability-engine-20261101';
 const signedPreviewRef=(v:unknown)=>typeof v==='string'&&
- SIGNED_PREVIEW_REF.test(v)&&!v.includes('//')&&!v.endsWith('/')&&
+ SIGNED_PREVIEW_REF.test(v)&&v==='refs/heads/'+APPROVED_PREVIEW_BRANCH&&
+ !v.includes('//')&&!v.endsWith('/')&&
  !v.split('/').includes('main')&&!v.split('/').includes('production');
 const validHistoricalRef=(v:unknown)=>signedPreviewRef(v)||v===HISTORICAL_BRANCH;
 const WORKFLOW='.github/workflows/reality-genuine-capability-auto-trigger-v1.yml';
