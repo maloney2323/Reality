@@ -211,7 +211,7 @@ BEGIN
    and t.inquiry_recorded_at>a.repair_applied_at
    and t.inquiry_recorded_at<=clock_timestamp()
    and t.inquiry_source_kind='GITHUB_ISSUE_INDEPENDENT_READBACK'
-   and t.inquiry_source_proof_sha256 ~ '^sha256:[a-f0-9]{64}
+   and t.inquiry_source_proof_sha256 ~ '^sha256:[a-f0-9]{64}$'
    and t.inquiry_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
    and t.inquiry_model_response_id ~ '^resp_[A-Za-z0-9_-]{4,160}$'
   order by t.inquiry_recorded_at limit 1;
@@ -233,28 +233,3 @@ BEGIN
  end loop;
  return 'PREVIEW_WORKER_REPAIR_INDEPENDENT_RESUMPTIONS_VERIFIED_'||verified_count;
 end $fn$;
-
-
-   and t.inquiry_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
-   and t.inquiry_model_response_id ~ '^resp_[A-Za-z0-9_-]{4,160}$'
-  order by t.inquiry_recorded_at limit 1;
-  if not found then
-   update reality_internal.preview_worker_auto_repairs_v1
-   set phase='WORKER_ATTESTED_AWAITING_ORIGINAL',
-    worker_run_id=actual.run_id,last_checked_at=clock_timestamp()
-   where repair_id=a.repair_id;
-   continue;
-  end if;
-  update reality_internal.preview_worker_auto_repairs_v1
-  set phase='INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED',
-   worker_run_id=actual.run_id,
-   original_capability_claim_id=original.claim_id,
-   original_work_receipt_sha256=original.inquiry_receipt_sha256,
-   verified_at=clock_timestamp(),last_checked_at=clock_timestamp()
-  where repair_id=a.repair_id;
-  verified_count:=verified_count+1;
- end loop;
- return 'PREVIEW_WORKER_REPAIR_INDEPENDENT_RESUMPTIONS_VERIFIED_'||verified_count;
-end $fn$;
-
-
