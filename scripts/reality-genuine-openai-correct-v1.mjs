@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Reality's own OpenAI model corrects a failing candidate using an independent
 // GitHub sandbox artifact from the SAME workflow run. The model can only propose.
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
@@ -11,7 +13,7 @@ const deny=x=>{throw Error('GENUINE_OPENAI_CORRECTION_'+x)};
 const hash=x=>createHash('sha256').update(x).digest('hex');
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  deny('PINNED_ISOLATED_WORKFLOW_REQUIRED');
 const proposal=JSON.parse(readFileSync(
  'previous/genuine-capability-model-proposal.json','utf8'));
