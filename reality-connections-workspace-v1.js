@@ -19,16 +19,33 @@
  state.setAttribute('aria-live','polite');
  const signinLink=create('a','rx-connection-signin','Sign in to Reality');
  signinLink.href='/';
- const check=create('button','rx-connection-refresh','Check connections');
+ const check=create('button','rx-connection-refresh','Auto-detect existing sources');
  check.type='button';
  head.append(state,signinLink,check);section.append(head);
+ const catalogTools=create('div','rx-connection-catalog-tools');
+ const browse=create('button','rx-connection-browse','Browse all apps');
+ browse.type='button';browse.setAttribute('aria-expanded','false');
+ const searchLabel=create('label','rx-connection-search-label','Find an app');
+ const search=create('input','rx-connection-search');
+ search.type='search';search.placeholder='Search PayPal, sales, field services…';
+ search.setAttribute('aria-label','Search available business app integrations');
+ searchLabel.append(search);
+ const groups=create('select','rx-connection-group-filter');
+ groups.setAttribute('aria-label','Filter connections by business category');
+ catalogTools.append(browse,searchLabel,groups);section.append(catalogTools);
  const grid=create('div','rx-connections-grid');section.append(grid);
  root.append(section);
- let loading=false,epoch=0;
+ let loading=false,epoch=0,requestBusy=false,allSources=[],showAll=false;
  const labels=new Set(['GitHub','Supabase','Vercel','Stripe','Gmail',
-  'Google Calendar','QuickBooks','Slack']);
+  'Google Calendar','QuickBooks','Slack','PayPal','Square','Shopify',
+  'Google Drive','Microsoft 365','Notion','HubSpot','Mailchimp',
+  'Xero','Zoom','Meta Business','Google Analytics','Asana','Trello',
+  'Jobber','Housecall Pro','ServiceTitan','Airtable']);
  const ids=new Set(['github','supabase','vercel','stripe','gmail',
-  'google-calendar','quickbooks','slack']);
+  'google-calendar','quickbooks','slack','paypal','square','shopify',
+  'google-drive','microsoft-365','notion','hubspot','mailchimp',
+  'xero','zoom','meta-business','google-analytics','asana','trello',
+  'jobber','housecall-pro','servicetitan','airtable']);
  const statuses=new Set([
   'OWNER_DATABASE_READBACK_VERIFIED',
   'GITHUB_PUBLIC_SOURCE_OBSERVED_NO_OAUTH_CLAIM',
@@ -38,13 +55,19 @@
  ]);
  const icon=id=>({
   github:'⌘',supabase:'▦',vercel:'△',stripe:'$',gmail:'✉',
-  'google-calendar':'▣',quickbooks:'◈',slack:'♧'
+  'google-calendar':'▣',quickbooks:'◈',slack:'♧',
+  paypal:'P',square:'▣',shopify:'▤','google-drive':'◇',
+  'microsoft-365':'▦',notion:'N',hubspot:'◉',mailchimp:'✉',
+  xero:'◈',zoom:'◉','meta-business':'M',
+  'google-analytics':'▥',asana:'☷',trello:'▦',
+  jobber:'⌂','housecall-pro':'⌂',servicetitan:'⚙',airtable:'▦'
  })[id]||'◦';
  const ownerSigned=()=>ready?.style.display==='block';
  function clear(message){
-  epoch++;grid.replaceChildren();
+  epoch++;allSources=[];grid.replaceChildren();
   state.textContent=message;
   signinLink.hidden=ownerSigned();check.hidden=!ownerSigned();
+  catalogTools.hidden=!ownerSigned();
  }
  function valid(d){
   if(d?.ok!==true||
@@ -55,8 +78,12 @@
    d.owner_billing_authorized!==false||
    d.external_execution_authorized!==false||
    d.source_work_items_not_jobs!==true||
-   !Array.isArray(d.providers)||d.providers.length!==8||
-   new Set(d.providers.map(x=>x.id)).size!==8||
+   !Array.isArray(d.providers)||d.providers.length!==26||
+   new Set(d.providers.map(x=>x.id)).size!==26||
+   !Number.isSafeInteger(d.setup_requests_pending)||
+   d.setup_requests_pending<0||d.setup_requests_pending>26||
+   d.automatic_discovery_of_existing_sources!==true||
+   d.automatic_grant_of_new_provider_access!==false||
    !d.providers.every(x=>
     ids.has(x.id)&&labels.has(x.label)&&
     typeof x.description==='string'&&x.description.length>12&&
@@ -72,6 +99,16 @@
     x.refunds_authorized===false&&
     x.billing_changes_authorized===false&&
     x.connection_action_available===false&&
+    x.setup_request_action_available===true&&
+    typeof x.setup_requested==='boolean'&&
+    x.setup_request_state===(x.setup_requested?
+     'SETUP_REQUESTED_NO_CREDENTIALS':'NOT_REQUESTED')&&
+    typeof x.auto_detect_supported==='boolean'&&
+    (x.documented_setup_url===null||
+     (x.id==='paypal'&&x.documented_setup_url===
+      'https://developer.paypal.com/api/rest/')||
+     (x.id==='stripe'&&x.documented_setup_url===
+      'https://docs.stripe.com/connect'))&&
     typeof x.adapter_registered==='boolean'&&
     typeof x.credential_configured==='boolean'&&
     typeof x.discovery_source_verified==='boolean'))
@@ -116,6 +153,24 @@
     'This provider needs a Reality-owned OAuth or restricted-token integration. ChatGPT connections do not transfer to Reality.');
   details.append(summary,perm,employee,advice);
   card.append(details);
+  if(!accessible&&!observed){
+   const actions=create('div','rx-connection-setup-actions');
+   const request=create('button','rx-connection-request',
+    source.setup_requested?'Setup requested':'Request secure setup');
+   request.type='button';
+   request.disabled=source.setup_requested;
+   request.setAttribute('aria-label',
+    'Request secure Reality connection setup for '+source.label);
+   request.addEventListener('click',()=>{void requestSetup(source.id)});
+   actions.append(request);
+   if(source.documented_setup_url){
+    const docs=create('a','rx-connection-docs','Provider setup guide');
+    docs.href=source.documented_setup_url;
+    docs.target='_blank';docs.rel='noopener noreferrer';
+    actions.append(docs);
+   }
+   card.append(actions);
+  }
   const foot=create('div','rx-connection-footer');
   foot.append(create('span','','No account changes · no payment authority'));
   if(!accessible&&!observed){
@@ -125,6 +180,60 @@
   }
   card.append(foot);return card;
  }
+ function render(){
+  grid.replaceChildren();
+  if(!allSources.length)return;
+  const q=search.value.trim().toLocaleLowerCase().slice(0,100);
+  const group=groups.value;
+  const defaultIds=new Set(['github','supabase','vercel','stripe',
+   'paypal','gmail','google-calendar','quickbooks','slack']);
+  const visible=allSources.filter(x=>
+   (showAll||q||group!=='All'||defaultIds.has(x.id))&&
+   (group==='All'||x.group===group)&&
+   (!q||[x.label,x.description,x.group,...x.employee_roles].join(' ')
+    .toLocaleLowerCase().includes(q)));
+  grid.append(...visible.map(showCard));
+  if(!visible.length)grid.append(create('p','rx-connection-empty',
+   'No matching apps. Try another category or a broader search.'));
+  browse.textContent=showAll?'Show essential apps':'Browse all apps ('+
+   allSources.length+')';
+  browse.setAttribute('aria-expanded',String(showAll));
+ }
+ async function requestSetup(providerId){
+  if(requestBusy||!ownerSigned()||!ids.has(providerId))return;
+  requestBusy=true;
+  state.textContent='Recording owner-requested setup for '+
+   (allSources.find(x=>x.id===providerId)?.label||'this app')+'…';
+  try{
+   const response=await fetch('/api/reality/personal-connections',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({provider_id:providerId}),
+    signal:AbortSignal.timeout(15000)});
+   const result=await response.json().catch(()=>null);
+   if(!ownerSigned()||response.status!==202||result?.ok!==true||
+    result.status!=='OWNER_CONNECTION_SETUP_REQUEST_RECORDED'||
+    result.provider_id!==providerId||
+    result.setup_state!=='SETUP_REQUESTED_NO_CREDENTIALS'||
+    result.actual_provider_connected!==false||
+    result.oauth_consent_granted!==false||
+    result.credentials_saved!==false||
+    result.payment_action_authorized!==false||
+    result.external_execution_authorized!==false)
+    throw Error('REALITY_SETUP_NOT_INDEPENDENTLY_RECORDED');
+   state.textContent='Setup requested. Reality has NOT accessed this provider or received account permissions.';
+   // Never convert request state to connection state without an owner readback.
+   await load();
+  }catch{
+   if(ownerSigned())state.textContent=
+    'Setup request not verified. No provider permission or connection was granted.';
+  }finally{requestBusy=false}
+ }
+ browse.addEventListener('click',()=>{
+  showAll=!showAll;render();
+ });
+ search.addEventListener('input',()=>{if(search.value.trim())showAll=true;render()});
+ groups.addEventListener('change',()=>{if(groups.value!=='All')showAll=true;render()});
  async function load(){
   if(!ownerSigned()){
    clear('Sign in to Reality to inspect your business connections.');
@@ -132,7 +241,7 @@
   }
   if(loading)return;
   loading=true;const thisLoad=++epoch;
-  signinLink.hidden=true;check.hidden=false;
+  signinLink.hidden=true;check.hidden=false;catalogTools.hidden=false;
   grid.replaceChildren();
   check.disabled=true;state.textContent='Checking Reality-owned connection evidence…';
   try{
@@ -146,13 +255,21 @@
     return;
    }
    if(!response.ok||!valid(data))throw Error('OWNER_CONNECTIONS_UNVERIFIED');
-   grid.append(...data.providers.map(showCard));
+   allSources=data.providers;
+   const previousGroup=groups.value||'All';
+   groups.replaceChildren();
+   for(const name of ['All',...new Set(allSources.map(x=>x.group))]){
+    const option=create('option','',name);
+    option.value=name;groups.append(option);
+   }
+   groups.value=[...groups.options].some(x=>x.value===previousGroup)?
+    previousGroup:'All';
+   render();
    const verified=data.providers.filter(x=>x.discovery_source_verified).length;
    state.textContent=verified+
-    ' Reality source readbacks observed · '+
-    (data.providers.length-verified)+
-    ' services still need connection verification or setup. '+
-    'Connector permission never implies automatic execution authority.';
+    ' Reality source readbacks · '+data.providers.length+
+    ' apps in catalog · '+data.setup_requests_pending+
+    ' setup requests saved. Auto-detection checks existing sources; new account access still requires permission.';
   }catch{
    if(thisLoad===epoch&&ownerSigned())
     clear('Connection status could not be verified. No apps are claimed connected.');
