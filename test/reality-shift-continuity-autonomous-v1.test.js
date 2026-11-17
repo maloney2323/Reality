@@ -513,3 +513,40 @@ test('legacy provider models are not passed unsupported reasoning options',async
  assert.equal(Object.hasOwn(modelRequest,'reasoning'),false);
  assert.equal(result.status,'SHIFT_CONTINUITY_INVESTIGATION_RECORDED');
 });
+
+test('signed model failure receipts preserve the exact failed validation gate',async()=>{
+ const cases=[
+  ['MODEL_RESPONSE_INCOMPLETE',{status:'incomplete',id:'resp_test_model_incomplete'}],
+  ['MODEL_RESPONSE_ID_MISSING',{status:'completed',id:'invalid',output_text:JSON.stringify(proposal)}],
+  ['MODEL_JSON_UNVERIFIED',{status:'completed',id:'resp_test_invalid_json',output_text:'not json'}],
+  ['MODEL_SCHEMA_INVALID',modelResponse({...proposal,production_changed:true})],
+  ['MODEL_REVIEWER_UNVERIFIED',modelResponse({...proposal,
+   reviewer_function_id:'diagnose_engineering'})],
+  ['MODEL_TEXT_BOUNDS_UNVERIFIED',modelResponse({...proposal,diagnosis:'short'})]
+ ];
+ for(const [expected,response] of cases){
+  const f=fixture();
+  const result=await investigateOneSignedShiftContinuityIncident({
+   db,env,shiftId:shift,call:f.call,invokeModel:async()=>response,
+   fetchImpl:async()=>{throw Error('NO_PROVIDER')},rolesBuilder:()=>({roles})
+  });
+  assert.equal(result.status,'SHIFT_CONTINUITY_INVESTIGATION_BLOCKED');
+  assert.equal(result.failure_reason,expected);
+  assert.equal(f.calls.at(-1).args.p_reason,expected);
+  assert.equal(result.original_job_created,false);
+  assert.equal(result.installation_authorized,false);
+  assert.equal(result.self_repair_proven,false);
+ }
+});
+test('output diagnostics remain bounded and do not reset the exhausted lease or mint an original',()=>{
+ const migration=readFileSync(new URL(
+  '../supabase/migrations/20261117_shift_continuity_model_output_diagnostics_v4.sql',
+  import.meta.url),'utf8');
+ assert.match(migration,/MODEL_RESPONSE_INCOMPLETE/);
+ assert.match(migration,/MODEL_TEXT_BOUNDS_UNVERIFIED/);
+ assert.match(migration,/MODEL_REVIEWER_UNVERIFIED/);
+ assert.match(migration,/current_user<>'service_role'/);
+ assert.doesNotMatch(migration,/investigation_attempts\s*=/);
+ assert.doesNotMatch(migration,/cron\.schedule\(/);
+ assert.doesNotMatch(migration,/grant execute[^;]+to (anon|authenticated)/is);
+});
