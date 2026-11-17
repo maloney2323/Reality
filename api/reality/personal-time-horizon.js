@@ -99,6 +99,41 @@ function futureDiscoveryProjection(value,now){
   observations_are_not_authorized_work:true,
   owner_can_review_at:'/employees'};
 }
+
+// Shared owner-scoped readback for Home and employee inquiry context.
+// This reads existing ledgers; it cannot qualify, approve, create or dispatch work.
+export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now=Date.now()}={}){
+ if(!UUID.test(ownerId||'')||!db||!Number.isFinite(now))
+  throw Error('REALITY_TIME_OWNER_READ_INPUT_UNVERIFIED');
+  const checks=await Promise.allSettled([
+   call(db,'reality_read_owner_final_receipts_v1',
+    {p_owner_id:ownerId}),
+   call(db,'reality_read_owner_employee_shifts_v1',
+    {p_owner_id:ownerId}),
+   call(db,'reality_read_owner_employee_discovery_v1',
+    {p_owner_id:ownerId})
+  ]);
+  const past=checks[0].status==='fulfilled'?
+   pastReceiptProjection(checks[0].value):null;
+  const present=checks[1].status==='fulfilled'?
+   presentShiftProjection(checks[1].value,now):null;
+  const potential=checks[2].status==='fulfilled'&&
+   checks[2].value?.owner_id===ownerId?
+   futureDiscoveryProjection(checks[2].value,now):null;
+  // Each horizon can fail independently; never represent missing evidence as
+  // zero jobs, zero receipts, a completed task, or a fresh plan.
+  return Object.freeze({
+   ok:true,status:'REALITY_OWNER_TIME_HORIZON_READ_ONLY',
+   owner_scope_verified:true,read_only:true,
+   checked_at:new Date(now).toISOString(),
+   past:past||{status:'PAST_RECEIPTS_NOT_VERIFIED'},
+   present:present||{status:'PRESENT_SHIFT_NOT_VERIFIED'},
+   future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
+   approved_new_work_by_read:false,shift_started_by_read:false,
+   deployment_changed_by_read:false,billing_changed_by_read:false,
+   new_jobs_created_by_read:0,verified_cash_savings_usd:null
+  });
+}
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  res.setHeader('X-Content-Type-Options','nosniff');
@@ -114,35 +149,10 @@ export default async function handler(req,res){
   const db=shiftDatabase(process.env);
   if(db.url!==session.config?.url)
    return res.status(403).json({ok:false,error:'REALITY_TIME_PROJECT_MISMATCH'});
-  const checks=await Promise.allSettled([
-   shiftRpc(db,'reality_read_owner_final_receipts_v1',
-    {p_owner_id:session.user_id}),
-   shiftRpc(db,'reality_read_owner_employee_shifts_v1',
-    {p_owner_id:session.user_id}),
-   shiftRpc(db,'reality_read_owner_employee_discovery_v1',
-    {p_owner_id:session.user_id})
-  ]);
-  const now=Date.now();
-  const past=checks[0].status==='fulfilled'?
-   pastReceiptProjection(checks[0].value):null;
-  const present=checks[1].status==='fulfilled'?
-   presentShiftProjection(checks[1].value,now):null;
-  const potential=checks[2].status==='fulfilled'&&
-   checks[2].value?.owner_id===session.user_id?
-   futureDiscoveryProjection(checks[2].value,now):null;
-  // Each horizon can fail independently; never represent missing evidence as
-  // zero jobs, zero receipts, a completed task, or a fresh plan.
-  return res.status(200).json({
-   ok:true,status:'REALITY_OWNER_TIME_HORIZON_READ_ONLY',
-   owner_scope_verified:true,read_only:true,
-   checked_at:new Date(now).toISOString(),
-   past:past||{status:'PAST_RECEIPTS_NOT_VERIFIED'},
-   present:present||{status:'PRESENT_SHIFT_NOT_VERIFIED'},
-   future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
-   approved_new_work_by_read:false,shift_started_by_read:false,
-   deployment_changed_by_read:false,billing_changed_by_read:false,
-   new_jobs_created_by_read:0,verified_cash_savings_usd:null
+  const data=await readOwnerTimeHorizonEvidence({
+   ownerId:session.user_id,db
   });
+  return res.status(200).json(data);
  }catch(e){
   console.warn('REALITY_TIME_OWNER_READBACK_UNAVAILABLE');
   return res.status(503).json({
