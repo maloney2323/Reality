@@ -51,7 +51,9 @@ test('broker independently verifies signed PREVIEW ref, SHA and source-bound own
  const broker=read('supabase/functions/reality-employee-capability-wake-broker-v1/index.ts');
  assert.match(broker,/base_branch,base_sha,original_work_id,shift_id/);
  assert.match(broker,/branch\.object\.sha!==request\.base_sha/);
- assert.match(broker,/SAFE_BRANCH\.test\(request\.base_branch/);
+ assert.match(broker,/SAFE_BRANCH\.test\(BRANCH/);
+ assert.match(broker,/signedScheduler=fields/);
+ assert.match(broker,/CURRENT_PREVIEW_BRANCH/);
  assert.match(broker,/reality_read_shift_capability_wake_v1/);
  assert.match(broker,/source_proof_sha256!==request\.source_proof_sha256/);
  assert.doesNotMatch(broker,/const BRANCH='feature\/reality-general-capability-engine-20261101'/);
