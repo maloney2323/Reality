@@ -199,8 +199,14 @@ export default async function handler(req,res){
     await advanceOneShiftContinuityIndependentReview({
      db,env:process.env,shiftId:wakeReceipt.shift_id,
      workerRunId:actualWorkerRunId,fetchImpl:fetch
-    }).catch(()=>({
+    }).catch(error=>({
      status:'CONTINUITY_INDEPENDENT_PROVIDER_REVIEW_UNVERIFIED',
+     failure_code:error?.message==='SHIFT_RPC_NOT_ALLOWLISTED'?
+      'SHARED_RPC_TRANSPORT_NOT_CONNECTED':
+      String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+       'SIGNED_DATABASE_RPC_UNAVAILABLE':
+       String(error?.message||'').startsWith('CONTINUITY_INDEPENDENT_REVIEW_')?
+        'SIGNED_REVIEW_PROOF_UNVERIFIED':'REVIEW_RUNTIME_UNVERIFIED',
      original_job_completed:false,repair_executed:false,
      installation_authorized:false,production_changed:false
     })):
