@@ -26,9 +26,14 @@ function panel(){
   add('h4',p,'Reality · your decision is needed');
   add('p',p).id='generalizedOriginalInstallReviewStatus';
   add('p',p).id='generalizedOriginalInstallRecoveryUpdate';
-  add('p',p).id='generalizedOriginalInstallReviewArtifact';
-  add('p',p).id='generalizedOriginalInstallReviewGates';
-  const links=add('p',p);links.id='generalizedOriginalInstallReviewEvidence';
+  // One concise conversation update comes first. Long source and CI proof
+  // stays available, but can no longer push the mobile decision or receipt
+  // out of the usable Chat viewport.
+  const proof=add('details',p);proof.id='generalizedOriginalInstallTechnicalDetails';
+  add('summary',proof,'View exact source, independent tests and release evidence');
+  add('p',proof).id='generalizedOriginalInstallReviewArtifact';
+  add('p',proof).id='generalizedOriginalInstallReviewGates';
+  const links=add('p',proof);links.id='generalizedOriginalInstallReviewEvidence';
   const approve=add('button',p,'Approve exact verified upgrade');
   approve.type='button';approve.hidden=true;
   approve.id='generalizedOriginalInstallApproveExactButton';
@@ -38,7 +43,7 @@ function panel(){
   recover.id='generalizedOriginalRecoveryApproveButton';
   recover.addEventListener('click',()=>approveRecoveryFromUserClick());
   add('p',p).id='generalizedOriginalInstallApprovalResult';
-  const warning=add('p',p,
+  const warning=add('p',proof,
    'Reality does not install a repair or settle an original job from a passing model answer or CI check. The exact owner approval must follow independent release-continuation readiness.');
   warning.style.fontSize='13px';
  }
@@ -84,6 +89,7 @@ function evidenceLink(parent,label,url){
  a.style.display='inline-block';a.style.marginRight='14px';
 }
 let busy=false,submitting=false,submitted=false,activeCard=null;
+let lastVisiblePhase=null;
 let recovering=false,recoverySubmitted=false,activeRecovery=null;
 function actionableRecovery(d){
  const p=d?.recovery_publication;
@@ -231,10 +237,18 @@ async function refresh(){
   recoverButton.hidden=!canRecover;recoverButton.disabled=!canRecover;
   activeRecovery=canRecover?d.recovery_publication:null;
   const issue=d.source_ref.split('/').at(-1);
-  p.querySelector('h4').textContent=d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'?
+  const completed=d.phase==='ORIGINAL_SETTLED'&&
+   d.original_job_completed===true&&
+   UUID.test(d.final_receipt_id||'')&&
+   SHA.test(d.installed_commit_sha||'')&&
+   d.roi_status==='NOT_MEASURED';
+  p.querySelector('h4').textContent=completed?
+    'Reality · original job completed':
+    d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'?
     'Reality · your decision is needed':'Reality · original repair progress';
-  get('generalizedOriginalInstallReviewStatus').textContent=
-    'Original job #'+issue+' · '+d.phase.replaceAll('_',' ')+
+  get('generalizedOriginalInstallReviewStatus').textContent=completed?
+   'Original job #'+issue+' · independently verified · final receipt saved':
+   'Original job #'+issue+' · '+d.phase.replaceAll('_',' ')+
     (d.original_job_completed?' · independently settled':
      ' · original job remains open');
   get('generalizedOriginalInstallReviewArtifact').textContent=
@@ -252,6 +266,10 @@ async function refresh(){
   const recoveryApproved=recovery?.phase==='OWNER_APPROVED'||
     recovery?.phase==='RECOVERY_WRITE_FENCED';
   get('generalizedOriginalInstallRecoveryUpdate').textContent=
+    completed?
+     'Reality completed the original customer job. Verified installed commit: '+
+     d.installed_commit_sha+'. Final receipt: '+d.final_receipt_id+
+     '. ROI: NOT MEASURED (no verified human time or cost baseline yet). No additional approval is needed.':
     reviewReady?
      'Reality · An independently tested recovery is ready for your exact decision. This is ONE additional isolated source write because the first approval was already consumed. Same original '+recovery.original_work_id+' · branch '+recovery.target_branch+' · source artifact '+recovery.candidate_artifact_sha256+' · independent recovery tests #'+recovery.independent_recovery_test_run_id+'. The original shift and customer job stay unchanged.':
     recoveryApproved?
@@ -280,6 +298,27 @@ async function refresh(){
    'https://github.com/maloney2323/Reality/actions/runs/'+d.independent_frozen_run_id);
   evidenceLink(links,'Integration tests',
    'https://github.com/maloney2323/Reality/actions/runs/'+d.integrated_test_run_id);
+  if(completed)
+   evidenceLink(links,'Installed source commit',
+    'https://github.com/maloney2323/Reality/commit/'+d.installed_commit_sha);
+  // Keep the existing conversation position except when the original job
+  // changes phase. Then reveal the beginning of this short, source-backed
+  // Reality update inside its own mobile scroller (not a floating overlay).
+  if(lastVisiblePhase!==d.phase){
+   const technical=get('generalizedOriginalInstallTechnicalDetails');
+   if(technical)technical.open=!!(canApprove||canRecover);
+   lastVisiblePhase=d.phase;
+   if(completed||d.phase==='OWNER_APPROVED'||
+       d.phase==='INSTALL_INTENT_FENCED'){
+    requestAnimationFrame(()=>{
+     const thread=get('privateTranscript');
+     if(!thread?.contains(p))return;
+     const top=p.getBoundingClientRect().top-
+      thread.getBoundingClientRect().top+thread.scrollTop;
+     thread.scrollTop=Math.max(0,top-8);
+    });
+   }
+  }
  }catch{if(p){p.hidden=false;get('generalizedOriginalInstallReviewStatus').textContent=
    'Owner verification readback unavailable; no installation approved.';}}
  finally{busy=false;}
