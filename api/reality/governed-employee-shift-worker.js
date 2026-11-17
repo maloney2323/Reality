@@ -94,6 +94,8 @@ import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
+import {generateOneEmployeeTemporalInquiry}
+ from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -685,6 +687,21 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
+  // existing employee discovery inventory. One bounded model inquiry at most
+  // per wake; the database singleflight prevents replay of unchanged sources.
+  // It only records source-backed investigation, never admits another job.
+  const employeeTemporalInquiryPromise=
+   unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+   /^[a-f0-9-]{36}$/i.test(unifiedGraph.owner_id||'')?
+    generateOneEmployeeTemporalInquiry({
+     ownerId:unifiedGraph.owner_id,db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({status:'EMPLOYEE_TIME_INQUIRY_UNVERIFIED',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false})):
+    Promise.resolve({status:'NO_CURRENT_SIGNED_SHIFT_FOR_EMPLOYEE_INQUIRY',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false});
   // The worker automatically reconciles native-repair and PR-review receipts
   // against the frozen owner warrant on every pulse. The status is merely
   // a truthful next-work diagnostic: never a new job or installation grant.
@@ -1345,6 +1362,7 @@ export default async function handler(req,res){
     throw Error('WORKER_COMPLETION_PULSE_UNVERIFIED');
    durableWorkerCompletion=completedPulse;
   }
+  const employeeTemporalInquiry=await employeeTemporalInquiryPromise;
   workerStage='WORKER_RESPONSE_PUBLICATION';
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
@@ -1354,6 +1372,7 @@ export default async function handler(req,res){
     integrated_work_intake:integratedWorkIntake,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
+    employee_time_inquiry_receipt:employeeTemporalInquiry,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
