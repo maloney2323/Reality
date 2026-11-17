@@ -169,10 +169,11 @@ test('the existing watchdog and signed worker are the ONLY trigger and execution
  const src=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
  const sql=src('supabase/migrations/20261117_incident_existing_original_governed_handoff_v1.sql');
  const worker=src('api/reality/governed-employee-shift-worker.js');
+ const originalBridge=src('src/reality-incident-existing-original-handoff-v1.js');
  const broker=src('src/reality-governed-shift-boundary-v1.js');
  const chat=src('src/reality-owner-operational-incident-chat-v1.js');
  assert.match(sql,/reconcile_incident_existing_original_handoff_v1/);
- assert.match(sql,/reality_commit_genuine_original_recovery_v1/);
+ assert.match(originalBridge,/reality_commit_genuine_original_recovery_v1/);
  assert.match(sql,/genuine_preview_install_approvals_v1/);
  assert.match(sql,/consumed_at is not null/);
  assert.match(sql,/independent_provider_readback_verified=true/);
