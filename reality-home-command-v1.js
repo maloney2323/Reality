@@ -96,6 +96,9 @@
  const main=el('div','rc-main-grid');
  const people=el('section','rc-workforce');
  people.append(head('AI WORKFORCE · OWNER-SCOPED ROLES','Your AI workforce'));
+ const discoverySummary=el('p','rc-discovery-summary',
+  'Checking source-backed discovery across all eight roles…');
+ people.append(discoverySummary);
  const capacity=el('p','rc-capacity',
   'Workload is evaluated against a hypothetical 40-hour-per-role reference, not actual scheduled employee hours.');
  const weekly=el('section','rc-weekly');
@@ -327,6 +330,33 @@
   }
   if(ordered.length>featured.length)weeklyRows.append(additional);
  }
+ if(typeof window.addEventListener==='function')
+  window.addEventListener('reality:employee-discovery-readback',event=>{
+   const d=event.detail;
+   if(!signed()||d?.status!=='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'||
+      d.read_only!==true||d.qualified_jobs!==0||
+      d.shift_authorized!==false||d.production_changed!==false||
+      !Array.isArray(d.roles)||d.roles.length!==8||
+      !Array.isArray(d.items)||d.items.length>150){
+    discoverySummary.textContent='Automatic employee discovery readback unavailable. No work or hours inferred.';
+    return;
+   }
+   const current=d.roles.reduce((n,r)=>n+r.candidate_source_count,0);
+   const historical=d.roles.reduce((n,r)=>n+r.historical_source_count,0);
+   const settled=d.roles.reduce((n,r)=>n+r.settled_source_count,0);
+   const noSource=d.roles.filter(r=>
+    r.coverage_state==='NO_CONNECTED_ROLE_SOURCE_EVIDENCE').length;
+   if(![current,historical,settled,noSource].every(Number.isSafeInteger)||
+      current+historical+settled!==d.items.length){
+    discoverySummary.textContent='Employee discovery counts unverified.';
+    return;
+   }
+   discoverySummary.textContent='Automatic discovery · '+
+    current+' current sources to investigate · '+
+    historical+' historical sources need refresh · '+
+    settled+' completed sources withheld · '+
+    noSource+' roles need connected evidence. No jobs authorized by discovery.';
+  });
  if(typeof window.addEventListener==='function')
   window.addEventListener('reality:weekly-workload-readback',event=>{
    const value=event.detail;
