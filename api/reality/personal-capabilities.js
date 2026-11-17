@@ -61,6 +61,9 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
      !/^[a-f0-9]{64}$/.test(entry.evidence_fingerprint||'')||
      !['CLAIMED_FOR_ROLE_TRIAGE',
        'INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF',
+       'INQUIRY_CLAIMED',
+       'INQUIRY_RECORDED_NEEDS_INDEPENDENT_GAP_PROOF',
+       'INQUIRY_BLOCKED_NEEDS_PROVIDER_PROOF',
        'BLOCKED_UNVERIFIED'].includes(entry.phase)||
      entry.execution_authorized_by_schedule!==false||
      entry.original_job_created_by_schedule!==false||
@@ -71,7 +74,9 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
      (entry.independent_current_gap_proven===true&&
       !/^work:[a-f0-9]{32}$/.test(entry.existing_original_work_id||'')))
    throw Error('CAPABILITY_SCHEDULE_PROOF_OR_PHASE_UNVERIFIED');
-  if(entry.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&(
+  if(['INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF',
+    'INQUIRY_CLAIMED','INQUIRY_RECORDED_NEEDS_INDEPENDENT_GAP_PROOF',
+    'INQUIRY_BLOCKED_NEEDS_PROVIDER_PROOF'].includes(entry.phase)&&(
      !validRoles.has(entry.function_id)||
      !validRoles.has(entry.reviewer_function_id)||
      entry.function_id===entry.reviewer_function_id||
@@ -84,6 +89,18 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
      entry.estimate_minutes_low>entry.estimate_minutes_high||
      !Number.isFinite(Date.parse(entry.planned_inquiry_at||''))))
    throw Error('CAPABILITY_SCHEDULE_EMPLOYEE_ESTIMATE_UNVERIFIED');
+  if(entry.phase==='INQUIRY_RECORDED_NEEDS_INDEPENDENT_GAP_PROOF'&&(
+     !/^sha256:[a-f0-9]{64}$/.test(entry.inquiry_receipt_sha256||'')||
+     !/^resp_[A-Za-z0-9_-]{4,160}$/.test(entry.inquiry_model_response_id||'')||
+     !['GITHUB_ISSUE_INDEPENDENT_READBACK',
+       'HISTORICAL_SOURCE_REQUIRES_CURRENT_PROVIDER_READBACK'].includes(
+        entry.inquiry_source_kind)||
+     (entry.inquiry_source_kind==='GITHUB_ISSUE_INDEPENDENT_READBACK'&&
+       !/^sha256:[a-f0-9]{64}$/.test(entry.inquiry_source_proof_sha256||''))||
+     typeof entry.inquiry_question!=='string'||
+     typeof entry.inquiry_findings!=='string'||
+     typeof entry.inquiry_next_evidence_action!=='string'))
+   throw Error('CAPABILITY_INQUIRY_RECEIPT_NOT_INDEPENDENTLY_BOUND');
   if(!assignments.has(entry.capability_key)||
    Date.parse(entry.assigned_at||'1970-01-01')>
     Date.parse(assignments.get(entry.capability_key).assigned_at||'1970-01-01'))
@@ -147,8 +164,15 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
    throw Error('CAPABILITY_UNVERIFIED_OR_DUPLICATE');
   seen.add(x.key);
   const active=assignments.get(x.key)||null;
-  const ready=active?.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&
-    active.source_feed_fingerprint_unchanged===true;
+  const activeWork=active&&[
+   'INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF',
+   'INQUIRY_CLAIMED',
+   'INQUIRY_RECORDED_NEEDS_INDEPENDENT_GAP_PROOF',
+   'INQUIRY_BLOCKED_NEEDS_PROVIDER_PROOF'
+  ].includes(active.phase);
+  const ready=activeWork&&active.source_feed_fingerprint_unchanged===true;
+  const performed=ready&&active.phase==='INQUIRY_RECORDED_NEEDS_INDEPENDENT_GAP_PROOF';
+  const blocked=ready&&active.phase==='INQUIRY_BLOCKED_NEEDS_PROVIDER_PROOF';
   return Object.freeze({
    key:x.key,title:x.title,kind:x.kind,
    stage:typeof x.stage==='string'?x.stage:'UNVERIFIED',
@@ -161,7 +185,10 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
    assigned_employee:ready?active.employee:null,
    reviewing_employee:ready?active.reviewer:null,
    owner_assignment_status:ready?
-     'EMPLOYEE_INQUIRY_SCHEDULED_AWAITING_INDEPENDENT_GAP_TEST':
+     (performed?'EMPLOYEE_INQUIRY_RECORDED_AWAITING_INDEPENDENT_GAP_TEST':
+      blocked?'EMPLOYEE_INQUIRY_BLOCKED_NEEDS_SOURCE_PROOF':
+      active.phase==='INQUIRY_CLAIMED'?'EMPLOYEE_INQUIRY_ACTIVELY_CLAIMED':
+      'EMPLOYEE_INQUIRY_SCHEDULED_AWAITING_INDEPENDENT_GAP_TEST'):
      active?.phase||'AWAITING_EMPLOYEE_OWNED_QUALIFICATION',
    planned_inquiry_at:ready?active.planned_inquiry_at:null,
    investigation_scope:ready?active.scope:null,
@@ -173,6 +200,13 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
    estimate_confidence:ready?
     'MODEL_PLANNING_RANGE_NOT_INDEPENDENTLY_VERIFIED':
     'NOT_SCOPED_NO_FABRICATED_HOURS',
+   inquiry_receipt_sha256:performed?active.inquiry_receipt_sha256:null,
+   inquiry_source_kind:performed?active.inquiry_source_kind:null,
+   inquiry_recorded_at:performed?active.inquiry_recorded_at:null,
+   inquiry_question:performed?active.inquiry_question:null,
+   inquiry_findings:performed?active.inquiry_findings:null,
+   inquiry_next_evidence_action:performed?active.inquiry_next_evidence_action:null,
+   inquiry_block_reason:blocked?active.inquiry_block_reason:null,
    independent_current_gap_proven:ready?
     active.independent_current_gap_proven:false,
    existing_original_work_id:ready?
@@ -195,6 +229,10 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,wor
   items:Object.freeze(items),
   scheduled_capability_investigations:items.filter(
    x=>x.assigned_employee!==null).length,
+  performed_capability_investigations:items.filter(
+   x=>x.inquiry_receipt_sha256!==null).length,
+  blocked_capability_investigations:items.filter(
+   x=>x.owner_assignment_status==='EMPLOYEE_INQUIRY_BLOCKED_NEEDS_SOURCE_PROOF').length,
   existing_independently_proven_originals:items.filter(
    x=>x.independent_current_gap_proven===true).length,
   worker_progress:Object.freeze({
