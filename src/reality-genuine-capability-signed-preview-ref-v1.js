@@ -1,12 +1,14 @@
 // Signed GitHub Actions identity for the active Reality isolated preview.
 // This is not a production deploy, owner approval or source of job authority.
 // The owner goal, original-work and frozen-failure guards remain mandatory.
-const REF=/^refs\/heads\/reality\/[a-z0-9][a-z0-9_/-]{8,109}$/;
+// Pin the trusted signed preview deployment, not every writable reality/** branch.
+// Only a deployment authority update may change this trust root.
+export const REALITY_SIGNED_CAPABILITY_PREVIEW_BRANCH=
+ 'reality/chat-direct-work-handoff-20261115';
+const REF='refs/heads/'+REALITY_SIGNED_CAPABILITY_PREVIEW_BRANCH;
 const SHA=/^[a-f0-9]{40}$/;
 export function isSignedRealityCapabilityPreviewRef(ref){
- return typeof ref==='string'&&REF.test(ref)&&
-  !ref.includes('//')&&!ref.endsWith('/')&&
-  !ref.split('/').includes('main')&&!ref.split('/').includes('production');
+ return typeof ref==='string'&&ref===REF;
 }
 export function isSignedRealityCapabilityPush(env){
  return env?.GITHUB_ACTIONS==='true'&&
