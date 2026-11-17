@@ -112,6 +112,9 @@ export async function investigateOneSignedShiftContinuityIncident({
   !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'].includes(claim.kind)||
+  (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
+   (!UUID.test(claim.source_claim_id||'')||
+    !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
   claim.scope!=='SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY'||
   claim.model_inquiry_authorized!==true||
   claim.new_original_jobs_created!==0||
