@@ -478,3 +478,38 @@ test('missing model configuration and role directory failure have distinct safe 
   assert.equal(x.production_changed,false);
  }
 });
+
+test('configured GPT-5.4 performs bounded independent diagnosis with supported none reasoning',async()=>{
+ const f=fixture();
+ let observed=null;
+ const result=await investigateOneSignedShiftContinuityIncident({
+  db,env:{...env,REALITY_OPENAI_MODEL:'gpt-5.4'},shiftId:shift,
+  call:f.call,invokeModel:async payload=>{
+   observed=payload;
+   return modelResponse();
+  },rolesBuilder:()=>({roles}),
+  fetchImpl:async()=>{throw Error('MUST_NOT_USE_PROVIDER')}
+ });
+ assert.equal(observed.model,'gpt-5.4');
+ assert.deepEqual(observed.reasoning,{effort:'none'});
+ assert.equal(observed.tool_choice,'none');
+ assert.equal(observed.store,false);
+ assert.equal(result.status,'SHIFT_CONTINUITY_INVESTIGATION_RECORDED');
+ assert.equal(result.installation_authorized,false);
+ assert.equal(result.original_job_created,false);
+});
+test('legacy provider models are not passed unsupported reasoning options',async()=>{
+ const f=fixture();
+ let modelRequest=null;
+ const result=await investigateOneSignedShiftContinuityIncident({
+  db,env,shiftId:shift,call:f.call,
+  invokeModel:async payload=>{
+   modelRequest=payload;
+   return modelResponse();
+  },rolesBuilder:()=>({roles}),
+  fetchImpl:async()=>{throw Error('NO_PROVIDER')}
+ });
+ assert.equal(modelRequest.model,'gpt-4.1-mini');
+ assert.equal(Object.hasOwn(modelRequest,'reasoning'),false);
+ assert.equal(result.status,'SHIFT_CONTINUITY_INVESTIGATION_RECORDED');
+});
