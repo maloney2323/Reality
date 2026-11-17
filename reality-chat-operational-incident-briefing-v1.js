@@ -27,10 +27,13 @@
   'Checking independent signed-worker execution receipts…');
  const repairReceipt=node('p','rx-owner-preview-repair-status',
   'Checking automatic preview repair and independently resumed work…');
+ const continuityStatus=node('p','rx-owner-worker-receipt',
+  'Checking for stalled employee work and pending capability investigations…');
+ const continuityCards=node('div','rx-owner-incidents-items');
  const cards=node('div','rx-owner-incidents-items');
  const description=node('p','rx-owner-incidents-caption',
   'For this signed-in owner only. Incident evidence is not a customer message, original-job authorization or independent repair receipt.');
- root.append(header,status,workerReceipt,repairReceipt,cards,description);
+ root.append(header,status,workerReceipt,repairReceipt,continuityStatus,continuityCards,cards,description);
  thread.parentNode.insertBefore(root,thread);
  let busy=false,seen=null;
  const isChat=()=>document.body?.dataset?.realityRoute==='chat'||
@@ -110,6 +113,41 @@
     'worker from an autonomous self-repair.';
    input.focus();
    input.scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  card.append(discuss);
+  return card;
+ };
+ const renderContinuity=item=>{
+  const card=node('article','rx-owner-incident');
+  card.append(node('strong','','Reality · Work continuity incident'),
+   node('p','rx-owner-incident-phase',item.phase),
+   node('p','',item.error_summary+' · '+when(item.observed_at)),
+   node('p','','Employee: '+(item.assigned_employee||'not assigned yet')+
+    ' · Independent reviewer: '+(item.independent_reviewer||'not yet assigned')));
+  if(item.diagnosis)
+   card.append(node('p','','Provisional diagnosis (not independent proof): '+item.diagnosis));
+  if(item.proposed_upgrade)
+   card.append(node('p','','Proposed capability upgrade (NOT installed): '+
+    item.proposed_upgrade));
+  if(item.independent_test_requirement)
+   card.append(node('p','','Independent test needed: '+
+    item.independent_test_requirement));
+  if(item.investigation_receipt_sha256)
+   card.append(node('p','rx-owner-incident-proof',
+    'Investigation receipt: '+item.investigation_receipt_sha256+
+    ' · Repair not yet proven; installation not authorized'));
+  card.append(node('p','rx-owner-incident-next','Next: '+item.next_action));
+  const discuss=node('button','rx-owner-incident-discuss','Discuss this stall in Chat');
+  discuss.type='button';
+  discuss.addEventListener('click',()=>{
+   const input=document.getElementById('privatePrompt');
+   if(!input)return;
+   input.value='Reality, review your recorded shift-continuity incident '+
+    item.incident_id+'. Explain the source-backed stall, your investigation, '+
+    'which employee owns the next test, what capability improvement is proposed, '+
+    'what has been independently verified, what existing authority permits, '+
+    'and how you will resume the original work without claiming an unverified repair.';
+   input.focus();input.scrollIntoView({behavior:'smooth',block:'center'});
   });
   card.append(discuss);
   return card;
@@ -200,6 +238,28 @@
      'Automatic preview recovery: no current self-repair attempt recorded. '+
      'The historical scheduler correction was external and remains classified that way.';
    }
+   const stalls=feed.shift_continuity_incidents;
+   if(!Array.isArray(stalls)||stalls.length>8||
+    feed.shift_continuity_count!==stalls.length||
+    !['OWNER_SHIFT_CONTINUITY_INCIDENTS_VERIFIED_READ_ONLY',
+      'OWNER_SHIFT_CONTINUITY_EVIDENCE_UNAVAILABLE']
+      .includes(feed.shift_continuity_read_status)||
+    stalls.some(x=>x.owner_chat_only!==true||
+     x.repair_executed!==false||
+     x.self_repair_proven!==false||
+     x.installation_authorized!==false||
+     x.customer_job_completed!==false))
+    throw Error('OWNER_SHIFT_CONTINUITY_STALL_EVIDENCE_UNVERIFIED');
+   continuityStatus.textContent=
+    feed.shift_continuity_read_status===
+     'OWNER_SHIFT_CONTINUITY_EVIDENCE_UNAVAILABLE'?
+     'Stalled-work watchdog evidence is temporarily unavailable; no repair or healthy state is assumed.':
+     stalls.length?
+     'Reality detected '+stalls.length+' signed-shift continuity issue'+
+      (stalls.length===1?'':'s')+
+      '. Diagnosis and upgrade proposals are not independently verified repairs.':
+     'Stalled-work watchdog: no source-backed continuity incident recorded.';
+   continuityCards.replaceChildren(...stalls.map(renderContinuity));
    const snapshot=JSON.stringify(feed.items);
    if(snapshot!==seen){
     cards.replaceChildren(...feed.items.map(render));
@@ -215,6 +275,8 @@
    status.textContent='Reality cannot independently read its current operational incident status. No recovery or repair is assumed.';
    workerReceipt.textContent='Worker execution evidence unavailable. A successful cron dispatch alone never proves completed work.';
    repairReceipt.textContent='Automatic repair receipt unavailable. No completed repair or resumed original job is assumed.';
+   continuityStatus.textContent='Stalled-work incident evidence unavailable; no healthy state is inferred.';
+   continuityCards.replaceChildren();
   }finally{busy=false;refresh.disabled=false;}
  };
  refresh.addEventListener('click',()=>{void update()});
