@@ -96,6 +96,8 @@ import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
 import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
+import {runOneStandingEmployeeDiscovery}
+ from '../../src/reality-standing-employee-discovery-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -143,6 +145,25 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // This existing signed worker can also investigate when NO shift is active,
+  // but ONLY after a separately signed owner enables a time-limited standing
+  // evidence-only delegation. A grant does not start a shift or install code.
+  // No owner, source, or grant can arrive from the HTTP request.
+  workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
+  const standingDiscoveryResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'?
+    await runOneStandingEmployeeDiscovery({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'STANDING_DISCOVERY_PROOF_OR_PROVIDER_UNAVAILABLE',
+     new_original_jobs_created:0,external_actions_authorized:false,
+     shift_execution_authorized:false,installation_authorized:false,
+     production_changed:false
+    })):
+    {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_DISCOVERY',
+     new_original_jobs_created:0,external_actions_authorized:false,
+     shift_execution_authorized:false,installation_authorized:false,
+     production_changed:false};
   // NEW Chat development uses its own signed original-message identity,
   // not an old shift's frozen issue scope. Reuse this same signed service
   // wake and broker; no second shift, scheduler or installation grant.
@@ -1373,6 +1394,7 @@ export default async function handler(req,res){
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
+    standing_employee_discovery:standingDiscoveryResult,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
