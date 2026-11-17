@@ -123,7 +123,8 @@ export async function investigateOneSignedShiftContinuityIncident({
    (!Number.isInteger(claim.investigation_attempt)||
     claim.investigation_attempt<1||claim.investigation_attempt>4))||
   (claim.investigation_attempt===4&&
-   (!/^[a-f0-9]{40}$/.test(claim.remediation_release_commit||'')||
+   (!Array.isArray(claim.failure_history)||claim.failure_history.length!==3||
+    !/^[a-f0-9]{40}$/.test(claim.remediation_release_commit||'')||
     !HASH.test(claim.remediation_receipt_sha256||'')||
     !Number.isSafeInteger(claim.remediation_ci_run_id)))||
   (claim.failure_history!==undefined&&

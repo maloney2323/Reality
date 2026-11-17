@@ -1,6 +1,6 @@
--- EXACT signed model remediation re-entry: one additional consumed attempt
--- only after a separate CI/preview-source-backed remediation grant.
--- Previous three failures and original work identity remain immutable.
+-- Source-backed, signed one-time remediation lease for an exhausted model inquiry.
+-- No grant in this migration. Exact CI/release source evidence required separately.
+-- All prior failed attempt receipts stay immutable.
 
 alter table reality_internal.owner_shift_continuity_incidents_v1
  add column if not exists remediation_release_commit text
@@ -48,7 +48,10 @@ begin
   and phase in ('DETECTED','BLOCKED_NEEDS_EVIDENCE')
   and (investigation_attempts<3 or (investigation_attempts=3
    and remediation_granted_at is not null and remediation_used_at is null
-   and remediation_release_commit~'^[a-f0-9]{40} or next_investigation_at<=clock_timestamp())
+   and remediation_release_commit~'^[a-f0-9]{40}$'
+   and remediation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+   and remediation_ci_run_id is not null))
+  and (next_investigation_at is null or next_investigation_at<=clock_timestamp())
  order by first_detected_at limit 1 for update skip locked;
  if not found then return pg_catalog.jsonb_build_object(
   'status','NO_DETECTED_SHIFT_CONTINUITY_INCIDENT',
@@ -73,71 +76,6 @@ begin
   'remediation_release_commit',i.remediation_release_commit,
   'remediation_ci_run_id',i.remediation_ci_run_id,
   'remediation_receipt_sha256',i.remediation_receipt_sha256,
-  'previous_failure_reason',i.limitations,
-  'failure_history',i.investigation_failure_history,
-  'qualified_job_id',i.qualified_job_id,
-  'failed_source_ref',(select j.source_ref from reality_internal.owner_qualified_employee_evidence_jobs_v1 j where j.job_id=i.qualified_job_id),
-  'failed_job_phase',(select j.phase from reality_internal.owner_qualified_employee_evidence_jobs_v1 j where j.job_id=i.qualified_job_id),
-  'failed_job_blocker',(select j.blocker from reality_internal.owner_qualified_employee_evidence_jobs_v1 j where j.job_id=i.qualified_job_id),
-  'scope','SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY',
-  'model_inquiry_authorized',true,'new_original_jobs_created',0,
-  'execution_authorized',false,'installation_authorized',false,
-  'production_changed',false);
-end $function$
-
-   and remediation_receipt_sha256~'^sha256:[a-f0-9]{64} or next_investigation_at<=clock_timestamp())
- order by first_detected_at limit 1 for update skip locked;
- if not found then return pg_catalog.jsonb_build_object(
-  'status','NO_DETECTED_SHIFT_CONTINUITY_INCIDENT',
-  'model_inquiry_authorized',false,'execution_authorized',false,
-  'installation_authorized',false,'production_changed',false);end if;
- update reality_internal.owner_shift_continuity_incidents_v1
- set phase='INVESTIGATION_CLAIMED',investigation_lease_id=gen_random_uuid(),
-  investigation_claimed_at=clock_timestamp(),
-  investigation_attempts=investigation_attempts+1,
-  next_investigation_at=null
- where incident_id=i.incident_id returning * into i;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_SHIFT_CONTINUITY_INVESTIGATION_CLAIMED',
-  'owner_id',i.owner_id,'shift_id',i.shift_id,
-  'incident_id',i.incident_id,'lease_id',i.investigation_lease_id,
-  'kind',i.kind,'source_claim_id',i.source_claim_id,
-  'error_summary',i.error_summary,'evidence_sha256',i.evidence_sha256,
-  'first_detected_at',i.first_detected_at,
-  'investigation_attempt',i.investigation_attempts,
-  'previous_failure_reason',i.limitations,
-  'failure_history',i.investigation_failure_history,
-  'qualified_job_id',i.qualified_job_id,
-  'failed_source_ref',(select j.source_ref from reality_internal.owner_qualified_employee_evidence_jobs_v1 j where j.job_id=i.qualified_job_id),
-  'failed_job_phase',(select j.phase from reality_internal.owner_qualified_employee_evidence_jobs_v1 j where j.job_id=i.qualified_job_id),
-  'failed_job_blocker',(select j.blocker from reality_internal.owner_qualified_employee_evidence_jobs_v1 j where j.job_id=i.qualified_job_id),
-  'scope','SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY',
-  'model_inquiry_authorized',true,'new_original_jobs_created',0,
-  'execution_authorized',false,'installation_authorized',false,
-  'production_changed',false);
-end $function$
-
-   and remediation_ci_run_id is not null))
-  and (next_investigation_at is null or next_investigation_at<=clock_timestamp())
- order by first_detected_at limit 1 for update skip locked;
- if not found then return pg_catalog.jsonb_build_object(
-  'status','NO_DETECTED_SHIFT_CONTINUITY_INCIDENT',
-  'model_inquiry_authorized',false,'execution_authorized',false,
-  'installation_authorized',false,'production_changed',false);end if;
- update reality_internal.owner_shift_continuity_incidents_v1
- set phase='INVESTIGATION_CLAIMED',investigation_lease_id=gen_random_uuid(),
-  investigation_claimed_at=clock_timestamp(),
-  investigation_attempts=investigation_attempts+1,
-  next_investigation_at=null
- where incident_id=i.incident_id returning * into i;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_SHIFT_CONTINUITY_INVESTIGATION_CLAIMED',
-  'owner_id',i.owner_id,'shift_id',i.shift_id,
-  'incident_id',i.incident_id,'lease_id',i.investigation_lease_id,
-  'kind',i.kind,'source_claim_id',i.source_claim_id,
-  'error_summary',i.error_summary,'evidence_sha256',i.evidence_sha256,
-  'first_detected_at',i.first_detected_at,
-  'investigation_attempt',i.investigation_attempts,
   'previous_failure_reason',i.limitations,
   'failure_history',i.investigation_failure_history,
   'qualified_job_id',i.qualified_job_id,
@@ -196,7 +134,7 @@ begin
     'The assigned employee proposed a diagnosis and capability improvement. The separate reviewer must reproduce the failure and independently test the proposed repair under an existing valid warrant before an installation.'
    when i.phase='BLOCKED_NEEDS_EVIDENCE' and i.investigation_attempts=3
     and i.remediation_granted_at is not null and i.remediation_used_at is null then
-    'One independently reviewed preview remediation inquiry is ready on the next signed wake; the original job is not complete.'
+    'One independently reviewed preview remediation inquiry is ready on the next signed wake; original unfinished.'
    when i.phase='BLOCKED_NEEDS_EVIDENCE' and i.investigation_attempts<3 then
     'Reality has recorded the failed investigation and will re-investigate on the next eligible signed wake after its bounded cooldown.'
    when i.phase='BLOCKED_NEEDS_EVIDENCE' then
