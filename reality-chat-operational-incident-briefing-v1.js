@@ -30,10 +30,13 @@
  const continuityStatus=node('p','rx-owner-worker-receipt',
   'Checking for stalled employee work and pending capability investigations…');
  const continuityCards=node('div','rx-owner-incidents-items');
+ const qualifiedWorkStatus=node('p','rx-owner-worker-receipt',
+  'Checking qualified executable employee work and independent job receipts…');
+ const qualifiedWorkCards=node('div','rx-owner-incidents-items');
  const cards=node('div','rx-owner-incidents-items');
  const description=node('p','rx-owner-incidents-caption',
   'For this signed-in owner only. Incident evidence is not a customer message, original-job authorization or independent repair receipt.');
- root.append(header,status,workerReceipt,repairReceipt,continuityStatus,continuityCards,cards,description);
+ root.append(header,status,workerReceipt,repairReceipt,qualifiedWorkStatus,qualifiedWorkCards,continuityStatus,continuityCards,cards,description);
  thread.parentNode.insertBefore(root,thread);
  let busy=false,seen=null;
  const isChat=()=>document.body?.dataset?.realityRoute==='chat'||
@@ -178,6 +181,40 @@
   card.append(discuss);
   return card;
  };
+ const renderQualifiedEvidenceJob=item=>{
+  const article=node('article','rx-owner-incident');
+  article.append(node('strong','','Qualified employee work · '+item.employee),
+   node('p','rx-owner-incident-phase',
+    item.phase==='COMPLETED_INDEPENDENTLY_VERIFIED'?
+     'Source report independently verified by two signed worker runs':
+     item.phase==='QUALIFIED_EXECUTABLE'?
+     'Qualified and waiting for signed execution':
+     item.phase==='SUBMITTED_AWAITING_INDEPENDENT_RECHECK'?
+     'Evidence deliverable submitted · Independent source recheck pending':
+     item.phase),
+   node('p','','Current work: '+item.objective));
+  if(item.current_source_title)
+   article.append(node('p','','Verified source title: '+item.current_source_title));
+  const sourceLink=document.createElement('a');
+  sourceLink.href=item.source_ref;
+  sourceLink.textContent='View cited GitHub source';
+  sourceLink.target='_blank';sourceLink.rel='noopener noreferrer';
+  article.append(sourceLink);
+  if(item.independent_receipt_sha256)
+   article.append(node('p','rx-owner-incident-proof',
+    'Independent receipt: '+item.independent_receipt_sha256+
+    ' · Execution worker: '+item.execution_worker_run_id+
+    ' · Independent reviewing worker: '+item.review_worker_run_id));
+  if(item.followup_proof_still_required)
+   article.append(node('p','rx-owner-incident-next',
+    'Additional proof still needed: '+item.followup_proof_still_required));
+  if(item.blocker)
+   article.append(node('p','rx-owner-incident-next',
+    'Execution blocker: '+item.blocker));
+  article.append(node('p','rx-owner-incidents-caption',
+   'Read-only source deliverable. Not a code installation or settled customer job.'));
+  return article;
+ };
  const update=async()=>{
   if(busy||!isChat()||!isSigned())return;
   busy=true;refresh.disabled=true;
@@ -270,6 +307,27 @@
      !Number.isSafeInteger(feed.exact_repair_install_gate_count)||
      feed.exact_repair_install_gate_count>8)
     throw Error('EXACT_ARTIFACT_REPAIR_GATE_READBACK_UNVERIFIED');
+   const q=feed.qualified_employee_evidence_work;
+   if(!q||!Array.isArray(q.items)||q.items.length>12||
+    !q.counts||!Number.isSafeInteger(q.counts.total)||
+    !['OWNER_SOURCE_QUALIFIED_EMPLOYEE_WORK_READ_ONLY',
+      'QUALIFIED_EMPLOYEE_WORK_READBACK_UNAVAILABLE'].includes(q.status)||
+    q.original_customer_job_completed!==false||
+    q.source_report_only!==true||
+    q.items.some(x=>x.original_customer_job_completed!==false||
+     x.code_repair_installed!==false||x.production_changed!==false||
+     x.evidence_job_completed!==(x.phase===
+      'COMPLETED_INDEPENDENTLY_VERIFIED')))
+    throw Error('OWNER_QUALIFIED_EMPLOYEE_SOURCE_WORK_PROOF_UNVERIFIED');
+   qualifiedWorkStatus.textContent=
+    q.status==='QUALIFIED_EMPLOYEE_WORK_READBACK_UNAVAILABLE'?
+    'Qualified employee work evidence unavailable; no job completion assumed.':
+    'Reality employee work · '+q.counts.total+' qualified source evidence jobs · '+
+    q.counts.independently_completed+' independently verified deliverable'+
+     (q.counts.independently_completed===1?'':'s')+
+    ' · '+q.counts.qualified_executable+' ready · '+
+    q.counts.blocked+' blocked. These are not customer-job or code-install receipts.';
+   qualifiedWorkCards.replaceChildren(...q.items.slice(0,5).map(renderQualifiedEvidenceJob));
    const stalls=feed.shift_continuity_incidents;
    if(!Array.isArray(stalls)||stalls.length>8||
     feed.shift_continuity_count!==stalls.length||
@@ -312,6 +370,8 @@
    workerReceipt.textContent='Worker execution evidence unavailable. A successful cron dispatch alone never proves completed work.';
    repairReceipt.textContent='Automatic repair receipt unavailable. No completed repair or resumed original job is assumed.';
    continuityStatus.textContent='Stalled-work incident evidence unavailable; no healthy state is inferred.';
+   qualifiedWorkStatus.textContent='Qualified employee work evidence unavailable; no verified deliverables assumed.';
+   qualifiedWorkCards.replaceChildren();
    continuityCards.replaceChildren();
   }finally{busy=false;refresh.disabled=false;}
  };
