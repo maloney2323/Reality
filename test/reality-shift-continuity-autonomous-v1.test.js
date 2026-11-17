@@ -206,6 +206,37 @@ test('owner Chat receives evidence-bound stall upgrade proposal but never a repa
   continuity:{...readback,items:[{...readback.items[0],repair_executed:true}]}
  }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
 });
+test('same-source signed worker resumption is recorded without claiming a code self-upgrade',()=>{
+ const verified={
+  ...readback,
+  items:[{
+   ...readback.items[0],
+   phase:'RECOVERED_AFTER_OBSERVATION',
+   recovered_at:'2026-11-17T15:42:00Z',
+   recovery_receipt_sha256:hash('c'),
+   resolved_worker_run_id:'66666666-7777-4888-8999-aaaaaaaaaaaa',
+   resolved_inquiry_claim_id:'77777777-8888-4999-8aaa-bbbbbbbbbbbb',
+   recovery_attribution:'WORK_RESUMED_AFTER_OBSERVATION_SELF_REPAIR_UNPROVEN'
+  }]
+ };
+ const b=projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,continuity:verified
+ });
+ assert.equal(b.shift_continuity_incidents[0].work_resumption_verified,true);
+ assert.equal(b.shift_continuity_incidents[0].self_repair_proven,false);
+ assert.equal(b.shift_continuity_incidents[0].verified_worker_run_id,
+  verified.items[0].resolved_worker_run_id);
+ const observed=incidentChatUniverseObservations(b);
+ assert.equal(observed[0].epistemic_status,
+  'SIGNED_WORKER_AND_SOURCE_RESUMPTION_VERIFIED_SELF_REPAIR_UNPROVEN');
+ assert.equal(observed[0].self_repair_proven,false);
+ assert.throws(()=>projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,
+  continuity:{...verified,items:[{
+   ...verified.items[0],resolved_worker_run_id:null
+  }]}
+ }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
+});
 test('watchdog, worker and Chat use existing signed infrastructure and no new authority',()=>{
  const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const schema=read('supabase/migrations/20261117_owner_shift_continuity_stall_incidents_v1.sql');
