@@ -98,6 +98,8 @@ import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
 import {runOneStandingEmployeeDiscovery}
  from '../../src/reality-standing-employee-discovery-v1.js';
+import {scheduleOneStandingCapability}
+ from '../../src/reality-capability-role-schedule-worker-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -150,8 +152,25 @@ export default async function handler(req,res){
   // evidence-only delegation. A grant does not start a shift or install code.
   // No owner, source, or grant can arrive from the HTTP request.
   workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
-  const standingDiscoveryResult=
+  const capabilityScheduleResult=
    wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'?
+    await scheduleOneStandingCapability({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'CAPABILITY_EMPLOYEE_SCHEDULE_PROOF_UNAVAILABLE',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_CAPABILITY_EXECUTION',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  // One model-directed standing-work stage per wake. When capability role
+  // scheduling consumes its grant quota, do not spend a second lease on
+  // ordinary source investigation. Existing signed shift work is unaffected.
+  const standingDiscoveryResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   capabilityScheduleResult.status===
+    'NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'?
     await runOneStandingEmployeeDiscovery({
      db,env:process.env,fetchImpl:fetch
     }).catch(()=>({
@@ -160,7 +179,7 @@ export default async function handler(req,res){
      shift_execution_authorized:false,installation_authorized:false,
      production_changed:false
     })):
-    {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_DISCOVERY',
+    {status:'CAPABILITY_SCHEDULING_OR_SIGNED_SHIFT_HANDLED_WAKE',
      new_original_jobs_created:0,external_actions_authorized:false,
      shift_execution_authorized:false,installation_authorized:false,
      production_changed:false};
@@ -1395,6 +1414,7 @@ export default async function handler(req,res){
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
     standing_employee_discovery:standingDiscoveryResult,
+    employee_capability_schedule:capabilityScheduleResult,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
     generalized_original_install_review:generalizedInstallReview,
