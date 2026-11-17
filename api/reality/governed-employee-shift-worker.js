@@ -108,6 +108,8 @@ import {investigateOneSignedShiftContinuityIncident}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
+import {advanceOneShiftContinuityIndependentReview}
+ from '../../src/reality-shift-continuity-independent-review-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -189,6 +191,22 @@ export default async function handler(req,res){
     {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false};
+  // A DIFFERENT signed worker, not the diagnosing model, re-observes
+  // the actual provider source for the assigned independent reviewer.
+  workerStage='INDEPENDENT_SHIFT_CONTINUITY_SOURCE_REVIEW';
+  const continuityIndependentReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceOneShiftContinuityIndependentReview({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'CONTINUITY_INDEPENDENT_PROVIDER_REVIEW_UNVERIFIED',
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_CONTINUITY_REVIEW_SCOPE',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
   // This is not a code repair. The first failure receipt remains immutable.
@@ -1602,6 +1620,7 @@ export default async function handler(req,res){
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
+    shift_continuity_independent_review:continuityIndependentReview,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
