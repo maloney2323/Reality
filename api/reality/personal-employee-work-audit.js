@@ -103,8 +103,42 @@ export default async function handler(req,res){
     // An unverified owner/source is not an inquiry, assignment or job.
    }
   }
+  // Only the existing service-role owner ledger can report questions
+  // actually generated and investigations durably recorded by Reality.
+  let employee_inquiry_receipts=null;
+  try{
+   const read=await shiftRpc(db,'reality_read_owner_employee_time_inquiries_v1',{
+    p_owner_id:session.user_id
+   });
+   const allowed=new Map(roster.proposed_employees.map(x=>[
+    x.display_name,x
+   ]));
+   if(read?.status==='OWNER_EMPLOYEE_INQUIRIES_READ_ONLY'&&
+      read.owner_scope_verified===true&&read.read_only===true&&
+      read.execution_authorized===false&&
+      read.installation_authorized===false&&
+      read.production_changed===false&&
+      read.new_original_jobs_created===0&&
+      read.qualified_executable_jobs===0&&
+      Array.isArray(read.items)&&read.items.length<=80&&
+      read.count===read.items.length&&
+      read.items.every(x=>allowed.has(x.employee)&&
+       /^sha256:[a-f0-9]{64}$/.test(x.evidence_sha256||'')&&
+       /^sha256:[a-f0-9]{64}$/.test(x.source_proof_sha256||'')&&
+       typeof x.question==='string'&&x.question.length>=15&&
+       typeof x.investigation==='string'&&x.investigation.length>=20&&
+       typeof x.next_proof==='string'&&x.next_proof.length>=15&&
+       x.qualified_executable_job===false&&
+       x.execution_authorized===false)){
+    employee_inquiry_receipts={
+     ...read,items:read.items.filter(x=>
+      req.body.employee_name==='ALL'||x.employee===req.body.employee_name)
+    };
+   }
+  }catch{}
   return res.status(200).json({
    ok:true,...audit,
+   employee_inquiry_receipts,
    employee_time_inquiry_context,
    employee_time_inquiry_status:employee_time_inquiry_context?.status||
     'TIME_EVIDENCE_OR_DISCOVERY_NOT_VERIFIED',
