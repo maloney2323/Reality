@@ -156,6 +156,9 @@ begin
   'status','SIGNED_BUSINESS_QUALIFICATION_REVIEW_CLAIMED',
   'incident_id',i.incident_id,'shift_id',i.shift_id,'owner_id',i.owner_id,
   'source_claim_id',i.source_claim_id,'claim_id',claim,
+  'review_attempt',(select r.review_attempts
+   from reality_internal.shift_business_qualification_reviews_v1 r
+   where r.incident_id=i.incident_id),
   'worker_run_id',p_worker_run_id,'reviewer',i.independent_reviewer,
   'reviewer_function_id',i.reviewer_function_id,
   'source_ref',i.source_ref,'prior_source_sha256',i.provider_proof_sha256,
