@@ -12,7 +12,7 @@ const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const kinds=new Set(['RESEARCH_OPPORTUNITY','INDEPENDENTLY_TESTED_CANDIDATE',
  'FROZEN_UNBOUND_SOURCE','VERIFIED_SOURCE_CANDIDATE']);
 const actions=new Set(['ENABLE_ROUTINE_DISCOVERY','PAUSE_ROUTINE_DISCOVERY']);
-export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule}={}){
+export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule,workerHealth=null}={}){
  if(!UUID.test(ownerId||'')||
   feed?.status!=='OWNER_GAP_INTAKE_RECONCILED'||
   feed.ok!==true||feed.owner_id!==ownerId||
@@ -89,6 +89,40 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule}={}
     Date.parse(assignments.get(entry.capability_key).assigned_at||'1970-01-01'))
    assignments.set(entry.capability_key,entry);
  }
+ const health=workerHealth||{
+  status:'OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY',
+  owner_id:ownerId,owner_scope_verified:true,read_only:true,
+  standing_grant_active:grant.currently_active===true,
+  last_scheduler_status:'NOT_CHECKED_IN_THIS_READ',
+  last_scheduler_check_at:null,last_scheduler_failure:null,
+  last_scheduler_success_at:null,
+  current_capability_investigations_scheduled:0,
+  scheduler_dispatch_success_not_worker_proof:true,
+  incident_count:0,incidents:[],
+  next_action:'Worker health evidence has not been read. Refresh to verify the signed worker.',
+  execution_authorized_by_read:false,
+  installation_authorized:false,production_changed:false
+ };
+ if(health.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
+    health.owner_id!==ownerId||health.owner_scope_verified!==true||
+    health.read_only!==true||
+    health.execution_authorized_by_read!==false||
+    health.installation_authorized!==false||
+    health.production_changed!==false||
+    health.scheduler_dispatch_success_not_worker_proof!==true||
+    !Array.isArray(health.incidents)||health.incidents.length>8||
+    health.incident_count!==health.incidents.length||
+    typeof health.next_action!=='string'||health.next_action.length>450||
+    !['succeeded','failed','running','starting',
+      'NO_SCHEDULER_HISTORY','NOT_CHECKED_IN_THIS_READ'].includes(
+      health.last_scheduler_status)||
+    health.incidents.some(i=>
+      !['DETECTED','LEASED_FOR_INVESTIGATION',
+        'EMPLOYEE_INVESTIGATION_SCHEDULED','BLOCKED_NEEDS_EVIDENCE'].includes(i.phase)||
+      typeof i.error_summary!=='string'||i.error_summary.length>220||
+      i.independently_verified_repaired!==false||
+      typeof i.scheduler_dispatched_after_failure!=='boolean'))
+  throw Error('WORKER_RECOVERY_OWNER_OR_PROOF_UNVERIFIED');
  const seen=new Set();
  const items=feed.items.map(x=>{
   if(!kinds.has(x?.kind)||
@@ -151,6 +185,31 @@ export function projectOwnerCapabilityWorkspace({ownerId,feed,grant,schedule}={}
    x=>x.assigned_employee!==null).length,
   existing_independently_proven_originals:items.filter(
    x=>x.independent_current_gap_proven===true).length,
+  worker_progress:Object.freeze({
+   last_scheduler_status:health.last_scheduler_status,
+   last_scheduler_check_at:health.last_scheduler_check_at,
+   last_scheduler_success_at:health.last_scheduler_success_at,
+   last_scheduler_failure:health.last_scheduler_failure,
+   standing_grant_active:health.standing_grant_active===true,
+   current_capability_investigations_scheduled:
+     health.current_capability_investigations_scheduled,
+   incident_count:health.incident_count,
+   incidents:Object.freeze(health.incidents.map(i=>Object.freeze({
+    phase:i.phase,error_summary:i.error_summary,
+    failure_count:i.failure_count,
+    last_observed_at:i.last_observed_at,
+    assigned_employee:i.assigned_employee,
+    independent_reviewer:i.independent_reviewer,
+    investigation_scope:i.investigation_scope,
+    independent_test_requirement:i.independent_test_requirement,
+    scheduler_dispatched_after_failure:i.scheduler_dispatched_after_failure,
+    independently_verified_repaired:false
+   }))),
+   next_action:health.next_action,
+   scheduler_dispatch_success_not_worker_proof:true,
+   execution_authorized_by_read:false,
+   installation_authorized:false
+  }),
   standing_delegation:Object.freeze({
    enabled:grant.enabled===true,active:grant.currently_active===true,
    scope:grant.scope,expires_at:grant.expires_at,
@@ -214,7 +273,7 @@ export default async function handler(req,res){
     execution_authorized:false,installation_authorized:false,
     production_changed:false});
   }
-  const [feed,grant,schedule]=await Promise.all([
+  const [feed,grant,schedule,workerHealth]=await Promise.all([
    shiftRpc(db,'reality_read_owner_capability_gap_feed_v1',{
     p_owner_id:session.user_id
    }),
@@ -223,10 +282,13 @@ export default async function handler(req,res){
    }),
    shiftRpc(db,'reality_read_owner_capability_employee_schedule_v1',{
     p_owner_id:session.user_id
+   }),
+   shiftRpc(db,'reality_read_owner_worker_recovery_status_v1',{
+    p_owner_id:session.user_id
    })
   ]);
   return res.status(200).json({ok:true,
-   ...projectOwnerCapabilityWorkspace({ownerId:session.user_id,feed,grant,schedule})});
+   ...projectOwnerCapabilityWorkspace({ownerId:session.user_id,feed,grant,schedule,workerHealth})});
  }catch{
   return res.status(503).json({ok:false,
    error:'OWNER_CAPABILITIES_OR_DELEGATION_PROOF_UNAVAILABLE',
