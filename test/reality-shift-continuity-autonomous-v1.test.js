@@ -611,3 +611,15 @@ test('database consumes exactly one reviewed remediation attempt and never reset
  assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
  assert.doesNotMatch(sql,/grant execute[^;]+to (anon|authenticated)/is);
 });
+
+test('reviewed remediation SQL is not truncated at postgres regex end anchors',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_continuity_reviewed_remediation_retry_v5.sql',
+  import.meta.url),'utf8');
+ assert.ok(sql.includes("remediation_receipt_sha256~'^sha256:[a-f0-9]{64}$'"));
+ assert.ok(sql.includes("remediation_release_commit~'^[a-f0-9]{40}$'"));
+ assert.equal(sql.split('CREATE OR REPLACE FUNCTION public.reality_claim_next_shift_continuity_investigation_v1').length-1,1);
+ assert.equal(sql.split('CREATE OR REPLACE FUNCTION public.reality_read_owner_shift_continuity_incidents_v1').length-1,1);
+ assert.doesNotMatch(sql,/end \$function\$\s*\n\s*and remediation_receipt_sha256/);
+ assert.match(sql,/remediation_used_at=case when i.investigation_attempts=3/);
+});
