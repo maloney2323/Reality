@@ -136,6 +136,24 @@
    card.append(node('p','rx-owner-incident-proof',
     'Investigation receipt: '+item.investigation_receipt_sha256+
     ' · Repair not yet proven; installation not authorized'));
+  const exactGate=item.exact_code_repair_install_gate;
+  if(exactGate){
+   card.append(node('p','rx-owner-incident-phase',
+    'Independent code repair + installation gate: '+exactGate.status),
+    node('p','rx-owner-incident-next',
+     'Next verified step: '+exactGate.next_action));
+   if(exactGate.independent_ci_run_id)
+    card.append(node('p','rx-owner-incident-proof',
+     'Independent CI run: '+exactGate.independent_ci_run_id+
+     ' · exact candidate: '+(exactGate.candidate_commit_sha||'not verified')));
+   if(exactGate.candidate_artifact_sha256)
+    card.append(node('p','rx-owner-incident-proof',
+     'Exact candidate digest: '+exactGate.candidate_artifact_sha256+
+     ' · Specific authenticated artifact approval is required before installation'));
+  }else{
+   card.append(node('p','rx-owner-incident-next',
+    'Exact code repair approval gate unavailable. Do not infer testing or installation authority.'));
+  }
   if(item.work_resumption_verified===true&&
     item.independent_resumption_receipt_sha256)
    card.append(node('p','rx-owner-incident-proof',
@@ -246,6 +264,12 @@
      'Automatic preview recovery: no current self-repair attempt recorded. '+
      'The historical scheduler correction was external and remains classified that way.';
    }
+   if(!['OWNER_EXACT_REPAIR_INSTALL_GATE_VERIFIED_READ_ONLY',
+      'EXACT_REPAIR_INSTALL_GATE_READBACK_UNAVAILABLE']
+      .includes(feed.exact_repair_install_gate_read_status)||
+     !Number.isSafeInteger(feed.exact_repair_install_gate_count)||
+     feed.exact_repair_install_gate_count>8)
+    throw Error('EXACT_ARTIFACT_REPAIR_GATE_READBACK_UNVERIFIED');
    const stalls=feed.shift_continuity_incidents;
    if(!Array.isArray(stalls)||stalls.length>8||
     feed.shift_continuity_count!==stalls.length||
@@ -256,7 +280,11 @@
      x.repair_executed!==false||
      x.self_repair_proven!==false||
      x.installation_authorized!==false||
-     x.customer_job_completed!==false))
+     x.customer_job_completed!==false||
+     (x.exact_code_repair_install_gate!==null&&
+      (x.exact_code_repair_install_gate?.installation_authorized_by_read!==false||
+       x.exact_code_repair_install_gate?.new_self_repair_proven!==false||
+       x.exact_code_repair_install_gate?.production_changed!==false))))
     throw Error('OWNER_SHIFT_CONTINUITY_STALL_EVIDENCE_UNVERIFIED');
    continuityStatus.textContent=
     feed.shift_continuity_read_status===
