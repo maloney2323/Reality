@@ -56,7 +56,6 @@ BEGIN
  'original_job_completed',(r.phase='ORIGINAL_SETTLED' AND
    r.original_final_receipt_id IS NOT NULL),
  'production_changed',false);
-END $function$
-
+END $function$;
 REVOKE ALL ON FUNCTION public.reality_read_generalized_original_install_review_v1(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_read_generalized_original_install_review_v1(uuid) TO service_role;
