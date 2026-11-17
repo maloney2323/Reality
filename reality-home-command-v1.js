@@ -40,6 +40,7 @@
  for(const [title,path,sym,target] of [
   ['Home','/','⌂'],['Chat','/chat','▤'],
   ['Employees','/employees','♧'],
+  ['Capabilities','/#realityCapabilities','◇'],
   ['Work',null,'▣','realityHomeWorkday'],
   ['Shifts',null,'▦','realityEmployeeShiftPlanner'],
   ['ROI & Drift','/value','▥'],['Receipts','/value','✓']
@@ -165,6 +166,7 @@
  mobile.setAttribute('aria-label','Reality mobile navigation');
  for(const [label,path,sym,target] of [
   ['Home','/','⌂'],['Employees','/employees','♧'],
+  ['Capabilities','/#realityCapabilities','◇'],
   ['Work',null,'▣','realityHomeWorkday'],['ROI','/value','▥'],['Chat','/chat','▤']
  ])mobile.append(item(label,path,sym,target));
  document.body.append(mobile);
