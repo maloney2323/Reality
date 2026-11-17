@@ -110,6 +110,8 @@ import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
 import {advanceOneShiftContinuityIndependentReview}
  from '../../src/reality-shift-continuity-independent-review-v1.js';
+import {reviewOneSignedBusinessQualificationStall}
+ from '../../src/reality-shift-business-qualification-review-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -212,6 +214,28 @@ export default async function handler(req,res){
      installation_authorized:false,production_changed:false
     })):
     {status:'NO_SIGNED_CONTINUITY_REVIEW_SCOPE',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
+  // Business job qualification has a DISTINCT independent check: neither
+  // source-evidence jobs nor model proposals can be counted as originals.
+  // This reads the existing owner-scoped ledger and current provider source.
+  workerStage='INDEPENDENT_BUSINESS_ORIGINAL_QUALIFICATION_REVIEW';
+  const businessQualificationReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await reviewOneSignedBusinessQualificationStall({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'BUSINESS_QUALIFICATION_REVIEW_UNVERIFIED',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_BUSINESS_QUALIFICATION_RPC_UNAVAILABLE':
+      String(error?.message||'').startsWith('BUSINESS_QUALIFICATION_')?
+       'INDEPENDENT_BUSINESS_QUALIFICATION_SCOPE_INVALID':
+       'BUSINESS_QUALIFICATION_REVIEW_RUNTIME_UNVERIFIED',
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_ACTIVE_SIGNED_BUSINESS_QUALIFICATION_SCOPE',
      original_job_completed:false,installation_authorized:false,
      production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
@@ -1628,6 +1652,7 @@ export default async function handler(req,res){
     changed_source_same_job_requalification:changedSourceRequalification,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     shift_continuity_independent_review:continuityIndependentReview,
+    independent_business_qualification_review:businessQualificationReview,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
