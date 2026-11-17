@@ -183,8 +183,14 @@ export default async function handler(req,res){
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await investigateOneSignedShiftContinuityIncident({
      db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
-    }).catch(()=>({
+    }).catch(error=>({
      status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_INVESTIGATION_DATABASE_RPC_REJECTED':
+      error?.message==='SHIFT_RPC_NOT_ALLOWLISTED'?
+       'INVESTIGATION_RPC_TRANSPORT_NOT_CONNECTED':
+       String(error?.message||'').startsWith('SHIFT_CONTINUITY_')?
+        'SIGNED_INVESTIGATION_CLAIM_INVALID':'INVESTIGATION_RUNTIME_UNVERIFIED',
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false
     })):
