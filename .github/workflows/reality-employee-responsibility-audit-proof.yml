@@ -12,6 +12,8 @@ on:
       - supabase/migrations/20261117_owner_worker_self_observation_and_recovery_v1.sql
       - supabase/migrations/20261117_worker_failure_summary_reconciliation_v2.sql
       - supabase/migrations/20261117_owner_worker_cron_readback_access_v1.sql
+      - supabase/migrations/20261117_worker_operational_continuity_verification_v1.sql
+      - supabase/migrations/20261117_owner_worker_recovery_status_readback_v2.sql
       - supabase/migrations/20261117_owner_capability_employee_schedule_v1.sql
       - supabase/migrations/20261117_existing_worker_capability_schedule_wake_v1.sql
       - supabase/migrations/20261117_capability_schedule_proof_readback_v2.sql
@@ -37,6 +39,7 @@ on:
       - test/reality-standing-capability-autonomy-v1.test.js
       - test/reality-capability-role-schedule-v1.test.js
       - test/reality-worker-self-recovery-v1.test.js
+      - test/reality-worker-operational-continuity-v1.test.js
       - test/reality-past-present-future-time-map-v1.test.js
       - test/reality-home-live-employees-v1.test.js
       - src/reality-active-weekly-source-investigator-v1.js
@@ -75,7 +78,7 @@ jobs:
           node --check reality-home-employee-brief-v1.js
       - name: Run the actual isolated employee-audit acceptance tests
         run: |
-          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js test/reality-employee-time-inquiry-context-v1.test.js test/reality-past-present-future-time-map-v1.test.js test/reality-dynamic-employee-inquiry-worker-v1.test.js test/reality-standing-capability-autonomy-v1.test.js test/reality-capability-role-schedule-v1.test.js test/reality-worker-self-recovery-v1.test.js
+          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js test/reality-employee-time-inquiry-context-v1.test.js test/reality-past-present-future-time-map-v1.test.js test/reality-dynamic-employee-inquiry-worker-v1.test.js test/reality-standing-capability-autonomy-v1.test.js test/reality-capability-role-schedule-v1.test.js test/reality-worker-self-recovery-v1.test.js test/reality-worker-operational-continuity-v1.test.js
       - name: No new shift, installation or production effect
         run: |
           echo 'Read-only responsibility audit proof; no secrets or provider mutations'
