@@ -291,7 +291,7 @@ test('independent CI and exact install authority is a read-only, source-bound ga
  assert.match(code,/OWNER_EXACT_TESTED_ARTIFACT_APPROVAL_REQUIRED/);
  assert.match(code,/EXACT_OWNER_APPROVED_INSTALL_CONTINUATION_ELIGIBLE/);
  assert.match(code,/installation_authorized_by_read',false/);
- assert.doesNotMatch(code,/cron\\.schedule\\(/);
+ assert.doesNotMatch(code,/cron\.schedule\(/);
 });
 test('watchdog, worker and Chat use existing signed infrastructure and no new authority',()=>{
  const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
