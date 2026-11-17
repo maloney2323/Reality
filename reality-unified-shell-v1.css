@@ -221,7 +221,7 @@ body.reality-unified-ui[data-reality-route="chat"] .reality-chat-inspector{borde
 body.reality-unified-ui :is(button,a,summary,input,textarea,select):focus-visible{
  outline:3px solid #8edfff;outline-offset:2px;
 }
-/* Tablet and mobile: same five places, no old tab bar or floating button. */
+/* Tablet and mobile: six key destinations, no old tab bar or floating button. */
 @media(max-width:1130px){
  body.reality-unified-ui .rx-nav-rail{width:175px}
  body.reality-unified-ui main,
