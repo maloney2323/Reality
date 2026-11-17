@@ -104,6 +104,8 @@ import {advanceExistingOwnerIncidentOriginal}
  from '../../src/reality-incident-existing-original-handoff-v1.js';
 import {advanceOneScheduledCapabilityInquiry}
  from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
+import {investigateOneSignedShiftContinuityIncident}
+ from '../../src/reality-shift-continuity-auto-investigation-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -167,6 +169,22 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // A detected stall is not a model guess or a reason to start another shift.
+  // It is a durable independently observed incident; investigate it on THIS
+  // signed wake before normal employee discovery, preserving exact authority.
+  workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
+  const shiftContinuityInvestigation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await investigateOneSignedShiftContinuityIncident({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
   // This existing signed worker can also investigate when NO shift is active,
   // but ONLY after a separately signed owner enables a time-limited standing
   // evidence-only delegation. A grant does not start a shift or install code.
@@ -1545,6 +1563,7 @@ export default async function handler(req,res){
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
+    shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
