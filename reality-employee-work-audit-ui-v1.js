@@ -21,13 +21,18 @@
  action.type='button';
  action.setAttribute('aria-label','Audit the weekly responsibilities of all eight employees');
  heading.append(action);
+ const inquiryAction=add('button','simple-secondary reality-employee-inquiry-trigger',
+  'Discover next question');
+ inquiryAction.type='button';
+ inquiryAction.setAttribute('aria-label','Let Reality form and investigate one source-backed question');
+ heading.append(inquiryAction);
  const panel=add('section','reality-employee-audit-panel');
  panel.id='realityEmployeeResponsibilityAuditResults';
  panel.setAttribute('aria-live','polite');
  panel.setAttribute('aria-label','Independently checked employee weekly responsibilities');
  panel.hidden=true;
  grid.insertAdjacentElement('afterend',panel);
- const buttons=[action];
+ const buttons=[action,inquiryAction];
  let running=false;
  async function audit(name){
   if(running)return;
@@ -199,6 +204,38 @@
       card.append(block);
      }
     }
+    // Only signed durable model/investigation receipts are surfaced here.
+    const inquiry=data.employee_inquiry_receipts;
+    if(inquiry?.status==='OWNER_EMPLOYEE_INQUIRIES_READ_ONLY'&&
+       inquiry.owner_scope_verified===true&&inquiry.read_only===true&&
+       inquiry.execution_authorized===false&&
+       inquiry.qualified_executable_jobs===0&&
+       Array.isArray(inquiry.items)){
+     const received=inquiry.items.filter(x=>x.employee===role.employee_name);
+     if(received.length){
+      const saved=add('details','reality-audit-findings');
+      saved.append(add('summary',null,
+       'Reality investigated '+received.length+' source question(s)'));
+      for(const record of received){
+       if(record.qualified_executable_job!==false||
+          record.execution_authorized!==false||
+          !/^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/[1-9][0-9]*$/.test(
+           record.source_ref||''))continue;
+       const item=add('div','reality-audit-work-item');
+       item.append(add('strong',null,record.question));
+       const source=add('a',null,'View original source');
+       source.href=record.source_ref;source.target='_blank';
+       source.rel='noopener noreferrer';item.append(source);
+       item.append(add('p',null,'Investigation: '+record.investigation));
+       item.append(add('p',null,'Next independent proof: '+record.next_proof));
+       item.append(add('small',null,
+        'Source checked and model response recorded · '+record.recommendation+
+        ' · Not a verified repair, approved job or completed customer outcome'));
+       saved.append(item);
+      }
+      card.append(saved);
+     }
+    }
     if(role.additional_business_connections_needed)
      card.append(add('p','reality-audit-warning',
       'Connected GitHub sources do not yet cover this role\'s full business responsibilities.'));
@@ -225,5 +262,41 @@
   button.addEventListener('click',()=>{void audit(name);});
   card.append(button);buttons.push(button);
  }
+ async function inquire(){
+  if(running)return;
+  running=true;buttons.forEach(b=>b.disabled=true);
+  panel.hidden=false;
+  panel.replaceChildren(add('p','reality-audit-progress',
+   'Reality is rechecking one source and generating its own evidence-grounded question…'));
+  let refresh=false;
+  try{
+   const response=await fetch('/api/reality/personal-employee-inquiry',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({intent:'INVESTIGATE_NEXT_SOURCE'}),
+    signal:AbortSignal.timeout(55000)
+   });
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true||
+      data.execution_authorized!==false||
+      data.installation_authorized!==false||
+      data.production_changed!==false)
+    throw Error('INQUIRY_VERIFIED_RESPONSE_REQUIRED');
+   refresh=data.status==='EMPLOYEE_SOURCE_QUESTION_AND_INVESTIGATION_RECORDED';
+   panel.replaceChildren(add('p','reality-audit-summary',
+    refresh?'Reality recorded a new source-backed question for '+
+       data.employee+'. Reloading verified employee investigation receipts…':
+    data.status==='NO_FRESH_UNSETTLED_EMPLOYEE_INQUIRY_SOURCE'?
+       'No new verified unsettled source is eligible. Refresh connected business sources; no job created.':
+    'Inquiry is blocked or already claimed. No job or approval was created.'));
+  }catch{
+   panel.replaceChildren(add('p','reality-audit-warning',
+    'Reality could not verify a new investigation. No work or capability was authorized.'));
+  }finally{
+   running=false;buttons.forEach(b=>b.disabled=false);
+  }
+  if(refresh)void audit('ALL');
+ }
+ inquiryAction.addEventListener('click',()=>{void inquire()});
  action.addEventListener('click',()=>{void audit('ALL');});
 })();
