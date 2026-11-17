@@ -26,6 +26,8 @@ import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
 import {readOwnerChatWorkHandoff} from '../../src/reality-private-chat-work-readback-v1.js';
+import {readOwnerOperationalIncidentChatBriefing,incidentChatUniverseObservations}
+ from '../../src/reality-owner-operational-incident-chat-v1.js';
 import {readOwnerOriginalWorkForChat,originalWorkObservation,
  readOwnerWeeklyCandidateQueueForChat,weeklyQueueObservation,
  scopeOwnerOriginalWorkToShift}
@@ -65,6 +67,16 @@ export default async function handler(req,res){
   const conversationId=String((req.method==='GET'?req.query?.conversation_id:req.body?.conversation_id)||'');
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID',400);
   stage='AUTHENTICATED_HISTORY';
+  // Automatic owner-only operational incident read, no model or write.
+  if(req.method==='GET'&&String(req.query?.incident_readback||'')==='1'){
+   const result=await readOwnerOperationalIncidentChatBriefing({session});
+   return res.status(200).json({
+    ok:true,conversation_id:conversationId,
+    operational_incidents_readback:result,
+    execution_authorized_by_chat:false,
+    installation_authorized:false,production_changed:false
+   });
+  }
   // Progress polling is exact-request owner-RLS readback only, with
   // no model, worker, full-history reconstruction or dashboard lookups.
   if(req.method==='GET'&&String(req.query?.reply_readback||'')==='1'){
@@ -136,6 +148,11 @@ export default async function handler(req,res){
   const history=await readPrivateChat(session,conversationId);
   if(req.method==='GET'){
    const context=await collectOptionalChatEvidence([
+    {id:'operational_incidents',
+     read:()=>readOwnerOperationalIncidentChatBriefing({session}),
+     validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&
+      v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false,
+     fallback:null},
     {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({session,conversationId}),
      validate:v=>v!==null&&typeof v==='object',fallback:null},
     {id:'owner_originals',read:()=>readOwnerOriginalWorkForChat({session}),
@@ -149,6 +166,7 @@ export default async function handler(req,res){
     messages:history.messages,
     reply_readback:summarizeSavedChatReplyReadback(history.messages),
     work_handoff:context.values.work_handoff,
+    operational_incidents_readback:context.values.operational_incidents,
     original_work_readback:context.values.owner_originals,
     weekly_queue_readback:context.values.weekly_queue,
     contextual_readback_status:context.status,
@@ -252,6 +270,12 @@ export default async function handler(req,res){
   // optional sources and existing read-only governance.
   const wantsWorkerHealth=/(?:\bwatchdog\b|\bauto[ -]?wake\b|\bwake(?:up)?\s+(?:status|health|failure|trigger)\b|\bworker\s+(?:health|status|wake|failed)\b)/i.test(text);
   const optionalContextPromise=collectOptionalChatEvidence([
+   {id:'operational_incidents',
+    read:()=>readOwnerOperationalIncidentChatBriefing({session,db:isolated}),
+    validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&
+     v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false&&
+     v.installation_authorized===false,
+    fallback:null},
    {id:'primary_mission',
     read:()=>readFreshPersonalAccountMissionState({session}),
     validate:x=>x?.version==='reality-account-primary-business-mission-v1'&&
@@ -346,6 +370,7 @@ export default async function handler(req,res){
   optionalContextWaitMs=Date.now()-optionalContextWaitStart;
   const {
    primary_mission:ownerMissionReadback,
+   operational_incidents:operationalIncidentsReadback,
    work_handoff:chatWorkReadback,
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
    employee_shift:employeeShiftObservations,worker_wake:workerWakeObservations,
@@ -441,7 +466,9 @@ export default async function handler(req,res){
    ...employeeShiftObservations,...workerWakeObservations,
    ...companyWorkforceObservations,...rileySourceWorkObservations,
    ...weeklyWorkloadObservations,
-   ...selfVisibilityObservations,...originalWorkObservation(ownerOriginalWork),
+   ...selfVisibilityObservations,
+   ...incidentChatUniverseObservations(operationalIncidentsReadback),
+   ...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
   ];
   const makeOwnerUniverseReadModel=(priorHistory=null)=>{
@@ -532,6 +559,9 @@ export default async function handler(req,res){
      weekly_queue:ownerWeeklyQueue||null,
      weekly_workload_gap:weeklyWorkloadObservations[0]?.weekly_workload_insight||null,
      verified_workforce:companyWorkforceObservations.slice(0,12),
+     owner_operational_incidents:operationalIncidentsReadback?.items?.slice(0,3)||null,
+     owner_operational_incident_source_available:
+      operationalIncidentsReadback?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY',
      authoritative_goal_state:currentGoal,
      verified_primary_business_mission:activePrimaryMission?Object.freeze({
       goal_id:activePrimaryMission.goal_id,
