@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null,repairGates=null}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null,repairGates=null,qualifiedWork=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -165,6 +165,84 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   previewRepair={
    status:autoRepair.status,count:autoRepair.count,items:normalized,
    historical_external_correction_not_reclassified:true
+  };
+ }
+ let qualifiedEmployeeWork={
+  status:'QUALIFIED_EMPLOYEE_WORK_READBACK_UNAVAILABLE',
+  counts:{total:0,qualified_executable:0,executing:0,
+   pending_independent_verification:0,independently_completed:0,blocked:0},
+  items:[],source_report_only:true,original_customer_job_completed:false
+ };
+ if(qualifiedWork!==null){
+  if(qualifiedWork?.status!=='OWNER_SOURCE_QUALIFIED_EMPLOYEE_WORK_READ_ONLY'||
+   qualifiedWork.owner_id!==ownerId||
+   qualifiedWork.owner_scope_verified!==true||
+   qualifiedWork.read_only!==true||
+   qualifiedWork.installation_authorized_by_read!==false||
+   qualifiedWork.original_customer_job_completed_by_read!==false||
+   qualifiedWork.production_changed!==false||
+   !Array.isArray(qualifiedWork.items)||qualifiedWork.items.length>12)
+   fail();
+  const counts=qualifiedWork.counts;
+  const countKeys=['total','qualified_executable','executing',
+   'pending_independent_verification','independently_completed','blocked'];
+  if(!counts||countKeys.some(k=>!Number.isSafeInteger(counts[k])||
+   counts[k]<0||counts[k]>100000)||
+   counts.total!==countKeys.slice(1).reduce((acc,k)=>acc+counts[k],0))
+   fail();
+  const phases=new Set(['QUALIFIED_EXECUTABLE','EXECUTION_CLAIMED',
+   'SUBMITTED_AWAITING_INDEPENDENT_RECHECK','REVIEW_CLAIMED',
+   'COMPLETED_INDEPENDENTLY_VERIFIED','BLOCKED_SOURCE_CHANGED',
+   'BLOCKED_PROVIDER_OR_WORKER_EVIDENCE']);
+  const jobs=qualifiedWork.items.map(job=>{
+   if(!UUID.test(job.job_id||'')||
+    !UUID.test(job.shift_id||'')||
+    typeof job.employee!=='string'||job.employee.length<2||
+    job.employee.length>160||
+    job.job_type!=='CURRENT_SOURCE_EVIDENCE_PACK'||
+    !/^https:\/\/github[.]com\/[^/]+\/[^/]+\/(issues|pull)\/[1-9][0-9]*$/.test(job.source_ref||'')||
+    !phases.has(job.phase)||
+    typeof job.objective!=='string'||job.objective.length<15||
+    job.objective.length>1500||
+    !HASH.test(job.qualification_receipt_sha256||'')||
+    (job.deliverable_receipt_sha256!==null&&
+     !HASH.test(job.deliverable_receipt_sha256))||
+    (job.independent_receipt_sha256!==null&&
+     !HASH.test(job.independent_receipt_sha256))||
+    job.original_customer_job_completed!==false||
+    job.code_repair_installed===true||
+    job.production_changed!==false||
+    job.evidence_job_completed!==(job.phase===
+     'COMPLETED_INDEPENDENTLY_VERIFIED')||
+    (job.evidence_job_completed===true&&
+     (!UUID.test(job.execution_worker_run_id||'')||
+      !UUID.test(job.review_worker_run_id||'')||
+      job.execution_worker_run_id===job.review_worker_run_id||
+      !HASH.test(job.independent_receipt_sha256||'')||
+      !validDate(job.verified_at))))
+    fail();
+   return Object.freeze({
+    job_id:job.job_id,shift_id:job.shift_id,employee:job.employee,
+    source_ref:job.source_ref,job_type:job.job_type,phase:job.phase,
+    objective:trim(job.objective,1500),
+    qualification_receipt_sha256:job.qualification_receipt_sha256,
+    deliverable_receipt_sha256:job.deliverable_receipt_sha256,
+    independent_receipt_sha256:job.independent_receipt_sha256,
+    execution_worker_run_id:job.execution_worker_run_id,
+    review_worker_run_id:job.review_worker_run_id,
+    current_source_title:trim(job.deliverable?.source_title,500)||null,
+    followup_proof_still_required:
+     trim(job.deliverable?.next_evidence_required,1500)||null,
+    blocker:trim(job.blocker,500)||null,
+    evidence_job_completed:job.evidence_job_completed===true,
+    original_customer_job_completed:false,code_repair_installed:false,
+    production_changed:false
+   });
+  });
+  qualifiedEmployeeWork={
+   status:qualifiedWork.status,counts:Object.freeze({...counts}),
+   items:jobs,source_report_only:true,
+   original_customer_job_completed:false
   };
  }
  const gateByIncident=new Map();
@@ -453,6 +531,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   shift_continuity_count:continuityItems.length,
   exact_repair_install_gate_read_status:installGateReadStatus,
   exact_repair_install_gate_count:gateByIncident.size,
+  qualified_employee_evidence_work:Object.freeze(qualifiedEmployeeWork),
   reported_next_action:trim(source.next_action,500),
   external_actions_authorized:false,production_changed:false,
   original_job_authorized_by_chat:false,installation_authorized:false
@@ -467,7 +546,7 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const [source,handoff,delivery,autoRepair,continuity,repairGates]=await Promise.all([
+ const [source,handoff,delivery,autoRepair,continuity,repairGates,qualifiedWork]=await Promise.all([
   call(db,'reality_read_owner_worker_recovery_status_v1',{
    p_owner_id:owner
   },{fetchImpl}),
@@ -487,10 +566,14 @@ export async function readOwnerOperationalIncidentChatBriefing({
   },{fetchImpl}).catch(()=>null),
   call(db,'reality_read_owner_shift_repair_install_gates_v1',{
    p_owner_id:owner
+  },{fetchImpl}).catch(()=>null),
+  call(db,'reality_read_owner_qualified_employee_evidence_jobs_v1',{
+   p_owner_id:owner
   },{fetchImpl}).catch(()=>null)
  ]);
  return projectOwnerIncidentChatBriefing({
-  ownerId:owner,source,handoff,delivery,autoRepair,continuity,repairGates
+  ownerId:owner,source,handoff,delivery,autoRepair,continuity,repairGates,
+  qualifiedWork
  });
 }
 export function incidentChatUniverseObservations(briefing){
