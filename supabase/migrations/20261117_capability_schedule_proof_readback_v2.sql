@@ -1,4 +1,4 @@
--- Tighten independent original proof and version-match the capability feed.
+-- Tighten independent original proof and verify matching capability-feed version.
 create or replace function public.reality_read_owner_capability_employee_schedule_v1(p_owner_id uuid)
 returns jsonb language plpgsql security invoker set search_path to '' as $f$
 declare result jsonb;
@@ -19,8 +19,6 @@ begin
    'estimate_minutes_low',t.provisional_minutes_low,
    'estimate_minutes_high',t.provisional_minutes_high,
    'estimate_is_model_provisional_only',true,
-   -- The feed is evidence of a proposal, NOT proof the external source is
-   -- current. Exact fingerprint blocks stale role/scope reuse on a changed feed.
    'source_feed_fingerprint_unchanged',exists(
     select 1 from pg_catalog.jsonb_array_elements(
      public.reality_read_owner_capability_gap_feed_v1(p_owner_id)->'items'
@@ -36,31 +34,7 @@ begin
      'LEASED_FOR_INDEPENDENT_REPRODUCTION',
      'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
      'AWAITING_OWNER_APPROVAL','AWAITING_INSTALLATION_APPROVAL')
-    and q.original_work_id ~ '^work:[a-f0-9]{32}
-   ),
-   'existing_original_work_id',case when q.trigger_id is not null
-    and q.verified_frozen_reproduction->>'status'='ORIGINAL_FROZEN_REPRODUCED_RED'
-    and q.verified_frozen_reproduction->>'original_work_id'=q.original_work_id
-     then q.original_work_id else null end,
-   'existing_governance_phase',q.phase,
-   'execution_authorized_by_schedule',false,
-   'original_job_created_by_schedule',false,
-   'installation_authorized',false
-  ) order by t.priority,t.claimed_at),'[]'::jsonb)
- into result
- from (select t.* from reality_internal.owner_capability_employee_schedule_v1 t
-  where t.owner_id=p_owner_id order by t.priority,t.claimed_at limit 50) t
- left join reality_internal.genuine_capability_queue_v1 q
-  on t.capability_key='queue:'||q.trigger_id::text
-   and q.owner_id=t.owner_id;
- return pg_catalog.jsonb_build_object(
-  'status','OWNER_CAPABILITY_EMPLOYEE_SCHEDULE_READ_ONLY',
-  'owner_id',p_owner_id,'owner_scope_verified',true,'read_only',true,
-  'items',result,'count',pg_catalog.jsonb_array_length(result),
-  'new_original_jobs_created',0,'execution_authorized_by_schedule',false,
-  'installation_authorized',false,'production_changed',false);
-end $f$;
-
+    and q.original_work_id ~ '^work:[a-f0-9]{32}$'
     and q.verified_frozen_reproduction->>'status'='ORIGINAL_FROZEN_REPRODUCED_RED'
     and q.verified_frozen_reproduction->>'original_work_id'=q.original_work_id
     and q.verified_frozen_reproduction->>'frozen_sha256'=
@@ -72,27 +46,7 @@ end $f$;
      'LEASED_FOR_INDEPENDENT_REPRODUCTION',
      'FROZEN_REPRODUCED_AWAITING_CANDIDATE',
      'AWAITING_OWNER_APPROVAL','AWAITING_INSTALLATION_APPROVAL')
-    and q.original_work_id ~ '^work:[a-f0-9]{32}
-     then q.original_work_id else null end,
-   'existing_governance_phase',q.phase,
-   'execution_authorized_by_schedule',false,
-   'original_job_created_by_schedule',false,
-   'installation_authorized',false
-  ) order by t.priority,t.claimed_at),'[]'::jsonb)
- into result
- from (select t.* from reality_internal.owner_capability_employee_schedule_v1 t
-  where t.owner_id=p_owner_id order by t.priority,t.claimed_at limit 50) t
- left join reality_internal.genuine_capability_queue_v1 q
-  on t.capability_key='queue:'||q.trigger_id::text
-   and q.owner_id=t.owner_id;
- return pg_catalog.jsonb_build_object(
-  'status','OWNER_CAPABILITY_EMPLOYEE_SCHEDULE_READ_ONLY',
-  'owner_id',p_owner_id,'owner_scope_verified',true,'read_only',true,
-  'items',result,'count',pg_catalog.jsonb_array_length(result),
-  'new_original_jobs_created',0,'execution_authorized_by_schedule',false,
-  'installation_authorized',false,'production_changed',false);
-end $f$;
-
+    and q.original_work_id ~ '^work:[a-f0-9]{32}$'
     and q.verified_frozen_reproduction->>'status'='ORIGINAL_FROZEN_REPRODUCED_RED'
     and q.verified_frozen_reproduction->>'original_work_id'=q.original_work_id
     and q.verified_frozen_reproduction->>'frozen_sha256'=
