@@ -7,6 +7,7 @@ test('ordinary signed eight-hour shift continues the same eight-employee source 
  const broker=read('src/reality-governed-shift-boundary-v1.js');
  const sql=read('supabase/migrations/20261117_signed_shift_to_all_employee_inquiry_handoff_v1.sql');
  const cron=read('supabase/migrations/20261117_signed_shift_employee_inquiry_continuation_wake_v1.sql');
+ const correctedWake=read('supabase/migrations/20261117_signed_shift_employee_inquiry_continuation_wake_v2.sql');
  assert.match(worker,/reality_read_current_signed_employee_inquiry_scope_v1/);
  assert.match(broker,/read_current_signed_employee_inquiry_scope_v1/);
  assert.match(worker,/signedEmployeeInquiryScope\.shift_id===wakeReceipt\.shift_id/);
@@ -28,6 +29,10 @@ test('ordinary signed eight-hour shift continues the same eight-employee source 
  assert.match(cron,/owner_routine_delegations_v1|employee_discovery_role_coverage_v1/);
  assert.match(cron,/not exists\(/);
  assert.match(cron,/s\.planned_end_at>clock_timestamp\(\)/);
+ assert.match(correctedWake,/on c\.owner_id=s\.owner_id/);
+ assert.match(correctedWake,/E'join reality_internal\.employee_discovery_role_coverage_v1 c/);
+ assert.doesNotMatch(correctedWake,/position\('realit'/);
+ assert.match(correctedWake,/SHIFT_EMPLOYEE_INQUIRY_WAKE_AUTHORITY_NOT_VERIFIED/);
  assert.doesNotMatch(cron,/cron\.schedule\(/);
  assert.doesNotMatch(cron,/public\.reality_read_owner_capability_gap_feed_v1\('/);
 });
