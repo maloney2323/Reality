@@ -25,6 +25,10 @@ test('Connection inventory is authenticated, owner-scoped and read-only',()=>{
  assert.match(api,/privateChatConfig\(\)/);
  assert.match(api,/authenticatedChatSession\(req,res\)/);
  assert.match(api,/VERCEL_ENV!=='preview'/);
+ assert.match(api,/REALITY_CONNECTION_SETUP_EXPLICIT_OWNER_SCOPE_REQUIRED/);
+ assert.match(api,/origin!=='https:\/\/'+host/);
+ assert.match(api,/reality_request_owner_connector_setup_v1/);
+ assert.match(api,/reality_read_owner_connector_setup_v1/);
  assert.match(api,/!\['GET','POST'\]\.includes\(req\.method\)/);
  assert.match(api,/Object\.keys\(req\.query\|\|\{\}\)\.length/);
  assert.match(api,/db\.url!==session\.config\?\.url/);
@@ -40,6 +44,9 @@ test('Connection inventory is authenticated, owner-scoped and read-only',()=>{
  assert.match(api,/oauth_flows_completed:0/);
  assert.match(api,/provider_oauth_verified_count:0/);
  assert.match(api,/connection_action_available:false/);
+ assert.match(api,/setup_request_action_available:true/);
+ assert.match(api,/automatic_grant_of_new_provider_access:false/);
+ assert.match(api,/automatic_discovery_of_existing_sources:true/);
  assert.doesNotMatch(api,/https:\/\/api\.stripe\.com|stripe\.refunds\.create|create_checkout/i);
 });
 test('Reality connector registry is not ChatGPT and never equates credential to proof',()=>{
@@ -47,7 +54,10 @@ test('Reality connector registry is not ChatGPT and never equates credential to 
  for(const provider of ['github','vercel','supabase'])
   assert.match(registry,new RegExp('\\b'+provider+':'));
  for(const provider of ['github','vercel','supabase','stripe','gmail',
-  'google-calendar','quickbooks','slack'])
+  'google-calendar','quickbooks','slack','paypal','square','shopify',
+  'google-drive','microsoft-365','notion','hubspot','mailchimp','xero',
+  'zoom','meta-business','google-analytics','asana','trello',
+  'jobber','housecall-pro','servicetitan','airtable'])
   assert.match(api,new RegExp("id:'"+provider+"'"));
  assert.match(api,/GITHUB_PUBLIC_SOURCE_OBSERVED_NO_OAUTH_CLAIM/);
  assert.match(api,/OWNER_DATABASE_READBACK_VERIFIED/);
@@ -67,4 +77,26 @@ test('No old connection data survives signout or a broken readback',()=>{
  assert.match(ui,/Connection status could not be verified/);
  assert.match(ui,/credentials:'same-origin'/);
  assert.match(ui,/cache:'no-store'/);
+});
+
+test('PayPal appears in the 26-provider catalog without pretending to connect',()=>{
+ assert.match(api,/id:'paypal',label:'PayPal'/);
+ assert.match(api,/developer\\.paypal\\.com\/api\/rest\//);
+ assert.match(ui,/Browse all apps/);
+ assert.match(ui,/Auto-detect existing sources/);
+ assert.match(ui,/Request secure setup/);
+ assert.match(ui,/source\.setup_requested\?'Setup requested':'Request secure setup'/);
+ assert.match(ui,/setup_state!=='SETUP_REQUESTED_NO_CREDENTIALS'/);
+ assert.match(ui,/actual_provider_connected!==false/);
+ assert.match(ui,/payment_action_authorized!==false/);
+ assert.match(ui,/new account access still requires permission/);
+ assert.doesNotMatch(api,/https:\/\/api\.paypal\.com\/v[12]\/|PAYPAL_CLIENT_SECRET/);
+});
+test('a new business can request first integration before discovery exists',()=>{
+ assert.match(api,/reality_read_owner_employee_discovery_v1/);
+ assert.match(api,/\.catch\(\(\)=>null\)/);
+ assert.match(api,/sourceReadbackVerified/);
+ assert.match(api,/requested\.owner_id!==session\.user_id/);
+ assert.match(api,/requested\.request_count!==requested\.requests\.length/);
+ assert.match(api,/SOURCES\.some\(s=>s\.id===x\.provider_id\)/);
 });
