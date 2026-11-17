@@ -70,7 +70,8 @@ export default async function handler(req,res){
     data.source_count!==data.items.length||
     !data.items.every(x=>
      names.has(x.employee)&&
-     ['GITHUB_ISSUE','MARKET_ASSESSMENT','CAPABILITY_AUDIT'].includes(x.source_family)&&
+     ['GITHUB_ISSUE','GITHUB_PULL_REQUEST','MARKET_ASSESSMENT',
+      'CAPABILITY_AUDIT','ROI_EVIDENCE_GAP'].includes(x.source_family)&&
      ['NEEDS_CURRENT_VALIDATION','HISTORICAL_REVALIDATION_REQUIRED',
       'SETTLED_NO_REPLAY'].includes(x.disposition)&&
      /^sha256:[a-f0-9]{64}$/.test(x.evidence_sha256||'')&&
