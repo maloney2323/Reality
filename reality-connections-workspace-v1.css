@@ -1,0 +1,83 @@
+/* Reality Connections · one page, one owner-scoped read-only source. */
+body.reality-unified-ui[data-reality-route="connections"]
+ main>:not(.top):not(#realityUnifiedView){display:none!important}
+body.reality-unified-ui[data-reality-route="connections"]
+ #realityUnifiedView{width:100%;box-sizing:border-box}
+body.reality-unified-ui .rx-connections-area{margin-top:22px}
+body.reality-unified-ui .rx-connection-actions{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:13px;margin:0 0 15px;flex-wrap:wrap
+}
+body.reality-unified-ui .rx-connections-status{
+ color:#c8ddef;font-size:13px;line-height:1.6;margin:0;max-width:730px
+}
+body.reality-unified-ui .rx-connection-refresh{
+ min-height:43px;padding:9px 15px;border-radius:10px;border:1px solid #478fb8;
+ background:#0c426d;color:#e7faff;cursor:pointer;
+ font:750 13px/1.2 system-ui,sans-serif
+}
+body.reality-unified-ui .rx-connection-refresh:disabled{opacity:.55;cursor:default}
+body.reality-unified-ui .rx-connections-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px
+}
+body.reality-unified-ui .rx-connection-card{
+ min-width:0;box-sizing:border-box;
+ background:linear-gradient(150deg,#071b34,#0a2946);
+ border:1px solid #2d6590;border-radius:14px;padding:17px;
+ display:flex;flex-direction:column;gap:11px
+}
+body.reality-unified-ui .rx-connection-card-head{
+ display:flex;align-items:center;flex-wrap:wrap;gap:11px
+}
+body.reality-unified-ui .rx-connection-glyph{
+ border:1px solid #4479a7;border-radius:12px;background:#103e67;
+ color:#a0e5ff;width:43px;height:43px;display:grid;
+ place-items:center;font-size:22px;font-weight:800;flex:none
+}
+body.reality-unified-ui .rx-connection-heading{flex:1;min-width:100px}
+body.reality-unified-ui .rx-connection-heading h2{
+ font-size:17px;line-height:1.3;color:#f0faff;margin:0 0 4px
+}
+body.reality-unified-ui .rx-connection-group{
+ font-size:11px;color:#a2cee5
+}
+body.reality-unified-ui .rx-connection-indicator{
+ border:1px solid #667b8f;color:#c3d6e2;background:#153043;
+ border-radius:99px;padding:6px 9px;font-size:10px;font-weight:800;
+ line-height:1.3
+}
+body.reality-unified-ui .rx-connection-indicator[data-level="verified"]{
+ border-color:#4b9b88;color:#bff3d9;background:#133e39
+}
+body.reality-unified-ui .rx-connection-indicator[data-level="observed"]{
+ border-color:#4d92b7;color:#c5eaff;background:#11394f
+}
+body.reality-unified-ui .rx-connection-description{
+ margin:0;color:#c0d6e7;font-size:12px;line-height:1.6
+}
+body.reality-unified-ui .rx-connection-details{
+ border-top:1px solid #2c5071;padding-top:11px
+}
+body.reality-unified-ui .rx-connection-details summary{
+ cursor:pointer;color:#c7e9ff;font-size:12px;font-weight:750
+}
+body.reality-unified-ui .rx-connection-details p{
+ font-size:12px;line-height:1.55;margin:9px 0;color:#c5d8e5
+}
+body.reality-unified-ui .rx-connection-footer{
+ display:flex;justify-content:space-between;align-items:center;
+ gap:9px;flex-wrap:wrap;margin-top:auto;padding-top:10px;
+ border-top:1px solid #254a68;
+ font-size:10px;line-height:1.5;color:#a9c6db
+}
+body.reality-unified-ui .rx-connection-note{color:#f0d9ae}
+@media(max-width:850px){
+ body.reality-unified-ui .rx-connections-grid{grid-template-columns:1fr}
+}
+@media(max-width:450px){
+ body.reality-unified-ui .rx-connection-card{padding:13px}
+ body.reality-unified-ui .rx-connection-indicator{
+  flex:1 1 100%;text-align:left;width:max-content;max-width:100%
+ }
+ body.reality-unified-ui .rx-connection-refresh{width:100%}
+}
