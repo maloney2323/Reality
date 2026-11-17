@@ -104,7 +104,7 @@ import {advanceExistingOwnerIncidentOriginal}
  from '../../src/reality-incident-existing-original-handoff-v1.js';
 import {advanceOneScheduledCapabilityInquiry}
  from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
-import {investigateOneSignedShiftContinuityIncident}
+import {investigateOneSignedShiftContinuityIncident,classifySignedContinuityClaimTransportError}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
@@ -183,8 +183,9 @@ export default async function handler(req,res){
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await investigateOneSignedShiftContinuityIncident({
      db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
-    }).catch(()=>({
+    }).catch(error=>({
      status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
+     failure_code:classifySignedContinuityClaimTransportError(error),
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false
     })):
