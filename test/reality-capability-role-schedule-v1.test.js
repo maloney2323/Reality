@@ -224,3 +224,18 @@ test('only existing original proof ledger may mark current gap verified; schedul
  assert.match(worker,/runOneStandingEmployeeDiscovery/);
  assert.doesNotMatch(sql,/UPDATE reality_internal\.genuine_capability_queue_v1/i);
 });
+
+test('capability schedule is the SAME ledger in the employee audit, not a new dispatch queue',()=>{
+ const audit=readFileSync(new URL('../api/reality/personal-employee-work-audit.js',
+  import.meta.url),'utf8');
+ const employees=readFileSync(new URL('../reality-employee-work-audit-ui-v1.js',
+  import.meta.url),'utf8');
+ const capability=readFileSync(new URL('../api/reality/personal-capabilities.js',
+  import.meta.url),'utf8');
+ assert.match(audit,/reality_read_owner_capability_employee_schedule_v1/);
+ assert.match(capability,/reality_read_owner_capability_employee_schedule_v1/);
+ assert.match(audit,/employee_capability_investigations/);
+ assert.match(employees,/assigned capability investigation/);
+ assert.match(employees,/independent_current_gap_proven/);
+ assert.match(employees,/execution_authorized_by_schedule===false/);
+});
