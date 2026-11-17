@@ -57,3 +57,9 @@
  padding:11px;margin:10px 0;color:#dbebf8;font-size:12px;
  line-height:1.6;overflow-wrap:anywhere
 }
+
+#realityOwnerIncidentChat .rx-owner-preview-repair-status{
+ border-radius:10px;border:1px solid #4b6f72;background:#172b30;
+ color:#d5f1e8;padding:11px;margin:10px 0;
+ font-size:12px;line-height:1.6;overflow-wrap:anywhere
+}
