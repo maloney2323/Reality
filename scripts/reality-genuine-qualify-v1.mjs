@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Only after an independent GitHub verification job has succeeded, Reality
 // qualifies the exact candidate for owner review. This NEVER installs code.
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -5,7 +7,7 @@ const env=process.env;
 const die=x=>{throw Error('GENUINE_CANDIDATE_QUALIFY_'+x)};
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  die('EXACT_SIGNED_ISOLATED_RUN_REQUIRED');
 const admission=JSON.parse(readFileSync(
  'admission/genuine-capability-admitted-queue.json','utf8'));
