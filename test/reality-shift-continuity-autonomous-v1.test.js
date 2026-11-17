@@ -626,3 +626,45 @@ test('reviewed remediation SQL is not truncated at postgres regex end anchors',(
  assert.doesNotMatch(sql,/end \$function\$\s*\n\s*and remediation_receipt_sha256/);
  assert.match(sql,/remediation_used_at=case when i.investigation_attempts=3/);
 });
+
+test('owner Chat carries Quinn source-change proof, but neither repairs nor settles an original',()=>{
+ const review={status:'SOURCE_CHANGED_NEEDS_FROZEN_TEST',reviewer:'Quinn',
+  worker_run_id:'88888888-9999-4aaa-8bbb-cccccccccccc',
+  prior_source_sha256:hash('a'),current_source_sha256:hash('c'),
+  receipt_sha256:hash('d'),verified_at:'2026-11-17T22:18:02Z',
+  original_job_completed:false,repair_executed:false,
+  installation_authorized:false,production_changed:false};
+ const read={...readback,items:[{...readback.items[0],
+  independent_source_review:review,
+  next_action:'Independent source review verified change; frozen test required.'}]};
+ const result=projectOwnerIncidentChatBriefing({ownerId:owner,source,continuity:read});
+ const item=result.shift_continuity_incidents[0];
+ assert.equal(item.independent_source_review.status,'SOURCE_CHANGED_NEEDS_FROZEN_TEST');
+ assert.equal(item.independent_source_review.source_change_independently_verified,true);
+ assert.equal(item.independent_source_review.independent_repair_test_completed,false);
+ assert.equal(item.independent_source_review.original_customer_job_completed,false);
+ assert.equal(item.self_repair_proven,false);
+ for(const invalid of [
+  {...review,reviewer:'Taylor'},
+  {...review,original_job_completed:true},
+  {...review,receipt_sha256:'FORGED'},
+  {...review,current_source_sha256:hash('a')},
+  {...review,installation_authorized:true}
+ ]){
+  assert.throws(()=>projectOwnerIncidentChatBriefing({ownerId:owner,source,
+   continuity:{...read,items:[{...read.items[0],
+    independent_source_review:invalid}]}
+  }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
+ }
+});
+test('owner readback SQL joins exact incident, owner, shift and source reviewer receipt',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261117_shift_continuity_review_owner_readback_v7.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/'independent_source_review'/);
+ assert.match(sql,/r\.incident_id=i\.incident_id and r\.owner_id=i\.owner_id/);
+ assert.match(sql,/r\.shift_id=i\.shift_id/);
+ assert.match(sql,/SOURCE_CHANGED_NEEDS_FROZEN_TEST/);
+ assert.match(sql,/r\.receipt_sha256/);
+ assert.doesNotMatch(sql,/cron\.schedule\(|cron\.alter_job/);
+});
