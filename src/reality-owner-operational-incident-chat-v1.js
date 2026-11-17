@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -102,6 +102,70 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     'The signed worker has not supplied a verified final receipt. Inspect worker delivery and preserve the blocker; do not call scheduler dispatch a completed job.'
   };
  }
+ let previewRepair={
+  status:'NO_OWNER_PREVIEW_SELF_REPAIR_READBACK',
+  count:0,items:[],historical_external_correction_not_reclassified:true
+ };
+ const repairByIncident=new Map();
+ if(autoRepair!==null){
+  if(autoRepair?.status!=='OWNER_PREVIEW_OPERATIONAL_AUTO_REPAIR_READ_ONLY'||
+   autoRepair.owner_id!==ownerId||
+   autoRepair.owner_scope_verified!==true||
+   autoRepair.read_only!==true||
+   autoRepair.production_changed!==false||
+   autoRepair.new_job_authorized_by_read!==false||
+   autoRepair.install_authorized_by_read!==false||
+   autoRepair.historical_external_correction_not_reclassified!==true||
+   !Array.isArray(autoRepair.items)||autoRepair.items.length>6||
+   autoRepair.items.length!==autoRepair.count)fail();
+  const allowed=new Set([
+   'PATCH_APPLIED_AWAITING_WORKER',
+   'WORKER_ATTESTED_AWAITING_ORIGINAL',
+   'INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED',
+   'BLOCKED_UNRECOGNIZED_SCOPE',
+   'BLOCKED_EVIDENCE_OR_WORKER_MISSING'
+  ]);
+  const normalized=autoRepair.items.map(r=>{
+   if(!UUID.test(r.repair_id||'')||
+      !UUID.test(r.incident_id||'')||
+      !allowed.has(r.phase)||
+      r.repair_kind!=='EXACT_PREVIEW_SCHEDULER_OWNER_FEED_ROLE_MISMATCH'||
+      r.preview_only!==true||r.production_changed!==false||
+      !HASH.test(r.before_sha256||'')||
+      !HASH.test(r.repair_receipt_sha256||'')||
+      (r.after_sha256!=null&&!HASH.test(r.after_sha256))||
+      (r.original_work_receipt_sha256!=null&&
+       !HASH.test(r.original_work_receipt_sha256))||
+      typeof r.next_action!=='string'||r.next_action.length>650||
+      (r.phase==='INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED'&&
+       (!UUID.test(r.worker_run_id||'')||
+        !UUID.test(r.original_capability_claim_id||'')||
+        !HASH.test(r.original_work_receipt_sha256||'')||
+        !validDate(r.verified_at)))||
+      (r.phase==='PATCH_APPLIED_AWAITING_WORKER'&&
+       (!HASH.test(r.after_sha256||'')||!validDate(r.repair_applied_at))))
+    fail();
+   const normalizedItem=Object.freeze({
+    repair_id:r.repair_id,incident_id:r.incident_id,phase:r.phase,
+    repair_kind:r.repair_kind,receipt_sha256:r.repair_receipt_sha256,
+    repair_applied_at:r.repair_applied_at||null,
+    verified_at:r.verified_at||null,
+    worker_run_id:r.worker_run_id||null,
+    original_capability_claim_id:r.original_capability_claim_id||null,
+    original_work_receipt_sha256:r.original_work_receipt_sha256||null,
+    next_action:trim(r.next_action,650),
+    bounded_preview_only:true,production_changed:false,
+    complete_cycle_proven:r.phase==='INDEPENDENT_WORKER_AND_ORIGINAL_VERIFIED'
+   });
+   if(!repairByIncident.has(r.incident_id))
+    repairByIncident.set(r.incident_id,normalizedItem);
+   return normalizedItem;
+  });
+  previewRepair={
+   status:autoRepair.status,count:autoRepair.count,items:normalized,
+   historical_external_correction_not_reclassified:true
+  };
+ }
  const handoffById=new Map();
  if(handoff!==null){
   if(handoff?.status!=='OWNER_INCIDENT_ORIGINAL_REPAIR_HANDOFF_READ_ONLY'||
@@ -153,6 +217,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    fail();
   const recovered=x.phase==='OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX';
   const handoffItem=handoffById.get(x.incident_id)||null;
+  const previewRepairItem=repairByIncident.get(x.incident_id)||null;
   const handoffStatus=handoffItem?.handoff_status||'HANDOFF_READBACK_UNAVAILABLE';
   if(recovered&&
    handoffItem&&handoffStatus!=='RECOVERED_PREVIOUSLY_NO_REPLAY')
@@ -195,6 +260,9 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    existing_original_handoff_receipt_sha256:
     handoffItem?.original_handoff_receipt_sha256||null,
    repair_executed_by_handoff:false,
+   bounded_preview_self_repair:previewRepairItem,
+   bounded_preview_self_repair_cycle_proven:
+    previewRepairItem?.complete_cycle_proven===true,
    operational_continuity_verified:recovered,
    operational_recovery_receipt_sha256:recovered?
     x.operational_recovery_receipt_sha256:null,
@@ -215,6 +283,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   count:items.length,
   scheduler_status:source.last_scheduler_status,
   signed_worker_delivery:Object.freeze(workerDelivery),
+  bounded_preview_auto_repair:Object.freeze(previewRepair),
   reported_next_action:trim(source.next_action,500),
   external_actions_authorized:false,production_changed:false,
   original_job_authorized_by_chat:false,installation_authorized:false
@@ -229,7 +298,7 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const [source,handoff,delivery]=await Promise.all([
+ const [source,handoff,delivery,autoRepair]=await Promise.all([
   call(db,'reality_read_owner_worker_recovery_status_v1',{
    p_owner_id:owner
   },{fetchImpl}),
@@ -240,9 +309,14 @@ export async function readOwnerOperationalIncidentChatBriefing({
   },{fetchImpl}).catch(()=>null),
   call(db,'reality_read_owner_signed_worker_actual_runs_v1',{
    p_owner_id:owner
+  },{fetchImpl}).catch(()=>null),
+  call(db,'reality_read_owner_preview_worker_auto_repair_v1',{
+   p_owner_id:owner
   },{fetchImpl}).catch(()=>null)
  ]);
- return projectOwnerIncidentChatBriefing({ownerId:owner,source,handoff,delivery});
+ return projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,handoff,delivery,autoRepair
+ });
 }
 export function incidentChatUniverseObservations(briefing){
  if(briefing?.status!=='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'||
@@ -268,6 +342,9 @@ export function incidentChatUniverseObservations(briefing){
    '; outcome '+item.outcome+
    '; governed original handoff '+item.governed_original_handoff_status+
    '; existing original '+(item.linked_existing_original_work_id||'not verified')+
+   '; preview remediation '+(
+     item.bounded_preview_self_repair?.phase||'NO_CURRENT_REPAIR_RECEIPT')+
+   '; preview remediation fully verified '+item.bounded_preview_self_repair_cycle_proven+
    '; signed worker process '+(briefing.signed_worker_delivery?.phase||'UNVERIFIED')+
    '; NEXT '+item.next_action,
   independent_recovery_receipt:item.operational_recovery_receipt_sha256,
