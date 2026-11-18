@@ -5,7 +5,7 @@
 (()=>{
  'use strict';
  const path=window.location.pathname;
- const routes={'/':'home','/employees':'employees','/work':'work',
+ const routes={'/':'home','/overview':'home','/employees':'employees','/work':'work',
   '/shifts':'shifts','/chat':'chat','/value':'value',
   '/connections':'connections'};
  const route=routes[path];if(!route||document.getElementById('realityUnifiedRail'))return;
@@ -16,11 +16,11 @@
   if(text!==undefined)el.textContent=text;return el;
  };
  const entries=[
-  {key:'home',label:'Home',url:'/',symbol:'⌂'},
+  {key:'home',label:'Overview',url:'/overview',symbol:'⌂'},
   {key:'employees',label:'Employees',url:'/employees',symbol:'♧'},
   {key:'work',label:'Work',url:'/work',symbol:'▣'},
   {key:'shifts',label:'Shifts',url:'/shifts',symbol:'▦'},
-  {key:'chat',label:'Chat',url:'/chat',symbol:'▤'},
+  {key:'chat',label:'Home · Chat',url:'/chat',symbol:'▤'},
   {key:'value',label:'ROI & receipts',url:'/value',symbol:'▥'},
   {key:'connections',label:'Connections',url:'/connections',symbol:'⌁'}
  ];
@@ -30,6 +30,7 @@
   a.append(n('span','rx-nav-icon',entry.symbol),n('span','rx-nav-label',entry.label));
   if(kind==='mobile'&&entry.key==='value')a.querySelector('.rx-nav-label').textContent='Value';
   if(kind==='mobile'&&entry.key==='connections')a.querySelector('.rx-nav-label').textContent='Connect';
+  if(kind==='mobile'&&entry.key==='chat')a.querySelector('.rx-nav-label').textContent='Home';
   return a;
  }
  const rail=n('nav','rx-nav-rail');rail.id='realityUnifiedRail';

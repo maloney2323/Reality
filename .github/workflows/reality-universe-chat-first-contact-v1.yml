@@ -1,0 +1,57 @@
+name: Reality — Universe Chat first-contact home
+on:
+  push:
+    branches: ['reality/**']
+    paths:
+      - 'api/reality/personal-chat-first-contact.js'
+      - 'reality-chat-first-contact-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'supabase/migrations/20261118_owner_first_proactive_business_chat_v23.sql'
+      - 'supabase/migrations/20261118_first_chat_purpose_welcome_v24.sql'
+      - 'index.html'
+      - 'reality-unified-shell-v1.js'
+      - 'vercel.json'
+      - 'test/reality-universe-chat-first-contact-v1.test.js'
+      - '.github/workflows/reality-universe-chat-first-contact-v1.yml'
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: ['reality/**']
+    paths:
+      - 'api/reality/personal-chat-first-contact.js'
+      - 'reality-chat-first-contact-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'supabase/migrations/20261118_owner_first_proactive_business_chat_v23.sql'
+      - 'supabase/migrations/20261118_first_chat_purpose_welcome_v24.sql'
+      - 'index.html'
+      - 'reality-unified-shell-v1.js'
+      - 'vercel.json'
+      - 'test/reality-universe-chat-first-contact-v1.test.js'
+      - '.github/workflows/reality-universe-chat-first-contact-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify-proactive-owner-chat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Check out exact code without retaining credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Test signed-first greeting, RLS source identity and mobile continuity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check api/reality/personal-chat-first-contact.js
+          node --check reality-chat-first-contact-v1.js
+          node --check reality-unified-shell-v1.js
+          node --test \
+            test/reality-universe-chat-first-contact-v1.test.js \
+            test/reality-chat-workspace-v1.test.js \
+            test/reality-chat-mobile-usable-v3.test.js \
+            test/reality-unified-chat-maintenance-continuation-v1.test.js \
+            test/reality-maintenance-owner-chat-dialogue-v1.test.js

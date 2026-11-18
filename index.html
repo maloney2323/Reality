@@ -6698,6 +6698,9 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    el('privateSelfImprovementStatus').textContent=
     'Sign in to inspect original verified work. No model action is authorized.';
   }
+  // Preserve / as a public landing page. AFTER a verified owner login,
+  // always enter the conversation instead of the dashboard.
+  if(yes&&window.location.pathname==='/')window.location.assign('/chat');
  }
  function bubble(role,text){
   const node=document.createElement('div');
@@ -7473,7 +7476,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
     void wcLoadCompletionReports();
    }
-   if(realityCurrentRoute()==='chat'&&!confirmedActiveGoal)jumpToWorkSetup('goal');
+   // Chat-first onboarding now asks for the owner's real goal in conversation.
+   // Do not pop Settings over the transcript just because a first goal is missing.
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
@@ -7889,6 +7893,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
  <script defer src="/reality-chat-maintenance-continuation-v1.js"></script>
+ <script defer src="/reality-chat-first-contact-v1.js"></script>
 <script defer src="/reality-chat-operational-incident-briefing-v1.js"></script>
 <script defer src="/reality-chat-direct-work-handoff-v1.js"></script>
 <script defer src="/reality-chat-employee-shift-card-v1.js"></script>
