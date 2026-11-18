@@ -121,7 +121,7 @@ begin
   and sh.planned_start_at<=v_now
  order by sh.planned_start_at,sh.created_at
  limit 1 for update of sh skip locked;
- if not found return jsonb_build_object(
+ if not found then return jsonb_build_object(
    'status','NO_ACTIVE_OWNER_MAINTENANCE_COMPLETION_SCOPE');end if;
  v_total:=jsonb_array_length(s.source_scope);
  if v_total<1 or v_total>4 then
