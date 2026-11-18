@@ -30,6 +30,8 @@ import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
 import {projectOwnerInternalMaintenanceContinuity}
  from '../../src/reality-owner-internal-maintenance-continuity-v1.js';
+import {buildOwnerMaintenanceContinuationDraft}
+ from '../../src/reality-owner-maintenance-continuation-plan-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
@@ -497,6 +499,20 @@ export default async function handler(req,res){
    }catch{
     // No work, approval, or settled receipt may be inferred from failed readback.
    }
+   let requested_maintenance_draft=null;
+   let requested_maintenance_draft_status='NO_VERIFIED_MAINTENANCE_CONTINUATION_READY';
+   if(!active&&internal_maintenance_continuity?.status===
+      'OWNER_UNFINISHED_INTERNAL_MAINTENANCE_PRESERVED'){
+    try{
+     requested_maintenance_draft=buildOwnerMaintenanceContinuationDraft(
+      internal_maintenance_continuity,{ownerId:session.user_id});
+     requested_maintenance_draft_status=
+      'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY';
+    }catch{
+     requested_maintenance_draft_status=
+      'MAINTENANCE_CONTINUATION_EXACT_SCOPE_UNAVAILABLE';
+    }
+   }
    const shift_briefing=buildRealityShiftConversationBrief(
     read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
@@ -532,6 +548,7 @@ export default async function handler(req,res){
     riley_native_batch_readiness,riley_native_model_tool_proof,
     requested_shift_draft:draft,
     internal_maintenance_continuity,internal_maintenance_continuity_status,
+    requested_maintenance_draft,requested_maintenance_draft_status,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
     capability_approval_handoffs:handoffs,handoff_status,
@@ -558,7 +575,11 @@ export default async function handler(req,res){
       (keys.length===3&&Object.hasOwn(b,'requested_hours'))))||
    (!Number.isSafeInteger(b.requested_hours??8)||
    (b.requested_hours??8)<1||(b.requested_hours??8)>12)||
-   b.action!=='AUTHORIZE_EXACT_EMPLOYEE_SHIFT'||!SHA.test(b.expected_fingerprint||''))
+   !['AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
+     'AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'].includes(b.action)||
+   (b.action==='AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'&&
+    (b.completion_bound!==true||b.requested_hours!==8))||
+   !SHA.test(b.expected_fingerprint||''))
    return res.status(400).json({ok:false,error:'SHIFT_EXACT_APPROVAL_REQUIRED'});
   const start=new Date(b.planned_start_at);
   if(typeof b.planned_start_at!=='string'||!/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ/.test(b.planned_start_at)||
