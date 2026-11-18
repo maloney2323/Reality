@@ -108,7 +108,7 @@ test('signed owner boundary, RLS and provider permissions cannot be expanded by 
  assert.match(server,/shiftDatabase\(process\.env\)/);
  assert.match(server,/db\.url!==session\.config\?\.url/);
  assert.match(server,/reality_send_owner_first_business_chat_v1/);
- assert.match(allowlist,/reality_send_owner_first_business_chat_v1/);
+ assert.match(allowlist,/\\|send_owner_first_business_chat_v1\\|/);
  assert.doesNotMatch(client,/authorization:\s*['"]Bearer|service_role|sb_secret_/);
 });
 test('Chat is owner homepage while public landing and overview remain available',()=>{

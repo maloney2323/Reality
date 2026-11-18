@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {Script,runInNewContext} from 'node:vm';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const sql=read('supabase/migrations/20261118_owner_first_proactive_business_chat_v23.sql');
@@ -94,6 +95,34 @@ test('first-contact server uses existing authenticated owner, same-origin, no cl
  assert.match(api,/external_actions_authorized!==false/);
  assert.doesNotMatch(api,/\bOpenAI\b|model\.generate|executeEmployeeShift|installPatch/);
  assert.doesNotThrow(()=>new Script(client));
+});
+test('actual signed first-contact RPC transports through the exact existing allowlist',async()=>{
+ const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
+ const db={url:'https://hvkfreoagbrphwghjajw.supabase.co',secretKey:'isolated-fixture'};
+ let observed=0;
+ const response=await shiftRpc(db,'reality_send_owner_first_business_chat_v1',{
+  p_owner_id:owner,p_conversation_id:cid
+ },{
+  fetchImpl:async(url,options)=>{
+   observed++;
+   assert.equal(url,db.url+'/rest/v1/rpc/reality_send_owner_first_business_chat_v1');
+   assert.equal(options.method,'POST');
+   assert.deepEqual(JSON.parse(options.body),{
+    p_owner_id:owner,p_conversation_id:cid
+   });
+   return {ok:true,json:async()=>({
+    status:'OWNER_RETURNING_CUSTOMER_EXISTING_CHAT_OR_WORK',
+    owner_id:owner,created:false
+   })};
+  }
+ });
+ assert.equal(observed,1);
+ assert.equal(response.owner_id,owner);
+ assert.equal(response.created,false);
+ await assert.rejects(shiftRpc(db,
+  'reality_allow_any_user_to_install_v999',{},{
+   fetchImpl:async()=>{throw Error('A DISALLOWED CALL CANNOT REACH THE DATABASE')}
+  }),/SHIFT_RPC_NOT_ALLOWLISTED/);
 });
 test('new business greeting goes into durable owner RLS conversation, exactly once per user across tabs',()=>{
  assert.match(sql,/create table if not exists reality_internal\.owner_first_chat_contact_v1/);
