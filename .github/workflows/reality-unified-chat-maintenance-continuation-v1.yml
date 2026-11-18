@@ -8,6 +8,8 @@ on:
       - 'reality-chat-maintenance-continuation-v1.css'
       - 'test/reality-unified-chat-maintenance-continuation-v1.test.js'
       - 'test/reality-maintenance-owner-chat-dialogue-v1.test.js'
+      - 'test/reality-owner-internal-maintenance-continuity-v1.test.js'
+      - 'supabase/migrations/20261118_owner_chat_maintenance_worker_progress_v22.sql'
       - 'src/reality-employee-shift-chat-context-v1.js'
       - '.github/workflows/reality-unified-chat-maintenance-continuation-v1.yml'
   pull_request:
@@ -19,6 +21,8 @@ on:
       - 'reality-chat-maintenance-continuation-v1.css'
       - 'test/reality-unified-chat-maintenance-continuation-v1.test.js'
       - 'test/reality-maintenance-owner-chat-dialogue-v1.test.js'
+      - 'test/reality-owner-internal-maintenance-continuity-v1.test.js'
+      - 'supabase/migrations/20261118_owner_chat_maintenance_worker_progress_v22.sql'
       - 'src/reality-employee-shift-chat-context-v1.js'
       - '.github/workflows/reality-unified-chat-maintenance-continuation-v1.yml'
 permissions:
@@ -45,6 +49,7 @@ jobs:
           node --test \
             test/reality-unified-chat-maintenance-continuation-v1.test.js \
             test/reality-maintenance-owner-chat-dialogue-v1.test.js \
+            test/reality-owner-internal-maintenance-continuity-v1.test.js \
             test/reality-owner-maintenance-exact-continuation-v1.test.js \
             test/reality-chat-mobile-usable-v3.test.js \
             test/reality-chat-workspace-v1.test.js \
