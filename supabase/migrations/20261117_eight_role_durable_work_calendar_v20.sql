@@ -48,6 +48,8 @@ create index if not exists owner_employee_operating_schedule_scope_v1
 alter table reality_internal.owner_employee_operating_schedule_v1 enable row level security;
 revoke all on reality_internal.owner_employee_operating_schedule_v1
  from public,anon,authenticated;
+grant select,insert,update on reality_internal.owner_employee_operating_schedule_v1
+ to service_role;
 
 create or replace function public.reality_refresh_employee_operating_schedule_v1()
 returns jsonb language plpgsql security invoker set search_path='' as $fn$
@@ -153,7 +155,9 @@ begin
    c.state not in('EVIDENCE_REVIEW_VERIFIED',
       'SOURCE_SETTLED_NO_REPLAY','MAINTENANCE_VERIFIED') as due,
    row_number() over(partition by c.owner_id,c.employee
-    order by case when c.kind='INTERNAL_MAINTENANCE' then 0 else 1 end,
+    order by case when c.state in('EVIDENCE_REVIEW_VERIFIED',
+      'SOURCE_SETTLED_NO_REPLAY','MAINTENANCE_VERIFIED') then 1 else 0 end,
+     case when c.kind='INTERNAL_MAINTENANCE' then 0 else 1 end,
      case c.state
       when 'SOURCE_EPOCH_REVIEW_REQUIRED' then 0
       when 'SOURCE_NO_LONGER_CURRENT' then 1 else 2 end,
