@@ -46,7 +46,7 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 <div><strong>Execution</strong><ul><li>Select highest-value authorized work</li><li>Create governed work items</li><li>Execute only what is authorized</li><li>Independently verify results</li><li>Move to the next legitimate work item</li></ul></div>
 <div><strong>End-of-shift</strong><ul><li>Report what was accomplished</li><li>Report discoveries and learning</li><li>List unfinished/blocked work</li><li>Identify the next capability needed</li><li>Measure work removed from Ryan</li></ul></div>
 </div></details>
-<button id="saveShift" type="button">Save shift setting</button><span id="shiftSaved" class="saved" role="status"></span>
+<button id="saveShift" type="button">Save shift setting</button><button id="startShiftNow" type="button">Start authorized shift now</button><span id="shiftSaved" class="saved" role="status"></span><div id="startShiftStatus" class="saved" role="status" aria-live="polite"></div>
 </section>
 
 <section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section><section class="reality-console" aria-label="Reality work and attention"><div class="console-card"><div class="label">WORK REALITY FOUND</div><div class="count" id="workCount">0</div><h3>Work Reality discovered</h3><p class="muted">Reality surfaces work from evidence. Discovery does not grant authority.</p><div id="workQueue"><div class="attention-empty">Run Reality and discovered work will appear here.</div></div><button id="findWork" type="button">Find work</button><div id="workResult" class="work-result" aria-live="polite"></div></div><div class="console-card"><div class="label">ATTENTION</div><div class="count" id="attentionCount">0</div><h3>Needs your authorization</h3><p class="muted">Reality can find and prepare work. You decide what it may execute.</p><div id="attentionQueue"><div class="attention-empty">Nothing is awaiting authorization.</div></div></div></section><div class="chat">
@@ -84,6 +84,31 @@ const SHIFT_KEY='reality.dailyShift.v1';
 function loadShift(){try{const s=JSON.parse(localStorage.getItem(SHIFT_KEY)||'{}');if(typeof s.enabled==='boolean')$('shiftEnabled').checked=s.enabled;if(s.readinessTime)$('readinessTime').value=s.readinessTime;if(s.shiftStart)$('shiftStart').value=s.shiftStart;if(s.shiftLength)$('shiftLength').value=String(s.shiftLength)}catch{}}
 $('saveShift').onclick=async()=>{const s={enabled:$('shiftEnabled').checked,readinessTime:$('readinessTime').value,shiftStart:$('shiftStart').value,shiftLength:Number($('shiftLength').value),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York'};localStorage.setItem(SHIFT_KEY,JSON.stringify(s));$('saveShift').disabled=true;$('shiftSaved').textContent='Saving to Reality…';try{const r=await fetch('/api/reality/shift',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(s)});const b=await r.json();if(!r.ok||!b.persisted)throw new Error(b.error||'Server save failed');$('shiftSaved').textContent='Saved to Reality';}catch(e){$('shiftSaved').textContent='Saved locally · server save failed'}finally{$('saveShift').disabled=false;setTimeout(()=>$('shiftSaved').textContent='',2500)}};
 loadShift();
+$('startShiftNow').onclick=async()=>{
+  const button=$('startShiftNow');
+  button.disabled=true;
+  $('startShiftStatus').textContent='Starting your authorized operating shift…';
+  try{
+    const response=await fetch('/api/reality/shift',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({intent:'START_SHIFT_NOW'}),
+    });
+    const body=await response.json();
+    if(!response.ok || !body.ok)throw new Error(body.error||'Shift could not start');
+    if(body.status==='ALREADY_RUNNING'){
+      $('startShiftStatus').textContent='Shift already active. Reality will continue on scheduled wake-ups.';
+    }else{
+      const cycle=body.result?.shift_cycle||{};
+      const count=Number(cycle.selected_count||0);
+      const completed=Number(cycle.completed_count||0);
+      $('startShiftStatus').textContent=count>0
+        ? 'Shift active · '+completed+' of '+count+' jobs independently verified in this pass. Remaining jobs continue under their existing authorization.'
+        : 'Shift activated · no previously authorized assignments were available yet. Reality will continue discovering work; no completion has been claimed.';
+    }
+  }catch(error){
+    $('startShiftStatus').textContent='Shift not started: '+(error?.message||'unknown error')+'. Save your shift settings and confirm authorization.';
+  }finally{button.disabled=false}
+};
 $('bannerSave').onclick=()=>{$('readinessTime').value='20:00';$('shiftStart').value='21:00';$('shiftEnabled').checked=true;$('saveShift').click()};
 function updateShiftBanner(){const f=v=>{if(!v)return '';const [h,m]=v.split(':').map(Number);const ap=h>=12?'PM':'AM';const hh=(h%12)||12;return `${hh}:${String(m).padStart(2,'0')} ${ap}`};$('bannerReadiness').textContent=f($('readinessTime').value);$('bannerStart').textContent=f($('shiftStart').value);$('bannerState').textContent=$('shiftEnabled').checked?'Shift enabled':'Shift disabled'}
 $('readinessTime').addEventListener('input',updateShiftBanner);$('shiftStart').addEventListener('input',updateShiftBanner);$('shiftEnabled').addEventListener('change',updateShiftBanner);updateShiftBanner();
