@@ -13,6 +13,9 @@
  const signedIn=()=>ready.style.display==='block';
  function safeToRefresh(){
   const prompt=get('privatePrompt');
+  // Do not replace an in-progress human or model turn when a new
+  // operational receipt arrives. It remains durably saved for later.
+  if(get('privateSend')?.disabled)return false;
   return !(prompt&&document.activeElement===prompt&&
    String(prompt.value||'').trim());
  }
