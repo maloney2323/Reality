@@ -586,6 +586,64 @@ export default async function handler(req,res){
    !Number.isFinite(start.valueOf())||
    start.getTime()<Date.now()-120000||start.getTime()>Date.now()+7*86400000)
    return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});
+  if(b.action==='AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'){
+   // Never trust browser-supplied owner or incident IDs. Bind all selected
+   // obligations to the authenticated owner and newly fingerprinted work.
+   const before=assertShiftReadback(await shiftRpc(db,
+    'reality_read_owner_employee_shifts_v1',{p_owner_id:session.user_id}));
+   if(before.shifts.some(s=>
+      ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+      (s.planned_end_at==='infinity'||Date.parse(s.planned_end_at)>Date.now())))
+    return res.status(409).json({ok:false,
+     error:'OWNER_ALREADY_HAS_ACTIVE_SIGNED_SHIFT_NO_DUPLICATE'});
+   const ledger=await shiftRpc(db,'reality_read_owner_internal_maintenance_v1',{
+    p_owner_id:session.user_id
+   });
+   const continuity=projectOwnerInternalMaintenanceContinuity(ledger,{
+    ownerId:session.user_id,shifts:before.shifts
+   });
+   const drafted=buildOwnerMaintenanceContinuationDraft(continuity,{
+    ownerId:session.user_id
+   });
+   if(drafted.expected_fingerprint!==b.expected_fingerprint)
+    return res.status(409).json({ok:false,
+     error:'OWNER_MAINTENANCE_SCOPE_CHANGED_REFRESH_BEFORE_START'});
+   const plan=drafted.plan;
+   const receipt=assertShiftReceipt(await shiftRpc(db,
+    'reality_authorize_employee_maintenance_continuation_v1',{
+     p_owner_id:session.user_id,p_fingerprint:drafted.expected_fingerprint,
+     p_source_observed_at:plan.observed_at,p_start_at:start.toISOString(),
+     p_steps:plan.slots
+    }));
+   if(receipt.completion_bound!==true||
+      receipt.carried_internal_maintenance_count!==drafted.open_maintenance_jobs||
+      receipt.completion_condition!==
+       'ALL_EXACT_INTERNAL_MAINTENANCE_REPAIR_RECEIPTS_VERIFIED')
+    throw Error('SHIFT_MAINTENANCE_CONTINUATION_WARRANT_UNVERIFIED');
+   const verified=assertShiftReadback(await shiftRpc(db,
+    'reality_read_owner_employee_shifts_v1',{p_owner_id:session.user_id}));
+   const exact=verified.shifts.find(s=>s.shift_id===receipt.shift_id&&
+    s.plan_fingerprint===drafted.expected_fingerprint&&
+    s.planned_end_at==='infinity'&&s.steps.length===8);
+   if(!exact)throw Error('SHIFT_MAINTENANCE_CONTINUATION_READBACK_UNVERIFIED');
+   return res.status(202).json({
+    ok:true,...receipt,shift:exact,status:'SHIFT_DURABLY_AUTHORIZED',
+    original_shift_ids:drafted.originating_shift_ids,
+    work_items:drafted.work_items,
+    start_confirmation:{
+     status:'EXACT_OWNER_INTERNAL_MAINTENANCE_CONTINUATION_AUTHORIZED',
+     shift_id:exact.shift_id,
+     old_shifts_unchanged:true,
+     exact_internal_work_count:drafted.open_maintenance_jobs,
+     worker_execution_verified:false,
+     customer_job_completed:false,production_changed:false
+    },
+    initial_authorization_recorded:true,
+    completion_bound:true,completion_condition:receipt.completion_condition,
+    job_started:false,shift_started:false,worker_dispatch_verified:false,
+    installation_authorized:false,production_changed:false
+   });
+  }
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const priority=await ownerExistingRileySourcePriority({
