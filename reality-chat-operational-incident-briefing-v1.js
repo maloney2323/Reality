@@ -13,14 +13,15 @@
   if(value!==undefined)e.textContent=String(value);
   return e;
  };
- const root=node('section','rx-owner-incidents');
+ // Operational events remain readable in Work but must not push the
+ // conversation and composer out of the mobile viewport.
+ const root=node('details','rx-owner-incidents');
  root.id='realityOwnerIncidentChat';
  root.setAttribute('aria-label','Reality operational incidents for the signed-in owner');
- const header=node('div','rx-owner-incidents-head');
- header.append(node('strong','','Reality · Operational briefing'));
+ const header=node('summary','rx-owner-incidents-head');
+ header.append(node('strong','','Operational briefing · View incidents'));
  const refresh=node('button','rx-owner-incidents-refresh','Check recovery progress');
  refresh.type='button';
- header.append(refresh);
  const status=node('p','rx-owner-incidents-status',
   'Checking Reality’s existing owner-scoped incident ledger…');
  const workerReceipt=node('p','rx-owner-worker-receipt',
@@ -36,8 +37,10 @@
  const cards=node('div','rx-owner-incidents-items');
  const description=node('p','rx-owner-incidents-caption',
   'For this signed-in owner only. Incident evidence is not a customer message, original-job authorization or independent repair receipt.');
- root.append(header,status,workerReceipt,repairReceipt,qualifiedWorkStatus,qualifiedWorkCards,continuityStatus,continuityCards,cards,description);
- thread.parentNode.insertBefore(root,thread);
+ root.append(header,refresh,status,workerReceipt,repairReceipt,qualifiedWorkStatus,qualifiedWorkCards,continuityStatus,continuityCards,cards,description);
+ const workPanel=document.getElementById('realityChatPanelWork');
+ if(workPanel)workPanel.prepend(root);
+ else thread.parentNode.insertBefore(root,thread);
  let busy=false,seen=null;
  const isChat=()=>document.body?.dataset?.realityRoute==='chat'||
   window.location.pathname==='/chat';

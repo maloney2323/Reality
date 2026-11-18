@@ -35,10 +35,11 @@ test('failed request reads authenticated saved history before restoring draft an
  assert.match(html,/savedAnswer=body\.messages\.find/);
  assert.match(html,/x\.request_id===sentRequest&&x\.text===value/);
  assert.match(html,/source_ref\|\|''\)\.startsWith\('supabase:reality_chat_messages:'\)/);
- assert.match(html,/if\(!savedUser&&!el\('privatePrompt'\)\.value\.trim\(\)\)/);
+ assert.match(html,/if\(!savedUser&&!intakeVerified&&!el\('privatePrompt'\)\.value\.trim\(\)\)/);
  assert.match(html,/YOU · SAVED · REPLY NOT VERIFIED/);
- assert.match(html,/Do not resend this request or assume a development job started/);
- assert.match(html,/const status=s=>\{el\('privateStatus'\)\.textContent=typeof s==='string'/);
+ assert.match(html,/Retry that saved reply; do not send a new request or assume execution/);
+ assert.match(html,/const status=s=>\{\s*const clean=typeof s==='string'\?s\.trim\(\):''/);
+ assert.match(html,/el\('privateStatus'\)\.textContent=clean&&/);
  assert.doesNotMatch(html,/el\('privateStatus'\)\.textContent=s;/);
 });
 
