@@ -48,6 +48,10 @@ const data={ok:true,
  internal_maintenance_continuity:{
   status:'OWNER_UNFINISHED_INTERNAL_MAINTENANCE_PRESERVED',
   open_count:2,items,current_shift_id:null,no_new_shift_started:true,
+  signed_warrant_scope_verified:false,signed_warrant_shift_id:null,
+  signed_unfinished_count:0,signed_maintenance_incident_ids:[],
+  newly_discovered_outside_warrant_count:2,
+  outside_warrant_incident_ids:items.map(i=>i.origin_incident_id),
   owner_authority_granted:false,customer_job_completed:false,
   production_changed:false
  },
@@ -74,7 +78,7 @@ class El{
  constructor(tag='div'){this.tagName=tag.toUpperCase();this.children=[];
   this.parentElement=null;this.style={display:''};this.hidden=false;
   this.disabled=false;this.textContent='';this.attributes={};this.handlers={};
-  this.id='';this.className='';this.dataset={};}
+  this.id='';this.className='';this.dataset={};this.focused=false;}
  append(...elements){for(const e of elements){this.children.push(e);e.parentElement=this;}}
  insertBefore(el,ref){
   const at=ref?this.children.indexOf(ref):-1;
@@ -86,6 +90,8 @@ class El{
  addEventListener(k,cb){this.handlers[k]=cb;}
  click(){return this.handlers.click?.();}
  scrollIntoView(){}
+ focus(){this.focused=true;}
+ contains(target){return this===target||this.children.some(x=>x.contains(target));}
 }
 function setup({readback=data,posted=receipt,signedIn=true}={}){
  const ready=new El();ready.id='privateReady';
@@ -97,7 +103,8 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
  const thread=new El();thread.id='privateTranscript';center.append(thread);
  const open=new El();open.id='realityChatOpenInspector';
  const approvals=new El();approvals.id='realityChatTabApprovals';
- const nodes=[ready,inbox,center,open,approvals];
+ const prompt=new El('textarea');prompt.id='privatePrompt';
+ const nodes=[ready,inbox,center,open,approvals,prompt];
  const locate=(id)=>{
   function scan(n){if(n.id===id)return n;
    for(const c of n.children){const found=scan(c);if(found)return found;}
@@ -134,7 +141,7 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
    }},Date,console};
  runInNewContext(ui,context);
  const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
- return {ready,inbox,thread,center,locate,calls,events,flush,
+ return {ready,inbox,thread,center,locate,calls,events,flush,observers,
   click:id=>locate(id)?.click()};
 }
 test('unified signed-in Chat actually loads existing maintenance controls, not old chat-simple',()=>{
@@ -201,7 +208,12 @@ test('an existing signed maintenance shift blocks duplicate authorization',async
  const current=setup({readback:{...data,requested_maintenance_draft:null,
   requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
   internal_maintenance_continuity:{...data.internal_maintenance_continuity,
-   current_shift_id:signedShiftId}}});
+   current_shift_id:signedShiftId,
+   signed_warrant_scope_verified:true,signed_warrant_shift_id:signedShiftId,
+   signed_unfinished_count:2,
+   signed_maintenance_incident_ids:items.map(i=>i.origin_incident_id),
+   newly_discovered_outside_warrant_count:0,
+   outside_warrant_incident_ids:[]}}});
  await current.flush();
  assert.equal(current.locate('realityChatMaintenanceAuthorize').disabled,true);
  assert.match(current.locate('realityChatMaintenanceAuthorize').textContent,
@@ -232,6 +244,86 @@ test('unknown network result locks button, preserves original jobs, never retrie
   /Use Check status first/);
  assert.equal(x.events.length,0);
 });
+test('assistant operational message is INSIDE the conversation and user can reply naturally',async()=>{
+ const v=setup();await v.flush();
+ const message=v.locate('realityChatMaintenanceNudge');
+ assert.equal(message.parentElement,v.thread,'the message must be inside the transcript scroll');
+ assert.equal(message.hidden,false);
+ assert.match(message.className,/bubble reality-chat-maintenance/);
+ assert.match(v.locate('realityChatMaintenanceInlineAuthorize').textContent,
+  /Continue 2 unfinished repairs/);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,false);
+ assert.match(ui,/get\('privatePrompt'\)\?\.focus\(\)/);
+ assert.match(ui,/threadObserver\.observe\(thread,\{childList:true\}\)/);
+ assert.match(ui,/!thread\.contains\(hint\)/);
+ assert.doesNotMatch(ui,/center\.insertBefore\(hint,thread\)/);
+});
+test('an explicit approve click from the chat message delegates to the ORIGINAL owner-signed authorization',async()=>{
+ const v=setup();await v.flush();
+ await v.click('realityChatMaintenanceInlineAuthorize');await v.flush();
+ assert.deepEqual(v.calls.map(c=>c.options.method),['GET','GET','POST']);
+ assert.equal(v.events.length,1);
+ assert.equal(v.events[0].type,'reality:maintenance-continuation-authorized');
+ const msg=v.locate('realityChatMaintenanceNudge');
+ assert.equal(msg.parentElement,v.thread);
+ assert.equal(msg.hidden,false,'signed result must stay in the conversation');
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /You authorized 2 exact earlier repairs/);
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /under shift/);
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /not reached independent final verification/);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+});
+test('an already signed shift is reported IN Chat instead of asking for another approval',async()=>{
+ const active=setup({readback:{...data,requested_maintenance_draft:null,
+  requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
+  internal_maintenance_continuity:{...data.internal_maintenance_continuity,
+   current_shift_id:signedShiftId,
+   signed_warrant_scope_verified:true,signed_warrant_shift_id:signedShiftId,
+   signed_unfinished_count:2,
+   signed_maintenance_incident_ids:items.map(i=>i.origin_incident_id),
+   newly_discovered_outside_warrant_count:0,
+   outside_warrant_incident_ids:[]}}});
+ await active.flush();
+ const msg=active.locate('realityChatMaintenanceNudge');
+ assert.equal(msg.hidden,false);
+ assert.equal(msg.parentElement,active.thread);
+ assert.match(msg.children[1].textContent,/You authorized 2 exact earlier repairs/);
+ assert.match(msg.children[1].textContent,new RegExp(signedShiftId));
+ assert.equal(active.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+ await active.click('realityChatMaintenanceInlineAuthorize');await active.flush();
+ assert.equal(active.calls.length,1,'no new signed shift was created');
+});
+test('ordinary chat replies are NOT owner authorization; missing receipt locks inline action too',async()=>{
+ const v=setup({posted:null});await v.flush();
+ assert.match(ui,/A reply is an ordinary saved owner Chat turn/);
+ assert.match(ui,/if\(!inlineContinue.disabled&&!authorize.disabled\)authorize.click\(\)/);
+ await v.click('realityChatMaintenanceInlineAuthorize');await v.flush();
+ assert.deepEqual(v.calls.map(c=>c.options.method),['GET','GET','POST']);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /I could not verify/);
+ assert.equal(v.events.length,0);
+});
+
+test('normal typed Chat reply remains an owner conversation message, never a duplicate authorization',async()=>{
+ const v=setup();await v.flush();
+ await v.click('realityChatMaintenanceReply');
+ assert.equal(v.locate('privatePrompt').focused,true);
+ assert.deepEqual(v.calls.map(x=>x.options.method),['GET']);
+ const rendered=v.locate('realityChatMaintenanceNudge');
+ assert.equal(rendered.parentElement,v.thread);
+ v.thread.replaceChildren();
+ // Saved conversation rerenders replacing all messages; the owner-signed
+ // work update remains anchored inside the transcript without duplication.
+ const watched=v.observers[0]; // transcript observer precedes sign-in observer
+ watched();
+ assert.equal(v.thread.children.filter(x=>x===rendered).length,1);
+ assert.equal(rendered.parentElement,v.thread);
+ watched();
+ assert.equal(v.thread.children.filter(x=>x===rendered).length,1);
+});
 test('backend is the EXISTING owner-authenticated same-origin exact-maintenance RPC',()=>{
  assert.match(api,/await authenticatedChatSession\(req,res\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
@@ -248,7 +340,7 @@ test('backend is the EXISTING owner-authenticated same-origin exact-maintenance 
 test('compact notice does not block transcript or composer; original direct account and install gates stay separate',()=>{
  assert.match(css,/\.reality-chat-maintenance-nudge\{/);
  assert.match(css,/\.reality-chat-maintenance-nudge\[hidden\]/);
- assert.match(ui,/center\.insertBefore\(hint,thread\)/);
+ assert.match(ui,/thread\.append\(hint\)/);
  assert.match(ui,/inbox\.insertBefore\(root,anchor\)/);
  assert.match(ui,/root\.setAttribute\('aria-label'/);
  assert.match(ui,/No work is started by reading this card/);

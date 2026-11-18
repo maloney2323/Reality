@@ -6,6 +6,8 @@ import {shiftRpc,assertShiftReadback}
  from './reality-governed-shift-boundary-v1.js';
 import {buildRealityShiftConversationBrief}
  from './reality-shift-conversation-brief-v1.js';
+import {projectOwnerInternalMaintenanceContinuity}
+ from './reality-owner-internal-maintenance-continuity-v1.js';
 import {buildRealityEvidenceGroundedSelfAudit,summarizeRealitySelfAuditForModel}
  from './reality-evidence-grounded-self-audit-v1.js';
 import {buildRealityWorkCatalog} from './reality-work-catalog-v0.1.js';
@@ -18,7 +20,7 @@ import {projectRealityWeeklyWorkloadInsight}
  from './reality-weekly-workload-insight-v1.js';
 import {assessRealityWorkdayTeam,assessRealityCompanyWorkforce,routeRealityWorkCategoriesToEmployees} from './reality-workday-team-assessment-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
-const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|jobs|hire|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|capabilit(?:y|ies)|automati(?:on|c)|self.aware|self.understand|know itself|own abilities|workload|hours saved|launch|market|business|company|startup|build|operate|workforce)\b/i.test(String(text||''));
+const relevant=text=>/\b(shift|workday|work day|employee|employees|staff|staffing|team|headcount|roles|jobs|hire|workers|what did|did you do|doing now|next|progress|task|status|schedule|approval|approved|authorize|authorized|authorization|maintenance|repairs?|continuation|what happened|what now|update|tell me|explain|why|how|okay|ok|yes|capabilit(?:y|ies)|automati(?:on|c)|self.aware|self.understand|know itself|own abilities|workload|hours saved|launch|market|business|company|startup|build|operate|workforce)\b/i.test(String(text||''));
 const teamRequested=text=>/(?:\b(?:shift|workday|work day)\b.{0,80}\b(?:staff|staffing|team|headcount|roles|workers)\b|\b(?:staff|staffing|team|headcount|roles|workers)\b.{0,80}\b(?:shift|workday|work day)\b)/i.test(String(text||''));
 const companyRequested=text=>/(?:\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b.{0,120}\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b|\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b.{0,120}\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b)/i.test(String(text||''));
 export async function readVerifiedEmployeeShiftForChat({
@@ -75,6 +77,84 @@ export async function readVerifiedEmployeeShiftForChat({
    installation_authorized:false,external_execution_authorized:false,
    production_changed:false
   })];
+  // Operational Chat is a real dialogue about the SAME independently
+  // reviewed maintenance obligations. The prior owner authorization is a
+  // durable ledger fact; never instruct the owner to repeat it, and never
+  // convert a model reply ("yes", "continue") into an install or new shift.
+  try{
+   const maintenance=await shiftRpc(db,
+    'reality_read_owner_internal_maintenance_v1',
+    {p_owner_id:session.user_id},{fetchImpl});
+   const continuity=projectOwnerInternalMaintenanceContinuity(maintenance,{
+    ownerId:session.user_id,shifts:read.shifts
+   });
+   if(continuity.status==='OWNER_UNFINISHED_INTERNAL_MAINTENANCE_PRESERVED'&&
+      continuity.open_count>0&&continuity.open_count<=4){
+    const activeForMaintenance=continuity.signed_warrant_scope_verified?
+     read.shifts.find(s=>
+      s.shift_id===continuity.signed_warrant_shift_id&&
+      ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+      s.closed_at==null)||null:null;
+    const signedSet=new Set(continuity.signed_maintenance_incident_ids);
+    const detail=continuity.items.map(j=>
+     j.assignee+' · '+j.kind+' · '+j.phase+
+     ' · independently reviewed by '+j.independent_reviewer+
+     ' · source '+j.source_ref+' · ORIGINAL INCIDENT '+j.origin_incident_id+
+     ' · authority '+(signedSet.has(j.origin_incident_id)?
+       'EXACT_SIGNED_WARRANT_SCOPE':'NEW_INCIDENT_NOT_IN_EXISTING_WARRANT')+
+     ' · worker stage '+j.worker_handling_state+
+     ' · failure baseline independently recorded '+
+       !!j.independent_failure_baseline_receipt_sha256+
+     ' · independent frozen CI RED receipt present '+j.frozen_reproduction_verified+
+     ' · repair verified '+j.repair_verified).join(' | ');
+    observations.push(Object.freeze({
+     entry_id:'maintenance-conversation:'+
+      (continuity.current_shift_id||continuity.items[0].origin_incident_id),
+     event_kind:'owner_verified_maintenance_repair_conversation',
+     source_kind:'AUTHENTICATED_OWNER_SCOPED_EXISTING_SHIFT_AND_MAINTENANCE_LEDGER',
+     source_ref:'reality:owner-internal-maintenance:'+
+      (continuity.current_shift_id||continuity.items[0].origin_incident_id),
+     assertion_time:now.toISOString(),
+     epistemic_status:'SIGNED_OWNER_MAINTENANCE_PENDING_INDEPENDENT_REPAIR_RECEIPTS',
+     summary:'REALITY MAINTENANCE CONVERSATION: '+continuity.open_count+
+      ' independently reviewed maintenance incidents remain unfinished. '+
+      (activeForMaintenance?
+       'THE OWNER ALREADY SIGNED AND AUTHORIZED EXACTLY '+
+         continuity.signed_unfinished_count+' EARLIER REPAIRS IN SHIFT '+
+         activeForMaintenance.shift_id+' with status '+activeForMaintenance.status+
+         '. NO SECOND APPROVAL IS NEEDED FOR THOSE EXACT REPAIRS. ':
+       'NO CURRENT EXACT SIGNED MAINTENANCE WARRANT IS VERIFIED. '+
+         'Verify current authority before asking for a new one. ')+
+      (continuity.newly_discovered_outside_warrant_count?
+       'IMPORTANT: '+continuity.newly_discovered_outside_warrant_count+
+        ' ADDITIONAL MAINTENANCE INCIDENT(S) ARE OUTSIDE THAT WARRANT. '+
+        'Do not treat those as previously approved. They may be investigated '+
+        'within evidence-only authority, but cannot install/execute consequential repairs. ':
+       '')+
+      detail+
+      '. You are speaking in the SAME Reality Chat conversation; answer '+
+      'follow-up questions about these facts directly. Do not send the owner '+
+      'back to a dashboard to understand them. Distinguish source review, '+
+      'independent frozen tests, verified repairs, and final receipts. '+
+      'Do NOT claim tests, patch installation, financial ROI or completed work '+
+      'without corresponding independent receipts. Do NOT ask the owner '+
+      'to reapprove a still-active signed shift. Plain Chat words cannot '+
+      'authorize code installation or an unrelated new shift.',
+     owner_current_signed_maintenance_shift_id:
+      activeForMaintenance?.shift_id||null,
+     owner_approval_already_recorded:!!activeForMaintenance,
+     owner_signed_repair_count:continuity.signed_unfinished_count,
+     new_repair_count_outside_signed_warrant:
+      continuity.newly_discovered_outside_warrant_count,
+     signed_maintenance_incident_ids:continuity.signed_maintenance_incident_ids,
+     unfinished_internal_repairs:continuity.open_count,
+     source_references:continuity.items.map(j=>j.source_ref),
+     original_incident_ids:continuity.items.map(j=>j.origin_incident_id),
+     repair_complete:false,customer_original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    }));
+   }
+  }catch{/* A failed maintenance readback is not proof that jobs vanished. */}
   // Live owner-scoped self-audit: source existence is not execution proof.
   try{
    const ownerLoop=await shiftRpc(db,'reality_read_owner_genuine_loop_v1',
