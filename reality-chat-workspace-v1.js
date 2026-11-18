@@ -369,11 +369,15 @@
   // entire page and without touching pending request state.
   const viewport=window.visualViewport;
   if(viewport){
+    // Retain the last unfocused screen height: some Android WebViews resize
+    // BOTH innerHeight and visualViewport when their keyboard opens.
+    let fullViewportHeight=Math.max(
+      document.documentElement.clientHeight,window.innerHeight,viewport.height);
     const syncKeyboardViewport=()=>{
-      const baseline=Math.max(document.documentElement.clientHeight,window.innerHeight);
+      const focused=document.activeElement===get('privatePrompt');
+      if(!focused)fullViewportHeight=Math.max(window.innerHeight,viewport.height);
       const keyboardOpen=window.matchMedia('(max-width:900px)').matches&&
-        document.activeElement===get('privatePrompt')&&
-        viewport.height<baseline-130;
+        focused&&viewport.height<fullViewportHeight-130;
       document.body.classList.toggle('reality-chat-keyboard-open',keyboardOpen);
       document.documentElement.style.setProperty('--reality-chat-visible-height',
         Math.round(viewport.height)+'px');
