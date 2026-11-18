@@ -1,0 +1,37 @@
+name: Reality frozen signed maintenance baseline regression
+on:
+  push:
+    branches:
+      - 'reality/**'
+    paths:
+      - '.github/workflows/reality-maintenance-baseline-frozen-regression.yml'
+      - 'test/reality-frozen-regressions/reality-maintenance-baseline-original-failure-v1.test.js'
+      - 'src/reality-signed-maintenance-failure-baseline-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'supabase/migrations/20261117_signed_internal_maintenance_failure_baseline_v18.sql'
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - 'reality/**'
+    paths:
+      - '.github/workflows/reality-maintenance-baseline-frozen-regression.yml'
+      - 'test/reality-frozen-regressions/reality-maintenance-baseline-original-failure-v1.test.js'
+permissions:
+  contents: read
+jobs:
+  frozen-handoff-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout immutable source commit without credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Set up pinned Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Independent frozen missing handoff acceptance
+        run: node --test test/reality-frozen-regressions/reality-maintenance-baseline-original-failure-v1.test.js
+      - name: No installation or customer settlement from CI
+        run: echo "CODE_REGRESSION_ONLY_NOT_CUSTOMER_ORIGINAL_RECEIPT"
