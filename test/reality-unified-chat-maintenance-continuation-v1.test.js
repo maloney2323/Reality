@@ -48,6 +48,10 @@ const data={ok:true,
  internal_maintenance_continuity:{
   status:'OWNER_UNFINISHED_INTERNAL_MAINTENANCE_PRESERVED',
   open_count:2,items,current_shift_id:null,no_new_shift_started:true,
+  signed_warrant_scope_verified:false,signed_warrant_shift_id:null,
+  signed_unfinished_count:0,signed_maintenance_incident_ids:[],
+  newly_discovered_outside_warrant_count:2,
+  outside_warrant_incident_ids:items.map(i=>i.origin_incident_id),
   owner_authority_granted:false,customer_job_completed:false,
   production_changed:false
  },
@@ -204,7 +208,12 @@ test('an existing signed maintenance shift blocks duplicate authorization',async
  const current=setup({readback:{...data,requested_maintenance_draft:null,
   requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
   internal_maintenance_continuity:{...data.internal_maintenance_continuity,
-   current_shift_id:signedShiftId}}});
+   current_shift_id:signedShiftId,
+   signed_warrant_scope_verified:true,signed_warrant_shift_id:signedShiftId,
+   signed_unfinished_count:2,
+   signed_maintenance_incident_ids:items.map(i=>i.origin_incident_id),
+   newly_discovered_outside_warrant_count:0,
+   outside_warrant_incident_ids:[]}}});
  await current.flush();
  assert.equal(current.locate('realityChatMaintenanceAuthorize').disabled,true);
  assert.match(current.locate('realityChatMaintenanceAuthorize').textContent,
@@ -259,9 +268,9 @@ test('an explicit approve click from the chat message delegates to the ORIGINAL 
  assert.equal(msg.parentElement,v.thread);
  assert.equal(msg.hidden,false,'signed result must stay in the conversation');
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /You authorized the continuation/);
+  /You authorized 2 exact earlier repairs/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /The signed shift/);
+  /under shift/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
   /not independently completed/);
  assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
@@ -270,12 +279,17 @@ test('an already signed shift is reported IN Chat instead of asking for another 
  const active=setup({readback:{...data,requested_maintenance_draft:null,
   requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
   internal_maintenance_continuity:{...data.internal_maintenance_continuity,
-   current_shift_id:signedShiftId}}});
+   current_shift_id:signedShiftId,
+   signed_warrant_scope_verified:true,signed_warrant_shift_id:signedShiftId,
+   signed_unfinished_count:2,
+   signed_maintenance_incident_ids:items.map(i=>i.origin_incident_id),
+   newly_discovered_outside_warrant_count:0,
+   outside_warrant_incident_ids:[]}}});
  await active.flush();
  const msg=active.locate('realityChatMaintenanceNudge');
  assert.equal(msg.hidden,false);
  assert.equal(msg.parentElement,active.thread);
- assert.match(msg.children[1].textContent,/You authorized the continuation/);
+ assert.match(msg.children[1].textContent,/You authorized 2 exact earlier repairs/);
  assert.match(msg.children[1].textContent,new RegExp(signedShiftId));
  assert.equal(active.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
  await active.click('realityChatMaintenanceInlineAuthorize');await active.flush();
