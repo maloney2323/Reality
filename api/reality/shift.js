@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+
+export const maxDuration = 60;
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import { createShiftPersistenceAdapter, shiftRunIdForLocalDate } from '../../src/reality-shift-persistence-v1.0.js';
 import { runShiftWorkLoop } from '../../src/reality-shift-work-loop-v1.0.js';
@@ -166,7 +168,15 @@ async function runTick({ config, phase, local, persistence }) {
     provenance: { source: 'reality-autonomous-shift-v0.2', tick_id: tickId },
   });
 
-  const commits = await githubCommits();
+  // An unavailable shadow-observation source does not prevent independent
+  // authorized work lanes from running; record the outage as a real gap.
+  let commits = [];
+  let shadowDiscoveryError = null;
+  try {
+    commits = await githubCommits();
+  } catch (error) {
+    shadowDiscoveryError = String(error?.message || 'GITHUB_SHADOW_OBSERVATION_UNAVAILABLE').slice(0, 240);
+  }
   const observations = buildShadowObservations({
     observedAt: new Date().toISOString(),
     commits: commits.map(c => ({
@@ -263,6 +273,8 @@ async function runTick({ config, phase, local, persistence }) {
     self_question_agenda: selfQuestionAgenda,
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
     recent_observation_count: observations.length,
+    shadow_discovery_status: shadowDiscoveryError ? 'BLOCKED' : 'OBSERVED',
+    shadow_discovery_error: shadowDiscoveryError,
     newly_persisted_observations: persisted,
     discovered_work: prioritizedWork,
     recurring_work_candidates: prioritizedWork.filter(w => w.classification === 'RECURRING'),
