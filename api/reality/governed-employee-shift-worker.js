@@ -112,6 +112,8 @@ import {advanceOneShiftContinuityIndependentReview}
  from '../../src/reality-shift-continuity-independent-review-v1.js';
 import {reviewOneSignedBusinessQualificationStall}
  from '../../src/reality-shift-business-qualification-review-v1.js';
+import {advanceOneSignedInternalMaintenanceJob}
+ from '../../src/reality-signed-internal-maintenance-worker-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -237,6 +239,30 @@ export default async function handler(req,res){
     })):
     {status:'NO_ACTIVE_SIGNED_BUSINESS_QUALIFICATION_SCOPE',
      original_job_completed:false,installation_authorized:false,
+     production_changed:false};
+  // Maintenance jobs survive their originating shift. A DIFFERENT active
+  // signed owner shift may investigate the SAME internal failure, but no
+  // permission to install code or settle customer work is created.
+  workerStage='SIGNED_INTERNAL_MAINTENANCE_EMPLOYEE_SOURCE_RECHECK';
+  const internalMaintenanceWork=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceOneSignedInternalMaintenanceJob({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_INTERNAL_MAINTENANCE_WORK_UNVERIFIED',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_MAINTENANCE_DATABASE_UNAVAILABLE':
+      String(error?.message||'').startsWith('SIGNED_INTERNAL_MAINTENANCE_')?
+       'SIGNED_MAINTENANCE_SCOPE_OR_PROOF_INVALID':
+       'SIGNED_MAINTENANCE_RUNTIME_UNVERIFIED',
+     customer_job_completed:false,new_customer_work_created:false,
+     repair_executed:false,installation_authorized:false,
+     production_changed:false
+    })):
+    {status:'NO_ACTIVE_OWNER_SHIFT_FOR_INTERNAL_MAINTENANCE',
+     customer_job_completed:false,new_customer_work_created:false,
+     repair_executed:false,installation_authorized:false,
      production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
@@ -1653,6 +1679,7 @@ export default async function handler(req,res){
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     shift_continuity_independent_review:continuityIndependentReview,
     independent_business_qualification_review:businessQualificationReview,
+    signed_internal_maintenance_work:internalMaintenanceWork,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
