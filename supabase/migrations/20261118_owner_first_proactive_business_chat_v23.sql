@@ -81,7 +81,7 @@ begin
   v_kind:='NEW_BUSINESS_WELCOME';
   v_text:='Welcome to Reality. I am here to help you run your business with less work on your shoulders.\n\nAutomation can feel confusing at first, but I will walk you through everything, step by step. You do not need to understand the technology.\n\nFirst, tell me a little about your business. Then I will help you connect the tools you already use, discover work your AI employees could handle, and review a safe first job with you. I will show you what is verified and ask permission before doing anything consequential.\n\nTo get started, what kind of business do you run?';
  end if;
- v_text:=pg_catalog.replace(v_text,'\\n',pg_catalog.chr(10));
+ v_text:=pg_catalog.replace(v_text,'\n',pg_catalog.chr(10));
  v_request:=pg_catalog.gen_random_uuid();
  insert into public.reality_chat_messages
   (user_id,conversation_id,request_id,role,content)
