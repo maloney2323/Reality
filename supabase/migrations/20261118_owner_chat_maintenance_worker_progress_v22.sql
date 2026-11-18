@@ -4,7 +4,7 @@
 create or replace function public.reality_read_owner_internal_maintenance_v1(
  p_owner_id uuid)
 returns jsonb language plpgsql set search_path='' as $function$
-declare items jsonb;
+declare items jsonb; warrant jsonb;
 begin
  if current_user<>'service_role' or p_owner_id is null then
   raise exception 'MAINTENANCE_OWNER_READ_AUTHORITY_REQUIRED';end if;
@@ -36,8 +36,33 @@ begin
  ) order by m.created_at desc),'[]'::jsonb) into items
  from (select * from reality_internal.owner_internal_maintenance_jobs_v1
        where owner_id=p_owner_id order by created_at desc limit 50) m;
+ -- Narrow owner-signed completion-bound warrant. The worker may discover
+ -- additional maintenance after authorization: those new incidents must
+ -- NEVER inherit permission from the first warrant.
+ select pg_catalog.jsonb_build_object(
+  'status','VERIFIED_ACTIVE_OWNER_MAINTENANCE_WARRANT_SCOPE',
+  'shift_id',w.shift_id,
+  'mode',w.mode,'state',w.state,
+  'plan_fingerprint',w.plan_fingerprint,
+  'source_scope',w.source_scope)
+ into warrant
+ from reality_internal.governed_employee_completion_warrants_v1 w
+ join reality_internal.governed_employee_shifts_v1 s
+  on s.shift_id=w.shift_id and s.owner_id=w.owner_id
+ where w.owner_id=p_owner_id
+  and w.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
+  and w.state='ACTIVE'
+  and s.closed_at is null
+  and s.status in('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+  and s.planned_start_at<=clock_timestamp()
+  and (s.planned_end_at='infinity'::timestamptz
+    or s.planned_end_at>clock_timestamp())
+  and pg_catalog.jsonb_typeof(w.source_scope)='array'
+  and pg_catalog.jsonb_array_length(w.source_scope) between 1 and 4
+ order by w.authorized_at desc limit 1;
  return pg_catalog.jsonb_build_object(
   'status','OWNER_VERIFIED_INTERNAL_MAINTENANCE_READ_ONLY',
+  'active_maintenance_warrant',warrant,
   'owner_id',p_owner_id,'read_only',true,
   'count',pg_catalog.jsonb_array_length(items),'items',items,
   'shift_started_by_read',false,'owner_authority_granted_by_read',false,
