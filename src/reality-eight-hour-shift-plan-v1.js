@@ -173,6 +173,7 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
   allocation:'EVIDENCE_FIRST_THEN_CONDITIONAL_GOVERNED_EXECUTION',
   counts:freeze({
     source_backed_opportunities:c.source_backed_opportunities,
+    independent_maintenance_obligations:c.independent_maintenance_obligations??0,
     selected_distinct_source_records:allocated.length,
     dropped_duplicate_source_records:duplicates,
     already_settled_source_records_excluded:settledSourceCount,
