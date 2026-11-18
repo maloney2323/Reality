@@ -18,7 +18,7 @@ const SHADOW_WORLDLINE_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1004';
 
 // Supabase's universe_events identifiers are UUIDs. Preserve the actual
 // source IDs inside payload/provenance instead of submitting text as a UUID.
-function stableUuid(kind, value) {
+export function stableUuid(kind, value) {
   const digits = crypto.createHash('sha256').update(JSON.stringify([kind, value])).digest('hex').slice(0, 32).split('');
   digits[12] = '5';
   digits[16] = ((parseInt(digits[16], 16) & 3) | 8).toString(16);
@@ -27,7 +27,7 @@ function stableUuid(kind, value) {
 }
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function shiftOperationPersistence(persistence) {
+export function shiftOperationPersistence(persistence) {
   return {
     appendEvent: event => persistence.appendEvent({
       ...event,
@@ -42,7 +42,8 @@ function shiftOperationPersistence(persistence) {
 
 // Only accept durable assignments and their original identities. Discovery
 // candidates are not silently converted into authorized employee jobs.
-async function loadAssignedShiftWork(persistence) {
+export async function loadAssignedShiftWork(persistence, { principalId } = {}) {
+  if (!principalId) return [];
   const events = await persistence.reconstruct({
     continuityRootId: CONFIG_ROOT, worldlineId: WORLDLINE,
   });
@@ -54,11 +55,11 @@ async function loadAssignedShiftWork(persistence) {
     latest.set(job.work_item_id, entry.payload);
   }
   return [...latest.values()]
-    .filter(value => value?.state === 'ASSIGNED')
+    .filter(value => value?.state === 'ASSIGNED' && value?.principal_id === principalId)
     .map(value => value.work_item);
 }
 
-async function persistShiftRecoveryStage(persistence, stage) {
+export async function persistShiftRecoveryStage(persistence, stage) {
   if (!UUID_PATTERN.test(stage.continuity_root_id)) {
     throw new Error('SHIFT_WORK_CONTINUITY_ROOT_UUID_REQUIRED');
   }
@@ -80,9 +81,14 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
-function cronRequest(req) {
-  return String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
+export function cronRequest(req, secret = process.env.CRON_SECRET) {
+  // A User-Agent or any random Bearer string is NOT cron authority.
+  if (typeof secret !== 'string' || !secret) return false;
+  const presented = String(req?.headers?.authorization || '');
+  const wanted = 'Bearer ' + secret;
+  const received = Buffer.from(presented);
+  const expected = Buffer.from(wanted);
+  return received.length === expected.length && crypto.timingSafeEqual(received, expected);
 }
 
 async function githubCommits() {
@@ -234,7 +240,7 @@ async function runTick({ config, phase, local, persistence }) {
   // No employee work can be invented from discovered GitHub commits.
   const assignedWorkCycle = await runGovernedShiftRecovery({
     shiftId: tickId,
-    loadAssignedWork: () => loadAssignedShiftWork(persistence),
+    loadAssignedWork: () => loadAssignedShiftWork(persistence, { principalId: config?.updated_by }),
     adapters: {
       record: stage => persistShiftRecoveryStage(persistence, stage),
       authorizeWork: async job => {
