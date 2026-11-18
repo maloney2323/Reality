@@ -64,7 +64,7 @@ test('discovery writes proposals but assigns a job only with exact prior authori
   const db=memory();
   const first=await persistShiftQueue({
     persistence:db,candidates:jobs,principalId:principal,
-    shiftRootId:root,worldline,hasExactAuthority:job=>job.work_item_id==='job-A',
+    shiftRootId:root,worldlineId:worldline,hasExactAuthority:job=>job.work_item_id==='job-A',
   });
   assert.equal(first.assigned,1);
   assert.equal(first.proposed,1);
@@ -73,14 +73,14 @@ test('discovery writes proposals but assigns a job only with exact prior authori
   assert.equal(db.rows[0].payload.work_item.source_verified,true);
   const same=await persistShiftQueue({
     persistence:db,candidates:jobs,principalId:principal,
-    shiftRootId:root,worldline,existingEvents:db.rows,
+    shiftRootId:root,worldlineId:worldline,existingEvents:db.rows,
     hasExactAuthority:job=>job.work_item_id==='job-A',
   });
   assert.equal(db.rows.length,2);
   assert.equal(same.assigned,1);
   const approved=await persistShiftQueue({
     persistence:db,candidates:jobs,principalId:principal,
-    shiftRootId:root,worldline,existingEvents:db.rows,
+    shiftRootId:root,worldlineId:worldline,existingEvents:db.rows,
     hasExactAuthority:()=>true,
   });
   assert.equal(approved.assigned,2);
