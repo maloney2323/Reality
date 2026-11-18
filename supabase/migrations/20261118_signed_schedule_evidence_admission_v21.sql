@@ -50,6 +50,13 @@ begin
   and sch.source_ref~
     '^https://github[.]com/maloney2323/Reality/(issues|pull)/[1-9][0-9]*$'
   and sch.source_evidence_sha256=o.evidence_sha256
+  and sch.source_family=o.source_family
+  and o.source_family in('GITHUB_ISSUE','GITHUB_PULL_REQUEST')
+  -- Qualify only sources the owner specifically put into THIS signed
+  -- work warrant. A general standing discovery grant cannot add originals.
+  and exists(select 1 from reality_internal.governed_employee_shift_steps_v1 selected
+   where selected.shift_id=s.shift_id and selected.step_index between 2 and 5
+    and selected.source_ref=sch.source_ref)
   and sch.last_reconciled_at>clock_timestamp()-interval '24 hours'
   and o.last_reconciled_at>clock_timestamp()-interval '24 hours'
   and o.installation_authorized=false and o.shift_authorized=false
@@ -128,6 +135,9 @@ begin
     'SOURCE_EPOCH_REVIEW_REQUIRED','HISTORICAL_REVALIDATION_REQUIRED')
   and planned_business_date<=(clock_timestamp() at time zone 'America/New_York')::date
   and last_reconciled_at>clock_timestamp()-interval '24 hours'
+  and exists(select 1 from reality_internal.governed_employee_shift_steps_v1 selected
+   where selected.shift_id=s.shift_id and selected.step_index between 2 and 5
+    and selected.source_ref=p_source_ref)
   and source_ref~
     '^https://github[.]com/maloney2323/Reality/(issues|pull)/[1-9][0-9]*$'
  for update;
@@ -149,6 +159,8 @@ begin
    where o.owner_id=sch.owner_id and o.employee=sch.employee
     and o.source_ref=sch.source_ref
     and o.evidence_sha256=sch.source_evidence_sha256
+    and o.source_family=sch.source_family
+    and o.source_family in('GITHUB_ISSUE','GITHUB_PULL_REQUEST')
     and o.last_reconciled_at>clock_timestamp()-interval '24 hours'
     and o.shift_authorized=false and o.production_changed=false)
  then raise exception 'SIGNED_SCHEDULE_DISCOVERY_EPOCH_UNVERIFIED';end if;
