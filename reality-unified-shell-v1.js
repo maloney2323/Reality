@@ -30,6 +30,7 @@
   a.append(n('span','rx-nav-icon',entry.symbol),n('span','rx-nav-label',entry.label));
   if(kind==='mobile'&&entry.key==='value')a.querySelector('.rx-nav-label').textContent='Value';
   if(kind==='mobile'&&entry.key==='connections')a.querySelector('.rx-nav-label').textContent='Connect';
+  if(kind==='mobile'&&entry.key==='chat')a.querySelector('.rx-nav-label').textContent='Home';
   return a;
  }
  const rail=n('nav','rx-nav-rail');rail.id='realityUnifiedRail';
