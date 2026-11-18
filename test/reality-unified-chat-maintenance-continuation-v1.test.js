@@ -272,7 +272,7 @@ test('an explicit approve click from the chat message delegates to the ORIGINAL 
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
   /under shift/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /not independently completed/);
+  /not reached independent final verification/);
  assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
 });
 test('an already signed shift is reported IN Chat instead of asking for another approval',async()=>{
