@@ -81,7 +81,15 @@ begin
     -- NOT the GitHub provider epoch. Compare the independently observed
     -- original updated_at and first/reviewer provider SHA before replaying.
     when j.phase='COMPLETED_INDEPENDENTLY_VERIFIED'
-      and j.independent_receipt_sha256~'^sha256:[a-f0-9]{64}
+      and j.independent_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+      and j.first_source_proof_sha256=j.reviewed_source_sha256
+      and (
+       j.discovery_evidence_sha256=o.evidence_sha256
+       or (o.source_family='GITHUB_PULL_REQUEST'
+        and j.first_source_updated_at=o.source_observed_at
+        and j.verified_at>=j.first_source_checked_at)
+      )
+      then 'EVIDENCE_REVIEW_VERIFIED'
     when o.disposition='SOURCE_NO_LONGER_CURRENT'
       then 'SOURCE_NO_LONGER_CURRENT'
     when j.phase in('COMPLETED_INDEPENDENTLY_VERIFIED','BLOCKED_SOURCE_CHANGED')
