@@ -112,6 +112,7 @@ test('full two-job shift passes actual existing execution-engine contract and pr
   const adapters=createShiftExecutionAdapters({
     principalId:principal,persistence:db,
     policyReader:async()=>policyFor(jobs),
+    issueReader:async()=>[],
     bridgeFactory,
     record:async event=>recorded.push(event),
     loadPriorStages:async()=>recorded,
@@ -138,6 +139,7 @@ test('exact authorization and a trustworthy provider receipt are mandatory',asyn
   const adapter=createShiftExecutionAdapters({
     principalId:principal,persistence:db,
     policyReader:async()=>policyFor([jobs[0]]),
+    issueReader:async()=>[],
     bridgeFactory:()=>({
       execute:async()=>{calls++;return {providerExecutionId:'provider'};},
       verify:async()=>({verified:true,independent:true,verification_id:'fake',
@@ -164,6 +166,7 @@ test('a crash between request and receipt blocks replay of external effects',asy
   const adapter=createShiftExecutionAdapters({
     principalId:principal,persistence:db,
     policyReader:async()=>policyFor(jobs),
+    issueReader:async()=>[],
     bridgeFactory:()=>({execute:async()=>{calls++;}}),
     record:async()=>{},
     loadPriorStages:async()=>prior,
@@ -185,4 +188,65 @@ test('all ticks in one shift share shift identity, including midnight rollover',
   assert.equal(deriveShiftInstanceId(config,at17),deriveShiftInstanceId(config,afterMidnight));
   assert.notEqual(deriveShiftInstanceId(config,at17),
     deriveShiftInstanceId(config,{...at17,day:'19',hour:'17'}));
+});
+test('an interrupted write is settled by fresh GitHub readback without creating a second issue',async()=>{
+  const jobs=projectShiftWorkCandidates(steward(candidate('job-A')),{principalId:principal});
+  const job=jobs[0];
+  const marker=job.inputs.body.match(/<!-- reality-shift-work:[a-f0-9]{32} -->/)?.[0];
+  assert.ok(marker);
+  const issue={
+    number:42,id:4242,body:job.inputs.body,title:job.inputs.title,
+    state:'open',html_url:'https://github.com/maloney2323/Reality/issues/42',
+  };
+  let writes=0,reads=0;
+  const adapter=createShiftExecutionAdapters({
+    principalId:principal,persistence:memory(),
+    policyReader:async()=>policyFor(jobs),
+    bridgeFactory:()=>({execute:async()=>{writes++;}}),
+    issueReader:async path=>{
+      reads++;
+      return path.includes('issues?') ? [issue] : issue;
+    },
+    record:async()=>{},
+    loadPriorStages:async()=>[{
+      shift_id:'shift-interrupted',work_item_id:job.work_item_id,
+      continuity_root_id:job.continuity_root_id,
+      stage:'EXECUTION_REQUESTED',attempt:1,detail:{},
+    }],
+  });
+  const record=[];
+  const result=await runGovernedShiftRecovery({
+    shiftId:'shift-interrupted',loadAssignedWork:async()=>jobs,
+    adapters:{...adapter,record:async event=>record.push(event)},
+  });
+  assert.equal(result.status,'ALL_SELECTED_JOBS_VERIFIED');
+  assert.equal(result.completed_count,1);
+  assert.equal(result.jobs[0].reconciled_from_provider,true);
+  assert.equal(writes,0);
+  assert.ok(reads>=2);
+  assert.equal(record[0].stage,'VERIFIED_COMPLETION');
+});
+
+test('an already existing work issue is verified instead of written a second time',async()=>{
+  const jobs=projectShiftWorkCandidates(steward(candidate('job-A')),{principalId:principal});
+  const job=jobs[0];
+  const issue={
+    number:45,id:4545,body:job.inputs.body,title:job.inputs.title,
+    state:'open',html_url:'https://github.com/maloney2323/Reality/issues/45',
+  };
+  let writes=0;
+  const adapter=createShiftExecutionAdapters({
+    principalId:principal,persistence:memory(),
+    policyReader:async()=>policyFor(jobs),
+    bridgeFactory:()=>({execute:async()=>{writes++;}}),
+    issueReader:async path=>path.includes('issues?')?[issue]:issue,
+    record:async()=>{},loadPriorStages:async()=>[],
+  });
+  const grant=await adapter.authorizeWork(job);
+  const execution=await adapter.executeWork(job,grant,{idempotency_key:'same-job'});
+  assert.equal(execution.status,'SUCCEEDED');
+  assert.equal(execution.reused_existing_issue,true);
+  assert.equal(writes,0);
+  const verified=await adapter.verifyOutcome(job,execution);
+  assert.equal(verified.status,'VERIFIED');
 });
