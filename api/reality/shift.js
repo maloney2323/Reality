@@ -7,12 +7,73 @@ import { getOrCreateSessionPrincipal } from '../../src/reality-session-principal
 import { buildRealitySelfQuestionAgenda, buildSelfQuestionPrompt } from '../../src/reality-self-question-engine-v1.0.js';
 import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '../../src/reality-operating-constitution-v1.0.js';
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
+import { runGovernedShiftRecovery, SHIFT_OPERATING_CONTRACT } from '../../src/reality-shift-recovery-loop-v1.js';
+import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
 const SHADOW_REPO = process.env.REALITY_SHADOW_GITHUB_REPO || 'maloney2323/Reality';
 const SHADOW_CONTINUITY_ROOT_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1003';
 const SHADOW_WORLDLINE_ID = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1004';
+
+// Supabase's universe_events identifiers are UUIDs. Preserve the actual
+// source IDs inside payload/provenance instead of submitting text as a UUID.
+function stableUuid(kind, value) {
+  const digits = crypto.createHash('sha256').update(JSON.stringify([kind, value])).digest('hex').slice(0, 32).split('');
+  digits[12] = '5';
+  digits[16] = ((parseInt(digits[16], 16) & 3) | 8).toString(16);
+  const h = digits.join('');
+  return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-');
+}
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function shiftOperationPersistence(persistence) {
+  return {
+    appendEvent: event => persistence.appendEvent({
+      ...event,
+      event_id: stableUuid('shift-operation-event', event.event_id),
+      entity_id: stableUuid('shift-operation-entity', event.entity_id),
+      parent_event_id: event.parent_event_id
+        ? stableUuid('shift-operation-event', event.parent_event_id) : null,
+      provenance: { ...(event.provenance || {}), source_operation_event_id: event.event_id },
+    }),
+  };
+}
+
+// Only accept durable assignments and their original identities. Discovery
+// candidates are not silently converted into authorized employee jobs.
+async function loadAssignedShiftWork(persistence) {
+  const events = await persistence.reconstruct({
+    continuityRootId: CONFIG_ROOT, worldlineId: WORLDLINE,
+  });
+  const latest = new Map();
+  for (const entry of events) {
+    if (entry.entity_type !== 'shift_work_item') continue;
+    const job = entry.payload?.work_item;
+    if (!job?.work_item_id) continue;
+    latest.set(job.work_item_id, entry.payload);
+  }
+  return [...latest.values()]
+    .filter(value => value?.state === 'ASSIGNED')
+    .map(value => value.work_item);
+}
+
+async function persistShiftRecoveryStage(persistence, stage) {
+  if (!UUID_PATTERN.test(stage.continuity_root_id)) {
+    throw new Error('SHIFT_WORK_CONTINUITY_ROOT_UUID_REQUIRED');
+  }
+  const when = new Date().toISOString();
+  return persistence.appendEvent({
+    event_id: stage.event_id, event_kind: 'operation',
+    entity_type: 'shift_recovery_stage',
+    entity_id: stableUuid('shift-work-entity', stage.work_item_id),
+    continuity_root_id: stage.continuity_root_id,
+    worldline_id: WORLDLINE, parent_event_id: null,
+    effective_time: when, assertion_time: when, epistemic_status: 'OBSERVED',
+    payload: stage, evidence_refs: stage.detail?.evidence_refs || [],
+    provenance: { source: 'reality-governed-shift-recovery-v1', shift_id: stage.shift_id },
+  });
+}
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
@@ -56,10 +117,11 @@ function withinShift(nowMinutes, startMinutes, lengthHours) {
 }
 
 async function runTick({ config, phase, local, persistence }) {
-  const tickId = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
+  const tickKey = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
+  const tickId = stableUuid('shift-tick', tickKey);
   const operationId = createOperationId(`shift-${phase.toLowerCase()}`);
   await appendOperationEvent({
-    persistence,
+    persistence: shiftOperationPersistence(persistence),
     continuityRootId: CONFIG_ROOT,
     worldlineId: WORLDLINE,
     event: createOperationEvent({
@@ -68,7 +130,7 @@ async function runTick({ config, phase, local, persistence }) {
       outcome: 'not_started',
       payload: { mission: 'Determine the next evidence-grounded business-critical work for this shift.' },
     }),
-    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
+    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickKey },
   });
   try {
     await persistence.appendEvent({
@@ -82,9 +144,9 @@ async function runTick({ config, phase, local, persistence }) {
       effective_time: new Date().toISOString(),
       assertion_time: new Date().toISOString(),
       epistemic_status: 'OBSERVED',
-      payload: { phase, local, config, status: 'STARTED' },
+      payload: { phase, local, config, status: 'STARTED', tick_key: tickKey },
       evidence_refs: [],
-      provenance: { source: 'reality-autonomous-shift-v0.1' },
+      provenance: { source: 'reality-autonomous-shift-v0.1', tick_key: tickKey },
     });
   } catch (e) {
     if (/23505|409|duplicate|already exists/i.test(e.message)) return { skipped: true, tick_id: tickId };
@@ -106,12 +168,13 @@ async function runTick({ config, phase, local, persistence }) {
   for (const o of observations) {
     try {
       await persistence.appendEvent({
-        event_id: o.observation_id, event_kind: 'observation', entity_type: 'shadow_activity',
-        entity_id: o.external_id, continuity_root_id: SHADOW_CONTINUITY_ROOT_ID,
+        event_id: stableUuid('shadow-observation', o.observation_id), event_kind: 'observation', entity_type: 'shadow_activity',
+        entity_id: stableUuid('shadow-activity', o.external_id), continuity_root_id: SHADOW_CONTINUITY_ROOT_ID,
         worldline_id: SHADOW_WORLDLINE_ID, parent_event_id: null,
         effective_time: o.effective_at, assertion_time: o.observed_at,
         epistemic_status: o.epistemic_status, payload: o, evidence_refs: [],
-        provenance: o.provenance, content_hash: o.content_hash,
+        provenance: { ...(o.provenance || {}), original_observation_id: o.observation_id },
+        content_hash: o.content_hash,
       });
       persisted++;
     } catch (e) {
@@ -167,8 +230,37 @@ async function runTick({ config, phase, local, persistence }) {
     },
   });
 
+  // A real shift is a governed execution lifecycle, not just an LLM plan.
+  // No employee work can be invented from discovered GitHub commits.
+  const assignedWorkCycle = await runGovernedShiftRecovery({
+    shiftId: tickId,
+    loadAssignedWork: () => loadAssignedShiftWork(persistence),
+    adapters: {
+      record: stage => persistShiftRecoveryStage(persistence, stage),
+      authorizeWork: async job => {
+        if (!config?.updated_by || !job?.work_item_id) return null;
+        const policy = await getAuthorityPolicy(config.updated_by, persistence);
+        if (!policy?.enabled || policy.mode !== 'auto') return null;
+        // No wildcard or inferred shift authority: require this exact job.
+        if (!policy.scopes.some(scope =>
+          scope.work_item_id === job.work_item_id &&
+          scope.connector === job.connector && scope.operation === job.operation)) return null;
+        const authorization = autoAuthorize({ policy, workItem: job });
+        return authorization?.authorization_id ? {
+          granted: true, authorization_ref: authorization.authorization_id,
+          scope: { work_item_id: job.work_item_id, operation: 'execute_work' },
+        } : null;
+      },
+      // Execution and self-repair are deliberately NOT improvised from an
+      // LLM response. They must be attached as server-side, idempotent,
+      // independently verified capability adapters before live use.
+    },
+  });
+
   const mission = [
     'Operate Reality as a governed autonomous business operating shift.',
+    'Permanent shift operating contract: ' + JSON.stringify(SHIFT_OPERATING_CONTRACT),
+    'Current independently checked shift handoff: ' + assignedWorkCycle.status + '. Do not call planning a completed shift.',
     'Constitutional state: ' + constitution.state + '. Never claim responsibility or authority that the constitution has not established.',
     'Do not begin by asking what feature to build. Begin by asking what Reality needs to know to operate the business successfully.',
     buildSelfQuestionPrompt(selfQuestionAgenda),
@@ -187,6 +279,8 @@ async function runTick({ config, phase, local, persistence }) {
     operating_constitution: constitution,
     self_question_agenda: selfQuestionAgenda,
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
+    shift_operating_contract: SHIFT_OPERATING_CONTRACT,
+    assigned_work_cycle: assignedWorkCycle,
     recent_observation_count: observations.length,
     newly_persisted_observations: persisted,
     discovered_work: prioritizedWork,
@@ -196,7 +290,7 @@ async function runTick({ config, phase, local, persistence }) {
   };
 
   await appendOperationEvent({
-    persistence,
+    persistence: shiftOperationPersistence(persistence),
     continuityRootId: CONFIG_ROOT,
     worldlineId: WORLDLINE,
     event: createOperationEvent({
@@ -212,7 +306,7 @@ async function runTick({ config, phase, local, persistence }) {
   const intelligence = await runLiveIntelligenceOrchestration({
     message: mission,
     requestedBy: 'reality-autonomous-shift',
-    systemContext: JSON.stringify({ shift_config: config, evidence }),
+    systemContext: { shift_config: config, evidence },
   });
 
   const result = {
@@ -220,10 +314,13 @@ async function runTick({ config, phase, local, persistence }) {
     intelligence_mode: intelligence.mode,
     work: intelligence.work || null,
     execution: intelligence.execution,
+    shift_cycle: assignedWorkCycle,
+    shift_completion_verified: assignedWorkCycle.status === 'ALL_SELECTED_JOBS_VERIFIED',
+    verified_completed_jobs: assignedWorkCycle.completed_count || 0,
   };
 
   await appendOperationEvent({
-    persistence,
+    persistence: shiftOperationPersistence(persistence),
     continuityRootId: CONFIG_ROOT,
     worldlineId: WORLDLINE,
     event: createOperationEvent({
@@ -236,7 +333,7 @@ async function runTick({ config, phase, local, persistence }) {
   });
 
   await persistence.appendEvent({
-    event_id: tickId + ':result',
+    event_id: stableUuid('shift-result', tickKey),
     event_kind: 'observation',
     entity_type: 'shift_result',
     entity_id: tickId,
@@ -270,7 +367,7 @@ export default async function handler(req, res) {
         updated_by: principal.principal_id,
         updated_at: new Date().toISOString(),
       };
-      const eventId = 'shift:config:' + crypto.randomUUID();
+      const eventId = crypto.randomUUID();
       await persistence.appendEvent({
         event_id: eventId, event_kind: 'governance', entity_type: 'shift_configuration',
         entity_id: eventId, continuity_root_id: CONFIG_ROOT, worldline_id: WORLDLINE,
@@ -307,7 +404,7 @@ export default async function handler(req, res) {
     if (!phase) return json(res, 200, { ok: true, status: 'WAITING', local, config });
 
     const result = await runTick({ config, phase, local, persistence });
-    return json(res, 200, { ok: true, status: 'WORKED', result });
+    return json(res, 200, { ok: true, status: 'TICK_RECORDED', result });
   } catch (error) {
     return json(res, 500, { ok: false, status: 'ERROR', error: error.message });
   }
