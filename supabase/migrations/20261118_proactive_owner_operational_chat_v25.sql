@@ -56,7 +56,7 @@ begin
   then raise exception 'OPERATIONAL_CHAT_SIGNED_WARRANT_INVALID';end if;
   v_shift:=(v_warrant->>'shift_id')::uuid;
  end if;
- select pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ select coalesce(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object(
     'incident_id',m.incident_id,'assignee',m.assignee,
     'kind',m.maintenance_kind,'source_ref',m.source_ref,
@@ -65,7 +65,7 @@ begin
     'frozen_sha',m.independent_frozen_test_receipt_sha256,
     'repair_sha',m.repaired_capability_receipt_sha256,
     'signed',v_shift is not null and
-      pg_catalog.coalesce((v_warrant->'source_scope') @>
+      coalesce((v_warrant->'source_scope') @>
         pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
           'maintenance_id',m.incident_id::text,
           'source_ref',m.source_ref,
