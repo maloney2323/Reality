@@ -303,7 +303,7 @@ test('normal typed Chat reply remains an owner conversation message, never a dup
  v.thread.replaceChildren();
  // Saved conversation rerenders replacing all messages; the owner-signed
  // work update remains anchored inside the transcript without duplication.
- const watched=v.observers.at(-1);
+ const watched=v.observers[0]; // transcript observer precedes sign-in observer
  watched();
  assert.equal(v.thread.children.filter(x=>x===rendered).length,1);
  assert.equal(rendered.parentElement,v.thread);
