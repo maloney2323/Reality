@@ -1,0 +1,78 @@
+/* The existing exact-maintenance authorization lives in Chat > Work >
+   Approvals. Only a verified owner-scoped maintenance ledger makes it visible.
+   Keep the normal Chat transcript as the main screen. */
+body[data-reality-route="chat"] .reality-chat-maintenance-continuation{
+ margin:12px 0 18px;padding:15px;border:1px solid #357cab;
+ border-radius:13px;background:linear-gradient(150deg,#102a45,#0b2138);
+ color:#eaf6ff;min-width:0;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-continuation[hidden],
+body[data-reality-route="chat"] .reality-chat-maintenance-nudge[hidden]{
+ display:none!important;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-title{
+ font-size:16px;display:block;line-height:1.35;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-detail,
+body[data-reality-route="chat"] .reality-chat-maintenance-feedback,
+body[data-reality-route="chat"] .reality-chat-maintenance-limits{
+ font-size:12px;line-height:1.55;color:#c5daec;overflow-wrap:anywhere;
+ margin:9px 0;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-list{
+ display:grid;gap:8px;margin:12px 0;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-job{
+ padding:11px 12px;border:1px solid #356080;border-radius:10px;
+ background:#0d1f34;min-width:0;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-job strong{
+ font-size:13px;line-height:1.45;display:block;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-job p{
+ margin:5px 0 7px;color:#bed5e8;font-size:12px;line-height:1.5;
+ overflow-wrap:anywhere;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-source{
+ font-size:12px;color:#82d7ff;overflow-wrap:anywhere;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-actions{
+ display:flex;gap:8px;flex-wrap:wrap;margin:9px 0;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-approve{
+ flex:1 1 200px;min-height:44px;padding:10px;
+ font-size:13px;font-weight:800;border:1px solid #73d2f0;
+ border-radius:10px;color:#061f32;background:#bdeeff;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-approve:disabled{
+ opacity:.65;cursor:not-allowed;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-refresh{
+ flex:0 0 auto;min-height:44px;padding:9px 12px;border:1px solid #557b99;
+ border-radius:10px;color:#dfedfa;background:#173b5b;font-size:12px;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-nudge{
+ display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;
+ gap:8px;min-height:37px;padding:5px 12px;background:#0d2c46;
+ border-bottom:1px solid #2a668e;color:#dcefff;
+ font-size:12px;line-height:1.35;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-nudge-text{
+ min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+body[data-reality-route="chat"] .reality-chat-maintenance-nudge-open{
+ min-height:30px;flex:0 0 auto;padding:6px 11px;
+ border:1px solid #7ebadd;border-radius:9px;background:#183c60;
+ color:#f1fbff;font-size:12px;font-weight:750;
+}
+@media(max-width:420px){
+ body[data-reality-route="chat"] .reality-chat-maintenance-nudge{
+  min-height:34px;padding:4px 9px;font-size:11px;
+ }
+ body[data-reality-route="chat"] .reality-chat-maintenance-nudge-open{
+  min-height:29px;font-size:11px;padding:5px 9px;
+ }
+ body[data-reality-route="chat"] .reality-chat-maintenance-continuation{
+  margin:10px 0;padding:12px;
+ }
+}
