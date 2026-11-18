@@ -33,8 +33,9 @@ export async function findExistingShiftIssue(job,githubRead) {
   const first=matching[0];
   if (!first) return null;
   const verified=await githubRead('/repos/maloney2323/Reality/issues/'+first.number);
-  if (!verified || verified.number!==first.number || verified.state!=='open'
-    || verified.title!==job.inputs.title || !verified.body?.includes(marker)
+  if (!verified || verified.number!==first.number ||
+    !['open','closed'].includes(verified.state) ||
+    verified.title!==job.inputs.title || !verified.body?.includes(marker)
     || verified.html_url!=='https://github.com/'+REPO+'/issues/'+verified.number) return null;
   return Object.freeze({
     work_item_id:job.work_item_id,issue_number:verified.number,
