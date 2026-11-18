@@ -5,6 +5,7 @@ import {Script,runInNewContext} from 'node:vm';
 
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const sql=read('supabase/migrations/20261118_owner_first_proactive_business_chat_v23.sql');
+const welcomeV24=read('supabase/migrations/20261118_first_chat_purpose_welcome_v24.sql');
 const api=read('api/reality/personal-chat-first-contact.js');
 const client=read('reality-chat-first-contact-v1.js');
 const html=read('index.html');
@@ -110,7 +111,10 @@ test('new business greeting goes into durable owner RLS conversation, exactly on
  assert.match(sql,/provider_access_verified=true/);
  assert.match(sql,/credential_saved=true and oauth_consent_granted=true/);
  assert.match(sql,/setup request does not mean the service is connected yet/);
- assert.match(sql,/what kind of business do you run/i);
+ assert.match(welcomeV24,/business, personal goals, or both/i);
+ assert.match(welcomeV24,/If it is for a business, what kind do you run/i);
+ assert.match(welcomeV24,/OWNER_RETURNING_CUSTOMER_EXISTING_CHAT_OR_WORK/);
+ assert.match(welcomeV24,/pg_catalog\.pg_advisory_xact_lock/);
  assert.doesNotMatch(sql,/insert into reality_internal\.governed_employee_shifts_v1/);
  assert.doesNotMatch(sql,/grant execute[^;]+to authenticated/is);
  assert.doesNotMatch(sql,/grant select on auth\.users/);
@@ -125,6 +129,8 @@ test('existing Chat history is the persistence and reply path, not a floating un
 });
 test('signed-in Chat is home, but public landing and original dashboard remain available',()=>{
  assert.match(html,/if\(yes&&window\.location\.pathname==='\/'\)window\.location\.assign\('\/chat'\)/);
+ assert.doesNotMatch(html,/if\(realityCurrentRoute\(\)==='chat'&&!confirmedActiveGoal\)jumpToWorkSetup\('goal'\)/);
+ assert.match(shell,/if\(kind==='mobile'&&entry\.key==='chat'\).*textContent='Home'/);
  assert.match(shell,/\{key:'home',label:'Overview',url:'\/overview'/);
  assert.match(shell,/\{key:'chat',label:'Home · Chat',url:'\/chat'/);
  assert.ok(routes.rewrites.some(x=>x.source==='/overview'&&x.destination==='/index.html'));
