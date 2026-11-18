@@ -49,10 +49,12 @@ export function buildRileyTaylorCombinedWorkOrders({plan,fingerprint}={}){
   const url=candidate.source_url,match=SOURCE.exec(url||'');
   const kind=candidate.finding_type;
   if(!match||!/^catalog:[a-f0-9]{32}$/.test(candidate.finding_id||'')||
-   !['OPEN_ISSUE','OPEN_PULL_REQUEST','RECURRING_FAILURE'].includes(kind)||
+   !['OPEN_ISSUE','OPEN_PULL_REQUEST','RECURRING_FAILURE','INTERNAL_MAINTENANCE'].includes(kind)||
    (kind==='OPEN_ISSUE'&&match[1]!=='issues')||
    (kind==='OPEN_PULL_REQUEST'&&match[1]!=='pull')||
    (kind==='RECURRING_FAILURE'&&match[1]!=='actions/runs')||
+   (kind==='INTERNAL_MAINTENANCE'&&
+    !['issues','pull'].includes(match[1]))||
    candidate.verified_current_defect!==false||
    candidate.authorized_execution!==false||
    typeof candidate.title!=='string'||!candidate.title.trim()||
@@ -63,7 +65,9 @@ export function buildRileyTaylorCombinedWorkOrders({plan,fingerprint}={}){
    assignment_id:'combined-source-step:'+index,
    source_step_index:index,source_ref:url,
    source_kind:kind,title:candidate.title.slice(0,210),
-   work_type:match[1]==='pull'?'PR_CODE_REVIEW':
+   work_type:kind==='INTERNAL_MAINTENANCE'?
+    'EXISTING_INTERNAL_MAINTENANCE_CONTINUATION':
+    match[1]==='pull'?'PR_CODE_REVIEW':
     match[1]==='issues'?'ISSUE_REPAIR_INVESTIGATION':'PROVIDER_FAILURE_REPRODUCTION',
    employees:Object.freeze(['Riley','Taylor']),
    ...instructions(match[1]),
