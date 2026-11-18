@@ -110,14 +110,18 @@
   const settingsSummary = settings.querySelector('summary');
   if (settingsSummary) settingsSummary.textContent = 'Edit goals & account settings';
   sidebar.append(settings);
+  // The permanent mission is an account preference, not a blocking Chat
+  // banner. Keep its original authenticated DOM nodes/handlers in Settings.
+  const missionBanner=get('privateAccountMissionBanner');
+  if(missionBanner)settings.insertBefore(missionBanner,settings.children[1]||null);
 
   // Center: a conversation, not a stack of operational cards.
   const threadHeader = node('div', 'reality-chat-thread-heading');
   const threadTitle = node('div');
   threadTitle.append(node('span','reality-chat-premium-eyebrow',
     'REALITY · CONTINUITY-AWARE CHAT'));
-  threadTitle.append(node('strong', '', 'Reality Chat'));
-  threadTitle.append(node('small', '', 'Ask. Investigate. Review. Move work forward.'));
+  threadTitle.append(node('strong', '', 'Reality'));
+  threadTitle.append(node('small', '', 'Chat · Your workspace'));
   const threadButtons = node('div', 'reality-chat-thread-buttons');
   // Redundant direct navigation is intentional: a signed-in user should
   // never depend on scrolling past an operational card to leave the chat.
@@ -173,6 +177,8 @@
   });
   updateFocusLabel();
   window.addEventListener('resize', updateFocusLabel);
+  // On mobile Chat is ALWAYS fullscreen; no confusing "Minimize" path.
+  // Preserve the desktop focus toggle for larger screens.
   threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, focusToggle);
   threadHeader.append(threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
@@ -187,8 +193,13 @@
   if (goalLabel) goalOptions.append(goalLabel);
   if (goalPicker) goalOptions.append(goalPicker);
   if (composerExplanation) goalOptions.append(composerExplanation);
-  const composerControls = node('div', 'reality-chat-composer-controls');
-  composerControls.append(goalOptions, get('privateSend'));
+  // One familiar message field. The original Send handler is moved INSIDE
+  // its bordered input, not cloned or replaced; request idempotency survives.
+  const inputRow=node('div','reality-chat-input-row');
+  inputRow.append(get('privatePrompt'),get('privateSend'));
+  composer.append(inputRow);
+  const composerControls=node('div','reality-chat-composer-controls');
+  composerControls.append(goalOptions);
   composer.append(composerControls);
   composer.append(node('p','reality-chat-typing-note','Enter to send on desktop · Shift+Enter for a new line · No message grants installation permission.'));
 
@@ -349,6 +360,29 @@
     attributes:true,attributeFilter:['style']
   });
   refreshReadyDisplay();
+
+  // The mobile keyboard changes Android's visible viewport height. Keep the
+  // actual conversation/composer above it without resizing or scrolling the
+  // entire page and without touching pending request state.
+  const viewport=window.visualViewport;
+  if(viewport){
+    const syncKeyboardViewport=()=>{
+      const baseline=Math.max(document.documentElement.clientHeight,window.innerHeight);
+      const keyboardOpen=window.matchMedia('(max-width:900px)').matches&&
+        document.activeElement===get('privatePrompt')&&
+        viewport.height<baseline-130;
+      document.body.classList.toggle('reality-chat-keyboard-open',keyboardOpen);
+      document.documentElement.style.setProperty('--reality-chat-visible-height',
+        Math.round(viewport.height)+'px');
+    };
+    viewport.addEventListener('resize',syncKeyboardViewport,{passive:true});
+    get('privatePrompt')?.addEventListener('focus',syncKeyboardViewport);
+    get('privatePrompt')?.addEventListener('blur',()=>{
+      document.body.classList.remove('reality-chat-keyboard-open');
+      document.documentElement.style.removeProperty('--reality-chat-visible-height');
+    });
+    syncKeyboardViewport();
+  }
 
   // On smaller screens the conversation fills the page. The side panels
   // overlay it only when explicitly opened, and remain available to screen readers.
