@@ -90,6 +90,10 @@ jobs:
           node --check src/reality-owner-internal-maintenance-continuity-v1.js
           node --check api/reality/personal-governed-employee-shift.js
           node --test test/reality-owner-internal-maintenance-continuity-v1.test.js
+          node --check src/reality-owner-maintenance-continuation-plan-v1.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-owner-maintenance-exact-continuation-v1.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |

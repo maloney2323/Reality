@@ -57,6 +57,7 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
    kind:item.kind,assignee:item.assignee,
    independent_reviewer:item.independent_reviewer,
    source_ref:item.source_ref,phase:item.phase,
+   independent_review_receipt_sha256:item.independent_review_receipt_sha256,
    frozen_reproduction_verified:item.frozen_reproduction_verified,
    repair_verified:item.repair_verified,
    original_customer_job_completed:false

@@ -1587,6 +1587,12 @@ export default async function handler(req,res){
    .catch(()=>({status:'FENCED_ORIGINAL_READBACK_UNVERIFIED',
      independently_tested:false,external_retry_authorized:false,
      original_job_completed:false,production_changed:false}));
+  workerStage='SIGNED_MAINTENANCE_FINAL_RECEIPT_RECONCILIATION';
+  const signedMaintenanceClose=await shiftRpc(db,
+   'reality_close_employee_maintenance_continuation_v1',{}).catch(()=>({
+    status:'SIGNED_MAINTENANCE_CLOSURE_READBACK_UNAVAILABLE',
+    customer_originals_settled:0,production_changed:false
+   }));
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -1709,6 +1715,7 @@ export default async function handler(req,res){
     independent_business_qualification_review:businessQualificationReview,
     signed_internal_maintenance_work:internalMaintenanceWork,
     signed_maintenance_failure_baseline:maintenanceFailureBaseline,
+    signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
