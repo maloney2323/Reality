@@ -1,3 +1,4 @@
+import { attachShiftIssueMarker } from './reality-shift-issue-idempotency-v1.js';
 import crypto from 'node:crypto';
 
 export const SHIFT_QUEUE_VERSION = 'reality-evidence-shift-queue-v1';
@@ -39,6 +40,7 @@ export function projectShiftWorkCandidates(stewardship, { principalId } = {}) {
     const workId=source.work_item_id;
     if (byId.has(workId)) continue;
     const job={ ...source,
+      inputs: { ...source.inputs, body:attachShiftIssueMarker(source.inputs.body,workId) },
       continuity_root_id: uuid(['shift-job-root',principalId,workId]),
       principal_id: principalId,
       evidence_refs: refs,
