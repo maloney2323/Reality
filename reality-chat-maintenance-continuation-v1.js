@@ -105,6 +105,29 @@
    c.customer_job_completed!==false||c.production_changed!==false||
    (c.current_shift_id!==null&&!UUID.test(c.current_shift_id||'')))
    fail('OWNER_INTERNAL_MAINTENANCE_SCOPE_INVALID');
+  // Active shift authority is exact to signed incident IDs, not to every
+  // maintenance discovered afterward by the worker.
+  if(c.signed_warrant_scope_verified!==true&&
+     c.signed_warrant_scope_verified!==false||
+     !Number.isSafeInteger(c.signed_unfinished_count)||
+     !Number.isSafeInteger(c.newly_discovered_outside_warrant_count)||
+     c.signed_unfinished_count<0||
+     c.newly_discovered_outside_warrant_count<0||
+     c.signed_unfinished_count+c.newly_discovered_outside_warrant_count!==
+      c.open_count||
+     !Array.isArray(c.signed_maintenance_incident_ids)||
+     c.signed_maintenance_incident_ids.length!==c.signed_unfinished_count||
+     !Array.isArray(c.outside_warrant_incident_ids)||
+     c.outside_warrant_incident_ids.length!==
+      c.newly_discovered_outside_warrant_count||
+     (c.signed_warrant_scope_verified&&
+      (!UUID.test(c.signed_warrant_shift_id||'')||
+       c.current_shift_id!==c.signed_warrant_shift_id))||
+     (!c.signed_warrant_scope_verified&&
+      (c.signed_warrant_shift_id!==null||c.signed_unfinished_count!==0)))
+   fail('EXACT_SIGNED_MAINTENANCE_WARRANT_SCOPE_UNVERIFIED');
+  const signed=new Set(c.signed_maintenance_incident_ids);
+  const outside=new Set(c.outside_warrant_incident_ids);
   const seenIds=new Set(),seenSources=new Set();
   for(const item of c.items){
    if(!UUID.test(item.origin_incident_id||'')||
@@ -118,7 +141,16 @@
       item.repair_verified!==false||
       item.original_customer_job_completed!==false||
       seenIds.has(item.origin_incident_id)||
-      seenSources.has(item.source_ref))
+      seenSources.has(item.source_ref)||
+      (signed.has(item.origin_incident_id)===outside.has(item.origin_incident_id))||
+      (item.worker_handling_state!==undefined&&
+       !['QUEUED','CLAIMED','SOURCE_REOBSERVED_NEEDS_FROZEN_TEST',
+        'FAILURE_BASELINE_CLAIMED','FAILURE_BASELINE_REPRODUCED_NEEDS_CI_RED',
+        'BLOCKED_INDEPENDENT_PROVIDER_UNVERIFIED',
+        'SOURCE_PROGRESS_NOT_INDEPENDENTLY_VERIFIED'].includes(item.worker_handling_state))||
+      (item.independent_failure_baseline_receipt_sha256!==undefined&&
+       item.independent_failure_baseline_receipt_sha256!==null&&
+       !SHA.test(item.independent_failure_baseline_receipt_sha256)))
     fail('INDEPENDENT_ORIGINAL_MAINTENANCE_PROOF_INVALID');
    seenIds.add(item.origin_incident_id);seenSources.add(item.source_ref);
   }
@@ -161,6 +193,10 @@
   }
   return Object.freeze({
    count:c.open_count,jobs:c.items,activeId:c.current_shift_id,
+   signedCount:c.signed_unfinished_count,
+   outsideCount:c.newly_discovered_outside_warrant_count,
+   signedIds:c.signed_maintenance_incident_ids,
+   warrantVerified:c.signed_warrant_scope_verified,
    fingerprint:valid?draft.expected_fingerprint:null,
    sourceKey:key(c.items),valid
   });
@@ -180,11 +216,18 @@
    EMPLOYEE_QUALIFICATION_HANDOFF_STALLED:'employee job qualification handoff',
    QUALIFIED_EVIDENCE_JOB_BLOCKED:'source-evidence execution handoff'
   };
-  hintLabel.textContent=scope.activeId?
-   'You authorized the continuation of '+scope.count+' existing repairs. '+
-   'The signed shift '+scope.activeId+' is active. '+
-   'I can explain each worker’s status here; you can reply in this conversation. '+
-   'Their repairs are not independently completed, and code installation is not authorized.':
+  const signedIds=new Set(scope.signedIds);
+  hintLabel.textContent=scope.activeId&&scope.warrantVerified?
+   'You authorized '+scope.signedCount+' exact earlier repairs under shift '+
+   scope.activeId+'. '+(scope.outsideCount?
+    'I discovered '+scope.outsideCount+' more repair incident'+
+     (scope.outsideCount===1?'':'s')+' afterward. That work is NOT covered '+
+     'by your original authorization. ':'')+
+   'The signed repairs have not reached independent final verification. '+
+   'You can reply right here to ask what happened. No code installation was authorized.':
+   scope.activeId?
+   'I see an active shift, but its exact repair authorization is not verified. '+
+   'I cannot treat any maintenance as approved until the signed source scope is confirmed.':
    scope.valid?
    'I found '+scope.count+' unfinished employee repairs from your earlier shift. '+
    'Riley and Taylor have independently reviewed maintenance to finish. '+
@@ -197,15 +240,22 @@
    dialogueJobs.append(make('p','',
     item.assignee+': '+roleLabels[item.kind]+
     ' · '+String(item.phase).replaceAll('_',' ').toLowerCase()+
-    ' · independent reviewer '+item.independent_reviewer));
+    ' · '+(signedIds.has(item.origin_incident_id)?
+       'covered by the signed shift':'not in the signed shift')+
+    ' · '+(item.independent_failure_baseline_receipt_sha256?
+       'failure baseline recorded; frozen CI RED still required':
+       'failure baseline not independently verified')+
+    ' · reviewer '+item.independent_reviewer));
   }
   inlineContinue.hidden=!!scope.activeId||!scope.valid;
   inlineContinue.disabled=authorizing||uncertain||!!scope.activeId||!scope.valid;
   inlineContinue.textContent='Continue '+scope.count+' unfinished repair'+
    (scope.count===1?'':'s');
-  dialogueProof.textContent=scope.activeId?
-   'Verified signed shift '+scope.activeId+
-   ' · remaining proof: frozen test, independently tested repair, exact install approval and final receipts. No reauthorization needed.':
+  dialogueProof.textContent=scope.activeId&&scope.warrantVerified?
+   'Verified exact maintenance warrant for '+scope.signedCount+
+    ' incident(s) in shift '+scope.activeId+
+    ' · remaining proof: frozen CI, independently tested repair, exact installation approval and final receipts. '+scope.outsideCount+
+    ' later incident(s) are not authorized by that warrant.':
    'Verified source scope from the existing owner maintenance ledger. '+
    'Continuing a shift never grants installation approval.';
   if(hint.parentElement!==thread)thread.append(hint);
@@ -227,12 +277,16 @@
     scope.valid?'Continue '+scope.count+' unfinished maintenance repair'+
      (scope.count===1?'':'s'):'Maintenance scope not independently verified';
   description.textContent=scope.activeId?
-   'An owner-signed shift already exists. Do not authorize a duplicate; Reality must prove the work and final receipts.':
+   'There is already a shift. '+scope.signedCount+
+    ' exact repairs are covered, '+scope.outsideCount+
+    ' newly discovered repairs are not. Do not authorize a duplicate.':
    scope.valid?
     'These are the original independently reviewed jobs, not new customer work. One approval authorizes their completion-bound continuation.':
     'The source or current owner warrant is not independently verified. No approval is available.';
   feedback.textContent=scope.activeId?
-   'Existing signed shift: '+scope.activeId+'. No installation or completed repair is implied.':
+   'Existing shift: '+scope.activeId+' · '+scope.signedCount+
+    ' exact signed repairs · '+scope.outsideCount+
+    ' outside-scope incidents. No installation or completed repair is implied.':
    scope.valid?'No work is started by reading this card. Press Continue to authorize the exact preserved maintenance set.':
     'Could not prepare an exact continuation; review and refresh the signed maintenance readback.';
  }
