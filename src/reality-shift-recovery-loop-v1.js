@@ -123,8 +123,37 @@ export async function runGovernedShiftRecovery({
       'EXECUTION_REQUESTED','SANDBOX_REPAIR_REQUESTED','INSTALLATION_REQUESTED',
     ].includes(e.stage));
     if (irreversible) {
-      // On a fresh invocation the external result may be unknown. Reconcile
-      // from its provider receipt before ever issuing a second write.
+      // Re-read the actual external target. This can settle a successful
+      // result whose response was lost, but MUST NEVER perform another write.
+      const request = prior.find(e => e.stage==='EXECUTION_REQUESTED');
+      const anyRepairRequest = prior.some(e => [
+        'SANDBOX_REPAIR_REQUESTED','INSTALLATION_REQUESTED',
+      ].includes(e.stage));
+      let reconciliation = null;
+      if (request && !anyRepairRequest &&
+        typeof adapters.reconcilePendingExecution==='function') {
+        try { reconciliation = await adapters.reconcilePendingExecution(job,{
+          shiftId,history:prior,
+        }); } catch { reconciliation=null; }
+      }
+      if (independentProof(reconciliation,job) &&
+        nonblank(reconciliation.execution_id)) {
+        const attempt=Number(request.attempt||1);
+        await persist(job,'VERIFIED_COMPLETION',attempt,{
+          execution_id:reconciliation.execution_id,
+          verification_id:reconciliation.verification_id,
+          evidence_refs:reconciliation.evidence_refs,
+          reconciled_from_provider:true,
+        });
+        outcomes.push(Object.freeze({
+          work_item_id:originalId,state:'VERIFIED',repair_attempts:attempt-1,
+          execution_id:reconciliation.execution_id,
+          verification_id:reconciliation.verification_id,
+          evidence_refs:reconciliation.evidence_refs,
+          reconciled_from_provider:true,
+        }));
+        continue;
+      }
       const last = prior.at(-1)?.stage || null;
       const reason = last === 'EXECUTION_OUTCOME_UNKNOWN'
         ? 'EXECUTION_OUTCOME_UNKNOWN'
