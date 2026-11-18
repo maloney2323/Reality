@@ -82,6 +82,8 @@ jobs:
           node --test test/reality-genuine-capability-live-preview-ref-v1.test.js
           node --test test/reality-verified-candidate-receipt-release-v1.test.js
           node --test test/reality-verified-internal-maintenance-work-v1.test.js
+          node --check src/reality-signed-internal-maintenance-worker-v1.js
+          node --test test/reality-signed-internal-maintenance-worker-v1.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |
