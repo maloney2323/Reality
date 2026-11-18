@@ -1,5 +1,11 @@
 import crypto from 'node:crypto';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
+import { createShiftPersistenceAdapter, shiftRunIdForLocalDate } from '../../src/reality-shift-persistence-v1.0.js';
+import { runShiftWorkLoop } from '../../src/reality-shift-work-loop-v1.0.js';
+import { runRealityStewardshipPass } from '../../src/reality-stewardship-pass-v1.0.js';
+import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
+import { executeAuthorizedWork } from '../../src/reality-governed-execution-engine-v0.1.js';
+import { getServerExecutionBridges } from '../../src/reality-server-execution-bridge-v0.1.js';
 import { buildShadowObservations } from '../../src/reality-shadow-observer-v0.1.js';
 import { reconstructOperationalWork, analyzeOwnership, analyzeCapabilityAndAuthority, createDiscoveredWork, validateDiscoveredWork, prioritizeDiscoveredWork } from '../../src/reality-discovered-work-v0.1.js';
 import { runLiveIntelligenceOrchestration } from '../../src/reality-live-intelligence-orchestration-v0.1.js';
@@ -19,9 +25,14 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
-function cronRequest(req) {
-  return String(req.headers.authorization || '').startsWith('Bearer ')
-    || String(req.headers['user-agent'] || '').includes('vercel-cron/');
+// Vercel schedules are authenticated with the exact CRON_SECRET. The old
+// arbitrary Bearer / user-agent checks allowed anybody to invoke shift work.
+export function cronRequest(req) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const expected = Buffer.from('Bearer ' + secret);
+  const actual = Buffer.from(String(req.headers?.authorization || ''));
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
 async function githubCommits() {
@@ -55,21 +66,74 @@ function withinShift(nowMinutes, startMinutes, lengthHours) {
   return elapsed >= 0 && elapsed < lengthHours * 60;
 }
 
+/**
+ * Real shift-worker integration. Discovery is evidence-backed; work executes
+ * only under a persisted principal's exact existing authority scope. Missing
+ * repair adapters are explicit blockers, not simulated self-healing.
+ */
+async function runGovernedShiftQueue({ config, local, persistence }) {
+  const shiftRunId = shiftRunIdForLocalDate(local, config);
+  const prior = await persistence.reconstruct({ continuityRootId: CONFIG_ROOT, worldlineId: WORLDLINE });
+  const priorEvents = prior.filter(event => event.entity_type === 'shift_job_event' &&
+      event.payload?.shift_run_id === shiftRunId).map(event => event.payload);
+
+  const discovered = await runRealityStewardshipPass();
+  const ownerPrincipal = config.updated_by || null;
+  const policy = ownerPrincipal ? await getAuthorityPolicy(ownerPrincipal, persistence) : null;
+  const bridges = getServerExecutionBridges();
+
+  const cycle = await runShiftWorkLoop({
+    candidates: discovered.work || [],
+    priorEvents,
+    authorize: ({ workItem }) => autoAuthorize({ policy, workItem }),
+    execute: ({ workItem, authorization }) => executeAuthorizedWork({
+      workItem, workflowId: workItem.workflow_id, authorization,
+      connector: bridges, independentVerifier: bridges,
+      requestSummary: workItem.action || 'Governed shift work',
+    }),
+    investigate: async ({ workItem, candidate, reason }) => ({
+      status: 'FAILURE_EVIDENCE_COLLECTED_ROOT_CAUSE_UNVERIFIED',
+      original_work_item_id: workItem.work_item_id,
+      observed_failure: reason,
+      evidence_refs: Array.isArray(candidate.evidence_refs) ? candidate.evidence_refs : [],
+      next_action: 'INVESTIGATE_AND_ACQUIRE_AUTHORIZED_REPAIR_CAPABILITY',
+    }),
+    // Repair is deliberately not faked. When a governed installation adapter
+    // has independent verification and exact original-job binding, wire it in
+    // here. Until then the shift reports REPAIR_PENDING and continues others.
+    repair: null,
+    verifyRepair: null,
+    record: event => persistence.appendEvent({
+      event_id: 'shift_job_event:' + JSON.stringify([shiftRunId, event.work_item_id, event.phase, event.attempt || 0]),
+      event_kind: 'observation',
+      entity_type: 'shift_job_event',
+      entity_id: event.work_item_id,
+      continuity_root_id: CONFIG_ROOT,
+      worldline_id: WORLDLINE,
+      parent_event_id: null,
+      effective_time: new Date().toISOString(),
+      assertion_time: new Date().toISOString(),
+      epistemic_status: event.phase === 'OUTCOME_VERIFIED' ? 'VERIFIED' : 'OBSERVED',
+      payload: { ...event, shift_run_id: shiftRunId, source: 'reality-shift-work-loop-v1.0' },
+      evidence_refs: [],
+      provenance: { source: 'reality-autonomous-shift-v0.2' },
+    }),
+  });
+
+  return {
+    shift_run_id: shiftRunId,
+    source: discovered.source,
+    source_coverage: 'GITHUB_STEWARDSHIP_ONLY',
+    employee_assignments_connected: false,
+    automatic_repair_installation_connected: false,
+    observed_at: discovered.observed_at,
+    cycle,
+  };
+}
+
 async function runTick({ config, phase, local, persistence }) {
   const tickId = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
   const operationId = createOperationId(`shift-${phase.toLowerCase()}`);
-  await appendOperationEvent({
-    persistence,
-    continuityRootId: CONFIG_ROOT,
-    worldlineId: WORLDLINE,
-    event: createOperationEvent({
-      operation_id: operationId,
-      stage: 'question',
-      outcome: 'not_started',
-      payload: { mission: 'Determine the next evidence-grounded business-critical work for this shift.' },
-    }),
-    provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
-  });
   try {
     await persistence.appendEvent({
       event_id: tickId,
@@ -90,6 +154,17 @@ async function runTick({ config, phase, local, persistence }) {
     if (/23505|409|duplicate|already exists/i.test(e.message)) return { skipped: true, tick_id: tickId };
     throw e;
   }
+
+  await appendOperationEvent({
+    persistence,
+    continuityRootId: CONFIG_ROOT,
+    worldlineId: WORLDLINE,
+    event: createOperationEvent({
+      operation_id: operationId, stage: 'question', outcome: 'not_started',
+      payload: { mission: 'Determine the next evidence-grounded business-critical work for this shift.' },
+    }),
+    provenance: { source: 'reality-autonomous-shift-v0.2', tick_id: tickId },
+  });
 
   const commits = await githubCommits();
   const observations = buildShadowObservations({
@@ -209,17 +284,59 @@ async function runTick({ config, phase, local, persistence }) {
     provenance: { source: 'reality-autonomous-shift-v0.1', tick_id: tickId },
   });
 
-  const intelligence = await runLiveIntelligenceOrchestration({
-    message: mission,
-    requestedBy: 'reality-autonomous-shift',
-    systemContext: JSON.stringify({ shift_config: config, evidence }),
-  });
+  // The executable loop runs in application code, independently of whether
+  // the language model produces a plan or is reachable.
+  let shiftWork;
+  try {
+    shiftWork = await runGovernedShiftQueue({ config, local, persistence });
+  } catch (error) {
+    shiftWork = {
+      state: 'BLOCKED',
+      reason: error.message,
+      shift_run_id: shiftRunIdForLocalDate(local, config),
+      verified_outcomes: 0,
+      needs_investigation: true,
+    };
+  }
+  evidence.work_loop = shiftWork;
+
+  let intelligence;
+  try {
+    intelligence = await runLiveIntelligenceOrchestration({
+      message: mission,
+      requestedBy: 'reality-autonomous-shift',
+      systemContext: {
+        shift_config: config,
+        operational_evidence: evidence,
+        universe_entries: [{
+          entry_id: tickId,
+          epistemic_kind: 'OBSERVATION',
+          event_kind: 'SHIFT_TICK_EVIDENCE',
+          content: JSON.stringify({
+            repository: SHADOW_REPO,
+            discovered_work_count: prioritizedWork.length,
+            shift_run_id: shiftWork.shift_run_id,
+            work_loop: shiftWork.cycle?.summary || shiftWork.reason || null,
+          }),
+          evidence_references: prioritizedWork.flatMap(x => x.evidence_refs || []),
+          provenance: { source: 'reality-autonomous-shift-v0.2' },
+        }],
+      },
+    });
+  } catch (error) {
+    intelligence = { mode: 'COGNITION_UNAVAILABLE', work: null,
+      execution: 'NOT_EXECUTED_BY_COGNITIVE_RUNTIME', error: error.message };
+  }
 
   const result = {
     tick_id: tickId, operation_id: operationId, phase, local, evidence_summary: evidence,
     intelligence_mode: intelligence.mode,
     work: intelligence.work || null,
     execution: intelligence.execution,
+    work_execution: shiftWork,
+    shift_complete: shiftWork.cycle?.state === 'ALL_VERIFIED' &&
+      shiftWork.cycle?.summary?.candidates > 0 &&
+      shiftWork.employee_assignments_connected === true,
   };
 
   await appendOperationEvent({
@@ -256,7 +373,7 @@ async function runTick({ config, phase, local, persistence }) {
 
 export default async function handler(req, res) {
   try {
-    const persistence = createUniversePostgresPersistence();
+    const persistence = createShiftPersistenceAdapter(createUniversePostgresPersistence());
 
     if (req.method === 'POST') {
       const principal = getOrCreateSessionPrincipal(req, res);
@@ -284,8 +401,11 @@ export default async function handler(req, res) {
     if (req.method !== 'GET') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
 
     if (!cronRequest(req)) {
+      if (String(req.headers.authorization || '').startsWith('Bearer ')) {
+        return json(res, 401, { ok: false, error: 'CRON_AUTH_REQUIRED' });
+      }
       const config = await readConfig(persistence);
-      return json(res, 200, { ok: true, config, runtime: 'server_backed' });
+      return json(res, 200, { ok: true, config, runtime: 'server_backed', cron_authorized: false });
     }
 
     const config = await readConfig(persistence);
