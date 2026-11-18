@@ -1,0 +1,19 @@
+name: Reality Full Shift Recovery Contract v1
+on:
+  push:
+    branches: [feature/governed-shift-repair-resume-20261118]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  recovery-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Test shift repair, verification, and same-job resumption
+        run: node --test test/reality-shift-recovery-loop-v1.test.js
+      - name: Parse shift handler and runtime
+        run: node --check api/reality/shift.js && node --check src/reality-shift-recovery-loop-v1.js
