@@ -394,7 +394,9 @@
    // The signed response contains an independent owner readback for the
    // same exact shift. Immediately answer in the conversation itself;
    // the next GET continues to reconcile against the live ledger.
-   render(Object.freeze({...fresh,activeId:receipt.shift_id,valid:false}));
+   render(Object.freeze({...fresh,activeId:receipt.shift_id,valid:false,
+    warrantVerified:true,signedCount:fresh.count,outsideCount:0,
+    signedIds:fresh.jobs.map(j=>j.origin_incident_id)}));
    authorize.textContent='Signed continuation recorded';
    feedback.textContent='Authorized shift '+receipt.shift_id+
     ' · '+fresh.count+' prior repairs carried forward. Worker execution, testing, installation and final repair receipts remain unverified. Do not start another shift.';
