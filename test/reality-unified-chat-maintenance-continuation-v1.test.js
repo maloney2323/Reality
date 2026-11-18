@@ -293,7 +293,7 @@ test('ordinary chat replies are NOT owner authorization; missing receipt locks i
  assert.equal(v.events.length,0);
 });
 
-test('normal typed Chat reply remains the user's own conversation message, never a duplicate authorization',async()=>{
+test('normal typed Chat reply remains an owner conversation message, never a duplicate authorization',async()=>{
  const v=setup();await v.flush();
  await v.click('realityChatMaintenanceReply');
  assert.equal(v.locate('privatePrompt').focused,true);
