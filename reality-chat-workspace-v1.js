@@ -171,8 +171,9 @@
     }
   }
   focusToggle.addEventListener('click', () => {
-    if(smallScreen()) document.body.classList.toggle('reality-chat-compact');
-    else document.body.classList.toggle('reality-chat-focus');
+    // Mobile Chat never minimizes into the unusable scrollable card.
+    if(smallScreen())return;
+    document.body.classList.toggle('reality-chat-focus');
     updateFocusLabel();
   });
   updateFocusLabel();
@@ -232,7 +233,9 @@
     statusExpand.setAttribute('aria-expanded',String(expanded));
   });
   statusBar.append(statusExpand);
-  conversation.append(statusBar);
+  // The actual message field remains the lowest interactive Chat control.
+  // Its existing delivery status is compact and appears ABOVE the composer.
+  conversation.insertBefore(statusBar,composer);
 
   // Right: the existing authenticated provider readbacks and real approval UI.
   const closeInspector = node('button','reality-chat-panel-close','Close work panel');
@@ -437,6 +440,10 @@
   // Work-in-progress indicator reflects the REAL request lifecycle only.
   const prompt=get('privatePrompt'),send=get('privateSend');
   if(prompt&&send){
+    prompt.placeholder='Message Reality…';
+    prompt.setAttribute('aria-label','Message Reality');
+    send.textContent='Send';
+    send.setAttribute('aria-label','Send message to Reality');
     prompt.addEventListener('input',()=>{
       prompt.style.height='auto';
       prompt.style.height=Math.min(prompt.scrollHeight,220)+'px';
