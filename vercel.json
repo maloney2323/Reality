@@ -24,6 +24,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/overview",
+      "destination": "/index.html"
+    },
+    {
       "source": "/value",
       "destination": "/index.html"
     },
