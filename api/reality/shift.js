@@ -107,6 +107,24 @@ async function githubCommits() {
   return JSON.parse(t);
 }
 
+async function readActiveManualShift(persistence,principalId,now=new Date()) {
+  if (!principalId) return null;
+  const history=await persistence.reconstruct({
+    continuityRootId:CONFIG_ROOT,worldlineId:WORLDLINE,
+  });
+  const activation=history.filter(e=>e.entity_type==='shift_activation' &&
+    e.payload?.principal_id===principalId &&
+    Number.isFinite(Date.parse(e.payload?.start_at)) &&
+    Number.isFinite(Date.parse(e.payload?.close_at)))
+    .map(e=>e.payload)
+    .sort((a,b)=>Date.parse(b.start_at)-Date.parse(a.start_at))[0];
+  if (!activation) return null;
+  const current=now.getTime();
+  const start=Date.parse(activation.start_at),end=Date.parse(activation.close_at);
+  if (current<start || current>=end+30*60000) return null;
+  return {...activation,phase:current>=end?'SHIFT_CLOSE':'OPERATING'};
+}
+
 async function readConfig(persistence) {
   const events = await persistence.reconstruct({ continuityRootId: CONFIG_ROOT, worldlineId: WORLDLINE });
   const configs = events.filter(e => e.entity_type === 'shift_configuration').sort((a,b) =>
@@ -139,7 +157,7 @@ function withinShift(nowMinutes, startMinutes, lengthHours) {
   return elapsed >= 0 && elapsed < lengthHours * 60;
 }
 
-async function runTick({ config, phase, local, persistence }) {
+async function runTick({ config, phase, local, persistence, shiftIdOverride = null }) {
   const tickMinute = String(Math.floor(Number(local.minute)/15)*15).padStart(2,'0');
   const tickKey = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${tickMinute}:${phase}`;
   const tickId = stableUuid('shift-tick', tickKey);
@@ -178,7 +196,7 @@ async function runTick({ config, phase, local, persistence }) {
   }
 
   if (phase==='SHIFT_CLOSE') {
-    const shiftId=deriveShiftInstanceId(config,local);
+    const shiftId=shiftIdOverride || deriveShiftInstanceId(config,local);
     const jobs=await loadAssignedShiftWork(persistence,{principalId:config.updated_by});
     const historyByJob={};
     for (const job of jobs) {
@@ -327,7 +345,7 @@ async function runTick({ config, phase, local, persistence }) {
     queue = {status:'DISCOVERY_UNAVAILABLE',error:String(error?.message||error),
       candidates:0,assigned:0,proposed:0};
   }
-  const shiftId=deriveShiftInstanceId(config,local);
+  const shiftId=shiftIdOverride || deriveShiftInstanceId(config,local);
   const assignedWorkCycle = phase==='READINESS'
     ? {status:'READINESS_ONLY',selected_count:0,completed_count:0}
     : await runGovernedShiftRecovery({
@@ -453,6 +471,48 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const principal = getOrCreateSessionPrincipal(req, res);
       const b = req.body && typeof req.body === 'object' ? req.body : {};
+      if (b.intent==='START_SHIFT_NOW') {
+        const config=await readConfig(persistence);
+        if (!config?.enabled || config.updated_by!==principal.principal_id) {
+          return json(res,403,{ok:false,error:'CURRENT_SHIFT_OWNER_AUTHORIZATION_REQUIRED'});
+        }
+        const now=new Date();
+        const local=localParts(now,config.timeZone || 'America/New_York');
+        const alreadyActive=await readActiveManualShift(persistence,principal.principal_id,now);
+        if (alreadyActive?.phase==='OPERATING') {
+          return json(res,200,{ok:true,status:'ALREADY_RUNNING',
+            shift_instance_id:alreadyActive.shift_instance_id,started_at:alreadyActive.start_at,
+            close_at:alreadyActive.close_at});
+        }
+        const [hh,mm]=String(config.shiftStart||'21:00').split(':').map(Number);
+        const insideScheduled=withinShift(Number(local.hour)*60+Number(local.minute),
+          hh*60+mm,Number(config.shiftLength||8));
+        const shiftId=insideScheduled
+          ? deriveShiftInstanceId(config,local)
+          : stableUuid('manual-shift-activation',[principal.principal_id,now.toISOString()]);
+        if (!insideScheduled) {
+          const activation={
+            principal_id:principal.principal_id,
+            shift_instance_id:shiftId,
+            start_at:now.toISOString(),
+            close_at:new Date(now.getTime()+Number(config.shiftLength||8)*3600000).toISOString(),
+          };
+          await persistence.appendEvent({
+            event_id:shiftId,event_kind:'governance',
+            entity_type:'shift_activation',entity_id:shiftId,
+            continuity_root_id:CONFIG_ROOT,worldline_id:WORLDLINE,parent_event_id:null,
+            effective_time:activation.start_at,assertion_time:activation.start_at,
+            epistemic_status:'OBSERVED',payload:activation,
+            evidence_refs:[],provenance:{source:'reality-shift-manual-start-v1',
+              principal_id:principal.principal_id},
+          });
+        }
+        const result=await runTick({
+          config,phase:'MANUAL_START',local,persistence,shiftIdOverride:shiftId,
+        });
+        return json(res,200,{ok:true,status:'SHIFT_STARTED',shift_instance_id:shiftId,
+          result});
+      }
       const config = {
         enabled: b.enabled === true,
         readinessTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.readinessTime)) ? b.readinessTime : '20:00',
@@ -499,10 +559,14 @@ export default async function handler(req, res) {
     if (!phase && withinShift(nowMinutes, start, Number(config.shiftLength || 8))) phase = 'OPERATING';
     if (!phase && elapsedSinceStart>=shiftLengthMinutes &&
       elapsedSinceStart<shiftLengthMinutes+30) phase='SHIFT_CLOSE';
+    const manualShift=await readActiveManualShift(persistence,config.updated_by,now);
+    if (manualShift) phase=manualShift.phase;
 
     if (!phase) return json(res, 200, { ok: true, status: 'WAITING', local, config });
 
-    const result = await runTick({ config, phase, local, persistence });
+    const result = await runTick({ config, phase, local, persistence,
+      shiftIdOverride:manualShift?.shift_instance_id || null,
+    });
     return json(res, 200, { ok: true, status: 'TICK_RECORDED', result });
   } catch (error) {
     return json(res, 500, { ok: false, status: 'ERROR', error: error.message });
