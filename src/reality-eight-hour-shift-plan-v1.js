@@ -3,7 +3,7 @@
 // The plan MUST NOT act as job, tool, installation or shift authorization.
 export const EIGHT_HOUR_SHIFT_PLAN_VERSION='reality-eight-hour-employee-shift-draft-v1';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9][0-9]*$/;
-const KIND=['OPEN_ISSUE','OPEN_PULL_REQUEST','RECURRING_FAILURE'];
+const KIND=['OPEN_ISSUE','OPEN_PULL_REQUEST','RECURRING_FAILURE','INTERNAL_MAINTENANCE'];
 const freeze=x=>Object.freeze(x);
 const fail=x=>{throw Error('REALITY_EIGHT_HOUR_SHIFT_'+x)};
 const isNum=x=>Number.isSafeInteger(x)&&x>=0;
@@ -67,8 +67,11 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
    !isNum(c?.source_backed_opportunities)||
    !isNum(c?.open_issues)||!isNum(c?.open_pull_requests)||
    !isNum(c?.historical_failure_signals)||
-   c.open_issues+c.open_pull_requests+c.historical_failure_signals!==
-     c.source_backed_opportunities||
+   c.open_issues+c.open_pull_requests+c.historical_failure_signals+
+    (c.independent_maintenance_obligations??0)!==c.source_backed_opportunities||
+   !Number.isSafeInteger(c.independent_maintenance_obligations??0)||
+   (c.independent_maintenance_obligations??0)<0||
+   (c.independent_maintenance_obligations??0)>4||
    c.verified_current_defects!==0||c.approved_autonomous_repairs!==0||
    c.completed_customer_jobs_from_this_report!==0||
    !brief.value_measurement||
@@ -108,10 +111,10 @@ export function buildRealityEightHourShiftDraft(brief,{durationHours=8,priorityS
  // Prioritize source validation, then code-review opportunities. Only
  // explicit source identity is de-duplicated: underlying issue/PR overlap
  // cannot be certified without independent cross-record review.
- const chosen=[take('OPEN_ISSUE'),
-   take('RECURRING_FAILURE')||take('OPEN_ISSUE')||take('OPEN_PULL_REQUEST'),
-   take('OPEN_PULL_REQUEST')||take('OPEN_ISSUE'),
-   take('OPEN_ISSUE')||take('OPEN_PULL_REQUEST')||take('RECURRING_FAILURE')];
+ const chosen=[take('INTERNAL_MAINTENANCE')||take('OPEN_ISSUE'),
+   take('INTERNAL_MAINTENANCE')||take('RECURRING_FAILURE')||take('OPEN_ISSUE')||take('OPEN_PULL_REQUEST'),
+   take('INTERNAL_MAINTENANCE')||take('OPEN_PULL_REQUEST')||take('OPEN_ISSUE'),
+   take('INTERNAL_MAINTENANCE')||take('OPEN_ISSUE')||take('OPEN_PULL_REQUEST')||take('RECURRING_FAILURE')];
  let cursor=0;
  const slots=[];
  function add(id,mins,stage,action,candidate=null,requiredGate=null){
