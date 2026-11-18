@@ -206,6 +206,8 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
 <details id="realityUnfinishedMaintenance" class="team-value section-fold" aria-label="Unfinished Reality internal maintenance work" aria-live="polite" hidden>
  <summary id="realityUnfinishedMaintenanceTitle">Unfinished maintenance from earlier shifts</summary>
  <div id="realityUnfinishedMaintenanceRows"></div>
+ <button id="resumeMaintenance" type="button" disabled>Verify outstanding maintenance before continuation</button>
+ <p id="resumeMaintenanceScope" style="font-size:12px">Requires authenticated owner approval of the exact outstanding work, not installation.</p>
 </details>
 <details class="section-fold shift-scope-fold"><summary>Shift authorization and operating rules</summary><p class="riley-start-guide" id="fullShiftScope">One authorization starts a verified fresh work batch until its independently accepted final receipts. Completed historical jobs are not re-queued; an exact new capability installation still requires your separate approval in Chat.</p></details>
 <details id="rileyStartConfirmation" class="team-value section-fold" role="status" aria-live="polite" aria-label="Reality job batch start confirmation" hidden>
@@ -2049,6 +2051,9 @@ function renderUnfinishedMaintenanceContinuity(data){
  if(!panel||!rows)return;
  rows.replaceChildren();
  const c=data?.internal_maintenance_continuity;
+ const resume=$('resumeMaintenance');
+ resume.disabled=true;
+ resume.textContent='Maintenance scope verification required';
  if(data?.internal_maintenance_continuity_status!==
      'OWNER_MAINTENANCE_SOURCE_AND_ROLE_VERIFIED'||!c){
   panel.hidden=false;
@@ -2065,6 +2070,23 @@ function renderUnfinishedMaintenanceContinuity(data){
   return;
  }
  panel.hidden=c.open_count===0;
+ const ready=data?.requested_maintenance_draft_status===
+  'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY'&&
+  data.requested_maintenance_draft?.status===
+   'EXACT_OWNER_INTERNAL_MAINTENANCE_CONTINUATION_DRAFT'&&
+  data.requested_maintenance_draft?.open_maintenance_jobs===c.open_count&&
+  data.requested_maintenance_draft?.owner_authorization_required===true&&
+  data.requested_maintenance_draft?.installation_authorized===false&&
+  data.requested_maintenance_draft?.production_changed===false;
+ resume.disabled=pending||!!c.current_shift_id||!ready;
+ resume.textContent=c.current_shift_id?'Existing signed shift is active':
+  ready?'Continue '+c.open_count+' unfinished maintenance repairs':
+  'Maintenance continuation is not yet verified';
+ $('resumeMaintenanceScope').textContent=c.current_shift_id?
+  'The existing signed shift controls execution. A second authorization would duplicate the work.':
+  ready?'Authorizes only the '+c.open_count+
+   ' exact prior-shift maintenance jobs until independent final repair receipts. Each code installation still requires separate exact approval.':
+  'No new shift or approval is created by this read; verify owner scope first.';
  if(!c.open_count)return;
  $('realityUnfinishedMaintenanceTitle').textContent=
   c.open_count+' unfinished internal repair'+(c.open_count===1?'':'s')+
