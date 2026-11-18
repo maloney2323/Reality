@@ -203,6 +203,10 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <p id="rileyNextActionText">Reading the current owner shift and excluding previously settled source work from a new draft.</p>
  <button id="rileyHistoryToggle" type="button" aria-expanded="false" aria-controls="rileyLiveProgressPanel">Show previous shift's receipts and investigation</button>
 </details>
+<details id="realityUnfinishedMaintenance" class="team-value section-fold" aria-label="Unfinished Reality internal maintenance work" aria-live="polite" hidden>
+ <summary id="realityUnfinishedMaintenanceTitle">Unfinished maintenance from earlier shifts</summary>
+ <div id="realityUnfinishedMaintenanceRows"></div>
+</details>
 <details class="section-fold shift-scope-fold"><summary>Shift authorization and operating rules</summary><p class="riley-start-guide" id="fullShiftScope">One authorization starts a verified fresh work batch until its independently accepted final receipts. Completed historical jobs are not re-queued; an exact new capability installation still requires your separate approval in Chat.</p></details>
 <details id="rileyStartConfirmation" class="team-value section-fold" role="status" aria-live="polite" aria-label="Reality job batch start confirmation" hidden>
  <summary>Reality · Job test confirmation</summary>
@@ -2039,12 +2043,58 @@ function renderCombinedShiftRoleEvidence(readback){
  panel.hidden=shown===0;
 }
 
+function renderUnfinishedMaintenanceContinuity(data){
+ const panel=$('realityUnfinishedMaintenance');
+ const rows=$('realityUnfinishedMaintenanceRows');
+ if(!panel||!rows)return;
+ rows.replaceChildren();
+ const c=data?.internal_maintenance_continuity;
+ if(data?.internal_maintenance_continuity_status!==
+     'OWNER_MAINTENANCE_SOURCE_AND_ROLE_VERIFIED'||!c){
+  panel.hidden=false;
+  $('realityUnfinishedMaintenanceTitle').textContent=
+   'Maintenance continuity · Verification unavailable';
+  rows.append(textNode('p',
+   'The owner maintenance queue could not be independently verified. This is not evidence that unfinished work disappeared.'));
+  return;
+ }
+ if(!Array.isArray(c.items)||!Number.isSafeInteger(c.open_count)||
+    c.open_count!==c.items.length){
+  panel.hidden=false;
+  $('realityUnfinishedMaintenanceTitle').textContent='Maintenance evidence needs reconciliation';
+  return;
+ }
+ panel.hidden=c.open_count===0;
+ if(!c.open_count)return;
+ $('realityUnfinishedMaintenanceTitle').textContent=
+  c.open_count+' unfinished internal repair'+(c.open_count===1?'':'s')+
+  ' carried over from previous shift';
+ rows.append(textNode('p',c.current_shift_id?
+  'An active owner-authorized shift exists. Reality can recheck the signed maintenance sources; a frozen reproduction, tested repair and independent final receipt are still required.':
+  'The prior shift is closed, but these exact internal jobs remain queued. An authenticated completion-bound shift is required to let the signed workers claim them. Do not reopen the archived shift or claim a completed repair.'));
+ for(const j of c.items){
+  const card=document.createElement('article');
+  card.className='automation-card';
+  const kind=j.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'?
+   'Business-job qualification handoff':'Source-evidence continuity';
+  card.append(textNode('strong',j.assignee+' · '+kind));
+  card.append(textNode('p','Independent reviewer: '+j.independent_reviewer+
+   ' · Phase: '+String(j.phase).replaceAll('_',' ')));
+  card.append(textNode('p','Original shift: '+j.origin_shift_id+
+   ' · Source: '+j.source_ref));
+  card.append(textNode('p',j.repair_verified?
+   'A repair receipt is recorded, but customer work is not settled.':
+   'No verified repair receipt yet. Frozen failure testing and governed execution remain required.'));
+  rows.append(card);
+ }
+}
 async function refreshShiftStatus(){
   if(shiftLoading)return;
   shiftLoading=true;
   try{
     const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
     const activeState=safeShiftReadbackState(data);
+    renderUnfinishedMaintenanceContinuity(data);
     renderCombinedShiftRoleEvidence(data);
     renderRileyLiveProgress(data);
     renderShiftStartProof(data);

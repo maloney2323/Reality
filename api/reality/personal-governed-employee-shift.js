@@ -28,6 +28,8 @@ import {assessRealityNativeBatchReadiness}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
+import {projectOwnerInternalMaintenanceContinuity}
+ from '../../src/reality-owner-internal-maintenance-continuity-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
@@ -481,6 +483,20 @@ export default async function handler(req,res){
       'WEEKLY_AND_HOMEPAGE_INTAKE_NOT_YET_VERIFIED';
     }
    }
+   // Preserve unfinished maintenance as a separate, signed owner work queue.
+   // The original closed shift is never reopened by a GET or new admission.
+   let internal_maintenance_continuity=null;
+   let internal_maintenance_continuity_status='OWNER_MAINTENANCE_READBACK_UNAVAILABLE';
+   try{
+    const maintenance=await shiftRpc(db,'reality_read_owner_internal_maintenance_v1',{
+     p_owner_id:session.user_id
+    });
+    internal_maintenance_continuity=projectOwnerInternalMaintenanceContinuity(
+     maintenance,{ownerId:session.user_id,shifts:read.shifts});
+    internal_maintenance_continuity_status='OWNER_MAINTENANCE_SOURCE_AND_ROLE_VERIFIED';
+   }catch{
+    // No work, approval, or settled receipt may be inferred from failed readback.
+   }
    const shift_briefing=buildRealityShiftConversationBrief(
     read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
@@ -515,6 +531,7 @@ export default async function handler(req,res){
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     riley_native_batch_readiness,riley_native_model_tool_proof,
     requested_shift_draft:draft,
+    internal_maintenance_continuity,internal_maintenance_continuity_status,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
     capability_approval_handoffs:handoffs,handoff_status,
