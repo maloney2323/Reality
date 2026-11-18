@@ -90,15 +90,22 @@ export async function readVerifiedEmployeeShiftForChat({
    });
    if(continuity.status==='OWNER_UNFINISHED_INTERNAL_MAINTENANCE_PRESERVED'&&
       continuity.open_count>0&&continuity.open_count<=4){
-    const activeForMaintenance=read.shifts.find(s=>
-     s.shift_id===continuity.current_shift_id&&
-     ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
-     s.closed_at==null)||null;
+    const activeForMaintenance=continuity.signed_warrant_scope_verified?
+     read.shifts.find(s=>
+      s.shift_id===continuity.signed_warrant_shift_id&&
+      ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+      s.closed_at==null)||null:null;
+    const signedSet=new Set(continuity.signed_maintenance_incident_ids);
     const detail=continuity.items.map(j=>
      j.assignee+' · '+j.kind+' · '+j.phase+
      ' · independently reviewed by '+j.independent_reviewer+
      ' · source '+j.source_ref+' · ORIGINAL INCIDENT '+j.origin_incident_id+
-     ' · frozen source reproduction verified '+j.frozen_reproduction_verified+
+     ' · authority '+(signedSet.has(j.origin_incident_id)?
+       'EXACT_SIGNED_WARRANT_SCOPE':'NEW_INCIDENT_NOT_IN_EXISTING_WARRANT')+
+     ' · worker stage '+j.worker_handling_state+
+     ' · failure baseline independently recorded '+
+       !!j.independent_failure_baseline_receipt_sha256+
+     ' · independent frozen CI RED receipt present '+j.frozen_reproduction_verified+
      ' · repair verified '+j.repair_verified).join(' | ');
     observations.push(Object.freeze({
      entry_id:'maintenance-conversation:'+
@@ -110,14 +117,20 @@ export async function readVerifiedEmployeeShiftForChat({
      assertion_time:now.toISOString(),
      epistemic_status:'SIGNED_OWNER_MAINTENANCE_PENDING_INDEPENDENT_REPAIR_RECEIPTS',
      summary:'REALITY MAINTENANCE CONVERSATION: '+continuity.open_count+
-      ' exact independently reviewed repairs are still unfinished. '+
+      ' independently reviewed maintenance incidents remain unfinished. '+
       (activeForMaintenance?
-       'THE OWNER ALREADY SIGNED AND AUTHORIZED CONTINUATION SHIFT '+
-         activeForMaintenance.shift_id+' with live status '+activeForMaintenance.status+
-         '. NO SECOND SHIFT OR CONTINUE APPROVAL IS NEEDED. ':
-       'NO CURRENT SIGNED MAINTENANCE SHIFT IS VERIFIED. An EXACT owner '+
-         'authorization button must be approved through authenticated Chat '+
-         'before these repairs can continue. Ordinary conversation is not approval. ')+
+       'THE OWNER ALREADY SIGNED AND AUTHORIZED EXACTLY '+
+         continuity.signed_unfinished_count+' EARLIER REPAIRS IN SHIFT '+
+         activeForMaintenance.shift_id+' with status '+activeForMaintenance.status+
+         '. NO SECOND APPROVAL IS NEEDED FOR THOSE EXACT REPAIRS. ':
+       'NO CURRENT EXACT SIGNED MAINTENANCE WARRANT IS VERIFIED. '+
+         'Verify current authority before asking for a new one. ')+
+      (continuity.newly_discovered_outside_warrant_count?
+       'IMPORTANT: '+continuity.newly_discovered_outside_warrant_count+
+        ' ADDITIONAL MAINTENANCE INCIDENT(S) ARE OUTSIDE THAT WARRANT. '+
+        'Do not treat those as previously approved. They may be investigated '+
+        'within evidence-only authority, but cannot install/execute consequential repairs. ':
+       '')+
       detail+
       '. You are speaking in the SAME Reality Chat conversation; answer '+
       'follow-up questions about these facts directly. Do not send the owner '+
@@ -130,6 +143,10 @@ export async function readVerifiedEmployeeShiftForChat({
      owner_current_signed_maintenance_shift_id:
       activeForMaintenance?.shift_id||null,
      owner_approval_already_recorded:!!activeForMaintenance,
+     owner_signed_repair_count:continuity.signed_unfinished_count,
+     new_repair_count_outside_signed_warrant:
+      continuity.newly_discovered_outside_warrant_count,
+     signed_maintenance_incident_ids:continuity.signed_maintenance_incident_ids,
      unfinished_internal_repairs:continuity.open_count,
      source_references:continuity.items.map(j=>j.source_ref),
      original_incident_ids:continuity.items.map(j=>j.origin_incident_id),
