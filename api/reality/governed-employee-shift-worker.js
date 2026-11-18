@@ -114,6 +114,8 @@ import {reviewOneSignedBusinessQualificationStall}
  from '../../src/reality-shift-business-qualification-review-v1.js';
 import {advanceOneSignedInternalMaintenanceJob}
  from '../../src/reality-signed-internal-maintenance-worker-v1.js';
+import {reproduceOneSignedMaintenanceFailureBaseline}
+ from '../../src/reality-signed-maintenance-failure-baseline-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -264,6 +266,32 @@ export default async function handler(req,res){
      customer_job_completed:false,new_customer_work_created:false,
      repair_executed:false,installation_authorized:false,
      production_changed:false};
+  // A SEPARATE signed worker run independently reconstructs one historical
+  // failure baseline. This does not prove a failing executable CI test, create
+  // a model patch, install code, or settle any customer original.
+  workerStage='SIGNED_INTERNAL_MAINTENANCE_INDEPENDENT_FAILURE_BASELINE';
+  const maintenanceFailureBaseline=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await reproduceOneSignedMaintenanceFailureBaseline({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_INDEPENDENT_BASELINE_UNVERIFIED',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_BASELINE_RPC_UNAVAILABLE':
+      String(error?.message||'').startsWith('SIGNED_MAINTENANCE_BASELINE_')?
+       'SIGNED_BASELINE_SCOPE_OR_PROVIDER_UNVERIFIED':
+       'SIGNED_BASELINE_RUNTIME_UNVERIFIED',
+     historical_baseline_verified:false,
+     executable_frozen_ci_red_verified:false,model_code_generated:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_ACTIVE_OWNER_SHIFT_FOR_MAINTENANCE_BASELINE',
+     historical_baseline_verified:false,
+     executable_frozen_ci_red_verified:false,model_code_generated:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
   // This is not a code repair. The first failure receipt remains immutable.
@@ -1680,6 +1708,7 @@ export default async function handler(req,res){
     shift_continuity_independent_review:continuityIndependentReview,
     independent_business_qualification_review:businessQualificationReview,
     signed_internal_maintenance_work:internalMaintenanceWork,
+    signed_maintenance_failure_baseline:maintenanceFailureBaseline,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
     standing_employee_discovery:standingDiscoveryResult,
     employee_capability_schedule:capabilityScheduleResult,
