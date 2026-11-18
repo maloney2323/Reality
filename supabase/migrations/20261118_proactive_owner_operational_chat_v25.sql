@@ -167,7 +167,7 @@ begin
     end;
    v_lines:=v_lines||pg_catalog.chr(10)||
     '• '||(v_row.item->>'assignee')||' — '||v_name||
-    ' ('||v_row.item->>'source_ref'||'): '||v_step||'. '||
+    ' ('||(v_row.item->>'source_ref')||'): '||v_step||'. '||
     case when v_signed_job then 'Already covered by the signed shift.'
     else 'Not covered by that signed shift.' end;
   end loop;
