@@ -1974,6 +1974,15 @@ async function refreshRileyTaylorCombinedWorkQueue(){
      Date.parse(s.planned_end_at)>Date.now())));
   if(current){renderActiveRileyTaylorQueue(read);return;}
   renderRileyTaylorDraftQueue(read.requested_shift_draft);
+  if(read?.requested_maintenance_draft_status===
+    'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY'&&
+    !verifiedFreshBatchReady){
+   showRileyNextAction('UNFINISHED REPAIRS FOUND · Continue existing maintenance',
+    'Reality still has independently verified internal maintenance assigned to Riley and Taylor. '+
+    'Open the expanded Unfinished maintenance panel and press Continue once. '+
+    'This starts a new signed execution epoch for the same old incidents, '+
+    'not a duplicate customer-job batch or a new approval to install code.');
+  }
  }catch{
   verifiedFreshBatchReady=false;
   $('runFullShift').disabled=true;
@@ -2078,6 +2087,10 @@ function renderUnfinishedMaintenanceContinuity(data){
   data.requested_maintenance_draft?.owner_authorization_required===true&&
   data.requested_maintenance_draft?.installation_authorized===false&&
   data.requested_maintenance_draft?.production_changed===false;
+ if(ready&&!c.current_shift_id&&!panel.dataset.maintenanceExpandedOnce){
+  panel.open=true;
+  panel.dataset.maintenanceExpandedOnce='true';
+ }
  resume.disabled=pending||!!c.current_shift_id||!ready;
  resume.textContent=c.current_shift_id?'Existing signed shift is active':
   ready?'Continue '+c.open_count+' unfinished maintenance repairs':
