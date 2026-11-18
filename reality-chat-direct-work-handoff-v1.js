@@ -43,7 +43,12 @@
  panel.append(label,description,recoverControls,actions,timeline);
  panel.hidden=false;
  description.textContent='Chat work status · Check an existing saved build instruction. No new message, shift or installation is created by looking it up.';
- container.insertBefore(panel,composer);
+ // This is important evidence but NOT a chat bubble or composer control.
+ // Keep the original status/actions alive in Work instead of letting another
+ // permanent card crowd out typing and scrolling on a phone.
+ const workPanel=document.getElementById('realityChatPanelWork');
+ if(workPanel)workPanel.append(panel);
+ else container.insertBefore(panel,composer);
  const transcript=document.getElementById('privateTranscript');
  let activeRef=null,activePhase=null,verifiedComplete=false;
  const phaseOrder=['QUEUED','DRAFT_GENERATED','CANDIDATE_STAGED','CI_VERIFIED'];
