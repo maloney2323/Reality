@@ -10,6 +10,7 @@ on:
       - 'reality-chat-direct-work-handoff-v1.js'
       - 'test/reality-chat-mobile-usable-v3.test.js'
       - 'test/reality-chat-fullscreen-v2.test.js'
+      - 'test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js'
       - '.github/workflows/reality-chat-mobile-usable-v3.yml'
   pull_request:
     types: [opened, reopened, synchronize]
@@ -22,6 +23,7 @@ on:
       - 'reality-chat-direct-work-handoff-v1.js'
       - 'test/reality-chat-mobile-usable-v3.test.js'
       - 'test/reality-chat-fullscreen-v2.test.js'
+      - 'test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js'
       - '.github/workflows/reality-chat-mobile-usable-v3.yml'
 permissions:
   contents: read
