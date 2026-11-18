@@ -144,9 +144,15 @@ begin
   v_text:=v_text||pg_catalog.chr(10)||pg_catalog.chr(10)||
    'There are '||v_open||' unfinished source-backed maintenance incidents. '||
    case when v_shift is not null then
-     v_signed||' are covered by your existing signed maintenance shift '||
-      v_shift::text||'. The other '||v_outside||
-      ' are NOT included in that authorization. '
+     v_signed||case when v_signed=1 then ' is' else ' are' end||
+      ' covered by your existing signed maintenance shift '||
+      v_shift::text||'. '||
+      case when v_outside=0 then
+       'Every listed incident is within that exact signed scope. '
+      else 'The remaining '||v_outside||
+       case when v_outside=1 then ' incident is' else ' incidents are' end||
+       ' NOT included in that authorization. '
+      end
     else 'I could not verify an active exact maintenance warrant. ' end;
   v_lines:='';
   for v_row in
