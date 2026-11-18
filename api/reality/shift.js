@@ -479,8 +479,9 @@ export default async function handler(req, res) {
         const now=new Date();
         const local=localParts(now,config.timeZone || 'America/New_York');
         const alreadyActive=await readActiveManualShift(persistence,principal.principal_id,now);
-        if (alreadyActive?.phase==='OPERATING') {
-          return json(res,200,{ok:true,status:'ALREADY_RUNNING',
+        if (alreadyActive) {
+          return json(res,200,{ok:true,
+            status:alreadyActive.phase==='OPERATING'?'ALREADY_RUNNING':'SETTLEMENT_PENDING',
             shift_instance_id:alreadyActive.shift_instance_id,started_at:alreadyActive.start_at,
             close_at:alreadyActive.close_at});
         }
@@ -489,7 +490,10 @@ export default async function handler(req, res) {
           hh*60+mm,Number(config.shiftLength||8));
         const shiftId=insideScheduled
           ? deriveShiftInstanceId(config,local)
-          : stableUuid('manual-shift-activation',[principal.principal_id,now.toISOString()]);
+          : stableUuid('manual-shift-activation',[
+              principal.principal_id,config.updated_at,
+              local.year+'-'+local.month+'-'+local.day,
+            ]);
         if (!insideScheduled) {
           const activation={
             principal_id:principal.principal_id,
@@ -497,15 +501,22 @@ export default async function handler(req, res) {
             start_at:now.toISOString(),
             close_at:new Date(now.getTime()+Number(config.shiftLength||8)*3600000).toISOString(),
           };
-          await persistence.appendEvent({
-            event_id:shiftId,event_kind:'governance',
-            entity_type:'shift_activation',entity_id:shiftId,
-            continuity_root_id:CONFIG_ROOT,worldline_id:WORLDLINE,parent_event_id:null,
-            effective_time:activation.start_at,assertion_time:activation.start_at,
-            epistemic_status:'OBSERVED',payload:activation,
-            evidence_refs:[],provenance:{source:'reality-shift-manual-start-v1',
-              principal_id:principal.principal_id},
-          });
+          try {
+            await persistence.appendEvent({
+              event_id:shiftId,event_kind:'governance',
+              entity_type:'shift_activation',entity_id:shiftId,
+              continuity_root_id:CONFIG_ROOT,worldline_id:WORLDLINE,parent_event_id:null,
+              effective_time:activation.start_at,assertion_time:activation.start_at,
+              epistemic_status:'OBSERVED',payload:activation,
+              evidence_refs:[],provenance:{source:'reality-shift-manual-start-v1',
+                principal_id:principal.principal_id},
+            });
+          } catch(error) {
+            if (/409|23505|duplicate/i.test(String(error?.message||''))) {
+              return json(res,409,{ok:false,error:'SHIFT_ALREADY_STARTED_FOR_THIS_DATE'});
+            }
+            throw error;
+          }
         }
         const result=await runTick({
           config,phase:'MANUAL_START',local,persistence,shiftIdOverride:shiftId,
