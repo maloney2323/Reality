@@ -151,7 +151,7 @@ test('database admission only builds existing read-only evidence-job records and
   "pulse.last_worker_status='WAKE_RECEIVED'",
   "t.finished_at<run.started_at",
   "t.recommendation='INVESTIGATE_MORE'",
-  "t.provider_proof_sha256=p_current_provider_sha256",
+  "provider_proof_sha256=p_current_provider_sha256",
   "prior.phase='COMPLETED_INDEPENDENTLY_VERIFIED'",
   "prior.reviewed_source_sha256=p_current_provider_sha256",
   'insert into reality_internal.owner_qualified_employee_evidence_jobs_v1',
