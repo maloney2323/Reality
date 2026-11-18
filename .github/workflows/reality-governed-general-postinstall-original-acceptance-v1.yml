@@ -94,6 +94,8 @@ jobs:
           node --check api/reality/personal-governed-employee-shift.js
           node --check api/reality/governed-employee-shift-worker.js
           node --test test/reality-owner-maintenance-exact-continuation-v1.test.js
+          node --check api/reality/personal-employee-roster.js
+          node --test test/reality-eight-role-durable-work-calendar-v1.test.js
       - name: Confirm no upgrade installation or customer settlement from CI
         shell: bash
         run: |
