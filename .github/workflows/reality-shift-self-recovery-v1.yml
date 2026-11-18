@@ -1,0 +1,26 @@
+name: Reality Shift Self-Recovery Runtime v1
+
+on:
+  push:
+    branches: [feature/shift-self-recovery-runtime-20261118]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-shift-recovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify shift self-recovery runtime and database contracts
+        run: node --test test/reality-shift-work-loop-v1.0.test.js
+      - name: Validate shift API and recovery source syntax
+        run: |
+          node --check api/reality/shift.js
+          node --check src/reality-shift-work-loop-v1.0.js
+          node --check src/reality-shift-persistence-v1.0.js
