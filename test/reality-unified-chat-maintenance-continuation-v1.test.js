@@ -74,7 +74,7 @@ class El{
  constructor(tag='div'){this.tagName=tag.toUpperCase();this.children=[];
   this.parentElement=null;this.style={display:''};this.hidden=false;
   this.disabled=false;this.textContent='';this.attributes={};this.handlers={};
-  this.id='';this.className='';this.dataset={};}
+  this.id='';this.className='';this.dataset={};this.focused=false;}
  append(...elements){for(const e of elements){this.children.push(e);e.parentElement=this;}}
  insertBefore(el,ref){
   const at=ref?this.children.indexOf(ref):-1;
@@ -86,6 +86,8 @@ class El{
  addEventListener(k,cb){this.handlers[k]=cb;}
  click(){return this.handlers.click?.();}
  scrollIntoView(){}
+ focus(){this.focused=true;}
+ contains(target){return this===target||this.children.some(x=>x.contains(target));}
 }
 function setup({readback=data,posted=receipt,signedIn=true}={}){
  const ready=new El();ready.id='privateReady';
@@ -97,7 +99,8 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
  const thread=new El();thread.id='privateTranscript';center.append(thread);
  const open=new El();open.id='realityChatOpenInspector';
  const approvals=new El();approvals.id='realityChatTabApprovals';
- const nodes=[ready,inbox,center,open,approvals];
+ const prompt=new El('textarea');prompt.id='privatePrompt';
+ const nodes=[ready,inbox,center,open,approvals,prompt];
  const locate=(id)=>{
   function scan(n){if(n.id===id)return n;
    for(const c of n.children){const found=scan(c);if(found)return found;}
@@ -134,7 +137,7 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
    }},Date,console};
  runInNewContext(ui,context);
  const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
- return {ready,inbox,thread,center,locate,calls,events,flush,
+ return {ready,inbox,thread,center,locate,calls,events,flush,observers,
   click:id=>locate(id)?.click()};
 }
 test('unified signed-in Chat actually loads existing maintenance controls, not old chat-simple',()=>{
@@ -290,6 +293,23 @@ test('ordinary chat replies are NOT owner authorization; missing receipt locks i
  assert.equal(v.events.length,0);
 });
 
+test('normal typed Chat reply remains the user's own conversation message, never a duplicate authorization',async()=>{
+ const v=setup();await v.flush();
+ await v.click('realityChatMaintenanceReply');
+ assert.equal(v.locate('privatePrompt').focused,true);
+ assert.deepEqual(v.calls.map(x=>x.options.method),['GET']);
+ const rendered=v.locate('realityChatMaintenanceNudge');
+ assert.equal(rendered.parentElement,v.thread);
+ v.thread.replaceChildren();
+ // Saved conversation rerenders replacing all messages; the owner-signed
+ // work update remains anchored inside the transcript without duplication.
+ const watched=v.observers.at(-1);
+ watched();
+ assert.equal(v.thread.children.filter(x=>x===rendered).length,1);
+ assert.equal(rendered.parentElement,v.thread);
+ watched();
+ assert.equal(v.thread.children.filter(x=>x===rendered).length,1);
+});
 test('backend is the EXISTING owner-authenticated same-origin exact-maintenance RPC',()=>{
  assert.match(api,/await authenticatedChatSession\(req,res\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
