@@ -62,7 +62,7 @@ test('signed current completion-bound shift can observe previous work, never cre
  const x=projectOwnerInternalMaintenanceContinuity(readback,{ownerId:owner,shifts});
  assert.equal(x.current_shift_id,active);
  assert.equal(x.next_action,
-  'CONTINUE_EXISTING_SIGNED_SHIFT_MAINTENANCE_RECHECK_THEN_FROZEN_TEST');
+  'VERIFY_ACTIVE_SHIFT_EXACT_MAINTENANCE_SCOPE');
  assert.equal(x.open_count,2);
  assert.equal(x.no_new_shift_started,true);
 });
