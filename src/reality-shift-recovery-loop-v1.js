@@ -98,20 +98,63 @@ export async function runGovernedShiftRecovery({
   const outcomes = [];
   for (const job of jobs) {
     const originalId = job.work_item_id;
+    const history = typeof adapters.loadPriorStages === 'function'
+      ? await adapters.loadPriorStages(job, shiftId) : [];
+    if (!Array.isArray(history)) throw new Error('SHIFT_PRIOR_STAGES_INVALID');
+    const prior = history.filter(event =>
+      event?.work_item_id === originalId &&
+      event?.continuity_root_id === job.continuity_root_id &&
+      event?.shift_id === shiftId);
+    const completion = prior.find(e => e.stage === 'VERIFIED_COMPLETION');
+    if (completion) {
+      const detail = completion.detail || {};
+      if (nonblank(detail.execution_id) && nonblank(detail.verification_id) &&
+        evidence(detail.evidence_refs)) {
+        outcomes.push(Object.freeze({
+          work_item_id:originalId,state:'VERIFIED',from_durable_receipt:true,
+          execution_id:detail.execution_id,verification_id:detail.verification_id,
+          evidence_refs:detail.evidence_refs,repair_attempts:Number(completion.attempt||1)-1,
+        }));
+        continue;
+      }
+      throw new Error('SHIFT_DURABLE_COMPLETION_RECEIPT_INVALID');
+    }
+    const irreversible = prior.some(e => [
+      'EXECUTION_REQUESTED','SANDBOX_REPAIR_REQUESTED','INSTALLATION_REQUESTED',
+    ].includes(e.stage));
+    if (irreversible) {
+      // On a fresh invocation the external result may be unknown. Reconcile
+      // from its provider receipt before ever issuing a second write.
+      const last = prior.at(-1)?.stage || null;
+      const reason = last === 'EXECUTION_OUTCOME_UNKNOWN'
+        ? 'EXECUTION_OUTCOME_UNKNOWN'
+        : 'PENDING_SIDE_EFFECT_RECONCILIATION_REQUIRED';
+      outcomes.push(Object.freeze({
+        work_item_id:originalId,state:'UNRESOLVED',reason,from_durable_checkpoint:true,
+        repair_attempts:0,
+      }));
+      continue;
+    }
     let repairAttempts = 0;
     let outcome = null;
+    // Record an unchanged information-only gate once, not on every wake.
+    const seenInformational = new Set(prior.map(x => x.stage));
     // A retry is allowed ONLY after independent proof of a repair installation.
     while (!outcome) {
       const attempt = repairAttempts + 1;
       const grant = typeof adapters.authorizeWork === 'function'
         ? await adapters.authorizeWork(job) : null;
       if (!authorized(grant, job, 'execute_work')) {
-        await persist(job, 'AWAITING_WORK_AUTHORIZATION', attempt);
+        if (!seenInformational.has('AWAITING_WORK_AUTHORIZATION')) {
+          await persist(job, 'AWAITING_WORK_AUTHORIZATION', attempt);
+        }
         outcome = { work_item_id: originalId, state: 'AWAITING_WORK_AUTHORIZATION', repair_attempts: repairAttempts };
         break;
       }
       if (typeof adapters.executeWork !== 'function' || typeof adapters.verifyOutcome !== 'function') {
-        await persist(job, 'MISSING_EXECUTION_OR_VERIFIER', attempt);
+        if (!seenInformational.has('MISSING_EXECUTION_OR_VERIFIER')) {
+          await persist(job, 'MISSING_EXECUTION_OR_VERIFIER', attempt);
+        }
         outcome = { work_item_id: originalId, state: 'BLOCKED', reason: 'EXECUTION_OR_VERIFICATION_BRIDGE_REQUIRED', repair_attempts: repairAttempts };
         break;
       }
