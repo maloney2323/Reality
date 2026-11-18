@@ -1,4 +1,6 @@
 import { getAuthorityPolicy, autoAuthorize } from './reality-authority-v1.0.js';
+import { githubGet } from './reality-connector-github-v1.0.js';
+import { findExistingShiftIssue } from './reality-shift-issue-idempotency-v1.js';
 import { getServerExecutionBridges } from './reality-server-execution-bridge-v0.1.js';
 import { executeAuthorizedWork } from './reality-governed-execution-engine-v0.1.js';
 
@@ -21,7 +23,7 @@ function matchesOwnedScope(policy,job,principalId) {
 export function createShiftExecutionAdapters({
   principalId,persistence,record,loadPriorStages,
   policyReader=getAuthorityPolicy, bridgeFactory=getServerExecutionBridges,
-  executor=executeAuthorizedWork,
+  executor=executeAuthorizedWork,issueReader=githubGet,
 }={}) {
   if (!principalId || !persistence?.reconstruct || !persistence?.appendEvent ||
     typeof record!=='function' || typeof loadPriorStages!=='function') {
@@ -52,6 +54,26 @@ export function createShiftExecutionAdapters({
         job.inputs?.repository!=='maloney2323/Reality') {
         throw new Error('SHIFT_EXECUTION_CAPABILITY_NOT_REGISTERED');
       }
+      // Provider readback before a new write protects against an issue that
+      // already exists from a completed or partially observed prior shift.
+      const existing=await findExistingShiftIssue(job,issueReader);
+      if (existing) {
+        if (existing.state!=='open') return Object.freeze({
+          work_item_id:job.work_item_id,status:'UNRESOLVED',
+          execution_id:'preexisting-closed:'+existing.provider_execution_id,
+          reason:'EXISTING_WORK_ISSUE_CLOSED',
+        });
+        return Object.freeze({
+          work_item_id:job.work_item_id,status:'SUCCEEDED',
+          execution_id:'readback:'+existing.provider_execution_id,
+          reused_existing_issue:true,
+          verification:{
+            verified:true,independent:true,verification_id:'github-readback:'+existing.provider_execution_id,
+            observedState:{repository:'maloney2323/Reality',issue_number:existing.issue_number,
+              title:existing.title,state:existing.state,url:existing.issue_url},
+          },
+        });
+      }
       const bridge=bridgeFactory();
       const result=await executor({
         workItem:job,workflowId:job.workflow_id,
@@ -75,6 +97,17 @@ export function createShiftExecutionAdapters({
       return Object.freeze({
         work_item_id:job.work_item_id,status:'UNRESOLVED',
         execution_id:executionId,
+      });
+    },
+    reconcilePendingExecution:async job=>{
+      const existing=await findExistingShiftIssue(job,issueReader);
+      if (!existing || existing.state!=='open') return null;
+      return Object.freeze({
+        work_item_id:job.work_item_id,status:'VERIFIED',independent:true,
+        execution_id:'recovered:'+existing.provider_execution_id,
+        verification_id:'github-readback:'+existing.provider_execution_id,
+        evidence_refs:[existing.issue_url],
+        reconciled_from_provider:true,
       });
     },
     verifyOutcome:async (job,execution)=>{
