@@ -50,13 +50,38 @@
  const anchor=get('realityChatApprovalItems');
  if(anchor)inbox.insertBefore(root,anchor);
  else inbox.append(root);
- const hint=make('div','reality-chat-maintenance-nudge');
+ // This is a REAL operational conversation entry, projected from the
+ // persistent signed shift / maintenance receipts on each owner readback.
+ // Never fabricate a saved AI reply or a completed worker receipt. It stays
+ // in the transcript instead of a blocking alert above it.
+ const hint=make('article','bubble reality-chat-maintenance-nudge reality-chat-maintenance-dialogue');
  hint.id='realityChatMaintenanceNudge';hint.hidden=true;
- const hintLabel=make('span','reality-chat-maintenance-nudge-text','Unfinished repairs need review');
- const review=make('button','reality-chat-maintenance-nudge-open','Review');
+ hint.setAttribute('aria-label','Reality verified maintenance conversation');
+ const verifiedLabel=make('div','label','REALITY · VERIFIED WORK MESSAGE');
+ const hintLabel=make('p','reality-chat-maintenance-nudge-text',
+  'Reality is checking your unfinished work…');
+ const dialogueJobs=make('div','reality-chat-maintenance-dialogue-jobs');
+ const dialogueActions=make('div','reality-chat-maintenance-dialogue-actions');
+ const inlineContinue=make('button','reality-chat-maintenance-inline-authorize',
+  'Continue exact unfinished repairs');
+ inlineContinue.id='realityChatMaintenanceInlineAuthorize';
+ inlineContinue.type='button';inlineContinue.disabled=true;
+ const review=make('button','reality-chat-maintenance-nudge-open','Review evidence');
  review.id='realityChatMaintenanceOpen';review.type='button';
- hint.append(hintLabel,review);
- center.insertBefore(hint,thread);
+ const reply=make('button','reality-chat-maintenance-reply','Reply to Reality');
+ reply.id='realityChatMaintenanceReply';reply.type='button';
+ const dialogueProof=make('p','reality-chat-maintenance-dialogue-proof',
+  'Source: owner-scoped signed shift and independent maintenance ledger. No installation authority is implied.');
+ dialogueActions.append(inlineContinue,reply,review);
+ hint.append(verifiedLabel,hintLabel,dialogueJobs,dialogueActions,dialogueProof);
+ thread.append(hint);
+ // The saved Chat history uses replaceChildren(). Re-attach this owner-ledger
+ // projection once after each transcript reload. No new AI message or shift.
+ const threadObserver=new MutationObserver(()=>{
+  if(signedIn()&&approvedScope?.count>0&&!thread.contains(hint))
+   thread.append(hint);
+ });
+ threadObserver.observe(thread,{childList:true});
  let loading=false,authorizing=false,uncertain=false;
  let approvedScope=null,initialized=false;
  const signedIn=()=>ready.style.display==='block';
@@ -144,15 +169,46 @@
   approvedScope=scope;
   list.replaceChildren();
   root.hidden=scope.count===0;
-  hint.hidden=scope.count===0||!!scope.activeId;
+  hint.hidden=scope.count===0;
   if(!scope.count){
    authorize.disabled=true;description.textContent='No unfinished maintenance repairs in the verified ledger.';
    feedback.textContent='No maintenance shift was started by this read.';
    return;
   }
   title.textContent=scope.count+' unfinished employee repair'+(scope.count===1?'':'s');
-  hintLabel.textContent=scope.count+' unfinished repair'+(scope.count===1?'':'s')+
-   ' · Your authorization needed';
+  const roleLabels={
+   EMPLOYEE_QUALIFICATION_HANDOFF_STALLED:'employee job qualification handoff',
+   QUALIFIED_EVIDENCE_JOB_BLOCKED:'source-evidence execution handoff'
+  };
+  hintLabel.textContent=scope.activeId?
+   'You authorized the continuation of '+scope.count+' existing repairs. '+
+   'The signed shift '+scope.activeId+' is active. '+
+   'I can explain each worker’s status here; you can reply in this conversation. '+
+   'Their repairs are not independently completed, and code installation is not authorized.':
+   scope.valid?
+   'I found '+scope.count+' unfinished employee repairs from your earlier shift. '+
+   'Riley and Taylor have independently reviewed maintenance to finish. '+
+   'May I continue exactly those repairs under a signed shift? '+
+   'I will ask separately before installing any code. You can reply to ask questions.':
+   'I found unfinished employee repairs, but I cannot verify an exact signed authorization scope yet. '+
+   'Ask me about the blockers or review the source evidence.';
+  dialogueJobs.replaceChildren();
+  for(const item of scope.jobs){
+   dialogueJobs.append(make('p','',
+    item.assignee+': '+roleLabels[item.kind]+
+    ' · '+String(item.phase).replaceAll('_',' ').toLowerCase()+
+    ' · independent reviewer '+item.independent_reviewer));
+  }
+  inlineContinue.hidden=!!scope.activeId||!scope.valid;
+  inlineContinue.disabled=authorizing||uncertain||!!scope.activeId||!scope.valid;
+  inlineContinue.textContent='Continue '+scope.count+' unfinished repair'+
+   (scope.count===1?'':'s');
+  dialogueProof.textContent=scope.activeId?
+   'Verified signed shift '+scope.activeId+
+   ' · remaining proof: frozen test, independently tested repair, exact install approval and final receipts. No reauthorization needed.':
+   'Verified source scope from the existing owner maintenance ledger. '+
+   'Continuing a shift never grants installation approval.';
+  if(hint.parentElement!==thread)thread.append(hint);
   for(const item of scope.jobs){
    const card=make('article','reality-chat-maintenance-job');
    const name=item.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'?
@@ -199,7 +255,8 @@
    uncertain=false;
    render(scope);
   }catch(e){
-   approvedScope=null;authorize.disabled=true;root.hidden=false;hint.hidden=true;
+   approvedScope=null;authorize.disabled=true;
+   inlineContinue.disabled=true;root.hidden=false;hint.hidden=true;
    title.textContent='Maintenance verification unavailable';
    list.replaceChildren();
    description.textContent='Reality cannot independently read the unfinished maintenance ledger.';
@@ -215,13 +272,25 @@
   root.scrollIntoView({behavior:'smooth',block:'nearest'});
  }
  review.addEventListener('click',showApprovals);
+ reply.addEventListener('click',()=>{
+  if(!signedIn())return;
+  // A reply is an ordinary saved owner Chat turn; it never consumes a
+  // maintenance or installation warrant. Preserve whatever the user typed.
+  get('privatePrompt')?.focus();
+ });
+ inlineContinue.addEventListener('click',()=>{
+  // Delegate to the EXACT existing click-only owner authorization handler,
+  // which freshly re-reads the scope and refuses an uncertain duplicate.
+  if(!inlineContinue.disabled&&!authorize.disabled)authorize.click();
+ });
  reload.addEventListener('click',()=>{if(!authorizing)void refresh()});
  authorize.addEventListener('click',async()=>{
   // The only POST path in this module is this REAL owner button event.
   if(authorizing||loading||uncertain||!signedIn()||
      authorize.disabled||!approvedScope?.valid||approvedScope.activeId)return;
   const previously=approvedScope;
-  authorizing=true;authorize.disabled=true;reload.disabled=true;
+  authorizing=true;authorize.disabled=true;inlineContinue.disabled=true;
+  reload.disabled=true;
   feedback.textContent='Verifying the exact current source scope before one signed authorization…';
   try{
    const fresh=await read();
@@ -267,7 +336,11 @@
       receipt.job_started!==false)
     fail('SIGNED_MAINTENANCE_AUTHORIZATION_RECEIPT_UNVERIFIED');
    uncertain=true;approvedScope=null;
-   authorize.disabled=true;hint.hidden=true;
+   authorize.disabled=true;inlineContinue.disabled=true;
+   // The signed response contains an independent owner readback for the
+   // same exact shift. Immediately answer in the conversation itself;
+   // the next GET continues to reconcile against the live ledger.
+   render(Object.freeze({...fresh,activeId:receipt.shift_id,valid:false}));
    authorize.textContent='Signed continuation recorded';
    feedback.textContent='Authorized shift '+receipt.shift_id+
     ' · '+fresh.count+' prior repairs carried forward. Worker execution, testing, installation and final repair receipts remain unverified. Do not start another shift.';
@@ -275,11 +348,18 @@
    window.dispatchEvent(new CustomEvent('reality:maintenance-continuation-authorized',{
     detail:{shift_id:receipt.shift_id,internal_work_count:fresh.count}
    }));
+   // Background readback only. It cannot trigger another POST.
+   void refresh();
   }catch(e){
    // Write might have succeeded even if response was lost; NEVER retry
    // automatically and never re-enable until the owner clicks Check status.
    uncertain=true;approvedScope=null;
-   authorize.disabled=true;
+   authorize.disabled=true;inlineContinue.disabled=true;
+   hint.hidden=false;
+   hintLabel.textContent='I could not verify whether the continuation request was recorded. '+
+    'Please choose Check status in Work before trying anything again. '+
+    'I will not issue a duplicate authorization.';
+   dialogueJobs.replaceChildren();
    feedback.textContent='Authorization could not be independently confirmed ('+
     safeError(e)+'). Use Check status first. Do not press Continue again until Reality proves there is no active shift.';
   }finally{authorizing=false;reload.disabled=false}
@@ -288,7 +368,7 @@
   if(signedIn()&&!initialized){initialized=true;void refresh()}
   if(!signedIn()){
    initialized=false;approvedScope=null;root.hidden=true;hint.hidden=true;
-   authorize.disabled=true;
+   authorize.disabled=true;inlineContinue.disabled=true;
   }
  });
  signObserver.observe(ready,{attributes:true,attributeFilter:['style']});
