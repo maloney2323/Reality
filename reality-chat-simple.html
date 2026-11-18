@@ -2508,6 +2508,67 @@ $('rileyHistoryToggle').onclick=()=>{
   'Hide previous shift evidence':'Show previous shift receipts and investigation';
  void refreshShiftStatus();
 };
+$('resumeMaintenance').onclick=async()=>{
+ // The owner explicitly clicks in an authenticated Reality session. The
+ // server rebuilds the exact maintenance IDs and scope from its own ledger.
+ if(pending||$('resumeMaintenance').disabled)return;
+ pending=true;$('resumeMaintenance').disabled=true;$('send').disabled=true;
+ const message=bubble('assistant',
+  'Checking and authorizing the exact unfinished maintenance scope…','pending');
+ try{
+  const data=await json(SHIFT,{signal:AbortSignal.timeout(16000)});
+  const draft=data?.requested_maintenance_draft;
+  if(data?.requested_maintenance_draft_status!==
+    'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY'||
+    draft?.status!=='EXACT_OWNER_INTERNAL_MAINTENANCE_CONTINUATION_DRAFT'||
+    !/^sha256:[a-f0-9]{64}$/.test(draft.expected_fingerprint||'')||
+    !Number.isSafeInteger(draft.open_maintenance_jobs)||
+    draft.open_maintenance_jobs<1||draft.open_maintenance_jobs>4||
+    draft.installation_authorized!==false||
+    draft.owner_authorization_required!==true||
+    draft.production_changed!==false)
+   throw Error('Exact owner maintenance scope cannot be verified');
+  const authorization=await json(SHIFT,{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    action:'AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION',
+    expected_fingerprint:draft.expected_fingerprint,
+    planned_start_at:new Date(Date.now()+12000).toISOString(),
+    requested_hours:8,completion_bound:true
+   }),
+   signal:AbortSignal.timeout(35000)
+  });
+  if(authorization?.ok!==true||
+     !uuid(authorization.shift_id)||
+     authorization.owner_scope_verified!==true||
+     authorization.completion_bound!==true||
+     authorization.completion_condition!==
+      'ALL_EXACT_INTERNAL_MAINTENANCE_REPAIR_RECEIPTS_VERIFIED'||
+     authorization.start_confirmation?.exact_internal_work_count!==
+      draft.open_maintenance_jobs||
+     authorization.installation_authorized!==false||
+     authorization.production_changed!==false)
+   throw Error('No verified owner signed maintenance warrant returned');
+  message.classList.remove('pending');
+  message.lastChild.textContent=
+   'SIGNED MAINTENANCE CONTINUATION AUTHORIZED · '+authorization.shift_id+
+   ' · '+draft.open_maintenance_jobs+' existing internal repair assignments. '+
+   'Archived shifts remain closed. Repair execution and independent final receipts '+
+   'are still required. No installation or customer job settlement is claimed.';
+  status('Signed maintenance continuation read back; check live worker events.');
+  void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();
+ }catch(error){
+  message.className='message assistant error';
+  message.lastChild.textContent=
+   'No maintenance authorization confirmed. Refresh existing shift status before retrying. ('+
+   String(error?.message||'Unknown').slice(0,170)+')';
+  status('Maintenance authorization unverified; do not create duplicate work.');
+  void refreshShiftStatus();
+ }finally{
+  pending=false;$('send').disabled=false;
+  void refreshShiftStatus();
+ }
+};
 $('runFullShift').onclick=async()=>{
  // Direct owner click is the sole trigger. The model and passive page load
  // cannot authorize the shift. Reuses the existing signed-in endpoint.
