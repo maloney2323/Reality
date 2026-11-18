@@ -231,6 +231,12 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <summary>AI employees · Roles and assignments</summary>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
+ <details id="employeeOperatingSchedule" class="team-value section-fold" aria-label="Durable owner employee discovery and maintenance schedules" open>
+  <summary><strong>Automatic employee work schedules · Current assignments and evidence</strong></summary>
+  <p id="operatingScheduleSummary" aria-live="polite">Reading independently reconciled discovery and repair assignments…</p>
+  <div id="operatingScheduleRoles"></div>
+  <p>Source investigation dates are evidence-only work plans, not measured labor hours or approvals to execute customer jobs. Repairs and external actions require their existing exact governance.</p>
+ </details>
  <details class="team-value section-fold" aria-label="Reality source-backed business value">
   <summary>Potential business value · before the shift</summary>
   <p>What Reality discovers, what comparable human work might cost, and what Reality has actually verified. Scheduled AI role-hours are not automatically human hours saved.</p>
@@ -1200,6 +1206,106 @@ function clearSavedEmployeeChatProposals(){
  $('savedEmployeeChatSummary').textContent='Saved Chat proposals unavailable. No recommendations or work authorization inferred.';
  $('savedEmployeeChatRoles').replaceChildren();
 }
+function renderEmployeeOperatingSchedule(roster){
+ const note=$('operatingScheduleSummary'),root=$('operatingScheduleRoles');
+ root.replaceChildren();
+ const s=roster?.employee_operating_schedule;
+ if(roster?.employee_operating_schedule_status!==
+    'OWNER_DURABLE_EIGHT_ROLE_CALENDAR_VERIFIED'||!s){
+  note.textContent='Live employee schedule readback unavailable. Prior discovery and maintenance receipts remain unchanged; no work is declared absent.';
+  return;
+ }
+ if(!['OWNER_EIGHT_ROLE_WORK_CALENDAR_CURRENT',
+      'OWNER_EIGHT_ROLE_WORK_CALENDAR_STALE'].includes(s.status)||
+    s.owner_scope_verified!==true||s.read_only!==true||
+    s.planned_dates_are_not_exec_authority!==true||
+    s.scheduled_executable_original_jobs!==0||
+    s.new_original_customer_jobs_created!==0||
+    s.production_changed!==false||
+    s.installation_authorized!==false||
+    !Array.isArray(s.roles)||s.roles.length!==8||
+    !Array.isArray(s.items)||s.items.length>160||
+    s.work_records!==s.items.length)
+  throw Error('OWNER_EMPLOYEE_CALENDAR_SCOPE_UNVERIFIED');
+ const seen=new Set(),known=new Set(['Avery','Riley','Quinn','Taylor',
+  'Casey','Morgan','Jordan','Sage']);
+ const current=s.status==='OWNER_EIGHT_ROLE_WORK_CALENDAR_CURRENT';
+ note.textContent=s.planned_investigations+
+  ' evidence-only reviews proposed across eight employee roles · '+
+  s.unfinished_internal_repairs+' unfinished internal repair(s) · '+
+  s.independently_verified_current_evidence_reviews+
+  ' independently verified current-evidence review(s). '+
+  (current?
+   'Calendar reconciled '+(verifiedLocalTimestamp(s.reconciled_at)||'recently')+
+    '; source discovery refreshes separately.':
+   'Calendar is stale; do not assume these are current assignments.')+
+  ' No new customer shift, installation or cash savings authorized.';
+ const byRole=new Map();
+ for(const j of s.items){
+  if(!known.has(j.employee)||seen.has(j.work_key)||
+   !/^schedule:[a-f0-9]{64}$/.test(j.work_key||'')||
+   !/^sha256:[a-f0-9]{64}$/.test(j.source_evidence_sha256||'')||
+   !['SOURCE_INVESTIGATION','INTERNAL_MAINTENANCE'].includes(j.work_kind)||
+   !['CURRENT_SOURCE_REVIEW_REQUIRED','HISTORICAL_REVALIDATION_REQUIRED',
+     'SOURCE_EPOCH_REVIEW_REQUIRED','SOURCE_NO_LONGER_CURRENT',
+     'SOURCE_SETTLED_NO_REPLAY','EVIDENCE_REVIEW_VERIFIED',
+     'MAINTENANCE_AWAITING_SIGNED_SHIFT','MAINTENANCE_IN_SIGNED_SHIFT',
+     'MAINTENANCE_VERIFIED'].includes(j.work_state))
+   throw Error('OWNER_EMPLOYEE_CALENDAR_WORK_SCOPE_INVALID');
+  seen.add(j.work_key);
+  if(!byRole.has(j.employee))byRole.set(j.employee,[]);
+  byRole.get(j.employee).push(j);
+ }
+ const states={
+  CURRENT_SOURCE_REVIEW_REQUIRED:'Validate the latest source evidence',
+  HISTORICAL_REVALIDATION_REQUIRED:'Refresh historical evidence first',
+  SOURCE_EPOCH_REVIEW_REQUIRED:'Source changed since prior evidence review',
+  SOURCE_NO_LONGER_CURRENT:'Check whether this older source is still relevant',
+  SOURCE_SETTLED_NO_REPLAY:'Previously settled; no duplicate work',
+  EVIDENCE_REVIEW_VERIFIED:'Current evidence review independently receipted',
+  MAINTENANCE_AWAITING_SIGNED_SHIFT:'Unfinished internal repair · signed shift required',
+  MAINTENANCE_IN_SIGNED_SHIFT:'Internal repair in authorized shift · final proof pending',
+  MAINTENANCE_VERIFIED:'Internal repair independently settled'
+ };
+ for(const role of s.roles){
+  if(!known.has(role.employee))throw Error('OWNER_EMPLOYEE_CALENDAR_ROLE_UNVERIFIED');
+  const list=byRole.get(role.employee)||[];
+  if(list.length!==role.work_records)
+   throw Error('OWNER_EMPLOYEE_CALENDAR_ROLE_COUNT_MISMATCH');
+  const wrap=document.createElement('details');wrap.className='week-role';
+  if(role.unfinished_internal_repairs>0)wrap.open=true;
+  const title=document.createElement('summary');
+  title.textContent=role.employee+' · '+role.planned_source_reviews+
+   ' review(s) planned · '+role.current_evidence_verified+
+   ' verified evidence · '+role.unfinished_internal_repairs+
+   ' unfinished repair(s)';
+  wrap.append(title);
+  if(!list.length){
+   wrap.append(textNode('p','No verified connected-source assignments. Discovery coverage must be expanded; the clock is not a job.'));
+  }
+  for(const item of list){
+   const row=document.createElement('div');row.className='workforce-output-row';
+   row.append(textNode('strong',item.title));
+   const moment=item.planned_business_date?
+    'Planned '+item.planned_business_date+' · '+item.daily_order+'/4':'History / no re-execution';
+   row.append(textNode('div',moment+' · '+states[item.work_state]));
+   if(item.work_kind==='INTERNAL_MAINTENANCE'){
+    row.append(textNode('div','Original maintenance incident: '+item.incident_id+
+     ' · Original shift: '+item.origin_shift_id));
+   }else if(item.previous_independent_evidence_receipt_sha256){
+    row.append(textNode('div','Earlier independent evidence receipt exists. '+
+     (item.independently_verified_current_evidence?
+      'The exact current evidence epoch is verified.':
+      'It does not verify the newly observed source epoch.')));
+   }
+   if(/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull)\/[1-9]\d*$/.test(item.source_ref))
+    row.append(combinedQueueLink(item.source_ref,'Open source evidence'));
+   wrap.append(row);
+  }
+  root.append(wrap);
+ }
+}
+
 function clearNextWeekWorkPlan(){
  $('nextWeekSourceStatus').textContent='Preparation unverified';
  $('nextWeekSummary').textContent='Next-week source or owner evidence could not be verified. No shift, worker execution or business savings is claimed.';
@@ -1233,6 +1339,7 @@ async function refreshEmployeeBoard(){
     configureWorkforceSavingsRoles(roster);
     loadWorkforceRoleInputs();
     renderNextWeekWorkPlan(roster);
+    renderEmployeeOperatingSchedule(roster);
     renderSavedEmployeeChatProposals(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
@@ -1246,6 +1353,9 @@ async function refreshEmployeeBoard(){
     $('teamCards').replaceChildren();
     clearShiftValueEvidence();
     clearNextWeekWorkPlan();
+    $('operatingScheduleSummary').textContent=
+     'Schedule source unverified. Existing evidence and approved work must not be erased.';
+    $('operatingScheduleRoles').replaceChildren();
     clearSavedEmployeeChatProposals();
     summary.textContent='Employee evidence unavailable';
     $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
