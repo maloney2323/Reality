@@ -13,6 +13,11 @@ const PHASES=new Set([
 ]);
 const KINDS=new Set(['EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
  'QUALIFIED_EVIDENCE_JOB_BLOCKED']);
+const HANDLING=new Set([
+ 'QUEUED','CLAIMED','SOURCE_REOBSERVED_NEEDS_FROZEN_TEST',
+ 'FAILURE_BASELINE_CLAIMED','FAILURE_BASELINE_REPRODUCED_NEEDS_CI_RED',
+ 'BLOCKED_INDEPENDENT_PROVIDER_UNVERIFIED'
+]);
 const fail=x=>{throw Error('OWNER_MAINTENANCE_CONTINUITY_'+x)};
 export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shifts=[]}={}){
  if(!UUID.test(ownerId||'')||!Array.isArray(shifts)||shifts.length>5||
@@ -40,6 +45,26 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
        .includes(item.independent_reviewer)||
      item.assignee===item.independent_reviewer||
      item.original_customer_job_completed!==false||
+     (item.worker_handling_state!==undefined&&
+      !HANDLING.has(item.worker_handling_state))||
+     (item.worker_baseline_attempts!==undefined&&
+      (!Number.isSafeInteger(item.worker_baseline_attempts)||
+       item.worker_baseline_attempts<0||item.worker_baseline_attempts>2))||
+     (item.worker_claim_attempts!==undefined&&
+      (!Number.isSafeInteger(item.worker_claim_attempts)||
+       item.worker_claim_attempts<0||item.worker_claim_attempts>2))||
+     (item.independent_failure_baseline_receipt_sha256!==undefined&&
+      item.independent_failure_baseline_receipt_sha256!==null&&
+      !HASH.test(item.independent_failure_baseline_receipt_sha256))||
+     (item.independent_source_observation_receipt_sha256!==undefined&&
+      item.independent_source_observation_receipt_sha256!==null&&
+      !HASH.test(item.independent_source_observation_receipt_sha256))||
+     (item.independent_frozen_test_receipt_sha256!==undefined&&
+      item.independent_frozen_test_receipt_sha256!==null&&
+      !HASH.test(item.independent_frozen_test_receipt_sha256))||
+     (item.worker_handling_state==='FAILURE_BASELINE_REPRODUCED_NEEDS_CI_RED'&&
+      (!HASH.test(item.independent_failure_baseline_receipt_sha256||'')||
+       item.worker_baseline_attempts<1))||
      item.installation_authorized_by_read!==false||
      item.external_action_authorized_by_read!==false||
      item.production_changed!==false||
@@ -59,6 +84,13 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
    source_ref:item.source_ref,phase:item.phase,
    independent_review_receipt_sha256:item.independent_review_receipt_sha256,
    frozen_reproduction_verified:item.frozen_reproduction_verified,
+   worker_handling_state:HANDLING.has(item.worker_handling_state)?
+    item.worker_handling_state:'SOURCE_PROGRESS_NOT_INDEPENDENTLY_VERIFIED',
+   independent_failure_baseline_receipt_sha256:
+    HASH.test(item.independent_failure_baseline_receipt_sha256||'')?
+     item.independent_failure_baseline_receipt_sha256:null,
+   worker_baseline_attempts:Number.isSafeInteger(item.worker_baseline_attempts)?
+    item.worker_baseline_attempts:0,
    repair_verified:item.repair_verified,
    original_customer_job_completed:false
   }));
