@@ -84,6 +84,9 @@ jobs:
           node --test test/reality-verified-internal-maintenance-work-v1.test.js
           node --check src/reality-signed-internal-maintenance-worker-v1.js
           node --test test/reality-signed-internal-maintenance-worker-v1.test.js
+          node --check src/reality-signed-maintenance-failure-baseline-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-signed-maintenance-failure-baseline-v1.test.js
           node --check src/reality-owner-internal-maintenance-continuity-v1.js
           node --check api/reality/personal-governed-employee-shift.js
           node --test test/reality-owner-internal-maintenance-continuity-v1.test.js
