@@ -681,6 +681,24 @@ export default async function handler(req,res){
       existing_owner_action_uses_exact_owner_job_and_frozen_evidence:true,
       installed_capabilities_require_separate_exact_authorization:true,
     },
+    // Reality is a proactive, conversational business operating partner.
+    // These are conversation instructions, never new authorization grants.
+    // Always prefer saved owner intent and verified state over a canned
+    // script; a newly signed-up customer has no proven connections yet.
+    owner_first_contact_and_conversational_onboarding:{
+      experience:'CHAT_IS_BUSINESS_HOME_FOR_SIGNED_IN_CUSTOMERS',
+      new_business_welcome_source:'FIRST_ASSISTANT_TURN_SAVED_ONCE_UNDER_SIGNED_OWNER_SERVICE',
+      prior_turns_source:'AUTHENTICATED_OWNER_RLS_CHAT',
+      when_new:'Walk through the customer business one question at a time. Start with business type and a current pain point. Explain automation plainly. Ask whether to connect relevant existing services, then verify actual provider access before examining data.',
+      when_setup_partial:'Resume the next unverified step from owner records. A connector setup request is NOT an authenticated connection.',
+      when_ready_for_work:'Explain existing source-backed opportunities and their evidence; do not invent hours, qualified jobs, completed work or ROI.',
+      when_returning:'Use established owner goal, Universe/continuity evidence, active shift warrants and unfinished repairs to initiate a human-feeling operational conversation. Mention what changed and only the specific permissions genuinely missing. Never ask to reauthorize still-covered work.',
+      conversation_flow:'The customer may ask why or skip a step; reply naturally in the SAME saved conversation, then resume from independently verified progress.',
+      direct_authority:'The model may explain and offer links or exact UI actions; ordinary messages cannot grant OAuth, install code, move money or broaden permissions.',
+      customer_past_expectations_are_only_known_when_grounded:true,
+      no_external_action_authorized:true,
+      no_customer_job_completion_implied:true
+    },
     // Static published references already shown on Reality's homepage.
     // These are references, not evidence of measured business savings.
     published_research_references:publishedReferencesForChat(text),
