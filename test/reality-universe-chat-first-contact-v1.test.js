@@ -108,7 +108,7 @@ test('new business greeting goes into durable owner RLS conversation, exactly on
  assert.match(sql,/current_user<>'service_role'/);
  assert.match(sql,/NEW_BUSINESS_CONTINUE_CONNECTION_SETUP/);
  assert.match(sql,/provider_access_verified=true/);
- assert.match(sql,/credentials_saved=true and oauth_consent_granted=true/);
+ assert.match(sql,/credential_saved=true and oauth_consent_granted=true/);
  assert.match(sql,/setup request does not mean the service is connected yet/);
  assert.match(sql,/what kind of business do you run/i);
  assert.doesNotMatch(sql,/insert into reality_internal\.governed_employee_shifts_v1/);
