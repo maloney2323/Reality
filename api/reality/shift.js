@@ -12,6 +12,7 @@ import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v
 import { runRealityStewardshipPass } from '../../src/reality-stewardship-pass-v1.0.js';
 import { projectShiftWorkCandidates, persistShiftQueue } from '../../src/reality-shift-evidence-queue-v1.js';
 import { createShiftExecutionAdapters } from '../../src/reality-shift-execution-bridge-v1.js';
+import { settleShift } from '../../src/reality-shift-settlement-v1.js';
 
 export const maxDuration = 60;
 
@@ -119,7 +120,7 @@ export function deriveShiftInstanceId(config, local) {
   const startMinute = start[0]*60 + start[1];
   const date = Date.UTC(Number(local.year),Number(local.month)-1,Number(local.day));
   const previousDay = localNow < startMinute &&
-    ((localNow-startMinute+1440) < Number(config?.shiftLength || 8)*60);
+    ((localNow-startMinute+1440) <= Number(config?.shiftLength || 8)*60);
   const day = new Date(date - (previousDay ? 86400000 : 0)).toISOString().slice(0,10);
   return stableUuid('shift-instance', [config.updated_at,day,config.shiftStart,config.shiftLength,config.timeZone]);
 }
@@ -174,6 +175,44 @@ async function runTick({ config, phase, local, persistence }) {
   } catch (e) {
     if (/23505|409|duplicate|already exists/i.test(e.message)) return { skipped: true, tick_id: tickId };
     throw e;
+  }
+
+  if (phase==='SHIFT_CLOSE') {
+    const shiftId=deriveShiftInstanceId(config,local);
+    const jobs=await loadAssignedShiftWork(persistence,{principalId:config.updated_by});
+    const historyByJob={};
+    for (const job of jobs) {
+      const entries=await persistence.reconstruct({
+        continuityRootId:job.continuity_root_id,worldlineId:WORLDLINE,
+      });
+      historyByJob[job.work_item_id]=entries.filter(e=>e.entity_type==='shift_recovery_stage')
+        .map(e=>e.payload);
+    }
+    const settlement=settleShift({
+      shiftId,jobs,stageHistoryByJob:historyByJob,
+      // Actual labor baselines/costs must be evidence-supplied, not invented.
+      valuation:null,
+    });
+    const closeEventId=stableUuid('shift-settlement',shiftId);
+    try {
+      await persistence.appendEvent({
+        event_id:closeEventId,event_kind:'observation',
+        entity_type:'shift_settlement',entity_id:shiftId,
+        continuity_root_id:CONFIG_ROOT,worldline_id:WORLDLINE,
+        parent_event_id:tickId,
+        effective_time:new Date().toISOString(),assertion_time:new Date().toISOString(),
+        epistemic_status:'OBSERVED',payload:settlement,
+        evidence_refs:settlement.jobs.flatMap(job=>job.evidence_refs||[]),
+        provenance:{source:'reality-shift-settlement-v1',shift_id:shiftId},
+      });
+    } catch (error) {
+      if (!/23505|409|duplicate|already exists/i.test(String(error?.message||''))) throw error;
+    }
+    return {
+      shift_instance_id:shiftId,phase,
+      shift_completion_verified:settlement.status==='ALL_SELECTED_WORK_VERIFIED',
+      settlement,financial_status:settlement.financial.status,
+    };
   }
 
   let commits = [];
@@ -455,7 +494,11 @@ export default async function handler(req, res) {
     let phase = null;
     if (nowMinutes === readiness) phase = 'READINESS';
     if (nowMinutes === start) phase = 'SHIFT_START';
-    if (!phase && withinShift(nowMinutes, start, Number(config.shiftLength || 8)) && Number(local.minute) % 15 === 0) phase = 'OPERATING';
+    const elapsedSinceStart=(nowMinutes-start+1440)%1440;
+    const shiftLengthMinutes=Number(config.shiftLength || 8)*60;
+    if (!phase && withinShift(nowMinutes, start, Number(config.shiftLength || 8))) phase = 'OPERATING';
+    if (!phase && elapsedSinceStart>=shiftLengthMinutes &&
+      elapsedSinceStart<shiftLengthMinutes+30) phase='SHIFT_CLOSE';
 
     if (!phase) return json(res, 200, { ok: true, status: 'WAITING', local, config });
 
