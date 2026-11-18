@@ -9,6 +9,11 @@ import { evaluateOperatingConstitution, constitutionalEvidenceFromShift } from '
 import { createOperationId, createOperationEvent, appendOperationEvent } from '../../src/reality-operation-ledger-v1.0.js';
 import { runGovernedShiftRecovery, SHIFT_OPERATING_CONTRACT } from '../../src/reality-shift-recovery-loop-v1.js';
 import { getAuthorityPolicy, autoAuthorize } from '../../src/reality-authority-v1.0.js';
+import { runRealityStewardshipPass } from '../../src/reality-stewardship-pass-v1.0.js';
+import { projectShiftWorkCandidates, persistShiftQueue } from '../../src/reality-shift-evidence-queue-v1.js';
+import { createShiftExecutionAdapters } from '../../src/reality-shift-execution-bridge-v1.js';
+
+export const maxDuration = 60;
 
 const CONFIG_ROOT = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1001';
 const WORLDLINE = '7b8f7a7e-5c5a-4f8e-9b9e-0d6b5c2f1002';
@@ -108,6 +113,17 @@ async function readConfig(persistence) {
   return configs.at(-1)?.payload || null;
 }
 
+export function deriveShiftInstanceId(config, local) {
+  const start = String(config?.shiftStart || '21:00').split(':').map(Number);
+  const localNow = Number(local.hour)*60 + Number(local.minute);
+  const startMinute = start[0]*60 + start[1];
+  const date = Date.UTC(Number(local.year),Number(local.month)-1,Number(local.day));
+  const previousDay = localNow < startMinute &&
+    ((localNow-startMinute+1440) < Number(config?.shiftLength || 8)*60);
+  const day = new Date(date - (previousDay ? 86400000 : 0)).toISOString().slice(0,10);
+  return stableUuid('shift-instance', [config.updated_at,day,config.shiftStart,config.shiftLength,config.timeZone]);
+}
+
 function localParts(date, timeZone) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -123,7 +139,8 @@ function withinShift(nowMinutes, startMinutes, lengthHours) {
 }
 
 async function runTick({ config, phase, local, persistence }) {
-  const tickKey = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${local.minute}:${phase}`;
+  const tickMinute = String(Math.floor(Number(local.minute)/15)*15).padStart(2,'0');
+  const tickKey = `shift:tick:${local.year}-${local.month}-${local.day}:${local.hour}:${tickMinute}:${phase}`;
   const tickId = stableUuid('shift-tick', tickKey);
   const operationId = createOperationId(`shift-${phase.toLowerCase()}`);
   await appendOperationEvent({
@@ -159,7 +176,12 @@ async function runTick({ config, phase, local, persistence }) {
     throw e;
   }
 
-  const commits = await githubCommits();
+  let commits = [];
+  let githubObservationError = null;
+  try { commits = await githubCommits(); }
+  catch (error) { githubObservationError = error.message; }
+  // An unavailable source may reduce work discovery, but cannot erase known
+  // assignments or interrupt unrelated authorized jobs.
   const observations = buildShadowObservations({
     observedAt: new Date().toISOString(),
     commits: commits.map(c => ({
@@ -236,32 +258,56 @@ async function runTick({ config, phase, local, persistence }) {
     },
   });
 
-  // A real shift is a governed execution lifecycle, not just an LLM plan.
-  // No employee work can be invented from discovered GitHub commits.
-  const assignedWorkCycle = await runGovernedShiftRecovery({
-    shiftId: tickId,
-    loadAssignedWork: () => loadAssignedShiftWork(persistence, { principalId: config?.updated_by }),
-    adapters: {
-      record: stage => persistShiftRecoveryStage(persistence, stage),
-      authorizeWork: async job => {
-        if (!config?.updated_by || !job?.work_item_id) return null;
-        const policy = await getAuthorityPolicy(config.updated_by, persistence);
-        if (!policy?.enabled || policy.mode !== 'auto') return null;
-        // No wildcard or inferred shift authority: require this exact job.
-        if (!policy.scopes.some(scope =>
-          scope.work_item_id === job.work_item_id &&
-          scope.connector === job.connector && scope.operation === job.operation)) return null;
-        const authorization = autoAuthorize({ policy, workItem: job });
-        return authorization?.authorization_id ? {
-          granted: true, authorization_ref: authorization.authorization_id,
-          scope: { work_item_id: job.work_item_id, operation: 'execute_work' },
-        } : null;
+  // Work discovery and assignment is a separate, governed, persistent stage.
+  // A GitHub observation is NOT an employee job until source and authority are checked.
+  let queue = {status:'DISCOVERY_UNAVAILABLE',candidates:0,assigned:0,proposed:0};
+  try {
+    const stewardship = await runRealityStewardshipPass();
+    const candidates = projectShiftWorkCandidates(stewardship,{principalId:config?.updated_by});
+    const queueHistory = await persistence.reconstruct({
+      continuityRootId:CONFIG_ROOT,worldlineId:WORLDLINE,
+    });
+    const policy = config?.updated_by
+      ? await getAuthorityPolicy(config.updated_by,persistence) : null;
+    queue = {status:'DISCOVERY_OBSERVED',...await persistShiftQueue({
+      persistence,candidates,principalId:config.updated_by,
+      shiftRootId:CONFIG_ROOT,worldlineId:WORLDLINE,
+      existingEvents:queueHistory,
+      hasExactAuthority:job=>{
+        if (!policy?.enabled || policy?.mode!=='auto') return false;
+        if (!policy.scopes.some(scope=>
+          scope.work_item_id===job.work_item_id &&
+          scope.connector===job.connector &&
+          scope.operation===job.operation &&
+          (!scope.resource || scope.resource===job.inputs?.repository))) return false;
+        const authorization=autoAuthorize({policy,workItem:job});
+        return authorization?.authorized===true;
       },
-      // Execution and self-repair are deliberately NOT improvised from an
-      // LLM response. They must be attached as server-side, idempotent,
-      // independently verified capability adapters before live use.
-    },
-  });
+    })};
+  } catch (error) {
+    queue = {status:'DISCOVERY_UNAVAILABLE',error:String(error?.message||error),
+      candidates:0,assigned:0,proposed:0};
+  }
+  const shiftId=deriveShiftInstanceId(config,local);
+  const assignedWorkCycle = phase==='READINESS'
+    ? {status:'READINESS_ONLY',selected_count:0,completed_count:0}
+    : await runGovernedShiftRecovery({
+      shiftId,
+      loadAssignedWork:()=>loadAssignedShiftWork(persistence,{principalId:config?.updated_by}),
+      adapters:createShiftExecutionAdapters({
+        principalId:config.updated_by,persistence,
+        record:stage=>persistShiftRecoveryStage(persistence,stage),
+        loadPriorStages:async (job,currentShiftId)=>{
+          const entries=await persistence.reconstruct({
+            continuityRootId:job.continuity_root_id,worldlineId:WORLDLINE,
+          });
+          return entries.filter(e=>e.entity_type==='shift_recovery_stage' &&
+            e.payload?.shift_id===currentShiftId).map(e=>e.payload);
+        },
+      }),
+      // Never broaden a failed external effect into permission to rebuild.
+      // The separate governed self-build / install approvals are still required.
+    });
 
   const mission = [
     'Operate Reality as a governed autonomous business operating shift.',
@@ -287,6 +333,8 @@ async function runTick({ config, phase, local, persistence }) {
     phase, observed_at: new Date().toISOString(), repository: SHADOW_REPO,
     shift_operating_contract: SHIFT_OPERATING_CONTRACT,
     assigned_work_cycle: assignedWorkCycle,
+    source_backed_shift_queue: queue,
+    github_observation_error:githubObservationError,
     recent_observation_count: observations.length,
     newly_persisted_observations: persisted,
     discovered_work: prioritizedWork,
@@ -321,6 +369,8 @@ async function runTick({ config, phase, local, persistence }) {
     work: intelligence.work || null,
     execution: intelligence.execution,
     shift_cycle: assignedWorkCycle,
+    shift_queue:queue,
+    shift_instance_id:shiftId,
     shift_completion_verified: assignedWorkCycle.status === 'ALL_SELECTED_JOBS_VERIFIED',
     verified_completed_jobs: assignedWorkCycle.completed_count || 0,
   };
