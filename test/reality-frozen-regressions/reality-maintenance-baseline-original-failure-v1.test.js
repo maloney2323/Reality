@@ -26,9 +26,9 @@ test('durable second signed-run reproduction is real, owner scoped and independe
  assert.match(sql,/m0\.claimed_worker_run_id<>p_worker_run_id/);
  assert.match(sql,/join reality_internal\.signed_worker_actual_runs_v1 run/);
  assert.match(sql,/last_source_sha256=p_provider_sha256/);
- assert.match(sql,/b\.original_claim_count=0 and prior_inquiry_count>=2/);
+ assert.match(sql,/original_claim_count=0 and prior_inquiry_count>=2/);
  assert.match(sql,/v_claims<>0 or v_inquiries<b\.prior_inquiry_count/);
- assert.match(sql,/r\.previously_reviewed_sha256<>current_provider_sha256/);
+ assert.match(sql,/previously_reviewed_sha256<>current_provider_sha256/);
  assert.match(sql,/failure_baseline_observed_at/);
  assert.match(sql,/reconcile_stale_internal_maintenance_baseline_v1/);
  assert.doesNotMatch(sql,/insert into reality_internal\.governed_employee_shifts_v1/);
