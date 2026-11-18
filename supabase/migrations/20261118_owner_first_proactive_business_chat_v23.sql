@@ -47,8 +47,9 @@ begin
    'external_actions_authorized',false,'provider_connected_by_read',false,
    'work_shift_authorized',false,'production_changed',false);
  end if;
- if not exists(select 1 from auth.users where id=p_owner_id)
- then raise exception 'FIRST_CHAT_AUTH_USER_NOT_VERIFIED';end if;
+ -- The caller is the existing verified Auth session, and inserting into
+ -- reality_chat_messages checks the canonical auth.users FK atomically.
+ -- Do not grant service_role direct SELECT over the private Auth table.
  -- Do NOT greet an established user as a new signup, including when they
  -- selected New Chat or already have a prior shift/work history.
  if exists(select 1 from public.reality_chat_messages where user_id=p_owner_id)
