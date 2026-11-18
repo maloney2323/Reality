@@ -1,0 +1,21 @@
+name: Reality Operational Greeting v0.1
+
+on:
+  push:
+    branches: [feature/proactive-operational-greeting-20261118]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  greeting-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify operational greeting and homepage syntax
+        run: node --test test/reality-operational-greeting-v0.1.test.js test/reality-operational-greeting-homepage-v0.1.test.js
