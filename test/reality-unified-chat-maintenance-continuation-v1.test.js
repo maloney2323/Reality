@@ -232,6 +232,64 @@ test('unknown network result locks button, preserves original jobs, never retrie
   /Use Check status first/);
  assert.equal(x.events.length,0);
 });
+test('assistant operational message is INSIDE the conversation and user can reply naturally',async()=>{
+ const v=setup();await v.flush();
+ const message=v.locate('realityChatMaintenanceNudge');
+ assert.equal(message.parentElement,v.thread,'the message must be inside the transcript scroll');
+ assert.equal(message.hidden,false);
+ assert.match(message.className,/bubble reality-chat-maintenance/);
+ assert.match(v.locate('realityChatMaintenanceInlineAuthorize').textContent,
+  /Continue 2 unfinished repairs/);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,false);
+ assert.match(ui,/get\('privatePrompt'\)\?\.focus\(\)/);
+ assert.match(ui,/threadObserver\.observe\(thread,\{childList:true\}\)/);
+ assert.match(ui,/!thread\.contains\(hint\)/);
+ assert.doesNotMatch(ui,/center\.insertBefore\(hint,thread\)/);
+});
+test('an explicit approve click from the chat message delegates to the ORIGINAL owner-signed authorization',async()=>{
+ const v=setup();await v.flush();
+ await v.click('realityChatMaintenanceInlineAuthorize');await v.flush();
+ assert.deepEqual(v.calls.map(c=>c.options.method),['GET','GET','POST']);
+ assert.equal(v.events.length,1);
+ assert.equal(v.events[0].type,'reality:maintenance-continuation-authorized');
+ const msg=v.locate('realityChatMaintenanceNudge');
+ assert.equal(msg.parentElement,v.thread);
+ assert.equal(msg.hidden,false,'signed result must stay in the conversation');
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /You authorized the continuation/);
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /The signed shift/);
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /not independently completed/);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+});
+test('an already signed shift is reported IN Chat instead of asking for another approval',async()=>{
+ const active=setup({readback:{...data,requested_maintenance_draft:null,
+  requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
+  internal_maintenance_continuity:{...data.internal_maintenance_continuity,
+   current_shift_id:signedShiftId}}});
+ await active.flush();
+ const msg=active.locate('realityChatMaintenanceNudge');
+ assert.equal(msg.hidden,false);
+ assert.equal(msg.parentElement,active.thread);
+ assert.match(msg.children[1].textContent,/You authorized the continuation/);
+ assert.match(msg.children[1].textContent,new RegExp(signedShiftId));
+ assert.equal(active.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+ await active.click('realityChatMaintenanceInlineAuthorize');await active.flush();
+ assert.equal(active.calls.length,1,'no new signed shift was created');
+});
+test('ordinary chat replies are NOT owner authorization; missing receipt locks inline action too',async()=>{
+ const v=setup({posted:null});await v.flush();
+ assert.match(ui,/A reply is an ordinary saved owner Chat turn/);
+ assert.match(ui,/if\(!inlineContinue.disabled&&!authorize.disabled\)authorize.click\(\)/);
+ await v.click('realityChatMaintenanceInlineAuthorize');await v.flush();
+ assert.deepEqual(v.calls.map(c=>c.options.method),['GET','GET','POST']);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+ assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
+  /I could not verify/);
+ assert.equal(v.events.length,0);
+});
+
 test('backend is the EXISTING owner-authenticated same-origin exact-maintenance RPC',()=>{
  assert.match(api,/await authenticatedChatSession\(req,res\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
@@ -248,7 +306,7 @@ test('backend is the EXISTING owner-authenticated same-origin exact-maintenance 
 test('compact notice does not block transcript or composer; original direct account and install gates stay separate',()=>{
  assert.match(css,/\.reality-chat-maintenance-nudge\{/);
  assert.match(css,/\.reality-chat-maintenance-nudge\[hidden\]/);
- assert.match(ui,/center\.insertBefore\(hint,thread\)/);
+ assert.match(ui,/thread\.append\(hint\)/);
  assert.match(ui,/inbox\.insertBefore\(root,anchor\)/);
  assert.match(ui,/root\.setAttribute\('aria-label'/);
  assert.match(ui,/No work is started by reading this card/);
