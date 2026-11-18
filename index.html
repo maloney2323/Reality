@@ -7476,7 +7476,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
     void wcLoadCompletionReports();
    }
-   if(realityCurrentRoute()==='chat'&&!confirmedActiveGoal)jumpToWorkSetup('goal');
+   // Chat-first onboarding now asks for the owner's real goal in conversation.
+   // Do not pop Settings over the transcript just because a first goal is missing.
   }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
