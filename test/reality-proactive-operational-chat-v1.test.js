@@ -77,7 +77,7 @@ test('signed-out, public landing or Overview do not scan owner operational data'
 test('preexisting unchanged operational state never pushes repeated assistant messages',async()=>{
  const app=boot({reply:noRepeat});await app.flush();
  assert.equal(app.calls.length,1);assert.equal(app.refreshes,0);
- assert.equal(app.callbacks.interval instanceof Function,true);
+ assert.equal(typeof app.callbacks.interval,'function');
  app.callbacks.interval();await app.flush();
  assert.equal(app.calls.length,1);
 });
