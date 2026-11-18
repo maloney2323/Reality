@@ -52,9 +52,20 @@ const jobs=[{
  original_customer_job_completed:false,installation_authorized_by_read:false,
  external_action_authorized_by_read:false,production_changed:false
 }];
+const warrant={
+ status:'VERIFIED_ACTIVE_OWNER_MAINTENANCE_WARRANT_SCOPE',
+ mode:'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS',
+ state:'ACTIVE',shift_id:shiftId,plan_fingerprint:sha('d'),
+ source_scope:jobs.map((j,i)=>({
+  step_index:i+2,maintenance_id:j.origin_incident_id,
+  origin_shift_id:j.origin_shift_id,source_ref:j.source_ref,
+  independent_review_receipt_sha256:j.independent_review_receipt_sha256
+ }))
+};
 const maintenance={
  status:'OWNER_VERIFIED_INTERNAL_MAINTENANCE_READ_ONLY',
  owner_id:owner,read_only:true,count:2,items:jobs,
+ active_maintenance_warrant:warrant,
  shift_started_by_read:false,owner_authority_granted_by_read:false,
  customer_jobs_completed_by_read:0,production_changed:false
 };
@@ -83,8 +94,8 @@ test('Reality can answer a conversational follow-up about the ALREADY authorized
  assert.equal(note.owner_current_signed_maintenance_shift_id,shiftId);
  assert.equal(note.owner_approval_already_recorded,true);
  assert.equal(note.unfinished_internal_repairs,2);
- assert.match(note.summary,/ALREADY SIGNED AND AUTHORIZED CONTINUATION SHIFT/);
- assert.match(note.summary,/NO SECOND SHIFT OR CONTINUE APPROVAL IS NEEDED/);
+ assert.match(note.summary,/ALREADY SIGNED AND AUTHORIZED EXACTLY 2 EARLIER REPAIRS/);
+ assert.match(note.summary,/NO SECOND APPROVAL IS NEEDED FOR THOSE EXACT REPAIRS/);
  assert.match(note.summary,/Riley/);
  assert.match(note.summary,/Taylor/);
  assert.match(note.summary,/Quinn/);
@@ -113,7 +124,8 @@ test('unverified independent reviewer proof is not repeated as Reality-sent work
   false);
 });
 test('signed-in owner has no active shift: Reality must still distinguish asking permission from granting it',async()=>{
- const {fetchImpl}=fetchFor(maintenance,{...readShifts,shifts:[]});
+ const {fetchImpl}=fetchFor({...maintenance,active_maintenance_warrant:null},
+  {...readShifts,shifts:[]});
  const result=await readVerifiedEmployeeShiftForChat({
   ...base,message:'Can Reality continue the maintenance repairs?',fetchImpl
  });
@@ -121,8 +133,27 @@ test('signed-in owner has no active shift: Reality must still distinguish asking
  assert.ok(x);
  assert.equal(x.owner_current_signed_maintenance_shift_id,null);
  assert.equal(x.owner_approval_already_recorded,false);
- assert.match(x.summary,/NO CURRENT SIGNED MAINTENANCE SHIFT IS VERIFIED/);
- assert.match(x.summary,/Ordinary conversation is not approval/);
+ assert.match(x.summary,/NO CURRENT EXACT SIGNED MAINTENANCE WARRANT IS VERIFIED/);
+ assert.match(x.summary,/Verify current authority before asking for a new one/);
+});
+test('new third Riley incident must not be presented as part of two previously approved repairs',async()=>{
+ const third={...jobs[0],
+  internal_work_id:'maintenance:2e4babcd-f2c6-40db-a6af-db8c7dd7b3e8',
+  origin_incident_id:'2e4babcd-f2c6-40db-a6af-db8c7dd7b3e8',
+  origin_shift_id:shiftId,
+  source_ref:'https://github.com/maloney2323/Reality/pull/211'};
+ const {fetchImpl}=fetchFor({...maintenance,items:[third,...jobs],count:3});
+ const result=await readVerifiedEmployeeShiftForChat({
+  ...base,message:'What is the status of my team?',fetchImpl});
+ const note=result.find(x=>x.event_kind==='owner_verified_maintenance_repair_conversation');
+ assert.ok(note);
+ assert.equal(note.owner_signed_repair_count,2);
+ assert.equal(note.new_repair_count_outside_signed_warrant,1);
+ assert.equal(note.owner_approval_already_recorded,true);
+ assert.match(note.summary,/1 ADDITIONAL MAINTENANCE INCIDENT/);
+ assert.match(note.summary,/NEW_INCIDENT_NOT_IN_EXISTING_WARRANT/);
+ assert.match(note.summary,/EXACT_SIGNED_WARRANT_SCOPE/);
+ assert.equal(note.installation_authorized,false);
 });
 test('different DB principal or nonpreview context can never read owner maintenance as Chat cognition',async()=>{
  const {calls,fetchImpl}=fetchFor();
