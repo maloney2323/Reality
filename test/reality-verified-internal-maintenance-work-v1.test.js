@@ -52,3 +52,16 @@ test('owner readback is truly owner-scoped, source-receipted and cannot grant cu
  assert.match(sql,/'customer_jobs_completed_by_read',0/);
  assert.match(sql,/grant execute on function public\.reality_read_owner_internal_maintenance_v1\(uuid\)\s+to service_role/);
 });
+
+test('source-review schema is not confused with business-review schema',()=>{
+ const patch=readFileSync(new URL(
+  '../supabase/migrations/20261117_maintenance_source_review_exact_schema_repair_v16.sql',
+  import.meta.url),'utf8');
+ assert.match(patch,/r\.previously_reviewed_sha256<>r\.current_provider_sha256/);
+ assert.match(patch,/r\.original_job_completed=false/);
+ assert.match(patch,/r\.installation_authorized=false/);
+ assert.match(patch,/r\.production_changed=false/);
+ assert.doesNotMatch(patch,/r\.repair_executed/);
+ assert.match(patch,/b\.repair_executed=false/);
+ assert.doesNotMatch(patch,/cron\.schedule\(|cron\.alter_job/);
+});
