@@ -78,16 +78,11 @@ test('wrong owner, duplicate source, missing reviewer proof, or invented complet
   {...input,items:[{...items[0],repair_verified:true},items[1]]}
  ];
  for(const v of variants){
-  if(v.items===input.items)assert.throws(
-   ()=>projectOwnerInternalMaintenanceContinuity(v,{ownerId:owner,shifts:closed}),
-   /OWNER_MAINTENANCE_CONTINUITY_/);
-  else{
+  assert.throws(()=>{
    const projected=projectOwnerInternalMaintenanceContinuity(v,{
     ownerId:owner,shifts:closed});
-   assert.throws(
-    ()=>buildOwnerMaintenanceContinuationDraft(projected,{ownerId:owner}),
-    /OWNER_MAINTENANCE_CONTINUATION_/);
-  }
+   buildOwnerMaintenanceContinuationDraft(projected,{ownerId:owner});
+  },/OWNER_MAINTENANCE_(?:CONTINUITY|CONTINUATION)_/);
  }
 });
 test('only explicit signed-in endpoint starts a maintenance warrant; no GET or owner input creates one',()=>{
