@@ -88,7 +88,7 @@ begin
  v_open:=pg_catalog.jsonb_array_length(v_repairs);
  select pg_catalog.count(*) into v_signed
  from pg_catalog.jsonb_array_elements(v_repairs) x
- where x->>'signed'='true';
+ where x.value->>'signed'='true';
  v_outside:=v_open-v_signed;
  select pg_catalog.count(*) into v_source_reviews
  from reality_internal.owner_employee_operating_schedule_v1
