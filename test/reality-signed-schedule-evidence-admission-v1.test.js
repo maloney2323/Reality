@@ -73,6 +73,23 @@ test('signed existing-calendar inquiry becomes exact executable evidence pack, w
  assert.equal(result.installation_authorized,false);
  assert.equal(result.production_changed,false);
 });
+test('signed schedule proof rechecks identical issue-comment evidence from prior inquiry',async()=>{
+ const issue='https://github.com/maloney2323/Reality/issues/351';
+ const p=setup({claim:{...ready,source_ref:issue},receipt:{...recorded,source_ref:issue}});
+ let optionCalls=0;
+ const result=await admitOneSignedScheduledEvidenceJob({
+  db,env,shiftId:shift,workerRunId:worker,call:p.call,
+  readSource:async(source,options)=>{
+   assert.equal(source,issue);
+   assert.equal(options.includeRecentComments,true);
+   optionCalls++;
+   return {...(await sourceRead()),source_ref:issue};
+  }
+ });
+ assert.equal(optionCalls,2);
+ assert.equal(result.evidence_job_created,true);
+ assert.equal(result.installation_authorized,false);
+});
 test('no current signed owner shift means no work, no source calls, no new job',async()=>{
  const p=setup({claim:{status:'NO_ELIGIBLE_SIGNED_SCHEDULED_INQUIRY_FOR_QUALIFICATION',
   evidence_job_created:false,customer_original_job_created:false,
