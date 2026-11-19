@@ -47,7 +47,7 @@ test('preview scheduler patch is fail-closed on exact command drift',()=>{
  assert.match(cron,/UNEXPECTED_STANDING_GRANT|PREVIEW_WORKER_COMMAND_DRIFT/);
  assert.match(cron,/cron\.alter_job/);
  assert.match(cron,/INDEPENDENT|READBACK_FAILED_ROLLBACK/);
- assert.match(cron,/schedule=>'\/5|schedule=>'\\*\/5/);
+ assert.ok(cron.includes("schedule=>'*/5 * * * *'"));
  assert.match(cron,/owner_capability_employee_schedule_v1/);
  assert.match(cron,/eligible_shift\.permitted/);
 });
