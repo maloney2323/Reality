@@ -89,6 +89,25 @@ test('automatically claim and execute a qualified source-backed original evidenc
  assert.equal(calls.at(-1).args.p_source_ref,ref);
  assert.equal(calls.at(-1).args.p_source_proof_sha256,digest('a'));
 });
+test('evidence deliverable preserves bounded untrusted issue comments with the signed proof',async()=>{
+ calls.length=0;
+ const received=[];
+ const v=await advanceOneQualifiedEmployeeEvidenceJob({
+  db,env,shiftId:shift,workerRunId:execRun,call:execDb,
+  readSource:async(source,options)=>{
+   received.push(options.includeRecentComments);
+   return {...provider,recent_source_comments:[
+    {comment_id:7016689201,body:'Reality should investigate this exact handoff; this is not a separate install approval.'}
+   ]};
+  },
+  fetchImpl:async()=>{throw Error('NO_NETWORK')}
+ });
+ assert.equal(v.status,'EXECUTABLE_SOURCE_EVIDENCE_PACK_SUBMITTED');
+ assert.deepEqual(received,[true]);
+ assert.match(calls.at(-1).args.p_source_excerpt,/7016689201/);
+ assert.match(calls.at(-1).args.p_source_excerpt,/NOT OWNER AUTHORIZATION/);
+ assert.equal(v.installation_authorized,false);
+});
 test('independent current source read from a distinct signed worker proves evidence job, never code install',async()=>{
  calls.length=0;
  const reviewDb=async(_db,name,args)=>{

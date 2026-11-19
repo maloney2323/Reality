@@ -62,8 +62,10 @@ export async function admitOneSignedScheduledEvidenceJob({
  let first,second;
  try{
   const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
-  first=await readSource(scope.source_ref,{fetchImpl,token});
-  second=await readSource(scope.source_ref,{fetchImpl,token});
+  first=await readSource(scope.source_ref,{fetchImpl,token,
+   includeRecentComments:scope.source_ref.includes('/issues/')});
+  second=await readSource(scope.source_ref,{fetchImpl,token,
+   includeRecentComments:scope.source_ref.includes('/issues/')});
  }catch{
   return stop('SIGNED_SCHEDULE_PROVIDER_UNAVAILABLE_NO_ADMISSION',{
    work_key:scope.work_key,source_ref:scope.source_ref,
