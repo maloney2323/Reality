@@ -3,9 +3,9 @@
 -- authority to create ORIGINAL customer jobs. This only tightens watchdog
 -- incident *admission*; it never edits historical receipts or real job claims.
 DO $guard$ BEGIN
-  IF pg_catalog.position('NO_ORIGINAL_JOB_CLAIMS' IN
-   pg_catalog.pg_get_functiondef(
-    'reality_internal.observe_qualified_employee_work_blockers_v1()'::pg_catalog.regprocedure))=0
+  IF pg_catalog.strpos(pg_catalog.pg_get_functiondef(
+    'reality_internal.observe_qualified_employee_work_blockers_v1()'::pg_catalog.regprocedure),
+    'NO_ORIGINAL_JOB_CLAIMS')=0
   THEN RAISE EXCEPTION 'WATCHDOG_ORIGINAL_ADMISSION_SOURCE_DRIFT'; END IF;
 END $guard$;
 CREATE OR REPLACE FUNCTION reality_internal.observe_qualified_employee_work_blockers_v1()
