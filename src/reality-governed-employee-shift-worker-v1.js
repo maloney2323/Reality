@@ -15,18 +15,27 @@ export function isIsolatedOriginalProviderOutage(error){
  return String(error?.message||'')==='SHIFT_GITHUB_PROVIDER_READBACK_UNAVAILABLE';
 }
 
-async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}){
+export async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}){
  const parsed=URL.exec(String(source||''));
  if(!parsed)throw Error('SHIFT_SOURCE_REF_NOT_ALLOWED');
  const category=parsed[1],id=parsed[2],endpoint=
   category==='issues'?'issues':category==='pull'?'pulls':'actions/runs';
  const target='https://api.github.com/repos/'+REPO+'/'+endpoint+'/'+id;
- const r=await fetchImpl(target,{
-  method:'GET',redirect:'error',cache:'no-store',
-  headers:{accept:'application/vnd.github+json','user-agent':'Reality-Employee-Shift-ReadOnly/1.0',
-   'x-github-api-version':'2022-11-28'},
-  signal:AbortSignal.timeout(10000)
- });
+ // A connection refusal, timeout or fetch transport exception is a
+ // source-job provider outage. Keep the error code stable so the existing
+ // shift worker can fence THIS job while continuing its other work.
+ // Do NOT catch source validation, owner scope, identity, or receipt failures.
+ let r;
+ try{
+  r=await fetchImpl(target,{
+   method:'GET',redirect:'error',cache:'no-store',
+   headers:{accept:'application/vnd.github+json','user-agent':'Reality-Employee-Shift-ReadOnly/1.0',
+    'x-github-api-version':'2022-11-28'},
+   signal:AbortSignal.timeout(10000)
+  });
+ }catch{
+  throw Error('SHIFT_GITHUB_PROVIDER_READBACK_UNAVAILABLE');
+ }
  if(r.status===404)return {
   kind:'GITHUB_SOURCE_READBACK',source_url:source,provider_status:'NOT_FOUND',
   provider_checked:true,read_only:true,production_changed:false,
