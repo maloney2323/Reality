@@ -89,6 +89,22 @@ $('startShiftNow').onclick=async()=>{
   button.disabled=true;
   $('startShiftStatus').textContent='Starting your authorized operating shift…';
   try{
+    const readinessResponse=await fetch('/api/reality/shift?readiness=1',
+      {credentials:'same-origin'});
+    const readinessBody=await readinessResponse.json();
+    if(!readinessResponse.ok)throw new Error('Shift readiness check failed');
+    const labels={
+      SHIFT_CONFIGURATION_REQUIRED:'Save your shift settings',
+      SHIFT_OWNER_SESSION_REQUIRED:'Sign in with the same Reality session that saved the shift',
+      UNIVERSE_PERSISTENCE_CREDENTIAL_REQUIRED:'Connect the Reality Universe database',
+      GITHUB_CONNECTOR_CREDENTIAL_REQUIRED:'Connect GitHub in this preview environment',
+      INTELLIGENCE_MODEL_CREDENTIAL_REQUIRED:'Connect the intelligence model in this preview environment',
+    };
+    if(readinessBody.readiness?.status!=='READY_TO_ATTEMPT'){
+      const blockers=(readinessBody.readiness?.blockers||[])
+        .map(x=>labels[x]||x);
+      throw new Error(blockers.join('; ')||'Shift prerequisites are unavailable');
+    }
     const response=await fetch('/api/reality/shift',{
       method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({intent:'START_SHIFT_NOW'}),
