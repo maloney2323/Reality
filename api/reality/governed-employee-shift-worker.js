@@ -371,9 +371,9 @@ export default async function handler(req,res){
    {status:'NO_CURRENT_SIGNED_QUALIFIED_EMPLOYEE_WORK',
     actual_evidence_report_submitted:false,
     installation_authorized:false,production_changed:false};
-  // This existing signed worker can also investigate when NO shift is active,
-  // but ONLY after a separately signed owner enables a time-limited standing
-  // evidence-only delegation. A grant does not start a shift or install code.
+  // Standing incident investigation uses the owner's existing time-limited
+  // evidence-only delegation. It can run DURING an active signed shift, but
+  // cannot extend that shift's executable scope, install, or start a new shift.
   // No owner, source, or grant can arrive from the HTTP request.
   workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
   // The SAME signed worker handles already warranted incident-linked
@@ -392,18 +392,19 @@ export default async function handler(req,res){
   // Reality's own watchdog captures signed-worker failures before they reach
   // this handler. Give incident investigation first claim on an already
   // delegated evidence-only wake; never auto-approve the actual repair.
+  // A detected failure DURING an authorized shift is real recovery work.
+  // It must enter the existing service-only, owner-delegated evidence-only
+  // investigation claim now rather than wait until the active shift closes.
+  // Claim dedupe, daily budget, role/reviewer validation, and the separate
+  // repair installation gate remain unchanged. No additional shift is started.
   const operationalRecoveryResult=
-   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'?
-    await scheduleOneStandingOperationalRecovery({
-     db,env:process.env,fetchImpl:fetch
-    }).catch(()=>({
-     status:'SIGNED_WORKER_INCIDENT_INVESTIGATION_UNVERIFIED',
-     new_original_jobs_created:0,execution_authorized:false,
-     installation_authorized:false,production_changed:false
-    })):
-    {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_RECOVERY',
-     new_original_jobs_created:0,execution_authorized:false,
-     installation_authorized:false,production_changed:false};
+   await scheduleOneStandingOperationalRecovery({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'SIGNED_WORKER_INCIDENT_INVESTIGATION_UNVERIFIED',
+    new_original_jobs_created:0,execution_authorized:false,
+    installation_authorized:false,production_changed:false
+   }));
   // Complete previously scheduled employee investigations before generating
   // more schedules. A scheduled job is not done until a separate durable
   // inquiry receipt exists; the independent current-gap gate still follows.

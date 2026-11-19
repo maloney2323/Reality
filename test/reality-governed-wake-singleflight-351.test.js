@@ -51,3 +51,19 @@ test('preview scheduler patch is fail-closed on exact command drift',()=>{
  assert.match(cron,/owner_capability_employee_schedule_v1/);
  assert.match(cron,/eligible_shift\.permitted/);
 });
+
+test('active-shift failure triage enters standing evidence-only investigation',()=>{
+ // A signed active shift must NOT prevent Reality from investigating
+ // the failure that is blocking the shift. This is only a diagnostic
+ // claim; it does not authorize execution, repair installation or a new shift.
+ const start=worker.indexOf('const operationalRecoveryResult=');
+ const end=worker.indexOf("workerStage='SCHEDULED_CAPABILITY_EMPLOYEE_INQUIRY'",start);
+ assert.ok(start>0 && end>start,'recovery lane is wired before ordinary inquiries');
+ const lane=worker.slice(start,end);
+ assert.match(lane,/await scheduleOneStandingOperationalRecovery\(/);
+ assert.doesNotMatch(lane,/NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE/);
+ assert.doesNotMatch(lane,/ACTIVE_SIGNED_SHIFT_CONTROLS_RECOVERY/);
+ assert.match(lane,/execution_authorized:false/);
+ assert.match(lane,/installation_authorized:false/);
+ assert.match(worker,/A detected failure DURING an authorized shift/);
+});
