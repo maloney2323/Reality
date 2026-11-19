@@ -134,7 +134,7 @@ test('owner readback projects signed executor receipts without claiming code rep
   {...claimed,ci_dispatch_receipt_sha256:null},
   {...claimed,ci_independent_diagnostic_receipt_sha256:'fabricated'},
   {...claimed,signed_executor_state:'SETTLED'},
-  {...requalified,signed_executor_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'}
+  {...requalified,signed_executor_action:'UNAUTHORIZED_REPAIR_ACTION'}
  ]){
   assert.throws(()=>projectOwnerInternalMaintenanceContinuity(
    {...readback,items:[changed],count:1},{ownerId:owner,shifts:[]}),
