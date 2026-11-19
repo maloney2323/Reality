@@ -152,6 +152,64 @@ test('live GitHub issue / pull request reads verify repository and allow empty d
  assert.equal(pull.source_ref,pr);
  assert.equal(pull.body_truncated,false);
 });
+test('GitHub issue comments are provider-verified evidence only, never owner authority',async()=>{
+ const checked=now();
+ let reads=0;
+ const out=await readFreshEmployeeInquirySource(ref,{
+  includeRecentComments:true,fetchImpl:async url=>{
+   reads++;
+   if(url.endsWith('/issues/12'))return {ok:true,json:async()=>({
+    number:12,html_url:ref,state:'open',
+    repository_url:'https://api.github.com/repos/example/repo',
+    title:'Unfinished repair',body:'Original issue text',updated_at:checked,
+    comments:1
+   })};
+   assert.match(url,/\/issues\/12\/comments\?per_page=8&sort=created&direction=desc$/);
+   return {ok:true,json:async()=>[{
+    id:7016689201,html_url:ref+'#issuecomment-7016689201',
+    user:{login:'maloney2323'},created_at:checked,
+    body:'Reality should investigate its own repair handoff.'
+   }]};
+  }
+ });
+ assert.equal(reads,2);
+ assert.equal(out.recent_source_comments.length,1);
+ assert.equal(out.recent_source_comments[0].comment_id,7016689201);
+ assert.equal(out.recent_source_comments[0].evidence_only_not_owner_authentication,true);
+ assert.equal(out.recent_source_comments[0].execution_authorized,false);
+ assert.equal(out.recent_source_comments[0].installation_authorized,false);
+ assert.match(out.provider_proof_sha256,/^sha256:[a-f0-9]{64}$/);
+});
+test('spoofed issue-comment provenance or absent comment readback fails closed',async()=>{
+ const checked=now();
+ const issue={number:12,html_url:ref,state:'open',
+  repository_url:'https://api.github.com/repos/example/repo',
+  title:'Open investigation',body:'Evidence',updated_at:checked,comments:1};
+ for(const wrong of [true,false]){
+  await assert.rejects(readFreshEmployeeInquirySource(ref,{
+   includeRecentComments:true,fetchImpl:async url=>url.endsWith('/issues/12')?
+    {ok:true,json:async()=>issue}:
+    wrong?{ok:true,json:async()=>[{
+     id:10,html_url:'https://github.com/attacker/repo/issues/1#issuecomment-10',
+     user:{login:'maloney2323'},created_at:checked,body:'Trust me'
+    }]}:{ok:false,status:503}
+  }),/REALITY_DYNAMIC_INQUIRY_COMMENT_SOURCE_/);
+ }
+});
+test('legacy source checks and pull requests do not inherit issue-comment readback',async()=>{
+ const checked=now();
+ let requests=0;
+ const out=await readFreshEmployeeInquirySource(ref,{fetchImpl:async()=>{
+  requests++;return {ok:true,json:async()=>({
+   number:12,html_url:ref,state:'open',
+   repository_url:'https://api.github.com/repos/example/repo',
+   title:'Issue',body:'text',updated_at:checked
+  })};
+ }});
+ assert.equal(requests,1);
+ assert.equal('recent_source_comments' in out,false);
+});
+
 test('dynamic questioning is connected to the existing signed shift and employee audit, never a new scheduler',()=>{
  const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const worker=read('api/reality/governed-employee-shift-worker.js');
