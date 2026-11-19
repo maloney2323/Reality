@@ -5,7 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
-import {independentlyReviewOneStagedMaintenanceRegression}
+import {independentlyReviewOneStagedMaintenanceRegression,
+ independentlyReviewOneClaimBoundMaintenanceCiDiagnostic}
  from '../../src/reality-signed-maintenance-external-review-v1.js';
 import {attestOneSignedMaintenanceCiSourceEpoch}
  from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
@@ -559,6 +560,26 @@ export default async function handler(req,res){
     status:signedMaintenanceResult.status,
     repair_executed:false,original_job_completed:false,
     installation_authorized:false,production_changed:false};
+  // A distinct signed worker checks the real provider's GitHub Actions job
+  // AND artifact after claim-bound CI dispatch. This independently verifies
+  // diagnostic execution, NOT the case-specific frozen failure or a repair.
+  workerStage='SIGNED_MAINTENANCE_CASE_CI_INDEPENDENT_DIAGNOSTIC_REVIEW';
+  const signedMaintenanceCaseCiIndependentReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')?
+    await independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEW_UNVERIFIED',
+     independent_diagnostic_verified:false,
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEW_WAKE',
+     independent_diagnostic_verified:false,
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false};
   // A claimed lease cannot be reported as executed or verified.
   // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
@@ -1973,6 +1994,7 @@ export default async function handler(req,res){
     signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
     signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
     signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
+    signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
