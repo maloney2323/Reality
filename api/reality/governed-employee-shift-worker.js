@@ -321,6 +321,45 @@ export default async function handler(req,res){
      executable_frozen_ci_red_verified:false,model_code_generated:false,
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
+  // Owner-warranted maintenance CI preflight reads the SAME signed shift,
+  // signed worker and exact maintenance ID after the historical baseline.
+  // This is not the CI runner: a fresh pinned provider epoch and real
+  // independently failing frozen test still have to be obtained.
+  workerStage='SIGNED_INTERNAL_MAINTENANCE_CI_PREFLIGHT';
+  const signedMaintenanceCiPreflight=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_read_signed_maintenance_ci_preflight_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_worker_run_id:actualWorkerRunId
+    }).then(receipt=>{
+     if(![
+      'SIGNED_MAINTENANCE_CI_PREFLIGHT_NEEDS_SOURCE_ATTESTATION',
+      'NO_SIGNED_MAINTENANCE_FROZEN_CI_SCOPE'
+     ].includes(receipt?.status)||
+      receipt.read_only!==true||
+      receipt.executable_frozen_ci_red_verified!==false||
+      receipt.repair_executed!==false||
+      receipt.original_job_completed!==false||
+      receipt.installation_authorized!==false||
+      receipt.production_changed!==false||
+      (receipt.status==='SIGNED_MAINTENANCE_CI_PREFLIGHT_NEEDS_SOURCE_ATTESTATION'&&
+       (receipt.shift_id!==wakeReceipt.shift_id||
+        !/^[a-f0-9-]{36}$/i.test(receipt.maintenance_id||'')||
+        !/^sha256:[a-f0-9]{64}$/.test(receipt.independent_failure_baseline_receipt_sha256||'')||
+        receipt.source_current_epoch_verified!==false||
+        receipt.next_action!=='RECHECK_EXACT_PROVIDER_SOURCE_AND_RUN_INDEPENDENT_FROZEN_CI_RED')))
+      throw Error('SIGNED_MAINTENANCE_CI_UNTRUSTED_PREFLIGHT_RECEIPT');
+     return receipt;
+    }).catch(()=>({
+     status:'SIGNED_MAINTENANCE_CI_PREFLIGHT_PROOF_UNAVAILABLE',
+     read_only:true,executable_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_MAINTENANCE_CI_PREFLIGHT',
+     read_only:true,executable_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
   // This is not a code repair. The first failure receipt remains immutable.
@@ -1711,6 +1750,7 @@ export default async function handler(req,res){
     independent_business_qualification_review:businessQualificationReview,
     signed_internal_maintenance_work:internalMaintenanceWork,
     signed_maintenance_failure_baseline:maintenanceFailureBaseline,
+    signed_maintenance_ci_preflight:signedMaintenanceCiPreflight,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
