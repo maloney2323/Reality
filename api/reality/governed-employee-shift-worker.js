@@ -389,6 +389,33 @@ export default async function handler(req,res){
      independent_frozen_ci_red_verified:false,
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
+  // Governed maintenance handoff classifier. A source-epoch receipt is a
+  // prerequisite for routing, never proof that CI ran or repair succeeded.
+  // The actual executor must separately claim and verify this exact scope.
+  workerStage='SIGNED_MAINTENANCE_EPOCH_HANDOFF_CLASSIFICATION';
+  const maintenanceEpochHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   maintenanceCiSourceEpoch?.receipt_sha256&&
+   /^sha256:[a-f0-9]{64}$/.test(maintenanceCiSourceEpoch.receipt_sha256)&&
+   maintenanceCiSourceEpoch?.installation_authorized===false&&
+   maintenanceCiSourceEpoch?.production_changed===false?
+    Object.freeze({
+     status:maintenanceCiSourceEpoch.epoch_status===
+      'SOURCE_EPOCH_ATTESTED_EXECUTABLE_RED_REQUIRED'?
+       'MAINTENANCE_CI_RED_HANDOFF_REQUIRES_INDEPENDENT_EXECUTOR':
+      maintenanceCiSourceEpoch.epoch_status===
+      'SOURCE_EPOCH_CHANGED_REQUALIFICATION_REQUIRED'?
+       'MAINTENANCE_SOURCE_REQUALIFICATION_HANDOFF_REQUIRES_EXECUTOR':
+       'MAINTENANCE_EPOCH_HANDOFF_NOT_QUALIFIED',
+     source_epoch_receipt_sha256:maintenanceCiSourceEpoch.receipt_sha256,
+     executable_frozen_ci_red_verified:false,
+     handoff_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    }):
+    {status:'NO_VERIFIED_MAINTENANCE_EPOCH_HANDOFF',
+     executable_frozen_ci_red_verified:false,handoff_executed:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
   // Independent Quinn review of staged historical GitHub evidence under the
   // same signed maintenance warrant. Historical regression != case-specific RED.
   workerStage='SIGNED_INDEPENDENT_MAINTENANCE_EXTERNAL_EVIDENCE_REVIEW';
@@ -1846,6 +1873,7 @@ export default async function handler(req,res){
     signed_maintenance_failure_baseline:maintenanceFailureBaseline,
     signed_maintenance_ci_preflight:signedMaintenanceCiPreflight,
     signed_maintenance_ci_source_epoch:maintenanceCiSourceEpoch,
+    signed_maintenance_epoch_handoff:maintenanceEpochHandoff,
     signed_external_maintenance_review:signedExternalMaintenanceReview,
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
     signed_schedule_evidence_admission:signedScheduleAdmission,
