@@ -143,6 +143,7 @@ export default async function handler(req,res){
     Array.isArray(req.body)||Object.keys(req.body).length>0)))
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  let activePulseDb=null,activePulseShiftId=null;
+ let governedWakeClaimId=null;
  let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
  let workerStage='SHIFT_DB_BOUNDARY';
@@ -150,6 +151,30 @@ export default async function handler(req,res){
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
+  // A standing shift or discovery grant is not a new execution event.
+  // Durable, service-role-only singleton claim prevents concurrent full
+  // workers even when a legacy cron wake arrives during active execution.
+  // Fail closed if the claim cannot be independently read back.
+  workerStage='SHIFT_WORKER_DURABLE_SINGLEFLIGHT';
+  const proposedWakeClaimId=crypto.randomUUID();
+  const governedWakeGate=await shiftRpc(
+   db,'reality_claim_governed_shift_worker_run_v1',
+   {p_claim_id:proposedWakeClaimId}
+  );
+  if(governedWakeGate?.status==='WAKE_COALESCED_ACTIVE_OR_COOLDOWN' &&
+     governedWakeGate.original_job_completed===false &&
+     governedWakeGate.installation_authorized===false)
+   return res.status(202).json({
+    status:'WAKE_COALESCED_ACTIVE_OR_COOLDOWN',
+    worker_started:false,work_completed:false,
+    installation_authorized:false,production_changed:false
+   });
+  if(governedWakeGate?.status!=='WAKE_CLAIMED' ||
+     governedWakeGate.claim_id!==proposedWakeClaimId ||
+     governedWakeGate.original_job_completed!==false ||
+     governedWakeGate.installation_authorized!==false)
+   throw Error('GOVERNED_SHIFT_WORKER_LEASE_READBACK_UNVERIFIED');
+  governedWakeClaimId=proposedWakeClaimId;
   // Cron SQL success is only queued HTTP; this durable receipt proves the
   // authenticated server worker actually entered its lifecycle.
   actualWorkerRunId=crypto.randomUUID();
@@ -1796,6 +1821,19 @@ export default async function handler(req,res){
     });
    }catch{
     console.warn('REALITY_SIGNED_WORKER_FINAL_ATTESTATION_UNAVAILABLE');
+   }
+  }
+  // A failed release leaves a bounded lease, not another concurrent worker.
+  // This does not settle customer work or change any authorization.
+  if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
+   try{
+    const released=await shiftRpc(activePulseDb,
+     'reality_release_governed_shift_worker_run_v1',
+     {p_claim_id:governedWakeClaimId});
+    if(released?.status!=='WAKE_RELEASED')
+     console.warn('REALITY_SHIFT_WORKER_WAKE_LEASE_NOT_RELEASED');
+   }catch{
+    console.warn('REALITY_SHIFT_WORKER_WAKE_LEASE_RELEASE_UNVERIFIED');
    }
   }
  }
