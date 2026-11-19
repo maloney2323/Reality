@@ -16,5 +16,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          # TEST-ONLY: ensure the frozen case runs on unrepaired source, not PR merge.
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Verify original authorization and complete provider source
         run: node --test test/reality-pr-review-exact-warrant-v1.test.js
