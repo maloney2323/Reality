@@ -541,6 +541,9 @@ export default async function handler(req,res){
     // durable repair ledger, without declaring a worker or job completed.
     sameOriginalRecoveryCheckpoint={
      status:sameOriginalRecovery.status,
+     next_action:sameOriginalRecovery.status==='SAME_ORIGINAL_RECOVERY_PATCH_RECORDED'?
+      'SAME_ORIGINAL_RECOVERY_PATCH_AWAITING_INDEPENDENT_CI':
+      'SAME_ORIGINAL_RECOVERY_PROOF_UNVERIFIED',
      independent_tests_passed:false,original_job_completed:false,
      new_shift_started:false,installation_authorized:false,
      production_changed:false
