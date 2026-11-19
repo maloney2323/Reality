@@ -468,6 +468,35 @@ export default async function handler(req,res){
      original_job_completed:false,
      independent_final_receipt_verified:false,
      installation_authorized:false,production_changed:false};
+  // Durable next-wake routing: the signed source-epoch is persisted, so
+  // a later wake must use the database readback, not replay the attestation.
+  // This is a classification receipt, NOT a claim that an executor ran.
+  workerStage='DURABLE_MAINTENANCE_HANDOFF_READBACK';
+  const durableMaintenanceHandoff=
+   sameOriginalPostmaintenanceGate?.status===
+     'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     sameOriginalPostmaintenanceGate.maintenance_source_epoch_receipt_sha256||'')&&
+   sameOriginalPostmaintenanceGate.original_job_completed===false&&
+   sameOriginalPostmaintenanceGate.installation_authorized===false&&
+   sameOriginalPostmaintenanceGate.production_changed===false&&
+   ['RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+    'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'].includes(
+     sameOriginalPostmaintenanceGate.next_action)?
+    Object.freeze({
+     status:sameOriginalPostmaintenanceGate.next_action,
+     original_work_id:sameOriginalPostmaintenanceGate.original_work_id,
+     source_ref:sameOriginalPostmaintenanceGate.source_ref,
+     source_epoch_receipt_sha256:
+      sameOriginalPostmaintenanceGate.maintenance_source_epoch_receipt_sha256,
+     handoff_executed:false,independent_frozen_ci_red_verified:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    }):
+    {status:'NO_DURABLE_AUTHORIZED_MAINTENANCE_HANDOFF',
+     handoff_executed:false,independent_frozen_ci_red_verified:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
   // This is not a code repair. The first failure receipt remains immutable.
@@ -1876,6 +1905,7 @@ export default async function handler(req,res){
     signed_maintenance_epoch_handoff:maintenanceEpochHandoff,
     signed_external_maintenance_review:signedExternalMaintenanceReview,
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
+    durable_maintenance_handoff:durableMaintenanceHandoff,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
