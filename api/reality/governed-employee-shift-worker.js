@@ -125,6 +125,8 @@ import {reproduceOneSignedMaintenanceFailureBaseline}
  from '../../src/reality-signed-maintenance-failure-baseline-v1.js';
 import {executeOneRegisteredMaintenanceAction}
  from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
+import {executeOneRegisteredMaintenanceCiWake}
+ from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -521,14 +523,40 @@ export default async function handler(req,res){
     {status:'SIGNED_MAINTENANCE_EXECUTOR_NOT_CONNECTED_OR_NO_AUTHORIZED_WAKE',
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
+  // A real independent CI runner exists for the OTHER exact action.
+  // Selection occurs only if the source executor returned an unclaimed
+  // 'no registered handler' result. Reuse the original signed worker run.
+  workerStage='SIGNED_MAINTENANCE_CASE_CI_EXECUTOR';
+  const signedMaintenanceCaseCi=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
+   signedMaintenanceExecutorHandoff.status===
+    'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'&&
+   signedMaintenanceExecutorHandoff.next_action===
+    'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'?
+    await executeOneRegisteredMaintenanceCiWake({
+      db,env:process.env,shiftId:wakeReceipt.shift_id,
+      workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_CASE_CI_EXECUTOR_UNVERIFIED',
+     error_code:String(error?.message||'SIGNED_CI_UNVERIFIED').slice(0,115),
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_AUTHORIZED_CASE_CI_RUNNER_WAKE',
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  const signedMaintenanceResult=
+   signedMaintenanceCaseCi.status==='NO_AUTHORIZED_CASE_CI_RUNNER_WAKE'?
+    signedMaintenanceExecutorHandoff:signedMaintenanceCaseCi;
   const signedMaintenanceExecutorClaim=
-   signedMaintenanceExecutorHandoff.claim||{
-    status:signedMaintenanceExecutorHandoff.status,
+   signedMaintenanceResult.claim||{
+    status:signedMaintenanceResult.status,
     handoff_executed:false,original_job_completed:false,
     installation_authorized:false,production_changed:false};
   const signedMaintenanceExecutorOutcome=
-   signedMaintenanceExecutorHandoff.outcome||{
-    status:signedMaintenanceExecutorHandoff.status,
+   signedMaintenanceResult.outcome||{
+    status:signedMaintenanceResult.status,
     repair_executed:false,original_job_completed:false,
     installation_authorized:false,production_changed:false};
   // A claimed lease cannot be reported as executed or verified.
@@ -1944,6 +1972,7 @@ export default async function handler(req,res){
     durable_maintenance_handoff:durableMaintenanceHandoff,
     signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
     signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
+    signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
