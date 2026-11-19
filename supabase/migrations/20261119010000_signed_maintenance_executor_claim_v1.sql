@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS reality_internal.signed_maintenance_executor_claims_v
  attempt_count integer NOT NULL DEFAULT 1 CHECK (attempt_count BETWEEN 1 AND 3)
 );
 REVOKE ALL ON reality_internal.signed_maintenance_executor_claims_v1 FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON reality_internal.signed_maintenance_executor_claims_v1 TO service_role;
 CREATE OR REPLACE FUNCTION public.reality_claim_signed_maintenance_executor_v1(
  p_shift_id uuid,p_worker_run_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SET search_path TO '' AS $$
@@ -42,6 +43,7 @@ BEGIN
    AND m.independent_failure_baseline_receipt_sha256=ep.baseline_receipt_sha256
    AND m.independent_frozen_test_receipt_sha256 IS NULL
    AND m.original_job_completed=false AND m.production_changed=false
+   AND ep.owner_id=m.owner_id
    AND EXISTS (
     SELECT 1 FROM pg_catalog.jsonb_array_elements(
      CASE WHEN pg_catalog.jsonb_typeof(w.source_scope)='array'
