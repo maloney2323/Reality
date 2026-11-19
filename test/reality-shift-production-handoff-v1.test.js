@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  stableUuid, cronRequest, loadAssignedShiftWork,
+  stableUuid, cronRequest, loadAssignedShiftWork, evaluateShiftLaunchReadiness,
   shiftOperationPersistence, persistShiftRecoveryStage,
 } from '../api/reality/shift.js';
 
@@ -76,4 +76,30 @@ test('scheduled shift rejects caller-controlled User-Agent and arbitrary Bearer 
   assert.equal(cronRequest({ headers: { authorization: 'Bearer anything' } }, secret), false);
   assert.equal(cronRequest({ headers: { authorization: 'Bearer ' + secret } }, secret), true);
   assert.equal(cronRequest({ headers: { authorization: 'Bearer ' + secret } }, ''), false);
+});
+
+
+test('live start refuses absent owner configuration or missing connector credentials',()=>{
+  const config={enabled:true,updated_by:'owner-1'};
+  const fullEnv={SUPABASE_URL:'http://supabase.invalid',
+    SUPABASE_SECRET_KEY:'present-but-not-a-real-key',
+    REALITY_GITHUB_TOKEN:'present-not-real',
+    OPENAI_API_KEY:'present-not-real'};
+  const ready=evaluateShiftLaunchReadiness({config,principalId:'owner-1',env:fullEnv});
+  assert.equal(ready.status,'READY_TO_ATTEMPT');
+  assert.equal(ready.live_connector_access_verified,false);
+  assert.equal(ready.authority_for_external_work_not_inferred,true);
+  const missing=evaluateShiftLaunchReadiness({
+    config,principalId:'owner-1',
+    env:{SUPABASE_URL:fullEnv.SUPABASE_URL,SUPABASE_SECRET_KEY:fullEnv.SUPABASE_SECRET_KEY},
+  });
+  assert.equal(missing.status,'BLOCKED');
+  assert.ok(missing.blockers.includes('GITHUB_CONNECTOR_CREDENTIAL_REQUIRED'));
+  assert.ok(missing.blockers.includes('INTELLIGENCE_MODEL_CREDENTIAL_REQUIRED'));
+  assert.ok(evaluateShiftLaunchReadiness({
+    config,principalId:'wrong',env:fullEnv,
+  }).blockers.includes('SHIFT_OWNER_SESSION_REQUIRED'));
+  assert.ok(evaluateShiftLaunchReadiness({
+    config:null,principalId:'owner-1',env:fullEnv,
+  }).blockers.includes('SHIFT_CONFIGURATION_REQUIRED'));
 });
