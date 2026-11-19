@@ -50,8 +50,7 @@ BEGIN
     WHERE scope->>'maintenance_id'=m.incident_id::text
       AND scope->>'origin_shift_id'=m.origin_shift_id::text
       AND scope->>'source_ref'=m.source_ref
-      AND scope->>'independent_review_receipt_sha256'=
-          m.independent_review_receipt_sha256
+      AND scope->>'independent_review_receipt_sha256'=m.independent_review_receipt_sha256
    )
    AND pulse.last_worker_status='WAKE_RECEIVED'
    AND pulse.last_worker_seen_at>clock_timestamp()-interval '3 minutes'
