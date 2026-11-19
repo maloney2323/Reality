@@ -1,0 +1,22 @@
+name: Reality Signed Shift DB Boundary Recovery
+on:
+  push:
+    branches:
+      - fix/reality-existing-shift-db-timeout-recovery-20261118
+  pull_request:
+    branches:
+      - reality/chat-direct-work-handoff-20261115
+permissions:
+  contents: read
+jobs:
+  bounded-existing-shift-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate signed worker source and timeout handler
+        run: node --check src/reality-governed-shift-boundary-v1.js && node --check api/reality/governed-employee-shift-worker.js
+      - name: Verify fail-closed recovery and existing signed worker receipts
+        run: node --test test/reality-signed-shift-db-stall-recovery-v1.test.js test/reality-signed-worker-actual-receipts-v1.test.js
