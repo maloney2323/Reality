@@ -56,6 +56,13 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
      (item.independent_failure_baseline_receipt_sha256!==undefined&&
       item.independent_failure_baseline_receipt_sha256!==null&&
       !HASH.test(item.independent_failure_baseline_receipt_sha256))||
+     (item.independent_frozen_test_receipt_sha256!==undefined&&
+      item.independent_frozen_test_receipt_sha256!==null&&
+      !HASH.test(item.independent_frozen_test_receipt_sha256))||
+     (item.independent_review_status!==undefined&&
+      !['NO_ORIGINAL_ADMISSION_CONFIRMED',
+       'SOURCE_CHANGED_NEEDS_FROZEN_TEST'].includes(
+        item.independent_review_status))||
      (item.independent_source_observation_receipt_sha256!==undefined&&
       item.independent_source_observation_receipt_sha256!==null&&
       !HASH.test(item.independent_source_observation_receipt_sha256))||
@@ -89,6 +96,10 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
    independent_failure_baseline_receipt_sha256:
     HASH.test(item.independent_failure_baseline_receipt_sha256||'')?
      item.independent_failure_baseline_receipt_sha256:null,
+   independent_frozen_test_receipt_sha256:
+    HASH.test(item.independent_frozen_test_receipt_sha256||'')?
+     item.independent_frozen_test_receipt_sha256:null,
+   independent_review_status:item.independent_review_status||null,
    worker_baseline_attempts:Number.isSafeInteger(item.worker_baseline_attempts)?
     item.worker_baseline_attempts:0,
    repair_verified:item.repair_verified,
