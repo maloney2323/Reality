@@ -71,6 +71,6 @@ test('end-of-wake receipt retains the failed original and each recovery lane out
   'corrective_ci_checkpoint:boundedCorrectiveCheckpoint',
   'actual_worker_completion_receipt:completedPulse',
  ])assert.ok(finish.includes(required),required);
- assert.match(finish,/isDurablyCompletedShiftWorkerPulse/);
- assert.match(finish,/p_status:'WAKE_COMPLETED'/);
+ assert.match(worker,/isDurablyCompletedShiftWorkerPulse\(completedPulse,wakeReceipt\.shift_id\)/);
+ assert.match(worker,/p_status:'WAKE_COMPLETED'/);
 });
