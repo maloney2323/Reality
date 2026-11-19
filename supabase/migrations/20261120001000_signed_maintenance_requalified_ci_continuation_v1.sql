@@ -176,7 +176,7 @@ grant execute on function public.reality_promote_requalified_maintenance_to_ci_c
  uuid,uuid,uuid,text,timestamptz) to service_role;
 
 -- Existing CI dispatch verifies both stable-source and independently requalified
--- changed-source incidents; the latter must retain its prior signed proof.
+-- changed-source incidents; require the existing signed requalification proof.
 CREATE OR REPLACE FUNCTION public.reality_read_signed_maintenance_ci_dispatch_scope_v1(p_shift_id uuid, p_maintenance_id uuid, p_worker_run_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -203,92 +203,8 @@ begin
    and receipt_sha256=c.source_epoch_receipt_sha256
    and (epoch_status='SOURCE_EPOCH_ATTESTED_EXECUTABLE_RED_REQUIRED'
     or (epoch_status='SOURCE_EPOCH_CHANGED_REQUALIFICATION_REQUIRED'
-      and c.requalification_receipt_sha256~'^sha256:[a-f0-9]{64}
- if not found then raise exception 'MAINTENANCE_CASE_CI_CURRENT_SOURCE_EPOCH_REQUIRED';end if;
- select * into m from reality_internal.owner_internal_maintenance_jobs_v1
- where incident_id=c.maintenance_id and owner_id=c.owner_id
-   and claimed_shift_id=c.shift_id and source_ref=c.source_ref
-   and independent_review_receipt_sha256=e.independent_review_receipt_sha256
-   and independent_failure_baseline_receipt_sha256=e.baseline_receipt_sha256
-   and original_customer_work_id is null
-   and independent_frozen_test_receipt_sha256 is null
-   and original_job_completed=false and production_changed=false;
- if not found then raise exception 'MAINTENANCE_CASE_CI_EXACT_UNREPAIRED_INCIDENT_REQUIRED';end if;
- select sh.* into s from reality_internal.governed_employee_shifts_v1 sh
- join reality_internal.governed_employee_completion_warrants_v1 w
-   on w.shift_id=sh.shift_id and w.owner_id=sh.owner_id
-     and w.plan_fingerprint=sh.plan_fingerprint
-     and w.state='ACTIVE'
-     and w.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
- where sh.shift_id=c.shift_id and sh.owner_id=c.owner_id
-   and sh.closed_at is null and sh.authorized_at is not null
-   and sh.planned_start_at<=pg_catalog.clock_timestamp()
-   and (sh.planned_end_at='infinity'::timestamptz
-     or sh.planned_end_at>pg_catalog.clock_timestamp())
-   and sh.status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK','QUEUED')
-   and exists(select 1 from pg_catalog.jsonb_array_elements(
-     case when pg_catalog.jsonb_typeof(w.source_scope)='array'
-       then w.source_scope else '[]'::jsonb end) sc
-     where sc->>'maintenance_id'=m.incident_id::text
-       and sc->>'origin_shift_id'=m.origin_shift_id::text
-       and sc->>'source_ref'=m.source_ref
-       and sc->>'independent_review_receipt_sha256'=m.independent_review_receipt_sha256);
- if not found then raise exception 'MAINTENANCE_CASE_CI_ACTIVE_OWNER_WARRANT_REQUIRED';end if;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_MAINTENANCE_CASE_CI_DISPATCH_AUTHORIZED',
-  'maintenance_id',c.maintenance_id,'shift_id',c.shift_id,
-  'worker_run_id',c.worker_run_id,'source_ref',c.source_ref,
-  'source_epoch_receipt_sha256',c.source_epoch_receipt_sha256,
-  'historical_failure_kind',m.failure_baseline_kind,
-  'dispatch_is_only_transport',true,
-  'frozen_ci_red_verified',false,'repair_executed',false,
-  'original_job_completed',false,'installation_authorized',false,
-  'production_changed',false);
-end $function$
-
-      and c.requalified_provider_sha256~'^sha256:[a-f0-9]{64}
- if not found then raise exception 'MAINTENANCE_CASE_CI_CURRENT_SOURCE_EPOCH_REQUIRED';end if;
- select * into m from reality_internal.owner_internal_maintenance_jobs_v1
- where incident_id=c.maintenance_id and owner_id=c.owner_id
-   and claimed_shift_id=c.shift_id and source_ref=c.source_ref
-   and independent_review_receipt_sha256=e.independent_review_receipt_sha256
-   and independent_failure_baseline_receipt_sha256=e.baseline_receipt_sha256
-   and original_customer_work_id is null
-   and independent_frozen_test_receipt_sha256 is null
-   and original_job_completed=false and production_changed=false;
- if not found then raise exception 'MAINTENANCE_CASE_CI_EXACT_UNREPAIRED_INCIDENT_REQUIRED';end if;
- select sh.* into s from reality_internal.governed_employee_shifts_v1 sh
- join reality_internal.governed_employee_completion_warrants_v1 w
-   on w.shift_id=sh.shift_id and w.owner_id=sh.owner_id
-     and w.plan_fingerprint=sh.plan_fingerprint
-     and w.state='ACTIVE'
-     and w.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
- where sh.shift_id=c.shift_id and sh.owner_id=c.owner_id
-   and sh.closed_at is null and sh.authorized_at is not null
-   and sh.planned_start_at<=pg_catalog.clock_timestamp()
-   and (sh.planned_end_at='infinity'::timestamptz
-     or sh.planned_end_at>pg_catalog.clock_timestamp())
-   and sh.status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK','QUEUED')
-   and exists(select 1 from pg_catalog.jsonb_array_elements(
-     case when pg_catalog.jsonb_typeof(w.source_scope)='array'
-       then w.source_scope else '[]'::jsonb end) sc
-     where sc->>'maintenance_id'=m.incident_id::text
-       and sc->>'origin_shift_id'=m.origin_shift_id::text
-       and sc->>'source_ref'=m.source_ref
-       and sc->>'independent_review_receipt_sha256'=m.independent_review_receipt_sha256);
- if not found then raise exception 'MAINTENANCE_CASE_CI_ACTIVE_OWNER_WARRANT_REQUIRED';end if;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_MAINTENANCE_CASE_CI_DISPATCH_AUTHORIZED',
-  'maintenance_id',c.maintenance_id,'shift_id',c.shift_id,
-  'worker_run_id',c.worker_run_id,'source_ref',c.source_ref,
-  'source_epoch_receipt_sha256',c.source_epoch_receipt_sha256,
-  'historical_failure_kind',m.failure_baseline_kind,
-  'dispatch_is_only_transport',true,
-  'frozen_ci_red_verified',false,'repair_executed',false,
-  'original_job_completed',false,'installation_authorized',false,
-  'production_changed',false);
-end $function$
-
+      and c.requalification_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+      and c.requalified_provider_sha256~'^sha256:[a-f0-9]{64}$'
       and c.requalification_worker_run_id is not null
       and c.requalification_worker_run_id<>c.worker_run_id
       and c.requalified_at>=recorded_at
