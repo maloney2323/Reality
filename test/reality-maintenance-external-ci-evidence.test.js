@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const sql=readFileSync(new URL('../supabase/migrations/20261119200000_maintenance_external_frozen_evidence_v1.sql',import.meta.url),'utf8');
 test('external regression is one immutable evidence entry under the same incident',()=>{
- assert.match(sql,/PRIMARY KEY\(maintenance_id\)/);
+ assert.match(sql,/maintenance_id uuid PRIMARY KEY/);
  assert.match(sql,/ON CONFLICT\(maintenance_id\) DO NOTHING/);
  assert.match(sql,/EXTERNAL_FROZEN_EVIDENCE_IMMUTABLE_CONFLICT/);
  assert.match(sql,/e\.receipt_sha256=p_source_epoch_receipt_sha256/);
