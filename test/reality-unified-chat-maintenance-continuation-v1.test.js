@@ -394,7 +394,7 @@ test('existing signed shift provides in-chat live repair progress without demand
  assert.match(summary,/Requalify changed source before case-specific CI/);
  assert.match(summary,/Run the case-specific executable frozen CI RED/);
  assert.match(summary,/No independently verified repair yet/);
- assert.match(summary,/Signed worker wakes: 9/);
+ assert.match(summary,/Signed worker wakes:\s+9/);
  assert.match(summary,/sha256:cccccccccccccccc/);
  assert.ok(v.calls.every(c=>c.options.method==='GET'),
   'watching signed work may never create a new shift or imply repair permission');
@@ -412,7 +412,7 @@ test('only independent steps six/seven/eight may produce a same-shift completed 
    step_index:i+1,
    state:i<5?'SOURCE_CHECKED':i<7?
     'INTERNAL_MAINTENANCE_RECEIPTS_VERIFIED':'REPORTED',
-   proof_sha256:HASH(String.fromCharCode(97+i))
+   proof_sha256:HASH(String.fromCharCode(97+(i%6)))
   }))
  };
  const closed={...data,
@@ -433,9 +433,9 @@ test('only independent steps six/seven/eight may produce a same-shift completed 
  await verified.click('realityChatMaintenanceWatch');await verified.flush();
  const summary=collectedText(verified.locate('realityChatMaintenanceLive'));
  assert.match(summary,/Independently verified completion receipt/);
- assert.match(summary,/Execution: sha256:ffffffff/);
- assert.match(summary,/Independent verification: sha256:gggggggg/);
- assert.match(summary,/Final report: sha256:hhhhhhhh/);
+ assert.match(summary,/Execution:\s+sha256:ffffffff/);
+ assert.match(summary,/Independent verification:\s+sha256:aaaaaaaa/);
+ assert.match(summary,/Final report:\s+sha256:bbbbbbbb/);
  assert.ok(verified.calls.every(c=>c.options.method==='GET'));
  const unverified=setup({readback:{...closed,shifts:[{...finalShift,
   steps:finalShift.steps.map((x,i)=>i===6?{...x,state:'AWAITING_EXACT_WORK'}:x)
