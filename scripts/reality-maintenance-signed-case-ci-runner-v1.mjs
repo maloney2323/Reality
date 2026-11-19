@@ -51,7 +51,7 @@ const suites=item.historical_failure_kind===
  ['test/reality-shift-business-qualification-review-v1.test.js',
   'test/reality-frozen-regressions/reality-maintenance-baseline-original-failure-v1.test.js',
   'test/reality-registered-signed-maintenance-executor-v1.test.js']:
- ['test/reality-qualified-source-requalification-v1.test.js',
+ ['test/reality-qualified-source-change-requalification-v1.test.js',
   'test/reality-registered-signed-maintenance-executor-v1.test.js'];
 for(const file of suites)if(!/^(?:test\/)[a-z0-9_./-]+\.test\.js$/.test(file))
  fail('CASE_SUITE_PATH_NOT_ALLOWLISTED');
