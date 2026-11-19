@@ -78,10 +78,25 @@ export async function loginChat(req,res,{fetchImpl=fetch,env=process.env}={}){
  if(!email||email.length>254||typeof password!=='string'||password.length<1||password.length>1024)
   fail('CHAT_EMAIL_PASSWORD_REQUIRED',400);
  const signed=await provider(c,'token?grant_type=password',{method:'POST',body:{email,password},fetchImpl});
- if(!signed.ok||!signed.body?.access_token||!signed.body?.refresh_token)
-  fail('CHAT_LOGIN_FAILED',signed.status===429?429:401);
+ // An overloaded Supabase Auth database can return 500/504 for a perfectly
+ // correct password. Never turn a provider outage into "wrong password".
+ if(!signed.ok){
+  if(signed.status===429)fail('CHAT_AUTH_RATE_LIMITED',429);
+  if(signed.status>=500)fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+  if([400,401].includes(signed.status))fail('CHAT_LOGIN_FAILED',401);
+  fail('CHAT_AUTH_PROVIDER_RESPONSE_UNVERIFIED',503);
+ }
+ if(typeof signed.body?.access_token!=='string'||
+    typeof signed.body?.refresh_token!=='string')
+  fail('CHAT_AUTH_PROVIDER_RESPONSE_UNVERIFIED',503);
  const user=await provider(c,'user',{token:signed.body.access_token,fetchImpl});
- if(!user.ok||!user.body?.id)fail('CHAT_LOGIN_IDENTITY_UNVERIFIED',401);
+ if(!user.ok){
+  if(user.status===429||user.status>=500)
+   fail('CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',503);
+  fail('CHAT_LOGIN_IDENTITY_UNVERIFIED',503);
+ }
+ if(typeof user.body?.id!=='string'||!user.body.id)
+  fail('CHAT_LOGIN_IDENTITY_UNVERIFIED',503);
  const now=Date.now();
  setCookie(res,{access:signed.body.access_token,refresh:signed.body.refresh_token,
   expires:now+Math.min(86400,Number(signed.body.expires_in)||3600)*1000},c.seal);
