@@ -1,6 +1,8 @@
 // Existing signed owner maintenance executor -> independent GitHub Actions
 // case-CI trigger. No test verdict, model repair, install, or original settlement.
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {readFreshEmployeeInquirySource}
+ from './reality-dynamic-employee-inquiry-worker-v1.js';
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -13,19 +15,104 @@ const safe=(status,other={})=>Object.freeze({
 });
 const fail=x=>{throw Error('SIGNED_MAINTENANCE_CI_EXECUTOR_'+x)};
 export async function executeOneRegisteredMaintenanceCiWake({
- db,env=process.env,shiftId,workerRunId,fetchImpl=fetch,call=shiftRpc
+ db,env=process.env,shiftId,workerRunId,fetchImpl=fetch,call=shiftRpc,
+ readSource=readFreshEmployeeInquirySource
 }={}){
  if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
   typeof db.url!=='string'||!db.url.startsWith('https://')||
   typeof db.secretKey!=='string'||db.secretKey.length<24||
   !UUID.test(shiftId||'')||!UUID.test(workerRunId||'')||
-  typeof fetchImpl!=='function'||typeof call!=='function')
+  typeof fetchImpl!=='function'||typeof call!=='function'||
+  typeof readSource!=='function')
   fail('EXACT_SIGNED_SHIFT_AND_SERVICE_REQUIRED');
- const claim=await call(db,'reality_claim_registered_maintenance_action_v2',{
+ let claim=await call(db,'reality_claim_registered_maintenance_action_v2',{
   p_shift_id:shiftId,p_worker_run_id:workerRunId,
   p_registered_action:ACTION
  },{fetchImpl});
+ // A completed requalification must become eligible for CI, not strand the
+ // original maintenance identity in a terminal one-action record. A separate
+ // signed worker independently rereads the SAME GitHub source twice before
+ // atomically promoting the original claim; no new owner authority is minted.
+ if(claim?.status==='NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR'&&
+    claim.original_job_completed===false&&
+    claim.installation_authorized===false&&
+    claim.production_changed===false&&claim.repair_executed===false){
+  const preflight=await call(db,
+   'reality_read_requalified_maintenance_ci_preflight_v1',{
+    p_shift_id:shiftId,p_worker_run_id:workerRunId
+   },{fetchImpl});
+  if(preflight?.status==='NO_SIGNED_REQUALIFIED_MAINTENANCE_CI_READY'&&
+     preflight.claim_consumed===false&&
+     preflight.repair_executed===false&&
+     preflight.original_job_completed===false&&
+     preflight.installation_authorized===false&&
+     preflight.production_changed===false)
+    return safe(preflight.status,{claim_consumed:false});
+  if(preflight?.status!=='SIGNED_REQUALIFIED_MAINTENANCE_CI_NEEDS_FRESH_SOURCE'||
+     preflight.shift_id!==shiftId||
+     !UUID.test(preflight.owner_id||'')||
+     !UUID.test(preflight.maintenance_id||'')||
+     !UUID.test(preflight.original_requalification_worker_run_id||'')||
+     preflight.original_requalification_worker_run_id===workerRunId||
+     !SOURCE.test(preflight.source_ref||'')||
+     !HASH.test(preflight.source_epoch_receipt_sha256||'')||
+     !HASH.test(preflight.source_requalification_receipt_sha256||'')||
+     !HASH.test(preflight.requalified_provider_sha256||'')||
+     preflight.claim_consumed!==false||
+     preflight.frozen_ci_red_verified!==false||
+     preflight.repair_executed!==false||
+     preflight.original_job_completed!==false||
+     preflight.installation_authorized!==false||
+     preflight.production_changed!==false)
+    fail('REQUALIFIED_CI_PREFLIGHT_NOT_SIGNED');
+  let first,second;
+  try{
+   const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
+   first=await readSource(preflight.source_ref,{fetchImpl,token});
+   second=await readSource(preflight.source_ref,{fetchImpl,token});
+  }catch{
+   return safe('REQUALIFIED_CI_SOURCE_PROVIDER_UNAVAILABLE',{
+    maintenance_id:preflight.maintenance_id,claim_consumed:false});
+  }
+  if(first?.source_ref!==preflight.source_ref||
+     second?.source_ref!==preflight.source_ref||
+     !HASH.test(first.provider_proof_sha256||'')||
+     !HASH.test(second.provider_proof_sha256||'')||
+     first.provider_proof_sha256!==second.provider_proof_sha256||
+     !Number.isFinite(Date.parse(second.checked_at||''))||
+     !Number.isFinite(Date.parse(first.checked_at||'')))
+    return safe('REQUALIFIED_CI_SOURCE_NOT_STABLE',{
+     maintenance_id:preflight.maintenance_id,claim_consumed:false});
+  if(second.provider_proof_sha256!==preflight.requalified_provider_sha256)
+    return safe('REQUALIFIED_CI_PROVIDER_SOURCE_CHANGED_AFTER_RECEIPT',{
+     maintenance_id:preflight.maintenance_id,claim_consumed:false,
+     next_action:'REQUALIFY_CHANGED_SOURCE_AGAIN_BEFORE_CI'});
+  claim=await call(db,
+   'reality_promote_requalified_maintenance_to_ci_claim_v1',{
+    p_shift_id:shiftId,p_worker_run_id:workerRunId,
+    p_maintenance_id:preflight.maintenance_id,
+    p_provider_sha256:second.provider_proof_sha256,
+    p_checked_at:second.checked_at
+   },{fetchImpl});
+  if(claim?.status==='MAINTENANCE_SOURCE_CHANGED_AFTER_REQUALIFICATION'&&
+     claim.claim_consumed===false&&claim.repair_executed===false&&
+     claim.original_job_completed===false&&
+     claim.installation_authorized===false&&
+     claim.production_changed===false)
+   return safe(claim.status,{maintenance_id:preflight.maintenance_id,
+    claim_consumed:false});
+  if(claim?.status==='SIGNED_MAINTENANCE_EXECUTOR_DURABLY_CLAIMED'&&
+     (claim.maintenance_id!==preflight.maintenance_id||
+      claim.source_ref!==preflight.source_ref||
+      claim.source_epoch_receipt_sha256!==
+       preflight.source_epoch_receipt_sha256||
+      claim.source_requalification_receipt_sha256!==
+       preflight.source_requalification_receipt_sha256||
+      claim.requalified_provider_sha256!==
+       second.provider_proof_sha256))
+   fail('REQUALIFIED_CI_PROMOTION_RECEIPT_DRIFT');
+ }
  if(['NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR',
   'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'].includes(claim?.status)&&
   claim.original_job_completed===false&&
