@@ -20,5 +20,15 @@ export default async function handler(req,res){
    return res.status(200).json(result);
   }
   return res.status(405).setHeader('Allow','GET, POST, DELETE, OPTIONS').json({error:'METHOD_NOT_ALLOWED'});
- }catch(e){return res.status(e.status||503).json({error:e.message||'CHAT_SESSION_UNAVAILABLE'})}
+ }catch(e){
+  // Log only the safe failure classification. Never log passwords, email,
+  // tokens, provider response bodies, or the sealed session cookie.
+  if(req.method==='POST'){
+   const code=String(e?.message||'');
+   const safe=/^CHAT_[A-Z0-9_]{3,90}$/.test(code)?
+    code:'CHAT_SESSION_UNAVAILABLE';
+   console.warn('REALITY_PREVIEW_SIGN_IN_RESULT',safe);
+  }
+  return res.status(e.status||503).json({error:e.message||'CHAT_SESSION_UNAVAILABLE'});
+ }
 }

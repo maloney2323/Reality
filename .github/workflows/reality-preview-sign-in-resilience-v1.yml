@@ -1,0 +1,22 @@
+name: Reality Private Preview Sign-in Reliability
+on:
+  push:
+    branches:
+      - fix/reality-preview-login-show-password-20261118
+  pull_request:
+    branches:
+      - reality/chat-direct-work-handoff-20261115
+permissions:
+  contents: read
+jobs:
+  account-login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify account backend syntax
+        run: node --check src/reality-private-chat-auth-v0.1.js && node --check api/reality/personal-session.js
+      - name: Verify password visibility, actual Auth outage handling, and existing signed sessions
+        run: node --test test/reality-preview-sign-in-resilience-v1.test.js test/reality-private-chat-preview-v0.1.test.js test/reality-private-chat-continuity-recovery-v1.test.js

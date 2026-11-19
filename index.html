@@ -63,6 +63,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .advanced-option{border:1px solid #303e52;border-radius:12px;padding:12px;margin:12px 0}
 .advanced-option>summary{font-size:13px;font-weight:700;cursor:pointer;color:#d5e2f0}
 #privateChat{scroll-margin-top:18px}#privateLogin,#privateReady{scroll-margin-top:16px}
+.private-password-field{position:relative;margin-top:6px}
+.private-password-field #privatePassword{margin-top:0!important;padding-right:58px!important}
+.private-password-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:grid;place-items:center;margin:0!important;padding:9px!important;border:1px solid transparent;background:transparent;color:#c5d8ec;border-radius:10px;cursor:pointer}
+.private-password-toggle:hover,.private-password-toggle:focus-visible{background:#243247;border-color:#6380a0;outline-offset:2px}
+.private-password-toggle svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
 #privateGoalText,#attentionQueue{scroll-margin-top:18px}
 @media(max-width:600px){.start-flow{padding:12px}.start-step{padding:14px}.start-flow-head h2{font-size:22px}}
 
@@ -1565,7 +1571,16 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <label for="privateEmail">Account email</label>
   <input id="privateEmail" type="email" required autocomplete="username" placeholder="Email" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
   <label for="privatePassword">Password</label>
-  <input id="privatePassword" type="password" required autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <div class="private-password-field">
+   <input id="privatePassword" type="password" required name="password" autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px">
+   <button id="privatePasswordToggle" class="private-password-toggle" type="button" aria-label="Show password" aria-pressed="false" aria-controls="privatePassword" title="Show password">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+     <path d="M2 12s3.7-6.5 10-6.5S22 12 22 12s-3.7 6.5-10 6.5S2 12 2 12Z"></path>
+     <circle cx="12" cy="12" r="3"></circle>
+     <path id="privatePasswordEyeSlash" d="M3 3 21 21" style="display:none"></path>
+    </svg>
+   </button>
+  </div>
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
@@ -7454,17 +7469,44 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    resetSessionRetry();void init();
   }
  });
+ function setPrivatePasswordVisibility(visible){
+  const password=el('privatePassword'),toggle=el('privatePasswordToggle');
+  password.type=visible?'text':'password';
+  toggle.setAttribute('aria-pressed',String(visible));
+  toggle.setAttribute('aria-label',visible?'Hide password':'Show password');
+  toggle.title=visible?'Hide password':'Show password';
+  el('privatePasswordEyeSlash').style.display=visible?'':'none';
+ }
+ el('privatePasswordToggle').onclick=()=>{
+  const input=el('privatePassword'),start=input.selectionStart,end=input.selectionEnd;
+  setPrivatePasswordVisibility(input.type==='password');
+  input.focus({preventScroll:true});
+  try{input.setSelectionRange(start,end)}catch{}
+ };
+ // Keyboard Enter and mobile Done submit through the same bounded sign-in POST.
+ for(const id of ['privateEmail','privatePassword']){
+  el(id).addEventListener('keydown',event=>{
+   if(event.key==='Enter'){
+    event.preventDefault();
+    if(!el('privateSignIn').disabled)el('privateSignIn').click();
+   }
+  });
+ }
  el('privateSignIn').onclick=async()=>{
+  if(el('privateSignIn').disabled)return;
   for(const id of ['privateEmail','privatePassword']){
     if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
   }
-  el('privateSignIn').disabled=true;status('Checking account…');
+  el('privateSignIn').disabled=true;status('Checking secure account…');
   try{
-   const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
-    signal:AbortSignal.timeout(18000),
+   const r=await fetch(endpoint,{method:'POST',credentials:'same-origin',
+    headers:{'content-type':'application/json'},
+    signal:AbortSignal.timeout(30000),
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
-   const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
-   el('privatePassword').value='';resetSessionRetry();showSignedIn(true);
+   const data=await r.json();
+   if(!r.ok)throw Error(data?.error||'CHAT_SIGN_IN_REQUEST_FAILED');
+   el('privatePassword').value='';setPrivatePasswordVisibility(false);
+   resetSessionRetry();showSignedIn(true);
    // Credentials were verified by the server; don't block the login control
    // behind unrelated endpoints and don't fetch a hidden page's Chat archive.
    if(realityCurrentRoute()==='chat'){
@@ -7478,7 +7520,20 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    }
    // Chat-first onboarding now asks for the owner's real goal in conversation.
    // Do not pop Settings over the transcript just because a first goal is missing.
-  }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
+  }catch(e){
+   const code=String(e?.message||'');
+   if(code==='CHAT_LOGIN_FAILED')
+    status('Reality could not verify the email and password. Use the eye icon to check what you entered, and confirm the account email.');
+   else if(['CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',
+     'CHAT_AUTH_PROVIDER_RESPONSE_UNVERIFIED',
+     'CHAT_LOGIN_IDENTITY_UNVERIFIED','CHAT_SESSION_UNAVAILABLE'].includes(code))
+    status('Reality’s sign-in service is temporarily unavailable. This does not mean your password is wrong. Your account was not changed; please retry the connection.');
+   else if(code==='CHAT_AUTH_RATE_LIMITED')
+    status('Sign-in attempts are temporarily limited. Try again after the service allows another attempt.');
+   else if(e?.name==='TimeoutError'||e?.name==='AbortError')
+    status('Reality’s account connection timed out. Your password may be correct; try again when the service recovers.');
+   else status('Reality could not complete sign-in: '+(code||'ACCOUNT_CONNECTION_UNAVAILABLE'));
+  }finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
   el('privateSignOut').disabled=true;
