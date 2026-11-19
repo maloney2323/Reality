@@ -444,3 +444,35 @@ test('only independent steps six/seven/eight may produce a same-shift completed 
  assert.equal(unverified.locate('realityChatMaintenanceNudge').hidden,true,
   'a final report without both independent maintenance steps is not proof');
 });
+
+test('owner Chat exposes executed maintenance stages, not a fabricated final repair',async()=>{
+ const current=runningOwnerMaintenance();
+ const sourceProof=HASH('e'),dispatch=HASH('f'),independent=HASH('a');
+ current.internal_maintenance_continuity.items[0]={
+  ...current.internal_maintenance_continuity.items[0],
+  signed_executor_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+  signed_executor_state:'COMPLETED',signed_executor_attempt_count:1,
+  ci_dispatch_receipt_sha256:dispatch,
+  ci_independent_diagnostic_receipt_sha256:independent,
+  ci_independent_artifact_digest:HASH('b'),
+  ci_independent_github_run_id:44633511608
+ };
+ current.internal_maintenance_continuity.items[1]={
+  ...current.internal_maintenance_continuity.items[1],
+  signed_executor_action:'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI',
+  signed_executor_state:'COMPLETED',
+  source_requalification_receipt_sha256:sourceProof
+ };
+ const v=setup({readback:current});await v.flush();
+ await v.click('realityChatMaintenanceWatch');await v.flush();
+ const screen=collectedText(v.locate('realityChatMaintenanceLive'));
+ assert.match(screen,/Source requalification:/);
+ assert.match(screen,/sha256:eeeeeeeeeeee/);
+ assert.match(screen,/Signed GitHub CI dispatch:/);
+ assert.match(screen,/sha256:ffffffffffff/);
+ assert.match(screen,/Independent GitHub diagnostics:/);
+ assert.match(screen,/44633511608/);
+ assert.match(screen,/original frozen RED still required/);
+ assert.match(screen,/No independently verified repair yet/);
+ assert.ok(v.calls.every(c=>c.options.method==='GET'));
+});
