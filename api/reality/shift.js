@@ -82,6 +82,22 @@ export async function persistShiftRecoveryStage(persistence, stage) {
   });
 }
 
+export function evaluateShiftLaunchReadiness({config,principalId,env=process.env}={}) {
+  const blockers=[];
+  if (!config?.enabled) blockers.push('SHIFT_CONFIGURATION_REQUIRED');
+  else if (!principalId || config.updated_by!==principalId) blockers.push('SHIFT_OWNER_SESSION_REQUIRED');
+  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) blockers.push('UNIVERSE_PERSISTENCE_CREDENTIAL_REQUIRED');
+  if (!env.REALITY_GITHUB_TOKEN) blockers.push('GITHUB_CONNECTOR_CREDENTIAL_REQUIRED');
+  if (!env.OPENAI_API_KEY) blockers.push('INTELLIGENCE_MODEL_CREDENTIAL_REQUIRED');
+  return Object.freeze({
+    status:blockers.length?'BLOCKED':'READY_TO_ATTEMPT',
+    blockers:Object.freeze(blockers),
+    // Credential presence is NOT successful provider verification.
+    live_connector_access_verified:false,
+    authority_for_external_work_not_inferred:true,
+  });
+}
+
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
   return res.status(status).json(body);
@@ -476,6 +492,13 @@ export default async function handler(req, res) {
         if (!config?.enabled || config.updated_by!==principal.principal_id) {
           return json(res,403,{ok:false,error:'CURRENT_SHIFT_OWNER_AUTHORIZATION_REQUIRED'});
         }
+        const readiness=evaluateShiftLaunchReadiness({
+          config,principalId:principal.principal_id,
+        });
+        if (readiness.status!=='READY_TO_ATTEMPT') {
+          return json(res,409,{ok:false,status:'PREFLIGHT_BLOCKED',readiness,
+            error:readiness.blockers.join(',')});
+        }
         const now=new Date();
         const local=localParts(now,config.timeZone || 'America/New_York');
         const alreadyActive=await readActiveManualShift(persistence,principal.principal_id,now);
@@ -548,6 +571,14 @@ export default async function handler(req, res) {
 
     if (!cronRequest(req)) {
       const config = await readConfig(persistence);
+      if (req.query?.readiness==='1') {
+        const principal=getOrCreateSessionPrincipal(req,res);
+        return json(res,200,{ok:true,runtime:'server_backed',
+          readiness:evaluateShiftLaunchReadiness({
+            config,principalId:principal.principal_id,
+          }),
+        });
+      }
       return json(res, 200, { ok: true, config, runtime: 'server_backed' });
     }
 
