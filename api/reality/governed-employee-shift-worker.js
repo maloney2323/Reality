@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import {shiftDatabase,shiftRpc,assertShiftReadback,
  isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
-import {processGovernedEmployeeShiftTick}
+import {processGovernedEmployeeShiftTick,isIsolatedOriginalProviderOutage}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
 import {createOneOpenAICombinedRoleCoordinator}
  from '../../src/reality-one-openai-combined-role-handoff-v1.js';
@@ -470,35 +470,17 @@ export default async function handler(req,res){
   }
   const newDevelopmentAdvanced=publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
+  // This lane already owns its signed ledger. A successful or blocked feature
+  // must not preempt the other employees in the same authorized shift.
+  let chatNewDevelopmentCheckpoint=null;
   if(newDevelopmentAdvanced){
-   // The old shift's pulse is only a worker-availability receipt. The newly
-   // generated development has its OWN source and independent proof ledger.
-   let pulse=null;
-   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
-    workerStage='CHAT_NEW_DEVELOPMENT_WAKE_DISPOSITION';
-    pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
-     p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
-     p_safe_result:'NEW_CHAT_DEVELOPMENT_SEPARATE_SIGNED_SOURCE'
-    });
-    if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-       pulse.shift_id!==wakeReceipt.shift_id||
-       pulse.installation_authorized!==false||
-       pulse.original_job_completed!==false||
-       pulse.production_changed!==false)
-     throw Error('CHAT_NEW_DEV_SIGNED_WAKE_DISPOSITION_UNVERIFIED');
-    if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-     durableWorkerCompletion=pulse;
-   }
-   workerStage='CHAT_NEW_DEVELOPMENT_BOUNDED_RESPONSE';
-   return res.status(200).json({
-    status:'SIGNED_CHAT_NEW_DEVELOPMENT_BOUNDED_TICK',
-    development_result:newDevelopmentAdvanced&&
-      publisherProgress.has(chatNewPublished.status)?chatNewPublished:chatNewBuild,
-    original_job_completed:false,new_shift_started:false,
-    installation_authorized:false,production_changed:false,
-    worker_wake_receipt:wakeReceipt,
-    ...(pulse?{worker_completion_receipt:pulse}:{})
-   });
+   chatNewDevelopmentCheckpoint={
+    status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
+    development_result:publisherProgress.has(chatNewPublished.status)?
+     chatNewPublished:chatNewBuild,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   };
   }
   // Existing original-job shift work continues on normal wakes, including
   // while a new feature awaits independent GitHub CI or reconciliation.
@@ -513,6 +495,7 @@ export default async function handler(req,res){
    .catch(()=>null);
   // A completed bounded check is not a completed customer job; every lane
   // still records its own durable worker outcome before responding.
+  let boundedCorrectiveCheckpoint=null;
   if(isBoundedCorrectiveProofWake(wakeReceipt,boundedCorrectiveScope)){
    workerStage='CORRECTIVE_CI_BOUNDED';
    const corrective=await continueRileyCorrectiveModelIntoIndependentCI({
@@ -523,36 +506,20 @@ export default async function handler(req,res){
     production_changed:false,new_shift_started:false
    }));
    const classification=classifyCorrectiveProofTick(corrective);
-   workerStage='CORRECTIVE_CI_RECEIPT';
-   const pulse=await shiftRpc(db,
-    'reality_record_employee_shift_worker_pulse_v1',{
-     p_shift_id:wakeReceipt.shift_id,
-     p_status:classification.worker_status,
-     p_safe_result:classification.worker_result,
-    });
-   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-      pulse.shift_id!==wakeReceipt.shift_id||
-      pulse.installation_authorized!==false||
-      pulse.production_changed!==false)
-    throw Error('BOUNDED_CORRECTIVE_WORKER_PULSE_READBACK_UNVERIFIED');
-   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-    durableWorkerCompletion=pulse;
-   workerStage='BOUNDED_WORKER_RESPONSE_PUBLICATION';
-   return res.status(classification.http_status).json({
+   boundedCorrectiveCheckpoint={
     status:'BOUNDED_OWNER_SHIFT_CORRECTIVE_CI_RECONCILED',
-    original_job_completed:false,
-    independent_ci_proof_verified:classification.proof_verified,
-    bounded_worker_wake_receipt:wakeReceipt,
-    bounded_worker_completion_receipt:pulse,
     corrective_ci_result:corrective,
-    new_shift_started:false,installation_authorized:false,
-    production_changed:false
-   });
+    independent_ci_proof_verified:classification.proof_verified,
+    independent_ci_verified:classification.proof_verified,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   };
   }
   // Existing Governed Auto-Trigger: separately qualified independent
   // failure can lease ONE new repair attempt on the SAME authorized original.
   // The bounded model stage records only a proposed edit; subsequent frozen
   // independent CI, exact install approval and final settlement remain gated.
+  let sameOriginalRecoveryCheckpoint=null;
   let sameOriginalRecovery={
    status:'NO_SAME_ORIGINAL_RECOVERY_ON_THIS_WORKER_WAKE',
    original_job_completed:false,installation_authorized:false,
@@ -571,37 +538,17 @@ export default async function handler(req,res){
    if(['SAME_ORIGINAL_RECOVERY_PATCH_RECORDED',
        'RECOVERY_PROVIDER_OR_EVIDENCE_UNVERIFIED_NO_REPLAY']
        .includes(sameOriginalRecovery.status)){
-    workerStage='SAME_ORIGINAL_RECOVERY_DURABLE_RECEIPT';
-    const recoveryCompleted=
-     sameOriginalRecovery.status==='SAME_ORIGINAL_RECOVERY_PATCH_RECORDED';
-    const pulse=await shiftRpc(db,
-     'reality_record_employee_shift_worker_pulse_v1',{
-      p_shift_id:wakeReceipt.shift_id,
-      p_status:recoveryCompleted?'WAKE_COMPLETED':'WAKE_FAILED',
-      p_safe_result:recoveryCompleted?
-       'SAME_ORIGINAL_RECOVERY_PATCH_AWAITING_INDEPENDENT_CI':
-       'SAME_ORIGINAL_RECOVERY_PROOF_UNVERIFIED'
-     });
-    if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-       pulse.shift_id!==wakeReceipt.shift_id||
-       pulse.installation_authorized!==false||
-       pulse.production_changed!==false)
-     throw Error('SAME_ORIGINAL_RECOVERY_WORKER_PULSE_UNVERIFIED');
-    if(recoveryCompleted&&
-       isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-     durableWorkerCompletion=pulse;
-    workerStage='SAME_ORIGINAL_RECOVERY_RESPONSE_PUBLICATION';
-    return res.status(recoveryCompleted?200:503).json({
-     status:recoveryCompleted?
-      'GOVERNED_SAME_ORIGINAL_RECOVERY_PATCH_RECORDED':
-      'GOVERNED_SAME_ORIGINAL_RECOVERY_UNVERIFIED',
-     same_original_recovery_attempt:sameOriginalRecovery,
-     actual_worker_wake_receipt:wakeReceipt,
-     actual_worker_completion_receipt:pulse,
+    // Failure belongs to this original, not the whole shift. Retain its
+    // durable repair ledger, without declaring a worker or job completed.
+    sameOriginalRecoveryCheckpoint={
+     status:sameOriginalRecovery.status,
+     next_action:sameOriginalRecovery.status==='SAME_ORIGINAL_RECOVERY_PATCH_RECORDED'?
+      'SAME_ORIGINAL_RECOVERY_PATCH_AWAITING_INDEPENDENT_CI':
+      'SAME_ORIGINAL_RECOVERY_PROOF_UNVERIFIED',
      independent_tests_passed:false,original_job_completed:false,
      new_shift_started:false,installation_authorized:false,
      production_changed:false
-    });
+    };
    }
   }
   // The EXISTING corrective broker now accepts v2 evidence-bound repair
@@ -613,7 +560,9 @@ export default async function handler(req,res){
   const recoveryCiScope=await shiftRpc(db,
    'reality_read_next_same_original_recovery_candidate_v2',{})
    .catch(()=>null);
-  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+  let sameOriginalRecoveryCiCheckpoint=null;
+  if(!boundedCorrectiveCheckpoint&&
+     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      recoveryCiScope?.status==='SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI'&&
      recoveryCiScope.shift_id===wakeReceipt.shift_id&&
      /^[a-f0-9-]{36}$/i.test(recoveryCiScope.attempt_id||'')&&
@@ -645,33 +594,17 @@ export default async function handler(req,res){
      {worker_status:'WAKE_FAILED',
       worker_result:'CORRECTIVE_PROOF_BOUNDARY_UNVERIFIED',
       http_status:503,proof_verified:false};
-   workerStage='SAME_ORIGINAL_RECOVERY_CI_PULSE';
-   const pulse=await shiftRpc(db,
-    'reality_record_employee_shift_worker_pulse_v1',{
-     p_shift_id:wakeReceipt.shift_id,
-     p_status:classification.worker_status,
-     p_safe_result:classification.worker_result
-    });
-   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-      pulse.shift_id!==wakeReceipt.shift_id||
-      pulse.installation_authorized!==false||
-      pulse.production_changed!==false)
-    throw Error('SAME_ORIGINAL_RECOVERY_CI_PULSE_UNVERIFIED');
-   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-    durableWorkerCompletion=pulse;
-   workerStage='SAME_ORIGINAL_RECOVERY_CI_RESPONSE_PUBLICATION';
-   return res.status(classification.http_status).json({
+   sameOriginalRecoveryCiCheckpoint={
     status:'GOVERNED_SAME_ORIGINAL_RECOVERY_CI_RECONCILED',
     original_work_id:recoveryCiScope.original_work_id,
     attempt_id:recoveryCiScope.attempt_id,
     attempt_number:recoveryCiScope.attempt_number,
-    same_original_recovery_ci:retryCi,
+    corrective_ci_result:retryCi,
+    independent_ci_proof_verified:classification.proof_verified,
     independent_ci_verified:classification.proof_verified,
-    actual_worker_wake_receipt:wakeReceipt,
-    actual_worker_completion_receipt:pulse,
     original_job_completed:false,new_shift_started:false,
     installation_authorized:false,production_changed:false
-   });
+   };
   }
   // Evidence-backed transition from verified corrective CI into the same
   // original's eventual owner install decision. This READS provider evidence
@@ -800,13 +733,17 @@ export default async function handler(req,res){
   // a protected isolated candidate branch and a real GitHub frozen CI run.
   // This work is service-only, can be reconciled after uncertainty, and runs
   // concurrently with already-authorized work, without a second Start.
-  const correctiveCiPromise=continueRileyCorrectiveModelIntoIndependentCI({
-   db,env:process.env,fetchImpl:fetch
-  }).catch(()=>({
-   status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
-   original_job_completed:false,installation_authorized:false,
-   production_changed:false,new_shift_started:false
-  }));
+  const correctiveCiPromise=boundedCorrectiveCheckpoint?
+   Promise.resolve(boundedCorrectiveCheckpoint.corrective_ci_result):
+   sameOriginalRecoveryCiCheckpoint?
+   Promise.resolve(sameOriginalRecoveryCiCheckpoint.corrective_ci_result):
+   continueRileyCorrectiveModelIntoIndependentCI({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   }));
   
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
@@ -901,6 +838,17 @@ export default async function handler(req,res){
   workerStage='GOVERNED_EXECUTION_TICK';
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
+  }).catch(error=>{
+   // Current shift graph has already passed owner/identity validation.
+   // Preserve the uncertain original, never replay its side effect here.
+   // An unavailable database remains a whole-worker infrastructure failure.
+   if(!isIsolatedOriginalProviderOutage(error))throw error;
+   console.warn('REALITY_SHIFT_ONE_ORIGINAL_PROVIDER_UNAVAILABLE');
+   return {ok:false,
+    status:'EXACT_SHIFT_ORIGINAL_TICK_BLOCKED_OTHER_WORK_CONTINUES',
+    shift_id:initialGraph.shift_id,original_job_completed:false,
+    original_job_retried:false,new_shift_started:false,
+    installation_authorized:false,production_changed:false};
   });
   // A source-checked commit-triage observation only becomes a durable original
   // after independent provider GET and service-only warrant/proof readback.
@@ -1747,6 +1695,10 @@ export default async function handler(req,res){
     incident_existing_original_handoff:incidentOriginalHandoff,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
+    same_original_recovery_checkpoint:sameOriginalRecoveryCheckpoint,
+    same_original_recovery_ci_checkpoint:sameOriginalRecoveryCiCheckpoint,
+    chat_new_development_checkpoint:chatNewDevelopmentCheckpoint,
+    corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
     generalized_original_acceptance_push_preflight:generalOriginalAcceptancePush,
