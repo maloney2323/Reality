@@ -101,10 +101,15 @@ export async function independentlyReviewOneStagedMaintenanceRegression({
   jobs.jobs.filter(x=>x.id===scope.github_red_job_id):[];
  const green=Array.isArray(jobs?.jobs)?
   jobs.jobs.filter(x=>x.id===scope.github_green_job_id):[];
+ const runUrl='https://github.com/maloney2323/Reality/actions/runs/'+scope.github_run_id;
+ const workflowText=workflowBlob?.encoding==='base64'&&
+    typeof workflowBlob.content==='string'?
+    Buffer.from(workflowBlob.content.replace(/\s/g,''),'base64').toString('utf8'):'';
  if(pr?.number!==scope.external_test_pr_number||
   pr?.head?.sha!==scope.github_head_sha||
   pr?.base?.repo?.full_name!=='maloney2323/Reality'||
   run?.id!==scope.github_run_id||
+  run?.html_url!==runUrl||runUrl!==scope.github_run_url||
   run?.head_sha!==scope.github_head_sha||
   run?.status!=='completed'||run?.conclusion!=='failure'||
   run?.event!=='pull_request'||
@@ -113,11 +118,19 @@ export async function independentlyReviewOneStagedMaintenanceRegression({
   testBlob?.path!==TEST||
   workflowBlob?.sha!==scope.frozen_workflow_blob_sha||
   workflowBlob?.path!==WORKFLOW||
+  !workflowText.includes('ref: '+scope.historical_source_commit_sha)||
+  !workflowText.includes('ref: '+scope.corrected_source_commit_sha)||
   red.length!==1||green.length!==1||
   red[0].name!=='historical-independent-red'||
   red[0].status!=='completed'||red[0].conclusion!=='failure'||
   green[0].name!=='repaired-independent-green'||
-  green[0].status!=='completed'||green[0].conclusion!=='success')
+  green[0].status!=='completed'||green[0].conclusion!=='success'||
+  !Array.isArray(red[0].steps)||!red[0].steps.some(s=>
+    s.name==='Historical code fails frozen owner-warrant and draft-source regression'&&
+    s.conclusion==='failure')||
+  !Array.isArray(green[0].steps)||!green[0].steps.some(s=>
+    s.name==='Repaired code passes exact same frozen regression'&&
+    s.conclusion==='success'))
   return safe('SIGNED_EXTERNAL_REVIEW_GITHUB_PROOF_MISMATCH',{
    maintenance_id:scope.maintenance_id,review_attempted:true});
  const receiptDigest='sha256:'+createHash('sha256').update(
