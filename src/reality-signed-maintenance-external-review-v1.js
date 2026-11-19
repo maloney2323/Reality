@@ -252,7 +252,8 @@ export async function independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
   'production_changed,repair_executed,schema,shift_id,'+
   'source_epoch_receipt_sha256,source_ref,worker_run_id';
  const triggerBlobSha=triggerBytes?createHash('sha1')
-  .update('blob '+triggerBytes.length+'\\0')
+  .update('blob '+triggerBytes.length)
+  .update(Buffer.from([0]))
   .update(triggerBytes).digest('hex'):null;
  if(triggerFile?.path!=='reality-maintenance-ci-triggers/'+
     scope.maintenance_id+'.json'||
