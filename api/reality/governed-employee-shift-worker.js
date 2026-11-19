@@ -123,6 +123,8 @@ import {advanceOneSignedInternalMaintenanceJob}
  from '../../src/reality-signed-internal-maintenance-worker-v1.js';
 import {reproduceOneSignedMaintenanceFailureBaseline}
  from '../../src/reality-signed-maintenance-failure-baseline-v1.js';
+import {executeOneRegisteredMaintenanceAction}
+ from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -497,40 +499,38 @@ export default async function handler(req,res){
      handoff_executed:false,independent_frozen_ci_red_verified:false,
      original_job_completed:false,installation_authorized:false,
      production_changed:false};
-  // Claim an exact warranted maintenance step on the existing shift.
-  // Claim is NOT execution; a downstream executor must independently prove CI.
-  workerStage='SIGNED_MAINTENANCE_EXECUTOR_CLAIM';
-  const signedMaintenanceExecutorClaim=
+  // Registered execution, not an empty claim-to-failure bridge:
+  // the service-role database first gates WHICH action has an executable
+  // handler. Unsupported frozen-CI work is never leased or charged retries.
+  // The currently registered action independently requalifies changed
+  // source ONLY; a full repair still needs real frozen CI and install approval.
+  workerStage='SIGNED_MAINTENANCE_REGISTERED_EXECUTOR_HANDOFF';
+  const signedMaintenanceExecutorHandoff=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
    process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
    /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')?
-    await shiftRpc(db,'reality_claim_signed_maintenance_executor_v1',{
-     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    await executeOneRegisteredMaintenanceAction({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
     }).catch(error=>({
-     status:'SIGNED_MAINTENANCE_EXECUTOR_CLAIM_FAILED',
-     error_code:String(error?.message||'CLAIM_RPC_UNAVAILABLE').slice(0,160),
-     handoff_executed:false,original_job_completed:false,
+     status:'SIGNED_MAINTENANCE_EXECUTOR_REQUALIFICATION_UNVERIFIED',
+     error_code:String(error?.message||'EXECUTOR_UNVERIFIED').slice(0,130),
+     repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false
     })):
     {status:'SIGNED_MAINTENANCE_EXECUTOR_NOT_CONNECTED_OR_NO_AUTHORIZED_WAKE',
-     handoff_executed:false,original_job_completed:false,
+     repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
-  // Until a case-specific executor is registered, record the missing
-  // capability as a real failed handoff. Never report claim as execution.
-  workerStage='SIGNED_MAINTENANCE_EXECUTOR_FAILURE_RECONCILIATION';
+  const signedMaintenanceExecutorClaim=
+   signedMaintenanceExecutorHandoff.claim||{
+    status:signedMaintenanceExecutorHandoff.status,
+    handoff_executed:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false};
   const signedMaintenanceExecutorOutcome=
-   signedMaintenanceExecutorClaim?.status===
-    'SIGNED_MAINTENANCE_EXECUTOR_DURABLY_CLAIMED'?
-    await shiftRpc(db,'reality_record_signed_maintenance_executor_failure_v1',{
-     p_maintenance_id:signedMaintenanceExecutorClaim.maintenance_id,
-     p_worker_run_id:actualWorkerRunId,
-     p_error_code:'EXECUTOR_NOT_CONNECTED'
-    }).catch(()=>({status:'MAINTENANCE_FAILURE_RECORD_UNAVAILABLE',
-     repair_executed:false,original_job_completed:false,
-     production_changed:false})):
-    {status:'NO_MAINTENANCE_EXECUTOR_CLAIM_TO_RECONCILE',
-     repair_executed:false,original_job_completed:false,
-     production_changed:false};
+   signedMaintenanceExecutorHandoff.outcome||{
+    status:signedMaintenanceExecutorHandoff.status,
+    repair_executed:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false};
   // A claimed lease cannot be reported as executed or verified.
   // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
