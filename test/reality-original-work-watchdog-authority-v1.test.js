@@ -20,7 +20,7 @@ test('qualifying inquiries must belong to an exact original-warrant source step,
  assert.equal(matches.length,2,'both inquiry-count and representative-source sample must be authorized');
  assert.equal((originalLoop.match(/scoped->>'step_index'=signed_step\.step_index::text/g)||[]).length,2);
  assert.equal((originalLoop.match(/signed_step\.step_index between 2 and 5/g)||[]).length,2);
- assert.equal((originalLoop.match(/warrant\.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'/g)||[]).length,2);
+ assert.equal((originalLoop.match(/and warrant\.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'/g)||[]).length,2);
  assert.match(originalLoop,/not exists\(\s*select 1 from reality_internal\.governed_employee_original_claims_v1 original/);
 });
 test('real blocked evidence job diagnosis remains unchanged and requires source-backed proof',()=>{
