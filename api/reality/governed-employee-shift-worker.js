@@ -145,6 +145,7 @@ export default async function handler(req,res){
  let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
  let workerStage='SHIFT_DB_BOUNDARY';
+ let shiftDbTransportUnreachable=false;
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
@@ -1806,11 +1807,18 @@ export default async function handler(req,res){
   }
   // Persist stage only; never provider error text or credentials.
   console.warn('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage);
+  // Classify transport failure without exposing RPC credentials or sending
+  // another database write while the boundary is demonstrably unavailable.
+  shiftDbTransportUnreachable=/^SHIFT_DATABASE_RPC_[A-Z0-9_]+_(TIMEOUT|UNAVAILABLE)$/
+    .test(String(error?.message||''));
+  if(shiftDbTransportUnreachable)
+   console.warn('REALITY_SHIFT_WORKER_DATABASE_TRANSPORT_UNAVAILABLE');
   const safeStage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
    workerStage:'UNCLASSIFIED_STAGE';
   // Best-effort independent failure timestamp; never claim a model/tool
   // succeeded, never take another job claim and never leak provider secrets.
-  if(activePulseDb&&/^[a-f0-9-]{36}$/i.test(activePulseShiftId||'')){
+  if(!shiftDbTransportUnreachable&&activePulseDb&&
+     /^[a-f0-9-]{36}$/i.test(activePulseShiftId||'')){
    try{
     await shiftRpc(activePulseDb,
      'reality_record_employee_shift_worker_pulse_v1',{
@@ -1826,7 +1834,7 @@ export default async function handler(req,res){
  }finally{
   // Independently attest actual completion or failure even when a worker
   // response has already been sent. No false 'successful job' claim.
-  if(actualWorkerRunId&&activePulseDb){
+  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
    const result=res.statusCode>=500?'FAILED':'COMPLETED';
    const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
     workerStage:'UNCLASSIFIED_STAGE';
