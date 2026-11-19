@@ -45,6 +45,14 @@ export function shiftDatabase(env=process.env){
  return db;
 }
 export const SHIFT_RPC_DEFAULT_TIMEOUT_MS=8000;
+export function isShiftDatabaseTransportUnreachable(error){
+ // The allowlisted RPC identifiers are lowercase reality_* names. This must
+ // match the error emitted by shiftRpc, otherwise failure handling can issue
+ // a second, ambiguous DB write during an outage.
+ return /^SHIFT_DATABASE_RPC_reality_[a-z0-9_]+_(TIMEOUT|UNAVAILABLE)$/
+  .test(String(error?.message||''));
+}
+
 // One signed worker can be invoked every minute. A stalled PostgREST call
 // must not occupy a Vercel worker for 300 seconds or stack duplicate wakes.
 export async function shiftRpc(db,rpc,payload,{
