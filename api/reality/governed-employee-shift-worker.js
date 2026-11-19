@@ -502,6 +502,7 @@ export default async function handler(req,res){
   workerStage='SIGNED_MAINTENANCE_EXECUTOR_CLAIM';
   const signedMaintenanceExecutorClaim=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
    /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')?
     await shiftRpc(db,'reality_claim_signed_maintenance_executor_v1',{
      p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
@@ -511,7 +512,7 @@ export default async function handler(req,res){
      handoff_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false
     })):
-    {status:'SIGNED_MAINTENANCE_EXECUTOR_NO_AUTHORIZED_WAKE',
+    {status:'SIGNED_MAINTENANCE_EXECUTOR_NOT_CONNECTED_OR_NO_AUTHORIZED_WAKE',
      handoff_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
   // Until a case-specific executor is registered, record the missing
