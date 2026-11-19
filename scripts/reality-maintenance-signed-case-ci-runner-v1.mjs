@@ -1,7 +1,7 @@
 // Independent GitHub Actions execution of a claim-bound maintenance diagnostic.
 // It deliberately does NOT convert a passing generic regression suite or
 // an ordinary failing CI run into the owner's case-specific frozen RED.
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,readdirSync,existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 const sha256=x=>'sha256:'+createHash('sha256').update(x).digest('hex');
@@ -13,19 +13,43 @@ const BRANCH='refs/heads/repair/maintenance-warrant-scope-handoff-20261119';
 const fail=x=>{throw Error('SIGNED_CASE_CI_'+x)};
 const env=process.env;
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!==BRANCH||!SHA.test(env.GITHUB_SHA||'')||
- env.GITHUB_EVENT_NAME!=='push')
+ !SHA.test(env.GITHUB_SHA||'')||
+ !['push','pull_request'].includes(env.GITHUB_EVENT_NAME))
  fail('EXACT_ISOLATED_SIGNED_ACTIONS_RUN_REQUIRED');
-const diff=spawnSync('git',['diff','--name-only','HEAD^','HEAD','--',
- 'reality-maintenance-ci-triggers/'],{encoding:'utf8',timeout:6000});
-if(diff.status!==0)fail('GIT_TRIGGER_CHANGESET_UNAVAILABLE');
-const changed=String(diff.stdout||'').trim().split('\n').filter(Boolean);
-if(changed.length!==1||
- !/^reality-maintenance-ci-triggers\/[a-f0-9-]{36}\.json$/.test(changed[0])){
- console.log('NO_CLAIM_BOUND_MAINTENANCE_CI_TRIGGER_ON_SOURCE_PUSH');
+const checked=spawnSync('git',['rev-parse','HEAD'],{
+ encoding:'utf8',timeout:6000});
+const sourceSha=String(checked.stdout||'').trim();
+if(checked.status!==0||!SHA.test(sourceSha))
+ fail('CHECKED_OUT_GITHUB_SOURCE_SHA_MISSING');
+if(env.GITHUB_EVENT_NAME==='push'){
+ if(env.GITHUB_REF!==BRANCH||env.GITHUB_SHA!==sourceSha)
+  fail('PUSH_PREVIEW_SOURCE_REF_UNVERIFIED');
+}else{
+ if(!env.GITHUB_EVENT_PATH||!env.GITHUB_HEAD_REF||
+   env.GITHUB_HEAD_REF!==BRANCH.slice('refs/heads/'.length)||
+   env.GITHUB_BASE_REF!=='reality/chat-direct-work-handoff-20261115')
+  fail('PR_ORIGINAL_SIGNED_BRANCH_REQUIRED');
+ const event=JSON.parse(readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
+ if(event.pull_request?.head?.repo?.full_name!=='maloney2323/Reality'||
+   event.pull_request.head.ref!==env.GITHUB_HEAD_REF||
+   event.pull_request.head.sha!==sourceSha||
+   event.pull_request.base?.repo?.full_name!=='maloney2323/Reality'||
+   event.pull_request.base.ref!==env.GITHUB_BASE_REF)
+  fail('PR_HEAD_AND_OWNER_REPOSITORY_MUST_MATCH');
+}
+const directory='reality-maintenance-ci-triggers';
+if(!existsSync(directory)){
+ console.log('NO_CLAIM_BOUND_MAINTENANCE_CI_TRIGGER_SOURCE');
  process.exit(0);
 }
-const path=changed[0];
+const changed=readdirSync(directory).filter(x=>x.endsWith('.json'));
+if(changed.length===0){
+ console.log('NO_CLAIM_BOUND_MAINTENANCE_CI_TRIGGER_SOURCE');
+ process.exit(0);
+}
+if(changed.length!==1||!UUID.test(changed[0].slice(0,-5)))
+ fail('EXACT_SINGLE_OWNER_SIGNED_MAINTENANCE_TRIGGER_REQUIRED');
+const path=directory+'/'+changed[0];
 const item=JSON.parse(readFileSync(path,'utf8'));
 if(item?.schema!=='reality-signed-maintenance-case-ci-trigger-v1'||
  !UUID.test(item.maintenance_id||'')||!UUID.test(item.shift_id||'')||
@@ -70,7 +94,7 @@ const receipt={
  source_epoch_receipt_sha256:item.source_epoch_receipt_sha256,
  source_proof_kind:item.historical_failure_kind,
  github_workflow_run_id:env.GITHUB_RUN_ID,
- repository_commit_sha:env.GITHUB_SHA,
+ repository_commit_sha:sourceSha,
  trigger_blob_sha256:sha256(scope),diagnostic_suites:suites,
  test_exit_code:run.status,tests:n('tests'),passed:n('pass'),failed:n('fail'),
  stdout_stderr_sha256:sha256(output),
