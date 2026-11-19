@@ -497,6 +497,25 @@ export default async function handler(req,res){
      handoff_executed:false,independent_frozen_ci_red_verified:false,
      original_job_completed:false,installation_authorized:false,
      production_changed:false};
+  // Claim an exact warranted maintenance step on the existing shift.
+  // Claim is NOT execution; a downstream executor must independently prove CI.
+  workerStage='SIGNED_MAINTENANCE_EXECUTOR_CLAIM';
+  const signedMaintenanceExecutorClaim=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')?
+    await shiftRpc(db,'reality_claim_signed_maintenance_executor_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_EXECUTOR_CLAIM_FAILED',
+     error_code:String(error?.message||'CLAIM_RPC_UNAVAILABLE').slice(0,160),
+     handoff_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'SIGNED_MAINTENANCE_EXECUTOR_NO_AUTHORIZED_WAKE',
+     handoff_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // A claimed lease cannot be reported as executed or verified.
+  // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
   // This is not a code repair. The first failure receipt remains immutable.
@@ -1906,6 +1925,7 @@ export default async function handler(req,res){
     signed_external_maintenance_review:signedExternalMaintenanceReview,
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
     durable_maintenance_handoff:durableMaintenanceHandoff,
+    signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
