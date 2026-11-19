@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
- shiftRpc,SHIFT_RPC_DEFAULT_TIMEOUT_MS
+ shiftRpc,SHIFT_RPC_DEFAULT_TIMEOUT_MS,isShiftDatabaseTransportUnreachable
 } from '../src/reality-governed-shift-boundary-v1.js';
 
 const db={url:'https://example.invalid',secretKey:'not-a-real-token'};
@@ -70,4 +70,23 @@ test('invalid transport deadline and unsupported RPC reject before any provider 
   timeoutMs:1000,fetchImpl
  }),/SHIFT_RPC_NOT_ALLOWLISTED/);
  assert.equal(calls,0);
+});
+
+
+test('real lower-case signed shift RPC timeout is recognized without another write',()=>{
+ assert.equal(isShiftDatabaseTransportUnreachable(
+  new Error('SHIFT_DATABASE_RPC_reality_record_signed_worker_actual_run_v1_TIMEOUT')
+ ),true);
+ assert.equal(isShiftDatabaseTransportUnreachable(
+  new Error('SHIFT_DATABASE_RPC_reality_record_signed_worker_actual_run_v1_UNAVAILABLE')
+ ),true);
+ assert.equal(isShiftDatabaseTransportUnreachable(
+  new Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE')
+ ),false);
+ assert.equal(isShiftDatabaseTransportUnreachable(
+  new Error('SHIFT_DATABASE_RPC_unsafe_arbitrary_rpc_TIMEOUT')
+ ),false);
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/shiftDbTransportUnreachable=isShiftDatabaseTransportUnreachable\(error\)/);
+ assert.match(worker,/!shiftDbTransportUnreachable/);
 });
