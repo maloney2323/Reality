@@ -1,0 +1,19 @@
+name: Reality signed maintenance advances past source drift
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261119193000_maintenance_ci_continue_after_epoch_v1.sql'
+      - 'test/reality-maintenance-ci-next-eligible-v1.test.js'
+      - '.github/workflows/reality-maintenance-ci-next-eligible-v1.yml'
+permissions:
+  contents: read
+jobs:
+  no-repeat-signed-maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify source-epoch continuity and next eligible maintenance selection
+        run: node --test test/reality-maintenance-ci-next-eligible-v1.test.js
