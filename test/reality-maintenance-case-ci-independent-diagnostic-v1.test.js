@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {independentlyReviewOneClaimBoundMaintenanceCiDiagnostic as review}
  from '../src/reality-signed-maintenance-external-review-v1.js';
 const shift='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
@@ -8,7 +9,7 @@ const maintenance='b7181e5b-a01c-4cb2-b191-10dea9dbe04f';
 const oldWorker='a6c2ad3c-9ae9-4c9e-b3cb-2cf00b59d1aa';
 const newWorker='aaaabbbb-cccc-4ddd-8eee-ffffffffffff';
 const trigger='046186de28b7ab634ad3c75e64ee7ef09475f6dc';
-const head='95a8f31780fc90f6ffe0f97b698a6d6f9e80e572';
+const head=trigger;
 const hash=x=>'sha256:'+x.repeat(64);
 const runId=44633511608,artifactId=14581204621;
 const digest='sha256:1e414f302fff9cd3c1ba3302b63fe2b504fcc86b01e8b6f9b5379bc3c89a5d32';
@@ -22,6 +23,18 @@ const scope={status:'SIGNED_MAINTENANCE_DIAGNOSTIC_NEEDS_INDEPENDENT_GITHUB_RECH
  read_only:true,frozen_ci_red_verified:false,repair_executed:false,
  original_job_completed:false,installation_authorized:false,production_changed:false};
 const runner=readFileSync(new URL('../scripts/reality-maintenance-signed-case-ci-runner-v1.mjs',import.meta.url),'utf8');
+const triggerItem={
+ schema:'reality-signed-maintenance-case-ci-trigger-v1',
+ maintenance_id:maintenance,shift_id:shift,worker_run_id:oldWorker,
+ source_ref:scope.source_ref,source_epoch_receipt_sha256:scope.source_epoch_receipt_sha256,
+ historical_failure_kind:'HISTORICAL_ZERO_ORIGINAL_CLAIMS_WITH_SIGNED_INQUIRIES',
+ frozen_ci_red_verified:false,repair_executed:false,
+ original_job_completed:false,installation_authorized:false,
+ production_changed:false
+};
+const triggerBytes=Buffer.from(JSON.stringify(triggerItem,null,2)+'\n');
+const triggerGitBlob=createHash('sha1').update('blob '+triggerBytes.length)
+ .update(Buffer.from([0])).update(triggerBytes).digest('hex');
 const providers={
  list:{workflow_runs:[{id:runId,name:'Reality registered signed maintenance executor',
    path:'.github/workflows/reality-registered-signed-maintenance-executor-v1.yml',
@@ -42,7 +55,9 @@ const providers={
  source:{path:'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs',
   sha:'a'.repeat(40),encoding:'base64',
   content:Buffer.from(runner).toString('base64')},
- compare:{status:'ahead',merge_base_commit:{sha:trigger},ahead_by:4}
+ trigger:{path:'reality-maintenance-ci-triggers/'+maintenance+'.json',
+  sha:triggerGitBlob,encoding:'base64',
+  content:triggerBytes.toString('base64')}
 };
 const saved={status:'SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEWED_CASE_RED_STILL_REQUIRED',
  maintenance_id:maintenance,shift_id:shift,
@@ -67,7 +82,8 @@ function mock({scoped=scope,provider=providers,record=saved}={}){
    const pick=url.includes('/actions/runs?')?provider.list:
     url.includes('/jobs?')?provider.jobs:
     url.includes('/artifacts?')?provider.artifacts:
-    url.includes('/compare/')?provider.compare:provider.source;
+    url.includes('/contents/reality-maintenance-ci-triggers/')?provider.trigger:
+    provider.source;
    return {ok:true,json:async()=>pick};
   }
  };
@@ -94,14 +110,28 @@ test('separate signed worker verifies real GitHub job and artifact, records diag
  assert.equal(f.calls[1].args.p_worker_run_id,newWorker);
  assert.equal(f.urls.length,5);
 });
-test('wrong run ancestry is blocked before any durable receipt',async()=>{
- const f=mock({provider:{...providers,compare:{...providers.compare,
-  merge_base_commit:{sha:'f'.repeat(40)}}}});
+test('unrelated CI commits are not the exact signed maintenance trigger',async()=>{
+ const wrong={...providers.list,workflow_runs:
+  providers.list.workflow_runs.map(x=>({...x,head_sha:'f'.repeat(40)}))};
+ const f=mock({provider:{...providers,list:wrong}});
  const result=await review({db,env,shiftId:shift,workerRunId:newWorker,...f});
- assert.equal(result.status,'MAINTENANCE_CI_DIAGNOSTIC_TRIGGER_ANCESTRY_UNVERIFIED');
+ assert.equal(result.status,'MAINTENANCE_CI_DIAGNOSTIC_INDEPENDENT_RUN_NOT_YET_FOUND');
  assert.equal(result.original_job_completed,false);
  assert.deepEqual(f.calls.map(x=>x.name),
   ['reality_read_next_signed_maintenance_ci_diagnostic_v1']);
+});
+test('an artifact for the wrong maintenance identity cannot be reconciled',async()=>{
+ const forged={...triggerItem,
+  maintenance_id:'05d1e1a9-8f9e-43a5-94ba-acd367cc2611'};
+ const bytes=Buffer.from(JSON.stringify(forged,null,2)+'\n');
+ const sha=createHash('sha1').update('blob '+bytes.length)
+  .update(Buffer.from([0])).update(bytes).digest('hex');
+ const f=mock({provider:{...providers,trigger:{...providers.trigger,
+  sha,content:bytes.toString('base64')}}});
+ const result=await review({db,env,shiftId:shift,workerRunId:newWorker,...f});
+ assert.equal(result.status,'MAINTENANCE_CI_DIAGNOSTIC_SIGNED_TRIGGER_IDENTITY_UNVERIFIED');
+ assert.equal(result.original_job_completed,false);
+ assert.equal(f.calls.length,1);
 });
 test('missing artifact is not evidence of diagnostic execution',async()=>{
  const f=mock({provider:{...providers,artifacts:{artifacts:[]}}});
