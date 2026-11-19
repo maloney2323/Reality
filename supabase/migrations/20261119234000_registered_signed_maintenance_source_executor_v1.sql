@@ -111,7 +111,7 @@ create or replace function public.reality_record_signed_maintenance_source_requa
  p_maintenance_id uuid,p_worker_run_id uuid,p_provider_sha256 text,
  p_checked_at timestamptz)
  returns jsonb language plpgsql set search_path to '' as $fn$
-declare c record;e record;m record;v_receipt text;v_now timestamptz;
+declare c record;e record;v_receipt text;v_now timestamptz;
 begin
  v_now:=pg_catalog.clock_timestamp();
  if current_user<>'service_role' or p_maintenance_id is null or
@@ -132,7 +132,7 @@ begin
   and epoch_status='SOURCE_EPOCH_CHANGED_REQUALIFICATION_REQUIRED'
   and worker_run_id<>p_worker_run_id;
  if not found then raise exception 'MAINTENANCE_SOURCE_REQUALIFICATION_PREVIOUS_SIGNED_EPOCH_REQUIRED';end if;
- select m.* into m from reality_internal.owner_internal_maintenance_jobs_v1 m
+ perform 1 from reality_internal.owner_internal_maintenance_jobs_v1 m
  join reality_internal.governed_employee_shifts_v1 s
   on s.shift_id=c.shift_id and s.owner_id=c.owner_id
  join reality_internal.governed_employee_completion_warrants_v1 w
