@@ -63,6 +63,9 @@ async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}
   const evidence={
    kind:'PULL_REQUEST_CHANGESET_OBSERVED',
    head_sha:headSha,base_sha:baseSha,changed_file_count:total,
+   // Source evidence records whether GitHub itself considers this PR draft.
+   // An absent or invalid draft state is UNKNOWN, never 'ready to review'.
+   draft:typeof data.draft==='boolean'?data.draft:null,
    files:[],review_coverage:'PATCH_UNAVAILABLE'
   };
   if(includePatch&&state==='OPEN_PULL_REQUEST'&&headSha){
