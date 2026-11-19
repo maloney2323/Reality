@@ -51,6 +51,7 @@ jobs:
           node --check scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
           node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
       - name: Run independent claim-bound case-CI diagnostics on GitHub trigger
+        if: github.event_name == 'push'
         run: node scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
       - name: Preserve independent diagnostic artifact without claiming RED
         if: always()
