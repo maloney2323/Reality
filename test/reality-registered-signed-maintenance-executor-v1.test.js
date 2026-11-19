@@ -140,6 +140,11 @@ test('worker is actually wired to registered action and SQL cannot report code r
   import.meta.url),'utf8');
  assert.match(worker,/executeOneRegisteredMaintenanceAction\(\{/);
  assert.match(worker,/REALITY_MAINTENANCE_EXECUTOR_CONNECTED/);
+ const trustedRpc=readFileSync(new URL(
+  '../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ assert.match(trustedRpc,/claim_registered_maintenance_action_v2/);
+ assert.match(trustedRpc,/record_signed_maintenance_source_requalification_v1/);
+
  assert.doesNotMatch(worker,/p_error_code:'EXECUTOR_NOT_CONNECTED'/);
  assert.match(sql,/reality_claim_signed_maintenance_executor_v1\(/);
  assert.match(sql,/v_next_action<>p_registered_action/);
