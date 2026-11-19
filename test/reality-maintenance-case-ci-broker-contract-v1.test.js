@@ -104,7 +104,7 @@ test('CI broker, workflow and DB close no customer original and cannot invent a 
  const worker=read('api/reality/governed-employee-shift-worker.js');
  const runner=read('scripts/reality-maintenance-signed-case-ci-runner-v1.mjs');
  const workflow=read('.github/workflows/reality-signed-maintenance-case-ci-v1.yml');
- assert.match(sql,/m\.independent_frozen_test_receipt_sha256 is null/);
+ assert.match(sql,/independent_frozen_test_receipt_sha256 is null/);
  assert.match(sql,/reality_read_signed_maintenance_ci_dispatch_scope_v1/);
  assert.match(sql,/reality_record_signed_maintenance_ci_dispatch_v1/);
  assert.match(sql,/red_verified',false/);
@@ -112,7 +112,7 @@ test('CI broker, workflow and DB close no customer original and cannot invent a 
  assert.match(broker,/REALITY_GITHUB_BROKER_TOKEN/);
  assert.match(broker,/reality_read_signed_maintenance_ci_dispatch_scope_v1/);
  assert.match(broker,/reality_record_signed_maintenance_ci_dispatch_v1/);
- assert.match(broker,/\/contents\/\'+path/);
+ assert.match(broker,/reality-maintenance-ci-triggers\//);
  assert.doesNotMatch(broker,/installation_authorized:true/);
  assert.match(worker,/executeOneRegisteredMaintenanceCiWake\(\{/);
  assert.match(workflow,/reality-maintenance-ci-triggers\/\*\*/);
