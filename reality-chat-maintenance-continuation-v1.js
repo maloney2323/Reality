@@ -393,6 +393,10 @@
    line('Signed worker wakes:',String(a.worker_wake_count));
    if(Number.isFinite(Date.parse(a.last_worker_seen_at||'')))
     line('Last worker contact:',new Date(a.last_worker_seen_at).toLocaleString());
+   if(typeof a.last_worker_safe_result==='string'&&
+      /^[A-Z][A-Z0-9_]{4,150}$/.test(a.last_worker_safe_result))
+    line('Last verified worker disposition:',
+     a.last_worker_safe_result.replaceAll('_',' ').toLowerCase());
   }else{
    line('Worker progress:', 'No independently verified live worker activity in this readback.');
   }
