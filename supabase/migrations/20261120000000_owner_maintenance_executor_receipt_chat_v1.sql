@@ -78,5 +78,4 @@ begin
   'count',pg_catalog.jsonb_array_length(items),'items',items,
   'shift_started_by_read',false,'owner_authority_granted_by_read',false,
   'customer_jobs_completed_by_read',0,'production_changed',false);
-end $function$
-
+end $function$;
