@@ -510,6 +510,7 @@ export default async function handler(req,res){
     status:'BOUNDED_OWNER_SHIFT_CORRECTIVE_CI_RECONCILED',
     corrective_ci_result:corrective,
     independent_ci_proof_verified:classification.proof_verified,
+    independent_ci_verified:classification.proof_verified,
     original_job_completed:false,installation_authorized:false,
     production_changed:false,new_shift_started:false
    };
@@ -600,6 +601,7 @@ export default async function handler(req,res){
     attempt_number:recoveryCiScope.attempt_number,
     corrective_ci_result:retryCi,
     independent_ci_proof_verified:classification.proof_verified,
+    independent_ci_verified:classification.proof_verified,
     original_job_completed:false,new_shift_started:false,
     installation_authorized:false,production_changed:false
    };
