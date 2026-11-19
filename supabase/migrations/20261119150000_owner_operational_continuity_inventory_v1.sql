@@ -97,7 +97,7 @@ begin
     where owner_id=p_owner_id order by created_at desc limit 25) s),'[]'::jsonb),
   'work_installation_authorized_by_read',false,
   'verified_human_hours_saved',null,'production_changed',false);
-end $function$
+end $function$;
 
 CREATE OR REPLACE FUNCTION public.reality_read_owner_qualified_employee_evidence_jobs_v1(p_owner_id uuid)
  RETURNS jsonb
@@ -144,7 +144,7 @@ begin
   'owner_id',p_owner_id,'owner_scope_verified',true,'read_only',true,
   'counts',counts,'items',items,'installation_authorized_by_read',false,
   'original_customer_job_completed_by_read',false,'production_changed',false);
-end $function$
+end $function$;
 
 
 -- A read-only lens over existing ledger, calendar, and maintenance tables.
