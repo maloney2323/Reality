@@ -1739,8 +1739,21 @@ export default async function handler(req,res){
      fencedOriginalInvestigationState.original_job_completed===false&&
      fencedOriginalInvestigationState.independently_tested===false&&
      fencedOriginalInvestigationState.external_retry_authorized===false);
+   // A signed independent evidence review does not complete a repair.
+   // Propagate the SAME original's remaining authority and test blocker into
+   // the existing owner shift pulse; do not lose it behind generic "not due".
+   const signedReviewStillNeedsOriginalAuthorization=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_NOT_AUTHORIZED_BY_MAINTENANCE_SHIFT'&&
+    /^sha256:[a-f0-9]{64}$/.test(
+      sameOriginalPostmaintenanceGate.signed_external_review_receipt_sha256||'')&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.independent_final_receipt_verified===false&&
+    sameOriginalPostmaintenanceGate.case_specific_maintenance_ci_red_attested===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    signedReviewStillNeedsOriginalAuthorization?
+    'SIGNED_EVIDENCE_REVIEWED_ORIGINAL_WORK_BLOCKED_BY_WARRANT':
     generalOriginalRecoveryPublication?.source_installed===true?
     'GENERAL_ORIGINAL_SOURCE_INSTALLED_POSTINSTALL_RECEIPT_PENDING':
     generalOriginalRecoveryPublication?.status===
