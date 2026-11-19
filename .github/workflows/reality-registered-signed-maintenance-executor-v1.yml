@@ -6,6 +6,9 @@ on:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'src/reality-signed-maintenance-external-review-v1.js'
+      - 'supabase/migrations/20261119235900_signed_maintenance_case_ci_independent_review_v1.sql'
+      - 'test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js'
       - 'supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts'
       - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
       - 'reality-maintenance-ci-triggers/**'
@@ -21,6 +24,9 @@ on:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'src/reality-signed-maintenance-external-review-v1.js'
+      - 'supabase/migrations/20261119235900_signed_maintenance_case_ci_independent_review_v1.sql'
+      - 'test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js'
       - 'supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts'
       - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
@@ -52,6 +58,8 @@ jobs:
           node --check src/reality-signed-maintenance-case-ci-executor-v1.js
           node --check scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
           node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
+          node --check src/reality-signed-maintenance-external-review-v1.js
+          node --test test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js
       - name: Run independent claim-bound case-CI diagnostics on GitHub trigger
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: node scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
