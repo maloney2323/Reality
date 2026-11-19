@@ -1,0 +1,22 @@
+name: Reality Shift Never Stops for One Blocked Job
+on:
+  push:
+    branches:
+      - fix/reality-shift-nonblocking-recovery-20261118
+  pull_request:
+    branches:
+      - reality/chat-direct-work-handoff-20261115
+permissions:
+  contents: read
+jobs:
+  shift-nonblocking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check signed worker code
+        run: node --check api/reality/governed-employee-shift-worker.js && node --check src/reality-governed-employee-shift-worker-v1.js
+      - name: Test recovery and shift continuation without bypassing governance
+        run: node --test test/reality-shift-nonblocking-recovery-v1.test.js test/reality-signed-shift-db-stall-recovery-v1.test.js test/reality-signed-worker-actual-receipts-v1.test.js
