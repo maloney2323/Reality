@@ -122,3 +122,115 @@ test('CI broker, workflow and DB close no customer original and cannot invent a 
  assert.match(runner,/original_job_completed:false/);
  assert.match(runner,/production_changed:false/);
 });
+
+test('same authorized PR #308 advances from completed source requalification to signed CI',async()=>{
+ const stageId='05d1e1a9-8f9e-43a5-94ba-acd367cc2611';
+ const ref='https://github.com/maloney2323/Reality/pull/308';
+ const sourceReceipt='sha256:'+'c'.repeat(64);
+ const currentSource='sha256:'+'d'.repeat(64);
+ const oldRun='aaaaaaa0-0000-4000-8000-000000000001';
+ const no={status:'NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR',
+  original_job_completed:false,repair_executed:false,
+  installation_authorized:false,production_changed:false};
+ const stage={status:'SIGNED_REQUALIFIED_MAINTENANCE_CI_NEEDS_FRESH_SOURCE',
+  maintenance_id:stageId,shift_id:shift,
+  owner_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
+  original_requalification_worker_run_id:oldRun,source_ref:ref,
+  source_epoch_receipt_sha256:hash,
+  source_requalification_receipt_sha256:sourceReceipt,
+  requalified_provider_sha256:currentSource,
+  claim_consumed:false,frozen_ci_red_verified:false,repair_executed:false,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false};
+ const lease={...claim,maintenance_id:stageId,source_ref:ref,
+  source_requalification_receipt_sha256:sourceReceipt,
+  requalified_provider_sha256:currentSource};
+ const resultReceipt={...receipt,maintenance_id:stageId,source_ref:ref};
+ const calls=[],requests=[],reads=[];
+ const call=async(_db,name,args)=>{
+  calls.push({name,args});
+  if(name==='reality_claim_registered_maintenance_action_v2')return no;
+  if(name==='reality_read_requalified_maintenance_ci_preflight_v1')return stage;
+  if(name==='reality_promote_requalified_maintenance_to_ci_claim_v1')
+   return lease;
+  throw Error('UNEXPECTED_REQUAL_CI_RPC_'+name);
+ };
+ const readSource=async value=>{
+  reads.push(value);
+  return {source_ref:ref,provider_proof_sha256:currentSource,
+   checked_at:new Date().toISOString()};
+ };
+ const fetchImpl=async (url,opts)=>{
+  requests.push({url,opts});
+  return {ok:true,json:async()=>({...resultReceipt})};
+ };
+ const result=await execute({db,env,shiftId:shift,workerRunId:run,
+  call,readSource,fetchImpl});
+ assert.equal(result.case_ci_dispatch_confirmed,true);
+ assert.equal(result.repair_executed,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.maintenance_id,stageId);
+ assert.deepEqual(reads,[ref,ref]);
+ assert.deepEqual(calls.map(c=>c.name),[
+  'reality_claim_registered_maintenance_action_v2',
+  'reality_read_requalified_maintenance_ci_preflight_v1',
+  'reality_promote_requalified_maintenance_to_ci_claim_v1']);
+ assert.equal(calls[2].args.p_provider_sha256,currentSource);
+ assert.equal(requests.length,1);
+ assert.equal(JSON.parse(requests[0].opts.body).maintenance_id,stageId);
+});
+test('source drift after a legitimate requalification preserves the old receipt and spends zero retries',async()=>{
+ const no={status:'NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR',
+  original_job_completed:false,repair_executed:false,
+  installation_authorized:false,production_changed:false};
+ const pre={status:'SIGNED_REQUALIFIED_MAINTENANCE_CI_NEEDS_FRESH_SOURCE',
+  maintenance_id:'05d1e1a9-8f9e-43a5-94ba-acd367cc2611',shift_id:shift,
+  owner_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
+  original_requalification_worker_run_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  source_epoch_receipt_sha256:hash,
+  source_requalification_receipt_sha256:hash,
+  requalified_provider_sha256:hash,
+  claim_consumed:false,frozen_ci_red_verified:false,repair_executed:false,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false};
+ const calls=[],requests=[];
+ const result=await execute({db,env,shiftId:shift,workerRunId:run,
+  call:async(_db,name)=>{
+   calls.push(name);
+   if(name==='reality_claim_registered_maintenance_action_v2')return no;
+   if(name==='reality_read_requalified_maintenance_ci_preflight_v1')return pre;
+   throw Error('SHOULD_NOT_PROMOTE_DRIFTED_SOURCE');
+  },
+  readSource:async()=>({
+   source_ref:pre.source_ref,
+   provider_proof_sha256:'sha256:'+'f'.repeat(64),
+   checked_at:new Date().toISOString()
+  }),
+  fetchImpl:async(url)=>{requests.push(url);throw Error('NO_TRANSPORT');}
+ });
+ assert.equal(result.status,'REQUALIFIED_CI_PROVIDER_SOURCE_CHANGED_AFTER_RECEIPT');
+ assert.equal(result.claim_consumed,false);
+ assert.equal(result.repair_executed,false);
+ assert.equal(result.original_job_completed,false);
+ assert.deepEqual(calls,[
+  'reality_claim_registered_maintenance_action_v2',
+  'reality_read_requalified_maintenance_ci_preflight_v1']);
+ assert.deepEqual(requests,[]);
+});
+test('same incident stage transition retains first receipt and signed owner in SQL',()=>{
+ const fs=read('supabase/migrations/20261120001000_signed_maintenance_requalified_ci_continuation_v1.sql');
+ const boundary=read('src/reality-governed-shift-boundary-v1.js');
+ const worker=read('api/reality/governed-employee-shift-worker.js');
+ assert.match(fs,/requalification_worker_run_id/);
+ assert.match(fs,/requalification_receipt_sha256/);
+ assert.match(fs,/worker_run_id=p_worker_run_id,attempt_count=1/);
+ assert.match(fs,/reality_read_requalified_maintenance_ci_preflight_v1/);
+ assert.match(fs,/reality_promote_requalified_maintenance_to_ci_claim_v1/);
+ assert.match(fs,/w\.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'/);
+ assert.match(fs,/MAINTENANCE_SOURCE_CHANGED_AFTER_REQUALIFICATION/);
+ assert.match(boundary,/read_requalified_maintenance_ci_preflight_v1/);
+ assert.match(boundary,/promote_requalified_maintenance_to_ci_claim_v1/);
+ assert.match(worker,/NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR/);
+ assert.doesNotMatch(fs,/grant execute[^;]*to (anon|authenticated)/i);
+});
