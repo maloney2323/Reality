@@ -101,7 +101,7 @@ export function assertShiftReadback(x){
     !['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK','ENDED_WITH_BLOCKED_WORK','ENDED_WITH_VERIFIED_JOB','ENDED_READ_ONLY','ESCALATED'].includes(s.status)||
     !Array.isArray(s.steps)||s.steps.length!==8||
     s.steps.some((t,i)=>t.step_index!==i+1||
-     !['QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK','ORIGINAL_JOB_RECEIPT_VERIFIED','BLOCKED_PROVIDER','REPORTED'].includes(t.state)||
+     !['QUEUED','CLAIMED','SOURCE_CHECKED','AWAITING_EXACT_WORK','ORIGINAL_JOB_RECEIPT_VERIFIED','INTERNAL_MAINTENANCE_RECEIPTS_VERIFIED','BLOCKED_PROVIDER','REPORTED'].includes(t.state)||
      (t.proof_sha256!=null&&!/^sha256:[a-f0-9]{64}$/.test(t.proof_sha256)))))
   throw Error('SHIFT_INDEPENDENT_READBACK_INVALID');
  return x;
