@@ -56,7 +56,7 @@ BEGIN
                    WHERE c.maintenance_id=ep.maintenance_id
                      AND (c.state='COMPLETED' OR c.attempt_count>=3 OR
                           (c.state='CLAIMED' AND c.lease_expires_at>now())))
- ORDER BY ep.recorded_at,ep.maintenance_id LIMIT 1 FOR UPDATE OF ep SKIP LOCKED;
+ ORDER BY ep.recorded_at,ep.maintenance_id LIMIT 1;
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
   'status','NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR',
   'handoff_executed',false,'independent_frozen_ci_red_verified',false,
