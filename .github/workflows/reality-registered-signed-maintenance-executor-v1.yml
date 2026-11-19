@@ -8,6 +8,7 @@ on:
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
       - 'supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts'
       - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
+      - 'reality-maintenance-ci-triggers/**'
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
       - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
@@ -49,3 +50,12 @@ jobs:
           node --check src/reality-signed-maintenance-case-ci-executor-v1.js
           node --check scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
           node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
+      - name: Run independent claim-bound case-CI diagnostics on GitHub trigger
+        run: node scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
+      - name: Preserve independent diagnostic artifact without claiming RED
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-maintenance-case-ci-diagnostic-${{ github.run_id }}
+          path: artifact/maintenance-case-ci-diagnostic.json
+          if-no-files-found: ignore
