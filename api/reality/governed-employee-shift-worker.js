@@ -5,6 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
+import {independentlyReviewOneStagedMaintenanceRegression}
+ from '../../src/reality-signed-maintenance-external-review-v1.js';
 import {attestOneSignedMaintenanceCiSourceEpoch}
  from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback,
@@ -386,6 +388,57 @@ export default async function handler(req,res){
      source_current_epoch_verified:false,
      independent_frozen_ci_red_verified:false,
      repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // Independent Quinn review of staged historical GitHub evidence under the
+  // same signed maintenance warrant. Historical regression != case-specific RED.
+  workerStage='SIGNED_INDEPENDENT_MAINTENANCE_EXTERNAL_EVIDENCE_REVIEW';
+  const signedExternalMaintenanceReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReviewOneStagedMaintenanceRegression({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_EXTERNAL_MAINTENANCE_REVIEW_PROOF_UNAVAILABLE',
+     independent_maintenance_ci_red_attested:false,
+     repair_executed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_EXTERNAL_REVIEW_WAKE',
+     independent_maintenance_ci_red_attested:false,
+     repair_executed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
+
+  // Link the existing original work ID to its actual authorization and
+  // independently observed final receipt. Read-only: no fresh work, no reset.
+  workerStage='SAME_ORIGINAL_CONTINUATION_AND_FINAL_RECEIPT_READBACK';
+  const sameOriginalPostmaintenanceGate=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_read_same_original_postmaintenance_gate_v1',{
+     p_shift_id:wakeReceipt.shift_id
+    }).then(result=>{
+     if(![
+      'EXISTING_ORIGINAL_HAS_INDEPENDENT_FINAL_RECEIPT',
+      'EXISTING_ORIGINAL_NOT_AUTHORIZED_BY_MAINTENANCE_SHIFT',
+      'EXISTING_ORIGINAL_BLOCKED_REQUALIFICATION_REQUIRED',
+      'EXISTING_ORIGINAL_GOVERNED_EXECUTION_REQUIRES_FRESH_ACCEPTANCE',
+      'NO_EXISTING_SAME_ORIGINAL_FOR_SHIFT'
+     ].includes(result?.status)||
+      result.original_job_completed===true&&
+        result.independent_final_receipt_verified!==true||
+      result.installation_authorized!==false||
+      result.new_job_created!==false||
+      result.production_changed===true)
+      throw Error('SAME_ORIGINAL_CONTINUATION_UNTRUSTED');
+     return result;
+    }).catch(()=>({
+     status:'SAME_ORIGINAL_CONTINUATION_READBACK_UNAVAILABLE',
+     original_job_completed:false,
+     independent_final_receipt_verified:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SAME_ORIGINAL_CONTINUATION_WAKE',
+     original_job_completed:false,
+     independent_final_receipt_verified:false,
      installation_authorized:false,production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
@@ -1779,6 +1832,8 @@ export default async function handler(req,res){
     signed_maintenance_failure_baseline:maintenanceFailureBaseline,
     signed_maintenance_ci_preflight:signedMaintenanceCiPreflight,
     signed_maintenance_ci_source_epoch:maintenanceCiSourceEpoch,
+    signed_external_maintenance_review:signedExternalMaintenanceReview,
+    same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,

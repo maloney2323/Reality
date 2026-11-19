@@ -1,0 +1,22 @@
+name: Reality signed independent maintenance evidence and original gate
+on:
+  pull_request:
+    paths:
+      - 'src/reality-signed-maintenance-external-review-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'supabase/migrations/20261119174500_signed_maintenance_external_review_and_original_gate_v1.sql'
+      - 'test/reality-signed-maintenance-external-review-original-gate.test.js'
+      - '.github/workflows/reality-signed-external-review-original-gate.yml'
+permissions:
+  contents: read
+jobs:
+  signed-evidence-and-original-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify signed independent GitHub review and same-original gate
+        run: node --test test/reality-signed-maintenance-external-review-original-gate.test.js
