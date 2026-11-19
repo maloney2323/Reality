@@ -56,6 +56,9 @@ BEGIN
     AND m.incident_id::text=scope.entry->>'maintenance_id'
    WHERE scope.entry->>'source_ref'=v.source_ref
     AND scope.entry->>'origin_shift_id'=m.origin_shift_id::text
+    AND scope.entry->>'independent_review_receipt_sha256'=m.independent_review_receipt_sha256
+    AND m.original_job_completed IS FALSE
+    AND m.production_changed IS FALSE
     AND v_warrant.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
   ) THEN 'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'
   WHEN v_warrant.mode<>'UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS' OR
