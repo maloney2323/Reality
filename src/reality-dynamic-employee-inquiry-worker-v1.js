@@ -44,7 +44,7 @@ export function validateDynamicInquiryOutput(response,claim){
   fail('MODEL_OUTPUT_NOT_GROUNDED_OR_BOUNDED');
  return Object.freeze({...value,model_response_id:response.id});
 }
-export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=null}={}){
+export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=null,includeRecentComments=false}={}){
  const match=SOURCE.exec(ref||'');
  if(!match||typeof fetchImpl!=='function')fail('PROVIDER_SOURCE_NOT_SUPPORTED');
  const [,owner,repo,kind,n]=match;
@@ -79,6 +79,50 @@ export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=
   current_state:x.state,provider_updated_at:x.updated_at,
   source_body:String(x.body||'').slice(0,9000)
  };
+ // The source inventory may contain an issue whose latest owner guidance
+ // exists only in GitHub comments. These are independently read back as
+ // UNTRUSTED evidence for an existing read-only employee investigation.
+ // Comment authorship is NEVER Reality owner authentication or install approval.
+ if(includeRecentComments&&kind==='issues'){
+  if(!Number.isSafeInteger(x.comments)||x.comments<0)
+   fail('COMMENT_SOURCE_COUNT_UNVERIFIED');
+  evidence.comment_coverage=x.comments>8?'LATEST_EIGHT_ONLY':'ALL_AT_READBACK';
+  let raw=[];
+  if(x.comments>0){
+   let commentsResponse;
+   try{commentsResponse=await fetchImpl(
+    api+'/issues/'+n+'/comments?per_page=8&sort=created&direction=desc',{
+     method:'GET',cache:'no-store',redirect:'error',
+     headers:{accept:'application/vnd.github+json',
+      'x-github-api-version':'2022-11-28',
+      'user-agent':'Reality-Dynamic-Employee-Inquiry/1.0',
+      ...(token?{authorization:'Bearer '+token}:{})},
+     signal:AbortSignal.timeout(10000)
+    })}catch{fail('COMMENT_SOURCE_REOBSERVATION_FAILED')}
+   if(!commentsResponse?.ok)fail('COMMENT_SOURCE_PROVIDER_READ_UNVERIFIED');
+   raw=await commentsResponse.json().catch(()=>null);
+   if(!Array.isArray(raw)||raw.length>8||
+      raw.length!==Math.min(8,x.comments))
+    fail('COMMENT_SOURCE_RESPONSE_UNVERIFIED');
+  }
+  evidence.recent_source_comments=raw.map(c=>{
+   if(!Number.isSafeInteger(c?.id)||c.id<1||
+      c.html_url!==ref+'#issuecomment-'+c.id||
+      typeof c.user?.login!=='string'||
+      !/^[A-Za-z0-9-]{1,39}$/.test(c.user.login)||
+      typeof c.body!=='string'||
+      !Number.isFinite(Date.parse(c.created_at||''))||
+      Date.parse(c.created_at)>Date.now()+120000)
+    fail('COMMENT_SOURCE_PROVENANCE_UNVERIFIED');
+   return {
+    comment_id:c.id,source_url:c.html_url,author_login:c.user.login,
+    created_at:c.created_at,body:c.body.slice(0,2800),
+    body_truncated:c.body.length>2800,
+    evidence_only_not_owner_authentication:true,
+    execution_authorized:false,installation_authorized:false
+   };
+  });
+ }
  return Object.freeze({
   ...evidence,checked_at:checkedAt,
   provider_proof_sha256:hash(JSON.stringify(evidence)),
@@ -125,7 +169,8 @@ export async function generateOneEmployeeTemporalInquiry({
   const role=roles.find(x=>x.employee_name===claimed.employee);
   if(!role)fail('EMPLOYEE_NOT_IN_EXISTING_ROLE_DIRECTORY');
   // Reobservation must precede cognition; source text is always untrusted data.
-  provider=await readSource(claimed.source_ref,{fetchImpl,token});
+  provider=await readSource(claimed.source_ref,{fetchImpl,token,
+   includeRecentComments:claimed.source_ref.includes('/issues/')});
   if(provider.source_ref!==claimed.source_ref||
      !SHA.test(provider.provider_proof_sha256||'')||
      !Number.isFinite(Date.parse(provider.checked_at||'')))
