@@ -5,7 +5,7 @@ CREATE OR REPLACE FUNCTION public.reality_read_same_original_postmaintenance_gat
  SET search_path TO ''
 AS $function$
 DECLARE v record; v_receipt record; v_warrant record;
- v_review record; v_staged record;
+ v_review record; v_staged record; v_epoch record;
 BEGIN
  IF current_user<>'service_role' OR p_shift_id IS NULL
  THEN RAISE EXCEPTION 'SAME_ORIGINAL_GATE_SERVICE_REQUIRED'; END IF;
@@ -41,6 +41,15 @@ BEGIN
  FROM reality_internal.owner_maintenance_external_regression_signed_reviews_v1 r
  WHERE r.shift_id=p_shift_id AND r.owner_id=v.owner_id
   AND r.source_ref=v.source_ref LIMIT 1;
+ SELECT e.epoch_status,e.receipt_sha256,e.maintenance_id
+ INTO v_epoch
+ FROM reality_internal.signed_maintenance_ci_source_epochs_v1 e
+ JOIN reality_internal.owner_internal_maintenance_jobs_v1 m
+  ON m.incident_id=e.maintenance_id AND m.owner_id=e.owner_id
+  AND m.source_ref=e.source_ref
+ WHERE e.shift_id=p_shift_id AND e.owner_id=v.owner_id
+  AND e.source_ref=v.source_ref
+ ORDER BY e.recorded_at DESC LIMIT 1;
  RETURN pg_catalog.jsonb_build_object(
  'status',CASE
   WHEN v_receipt.outcome='SUCCEEDED' AND
@@ -75,7 +84,14 @@ BEGIN
  'staged_external_evidence_sha256',v_staged.staging_receipt_sha256,
  'signed_external_review_receipt_sha256',v_review.final_receipt_sha256,
  'case_specific_maintenance_ci_red_attested',false,
- 'next_action',CASE WHEN v_review.final_receipt_sha256 IS NOT NULL THEN
+ 'maintenance_source_epoch_status',v_epoch.epoch_status,
+ 'maintenance_source_epoch_receipt_sha256',v_epoch.receipt_sha256,
+ 'next_action',CASE
+  WHEN v_epoch.epoch_status='SOURCE_EPOCH_CHANGED_REQUALIFICATION_REQUIRED'
+   THEN 'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'
+  WHEN v_epoch.epoch_status='SOURCE_EPOCH_ATTESTED_EXECUTABLE_RED_REQUIRED'
+   THEN 'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'
+  WHEN v_review.final_receipt_sha256 IS NOT NULL THEN
   'CASE_SPECIFIC_CI_RED_AND_EXACT_ORIGINAL_EXECUTION_AUTHORITY_REQUIRED'
   WHEN v_staged.staging_receipt_sha256 IS NOT NULL THEN
   'SIGNED_INDEPENDENT_GITHUB_REVIEW_AND_ORIGINAL_AUTHORITY_REQUIRED'
