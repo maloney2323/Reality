@@ -531,10 +531,12 @@ export default async function handler(req,res){
   const signedMaintenanceCaseCi=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
    process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
-   signedMaintenanceExecutorHandoff.status===
-    'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'&&
-   signedMaintenanceExecutorHandoff.next_action===
-    'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'?
+   (signedMaintenanceExecutorHandoff.status===
+     'NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR'||
+    (signedMaintenanceExecutorHandoff.status===
+     'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'&&
+     signedMaintenanceExecutorHandoff.next_action===
+      'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'))?
     await executeOneRegisteredMaintenanceCiWake({
       db,env:process.env,shiftId:wakeReceipt.shift_id,
       workerRunId:actualWorkerRunId,fetchImpl:fetch
