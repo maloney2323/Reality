@@ -514,6 +514,22 @@ export default async function handler(req,res){
     {status:'SIGNED_MAINTENANCE_EXECUTOR_NO_AUTHORIZED_WAKE',
      handoff_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
+  // Until a case-specific executor is registered, record the missing
+  // capability as a real failed handoff. Never report claim as execution.
+  workerStage='SIGNED_MAINTENANCE_EXECUTOR_FAILURE_RECONCILIATION';
+  const signedMaintenanceExecutorOutcome=
+   signedMaintenanceExecutorClaim?.status===
+    'SIGNED_MAINTENANCE_EXECUTOR_DURABLY_CLAIMED'?
+    await shiftRpc(db,'reality_record_signed_maintenance_executor_failure_v1',{
+     p_maintenance_id:signedMaintenanceExecutorClaim.maintenance_id,
+     p_worker_run_id:actualWorkerRunId,
+     p_error_code:'EXECUTOR_NOT_CONNECTED'
+    }).catch(()=>({status:'MAINTENANCE_FAILURE_RECORD_UNAVAILABLE',
+     repair_executed:false,original_job_completed:false,
+     production_changed:false})):
+    {status:'NO_MAINTENANCE_EXECUTOR_CLAIM_TO_RECONCILE',
+     repair_executed:false,original_job_completed:false,
+     production_changed:false};
   // A claimed lease cannot be reported as executed or verified.
   // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
@@ -1926,6 +1942,7 @@ export default async function handler(req,res){
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
     durable_maintenance_handoff:durableMaintenanceHandoff,
     signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
+    signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
