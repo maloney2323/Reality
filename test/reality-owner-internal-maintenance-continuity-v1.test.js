@@ -106,3 +106,49 @@ test('owner shift API and existing UI render maintenance without minting authori
  assert.match(ui,/No verified repair receipt yet/);
  assert.doesNotMatch(ui,/original_shifts_reopened:true|owner_authority_granted:true/);
 });
+
+test('owner readback projects signed executor receipts without claiming code repair',()=>{
+ const claimed={...maintenance[0],
+  signed_executor_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+  signed_executor_state:'COMPLETED',signed_executor_attempt_count:1,
+  ci_dispatch_receipt_sha256:hash,
+  ci_github_trigger_commit_sha:'a'.repeat(40),
+  ci_independent_diagnostic_receipt_sha256:hash,
+  ci_independent_artifact_digest:hash,
+  ci_independent_github_run_id:44633511608};
+ const requalified={...maintenance[1],
+  signed_executor_action:'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI',
+  signed_executor_state:'COMPLETED',signed_executor_attempt_count:1,
+  source_requalification_receipt_sha256:hash};
+ const proof={...readback,items:[claimed,requalified]};
+ const result=projectOwnerInternalMaintenanceContinuity(proof,{
+  ownerId:owner,shifts:[]});
+ assert.equal(result.open_count,2);
+ assert.equal(result.items[0].ci_independent_diagnostic_receipt_sha256,hash);
+ assert.equal(result.items[0].ci_independent_github_run_id,44633511608);
+ assert.equal(result.items[1].source_requalification_receipt_sha256,hash);
+ assert.equal(result.items[1].repair_verified,false);
+ assert.equal(result.customer_job_completed,false);
+ for(const changed of [
+  {...claimed,ci_independent_github_run_id:-1},
+  {...claimed,ci_dispatch_receipt_sha256:null},
+  {...claimed,ci_independent_diagnostic_receipt_sha256:'fabricated'},
+  {...claimed,signed_executor_state:'SETTLED'},
+  {...requalified,signed_executor_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'}
+ ]){
+  assert.throws(()=>projectOwnerInternalMaintenanceContinuity(
+   {...readback,items:[changed],count:1},{ownerId:owner,shifts:[]}),
+    /OWNER_MAINTENANCE_CONTINUITY_/);
+ }
+});
+test('owner service receipt migration joins only same owner maintenance claim',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261120000000_owner_maintenance_executor_receipt_chat_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/c\.maintenance_id=m\.incident_id and c\.owner_id=m\.owner_id/);
+ assert.match(sql,/ci_independent_diagnostic_receipt_sha256/);
+ assert.match(sql,/source_requalification_receipt_sha256/);
+ assert.match(sql,/ci_dispatch_receipt_sha256/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.doesNotMatch(sql,/\bUPDATE reality_internal\b|\bINSERT INTO reality_internal\b/i);
+});
