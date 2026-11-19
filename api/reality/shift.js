@@ -88,7 +88,7 @@ export function evaluateShiftLaunchReadiness({config,principalId,env=process.env
   else if (!principalId || config.updated_by!==principalId) blockers.push('SHIFT_OWNER_SESSION_REQUIRED');
   if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) blockers.push('UNIVERSE_PERSISTENCE_CREDENTIAL_REQUIRED');
   if (!env.REALITY_GITHUB_TOKEN) blockers.push('GITHUB_CONNECTOR_CREDENTIAL_REQUIRED');
-  if (!env.OPENAI_API_KEY) blockers.push('INTELLIGENCE_MODEL_CREDENTIAL_REQUIRED');
+  if (!env.OPENAI_API_KEY && !env.REALITY_STANDALONE_OPENAI_API_KEY) blockers.push('INTELLIGENCE_MODEL_CREDENTIAL_REQUIRED');
   return Object.freeze({
     status:blockers.length?'BLOCKED':'READY_TO_ATTEMPT',
     blockers:Object.freeze(blockers),
@@ -434,6 +434,9 @@ async function runTick({ config, phase, local, persistence, shiftIdOverride = nu
     message: mission,
     requestedBy: 'reality-autonomous-shift',
     systemContext: { shift_config: config, evidence },
+    // Reuse Reality's existing preview model credential; never move secrets
+    // between Vercel environments or expose them through the response.
+    apiKey: process.env.OPENAI_API_KEY || process.env.REALITY_STANDALONE_OPENAI_API_KEY,
   });
 
   const result = {
