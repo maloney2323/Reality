@@ -63,8 +63,12 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
       (!Number.isSafeInteger(item.ci_independent_github_run_id)||
        item.ci_independent_github_run_id<1))||
      (item.source_requalification_receipt_sha256!=null&&
-      (item.signed_executor_action!=='REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'||
-       item.signed_executor_state!=='COMPLETED'))||
+      (!['REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI',
+         'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED']
+       .includes(item.signed_executor_action)||
+       (item.signed_executor_action===
+        'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'&&
+        item.signed_executor_state!=='COMPLETED')))||
      (item.ci_dispatch_receipt_sha256!=null&&
       (item.signed_executor_action!=='RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'||
        item.signed_executor_state!=='COMPLETED'))||
