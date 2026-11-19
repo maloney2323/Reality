@@ -211,7 +211,7 @@ export async function independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
   scope.production_changed!==false)
   guard('CASE_CI_SIGNED_OWNER_SOURCE_OR_DISPATCH_UNTRUSTED');
  const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
- let result,run,jobs,artifacts,comparison,sourceFile;
+ let result,run,jobs,artifacts,sourceFile,triggerFile;
  try{
   result=await getGithub({fetchImpl,token,
    path:'/actions/runs?branch='+encodeURIComponent(CASE_CI_BRANCH)+
@@ -222,33 +222,58 @@ export async function independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
      x.head_branch===CASE_CI_BRANCH&&
      x.head_repository?.full_name==='maloney2323/Reality'&&
      x.status==='completed'&&x.conclusion==='success'&&
-     SHA.test(x.head_sha||'')&&
+     x.head_sha===scope.trigger_commit_sha&&
      Number.isSafeInteger(x.id)&&x.id>0&&
      Number.isFinite(Date.parse(x.created_at||''))&&
-     Date.parse(x.created_at)>=Date.parse(scope.ci_dispatched_at)&&
+     Date.parse(x.created_at)>=Date.parse(scope.ci_dispatched_at)-120000&&
      Date.parse(x.created_at)<=Date.now()+60000);
   if(!candidates.length)return safe('MAINTENANCE_CI_DIAGNOSTIC_INDEPENDENT_RUN_NOT_YET_FOUND',{
    maintenance_id:scope.maintenance_id,review_attempted:true});
   candidates.sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
   run=candidates[0];
-  [jobs,artifacts,sourceFile]=await Promise.all([
+  [jobs,artifacts,sourceFile,triggerFile]=await Promise.all([
    getGithub({fetchImpl,token,path:'/actions/runs/'+run.id+'/jobs?per_page=100'}),
    getGithub({fetchImpl,token,path:'/actions/runs/'+run.id+'/artifacts?per_page=100'}),
-   getGithub({fetchImpl,token,path:'/contents/scripts/reality-maintenance-signed-case-ci-runner-v1.mjs?ref='+run.head_sha})
+   getGithub({fetchImpl,token,path:'/contents/scripts/reality-maintenance-signed-case-ci-runner-v1.mjs?ref='+run.head_sha}),
+   getGithub({fetchImpl,token,path:'/contents/reality-maintenance-ci-triggers/'+scope.maintenance_id+'.json?ref='+run.head_sha})
   ]);
-  if(run.head_sha!==scope.trigger_commit_sha)
-   comparison=await getGithub({fetchImpl,token,
-    path:'/compare/'+scope.trigger_commit_sha+'...'+run.head_sha});
  }catch{
   return safe('MAINTENANCE_CI_DIAGNOSTIC_GITHUB_PROOF_UNAVAILABLE',{
    maintenance_id:scope.maintenance_id,review_attempted:true});
  }
- if(run.head_sha!==scope.trigger_commit_sha&&(
-   comparison?.status!=='ahead'||
-   comparison?.merge_base_commit?.sha!==scope.trigger_commit_sha||
-   !Number.isSafeInteger(comparison.ahead_by)||
-   comparison.ahead_by<1||comparison.ahead_by>75))
-  return safe('MAINTENANCE_CI_DIAGNOSTIC_TRIGGER_ANCESTRY_UNVERIFIED',{
+ const triggerBytes=triggerFile?.encoding==='base64'&&
+  typeof triggerFile.content==='string'?
+  Buffer.from(triggerFile.content.replace(/\s/g,''),'base64'):null;
+ let trigger;
+ try{trigger=triggerBytes?JSON.parse(triggerBytes.toString('utf8')):null;}
+ catch{trigger=null;}
+ const triggerKeys='frozen_ci_red_verified,historical_failure_kind,'+
+  'installation_authorized,maintenance_id,original_job_completed,'+
+  'production_changed,repair_executed,schema,shift_id,'+
+  'source_epoch_receipt_sha256,source_ref,worker_run_id';
+ const triggerBlobSha=triggerBytes?createHash('sha1')
+  .update('blob '+triggerBytes.length+'\\0')
+  .update(triggerBytes).digest('hex'):null;
+ if(triggerFile?.path!=='reality-maintenance-ci-triggers/'+
+    scope.maintenance_id+'.json'||
+   !SHA.test(triggerFile?.sha||'')||
+   triggerFile.sha!==triggerBlobSha||
+   !trigger||Object.keys(trigger).sort().join(',')!==triggerKeys||
+   trigger.schema!=='reality-signed-maintenance-case-ci-trigger-v1'||
+   trigger.maintenance_id!==scope.maintenance_id||
+   trigger.shift_id!==scope.shift_id||
+   trigger.worker_run_id!==scope.first_worker_run_id||
+   trigger.source_ref!==scope.source_ref||
+   trigger.source_epoch_receipt_sha256!==scope.source_epoch_receipt_sha256||
+   !['HISTORICAL_ZERO_ORIGINAL_CLAIMS_WITH_SIGNED_INQUIRIES',
+     'HISTORICAL_SOURCE_EPOCH_MISMATCH_INDEPENDENTLY_REOBSERVED']
+     .includes(trigger.historical_failure_kind)||
+   trigger.frozen_ci_red_verified!==false||
+   trigger.repair_executed!==false||
+   trigger.original_job_completed!==false||
+   trigger.installation_authorized!==false||
+   trigger.production_changed!==false)
+  return safe('MAINTENANCE_CI_DIAGNOSTIC_SIGNED_TRIGGER_IDENTITY_UNVERIFIED',{
    maintenance_id:scope.maintenance_id,review_attempted:true});
  const candidateJobs=Array.isArray(jobs?.jobs)?
   jobs.jobs.filter(x=>x.run_id===run.id&&
