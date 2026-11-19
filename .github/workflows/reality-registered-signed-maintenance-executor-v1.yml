@@ -5,6 +5,11 @@ on:
     paths:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
+      - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts'
+      - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
+      - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
+      - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
       - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
       - '.github/workflows/reality-registered-signed-maintenance-executor-v1.yml'
@@ -14,6 +19,11 @@ on:
     paths:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
+      - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts'
+      - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
+      - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
+      - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
       - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
       - '.github/workflows/reality-registered-signed-maintenance-executor-v1.yml'
@@ -36,3 +46,6 @@ jobs:
           node --check src/reality-signed-maintenance-source-requalification-executor-v1.js
           node --check api/reality/governed-employee-shift-worker.js
           node --test test/reality-registered-signed-maintenance-executor-v1.test.js
+          node --check src/reality-signed-maintenance-case-ci-executor-v1.js
+          node --check scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
+          node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
