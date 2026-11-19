@@ -148,3 +148,45 @@ body[data-reality-route="chat"] #privateTranscript
   min-height:38px;padding:7px 9px;font-size:12px;
  }
 }
+
+/* Owner-approved maintenance work is followed in the real Chat transcript.
+   Evidence is fetched from the signed ledger; it is not a synthetic progress bar. */
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live{
+ margin:13px 0 9px;padding:12px;min-width:0;
+ border:1px solid #446c88;border-radius:12px;background:#0a1b2d;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live[hidden]{display:none!important;}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live-title{
+ display:block;font-size:13px;line-height:1.5;color:#dff5ff;margin-bottom:8px;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live-job{
+ display:block;font-size:12px;line-height:1.5;margin-top:12px;
+ padding-top:9px;border-top:1px solid #294c63;color:#cde7f6;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live-line,
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live-proof{
+ font-size:12px;line-height:1.55;color:#c6dce9;
+ overflow-wrap:anywhere;margin:5px 0;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-live-proof code{
+ display:block;font-size:10px;color:#a8deee;
+ overflow-wrap:anywhere;word-break:break-all;margin:3px 0 8px;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-watch{
+ background:#bdeeff!important;border-color:#bdeeff!important;
+ color:#062336!important;font-weight:850!important;
+}
+@media(max-width:420px){
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-maintenance-live{padding:10px;}
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-maintenance-watch{width:100%;}
+}
