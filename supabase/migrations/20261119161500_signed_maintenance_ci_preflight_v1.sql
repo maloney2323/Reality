@@ -7,23 +7,23 @@ CREATE OR REPLACE FUNCTION public.reality_read_signed_maintenance_ci_preflight_v
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY INVOKER SET search_path=''
 AS $fn$
-DECLARE m record;
+DECLARE v record;
 BEGIN
  IF current_user<>'service_role' OR p_shift_id IS NULL
    OR p_worker_run_id IS NULL
  THEN RAISE EXCEPTION 'SIGNED_MAINTENANCE_CI_SERVICE_WORKER_REQUIRED'; END IF;
  SELECT
-   maintenance.incident_id,maintenance.owner_id,maintenance.origin_shift_id,
-   maintenance.claimed_shift_id,maintenance.source_ref,
-   maintenance.assignee,maintenance.independent_reviewer,
-   maintenance.failure_baseline_kind,maintenance.last_source_sha256,
-   maintenance.last_source_checked_at,
-   maintenance.independent_source_observation_receipt_sha256,
-   maintenance.independent_review_receipt_sha256,
-   maintenance.independent_failure_baseline_receipt_sha256,
-   maintenance.baseline_worker_run_id,
+   m.incident_id,v.owner_id,v.origin_shift_id,
+   m.claimed_shift_id,v.source_ref,
+   m.assignee,v.independent_reviewer,
+   m.failure_baseline_kind,v.last_source_sha256,
+   m.last_source_checked_at,
+   m.independent_source_observation_receipt_sha256,
+   m.independent_review_receipt_sha256,
+   m.independent_failure_baseline_receipt_sha256,
+   m.baseline_worker_run_id,
    sh.shift_id AS signed_shift_id
- INTO m
+ INTO v
  FROM reality_internal.governed_employee_shifts_v1 sh
  JOIN reality_internal.governed_employee_completion_warrants_v1 w
    ON w.shift_id=sh.shift_id AND w.owner_id=sh.owner_id
@@ -32,13 +32,10 @@ BEGIN
    ON pulse.shift_id=sh.shift_id AND pulse.owner_id=sh.owner_id
  JOIN reality_internal.signed_worker_actual_runs_v1 run
    ON run.run_id=p_worker_run_id AND run.status='STARTED'
- JOIN reality_internal.owner_internal_maintenance_jobs_v1 maintenance
-   ON maintenance.owner_id=sh.owner_id
-   AND maintenance.claimed_shift_id=sh.shift_id
-   AND maintenance.baseline_claimed_shift_id=sh.shift_id
- CROSS JOIN LATERAL (
-  SELECT maintenance.* 
- ) m0
+ JOIN reality_internal.owner_internal_maintenance_jobs_v1 m
+   ON m.owner_id=sh.owner_id
+   AND m.claimed_shift_id=sh.shift_id
+   AND m.baseline_claimed_shift_id=sh.shift_id
  WHERE sh.shift_id=p_shift_id
    AND sh.authorized_at IS NOT NULL AND sh.closed_at IS NULL
    AND sh.planned_start_at<=clock_timestamp()
@@ -50,37 +47,37 @@ BEGIN
    AND jsonb_typeof(w.source_scope)='array'
    AND EXISTS(
     SELECT 1 FROM jsonb_array_elements(w.source_scope) scope
-    WHERE scope->>'maintenance_id'=maintenance.incident_id::text
-      AND scope->>'origin_shift_id'=maintenance.origin_shift_id::text
-      AND scope->>'source_ref'=maintenance.source_ref
+    WHERE scope->>'maintenance_id'=m.incident_id::text
+      AND scope->>'origin_shift_id'=m.origin_shift_id::text
+      AND scope->>'source_ref'=m.source_ref
       AND scope->>'independent_review_receipt_sha256'=
-          maintenance.independent_review_receipt_sha256
+          m.independent_review_receipt_sha256
    )
    AND pulse.last_worker_status='WAKE_RECEIVED'
    AND pulse.last_worker_seen_at>clock_timestamp()-interval '3 minutes'
    AND run.started_at>clock_timestamp()-interval '3 minutes'
-   AND maintenance.handling_state='FAILURE_BASELINE_REPRODUCED_NEEDS_CI_RED'
-   AND maintenance.failure_baseline_kind IN(
+   AND m.handling_state='FAILURE_BASELINE_REPRODUCED_NEEDS_CI_RED'
+   AND m.failure_baseline_kind IN(
      'HISTORICAL_ZERO_ORIGINAL_CLAIMS_WITH_SIGNED_INQUIRIES',
      'HISTORICAL_SOURCE_EPOCH_MISMATCH_INDEPENDENTLY_REOBSERVED')
-   AND maintenance.baseline_worker_run_id<>p_worker_run_id
-   AND maintenance.assignee<>maintenance.independent_reviewer
-   AND maintenance.independent_review_receipt_sha256~
+   AND m.baseline_worker_run_id<>p_worker_run_id
+   AND m.assignee<>m.independent_reviewer
+   AND m.independent_review_receipt_sha256~
       '^sha256:[a-f0-9]{64}$'
-   AND maintenance.independent_source_observation_receipt_sha256~
+   AND m.independent_source_observation_receipt_sha256~
       '^sha256:[a-f0-9]{64}$'
-   AND maintenance.last_source_sha256~'^sha256:[a-f0-9]{64}$'
-   AND maintenance.independent_failure_baseline_receipt_sha256~
+   AND m.last_source_sha256~'^sha256:[a-f0-9]{64}$'
+   AND m.independent_failure_baseline_receipt_sha256~
       '^sha256:[a-f0-9]{64}$'
-   AND maintenance.independent_frozen_test_receipt_sha256 IS NULL
-   AND maintenance.exact_install_approval_receipt_sha256 IS NULL
-   AND maintenance.repaired_capability_receipt_sha256 IS NULL
-   AND maintenance.original_customer_work_id IS NULL
-   AND maintenance.original_job_completed IS FALSE
-   AND maintenance.production_changed IS FALSE
-   AND maintenance.installation_authorized_by_discovery IS FALSE
-   AND maintenance.external_action_authorized_by_discovery IS FALSE
- ORDER BY maintenance.created_at,maintenance.incident_id
+   AND m.independent_frozen_test_receipt_sha256 IS NULL
+   AND m.exact_install_approval_receipt_sha256 IS NULL
+   AND m.repaired_capability_receipt_sha256 IS NULL
+   AND m.original_customer_work_id IS NULL
+   AND m.original_job_completed IS FALSE
+   AND m.production_changed IS FALSE
+   AND m.installation_authorized_by_discovery IS FALSE
+   AND m.external_action_authorized_by_discovery IS FALSE
+ ORDER BY m.created_at,v.incident_id
  LIMIT 1;
  IF NOT FOUND THEN
   RETURN jsonb_build_object(
@@ -91,19 +88,19 @@ BEGIN
  END IF;
  RETURN jsonb_build_object(
   'status','SIGNED_MAINTENANCE_CI_PREFLIGHT_NEEDS_SOURCE_ATTESTATION',
-  'owner_id',m.owner_id,'shift_id',m.signed_shift_id,
-  'maintenance_id',m.incident_id,'origin_shift_id',m.origin_shift_id,
-  'source_ref',m.source_ref,'assignee',m.assignee,
-  'independent_reviewer',m.independent_reviewer,
-  'failure_baseline_kind',m.failure_baseline_kind,
-  'historical_source_sha256',m.last_source_sha256,
-  'historical_source_checked_at',m.last_source_checked_at,
+  'owner_id',v.owner_id,'shift_id',v.signed_shift_id,
+  'maintenance_id',v.incident_id,'origin_shift_id',v.origin_shift_id,
+  'source_ref',v.source_ref,'assignee',v.assignee,
+  'independent_reviewer',v.independent_reviewer,
+  'failure_baseline_kind',v.failure_baseline_kind,
+  'historical_source_sha256',v.last_source_sha256,
+  'historical_source_checked_at',v.last_source_checked_at,
   'source_observation_receipt_sha256',
-   m.independent_source_observation_receipt_sha256,
+   v.independent_source_observation_receipt_sha256,
   'independent_review_receipt_sha256',
-   m.independent_review_receipt_sha256,
+   v.independent_review_receipt_sha256,
   'independent_failure_baseline_receipt_sha256',
-   m.independent_failure_baseline_receipt_sha256,
+   v.independent_failure_baseline_receipt_sha256,
   'next_action','RECHECK_EXACT_PROVIDER_SOURCE_AND_RUN_INDEPENDENT_FROZEN_CI_RED',
   'source_current_epoch_verified',false,
   'read_only',true,'executable_frozen_ci_red_verified',false,
