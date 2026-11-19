@@ -45,6 +45,32 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
        .includes(item.independent_reviewer)||
      item.assignee===item.independent_reviewer||
      item.original_customer_job_completed!==false||
+     (item.signed_executor_action!=null&&
+      !['REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI',
+       'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'].includes(
+        item.signed_executor_action))||
+     (item.signed_executor_state!=null&&
+      !['CLAIMED','FAILED_RETRYABLE','COMPLETED'].includes(item.signed_executor_state))||
+     (item.signed_executor_attempt_count!=null&&
+      (!Number.isSafeInteger(item.signed_executor_attempt_count)||
+       item.signed_executor_attempt_count<1||item.signed_executor_attempt_count>3))||
+     ['source_requalification_receipt_sha256','ci_dispatch_receipt_sha256',
+      'ci_independent_diagnostic_receipt_sha256','ci_independent_artifact_digest']
+      .some(field=>item[field]!=null&&!HASH.test(item[field]))||
+     (item.ci_github_trigger_commit_sha!=null&&
+      !/^[a-f0-9]{40}$/.test(item.ci_github_trigger_commit_sha))||
+     (item.ci_independent_github_run_id!=null&&
+      (!Number.isSafeInteger(item.ci_independent_github_run_id)||
+       item.ci_independent_github_run_id<1))||
+     (item.source_requalification_receipt_sha256!=null&&
+      (item.signed_executor_action!=='REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'||
+       item.signed_executor_state!=='COMPLETED'))||
+     (item.ci_dispatch_receipt_sha256!=null&&
+      (item.signed_executor_action!=='RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'||
+       item.signed_executor_state!=='COMPLETED'))||
+     (item.ci_independent_diagnostic_receipt_sha256!=null&&
+      (!HASH.test(item.ci_dispatch_receipt_sha256||'')||
+       !Number.isSafeInteger(item.ci_independent_github_run_id)))||
      (item.worker_handling_state!==undefined&&
       !HANDLING.has(item.worker_handling_state))||
      (item.worker_baseline_attempts!==undefined&&
@@ -103,6 +129,17 @@ export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shif
    worker_baseline_attempts:Number.isSafeInteger(item.worker_baseline_attempts)?
     item.worker_baseline_attempts:0,
    repair_verified:item.repair_verified,
+   signed_executor_action:item.signed_executor_action||null,
+   signed_executor_state:item.signed_executor_state||null,
+   signed_executor_attempt_count:item.signed_executor_attempt_count||null,
+   source_requalification_receipt_sha256:
+    item.source_requalification_receipt_sha256||null,
+   ci_dispatch_receipt_sha256:item.ci_dispatch_receipt_sha256||null,
+   ci_github_trigger_commit_sha:item.ci_github_trigger_commit_sha||null,
+   ci_independent_diagnostic_receipt_sha256:
+    item.ci_independent_diagnostic_receipt_sha256||null,
+   ci_independent_github_run_id:item.ci_independent_github_run_id||null,
+   ci_independent_artifact_digest:item.ci_independent_artifact_digest||null,
    original_customer_job_completed:false
   }));
  }
