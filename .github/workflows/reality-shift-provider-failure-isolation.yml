@@ -1,0 +1,19 @@
+name: Reality job-scoped source provider transport isolation
+on:
+  pull_request:
+    paths:
+      - 'src/reality-governed-employee-shift-worker-v1.js'
+      - 'test/reality-shift-provider-failure-isolation.test.js'
+      - '.github/workflows/reality-shift-provider-failure-isolation.yml'
+permissions:
+  contents: read
+jobs:
+  source-transport-failure-does-not-halt-shift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify a genuine per-job transport outage cannot abort sibling work
+        run: node --test test/reality-shift-provider-failure-isolation.test.js
