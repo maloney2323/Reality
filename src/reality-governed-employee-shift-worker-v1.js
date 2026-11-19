@@ -9,6 +9,12 @@ const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const noProduction=x=>x?.production_changed===false;
+export function isIsolatedOriginalProviderOutage(error){
+ // Temporary GitHub source readback failure is one-job scoped.
+ // Owner/tenant identity, authority, proof, and receipt failures are NOT.
+ return String(error?.message||'')==='SHIFT_GITHUB_PROVIDER_READBACK_UNAVAILABLE';
+}
+
 async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}){
  const parsed=URL.exec(String(source||''));
  if(!parsed)throw Error('SHIFT_SOURCE_REF_NOT_ALLOWED');
