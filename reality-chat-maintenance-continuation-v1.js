@@ -409,7 +409,25 @@
    line('Investigation:',job.independent_failure_baseline_receipt_sha256?
     'Historical failure baseline receipted':'Failure reproduction not yet independently receipted');
    digest('Frozen baseline:',job.independent_failure_baseline_receipt_sha256);
-   if(job.independent_review_status==='SOURCE_CHANGED_NEEDS_FROZEN_TEST')
+   if(job.source_requalification_receipt_sha256){
+    line('Source requalification:', 'Verified in this same shift.');
+    digest('Independent source requalification:',job.source_requalification_receipt_sha256);
+   }
+   if(job.ci_dispatch_receipt_sha256){
+    line('Signed GitHub CI dispatch:', 'Completed. This is transport proof, not a test verdict.');
+    digest('GitHub CI dispatch:',job.ci_dispatch_receipt_sha256);
+   }
+   if(job.ci_independent_diagnostic_receipt_sha256){
+    line('Independent GitHub diagnostics:', 'Verified execution; original frozen RED still required.');
+    if(Number.isSafeInteger(job.ci_independent_github_run_id))
+     line('GitHub Actions run:',String(job.ci_independent_github_run_id));
+    digest('Independent diagnostic receipt:',job.ci_independent_diagnostic_receipt_sha256);
+    digest('GitHub artifact:',job.ci_independent_artifact_digest);
+   }
+   if(job.source_requalification_receipt_sha256&&
+      !job.independent_frozen_test_receipt_sha256)
+    line('Required next action:', 'Run the case-specific executable frozen CI RED on the requalified source.');
+   else if(job.independent_review_status==='SOURCE_CHANGED_NEEDS_FROZEN_TEST')
     line('Required next action:', 'Requalify changed source before case-specific CI.');
    else if(!job.independent_frozen_test_receipt_sha256)
     line('Required next action:', 'Run the case-specific executable frozen CI RED.');
