@@ -13,10 +13,10 @@ BEGIN
    OR p_worker_run_id IS NULL
  THEN RAISE EXCEPTION 'SIGNED_MAINTENANCE_CI_SERVICE_WORKER_REQUIRED'; END IF;
  SELECT
-   m.incident_id,v.owner_id,v.origin_shift_id,
-   m.claimed_shift_id,v.source_ref,
-   m.assignee,v.independent_reviewer,
-   m.failure_baseline_kind,v.last_source_sha256,
+   m.incident_id,m.owner_id,m.origin_shift_id,
+   m.claimed_shift_id,m.source_ref,
+   m.assignee,m.independent_reviewer,
+   m.failure_baseline_kind,m.last_source_sha256,
    m.last_source_checked_at,
    m.independent_source_observation_receipt_sha256,
    m.independent_review_receipt_sha256,
@@ -77,7 +77,7 @@ BEGIN
    AND m.production_changed IS FALSE
    AND m.installation_authorized_by_discovery IS FALSE
    AND m.external_action_authorized_by_discovery IS FALSE
- ORDER BY m.created_at,v.incident_id
+ ORDER BY m.created_at,m.incident_id
  LIMIT 1;
  IF NOT FOUND THEN
   RETURN jsonb_build_object(
