@@ -570,8 +570,10 @@ export default async function handler(req,res){
     await independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
      db,env:process.env,shiftId:wakeReceipt.shift_id,
      workerRunId:actualWorkerRunId,fetchImpl:fetch
-    }).catch(()=>({
+    }).catch(error=>({
      status:'SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEW_UNVERIFIED',
+     error_code:String(error?.message||'INDEPENDENT_REVIEW_UNVERIFIED')
+      .slice(0,145),
      independent_diagnostic_verified:false,
      original_job_completed:false,repair_executed:false,
      installation_authorized:false,production_changed:false
