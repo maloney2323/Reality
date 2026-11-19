@@ -206,6 +206,7 @@ CREATE OR REPLACE FUNCTION public.reality_read_same_original_postmaintenance_gat
 RETURNS jsonb LANGUAGE plpgsql SET search_path TO ''
 AS $fn$
 DECLARE v record; v_receipt record; v_warrant record;
+ v_review record; v_staged record;
 BEGIN
  IF current_user<>'service_role' OR p_shift_id IS NULL
  THEN RAISE EXCEPTION 'SAME_ORIGINAL_GATE_SERVICE_REQUIRED'; END IF;
@@ -231,6 +232,16 @@ BEGIN
   AND f.original_work_id=v.original_work_id
   AND f.source_ref=v.source_ref
  ORDER BY f.recorded_at DESC LIMIT 1;
+ SELECT x.maintenance_id,x.staging_receipt_sha256
+ INTO v_staged
+ FROM reality_internal.owner_maintenance_external_regression_evidence_v1 x
+ WHERE x.shift_id=p_shift_id AND x.owner_id=v.owner_id
+  AND x.source_ref=v.source_ref LIMIT 1;
+ SELECT r.maintenance_id,r.final_receipt_sha256,r.evidence_verdict
+ INTO v_review
+ FROM reality_internal.owner_maintenance_external_regression_signed_reviews_v1 r
+ WHERE r.shift_id=p_shift_id AND r.owner_id=v.owner_id
+  AND r.source_ref=v.source_ref LIMIT 1;
  RETURN pg_catalog.jsonb_build_object(
  'status',CASE
   WHEN v_receipt.outcome='SUCCEEDED' AND
@@ -246,6 +257,15 @@ BEGIN
  'shift_id',v.shift_id,'owner_id',v.owner_id,
  'original_work_id',v.original_work_id,'source_ref',v.source_ref,
  'phase',v.phase,'attempts',v.attempts,'warrant_mode',v_warrant.mode,
+ 'existing_maintenance_id',v_staged.maintenance_id,
+ 'staged_external_evidence_sha256',v_staged.staging_receipt_sha256,
+ 'signed_external_review_receipt_sha256',v_review.final_receipt_sha256,
+ 'case_specific_maintenance_ci_red_attested',false,
+ 'next_action',CASE WHEN v_review.final_receipt_sha256 IS NOT NULL THEN
+  'CASE_SPECIFIC_CI_RED_AND_EXACT_ORIGINAL_EXECUTION_AUTHORITY_REQUIRED'
+  WHEN v_staged.staging_receipt_sha256 IS NOT NULL THEN
+  'SIGNED_INDEPENDENT_GITHUB_REVIEW_AND_ORIGINAL_AUTHORITY_REQUIRED'
+  ELSE 'ORIGINAL_GOVERNANCE_AND_SOURCE_QUALIFICATION_REQUIRED' END,
  'independent_final_receipt_id',v_receipt.receipt_id,
  'independent_final_receipt_verified',
   coalesce(v_receipt.outcome='SUCCEEDED' AND
