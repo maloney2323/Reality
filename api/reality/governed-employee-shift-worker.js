@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import {shiftDatabase,shiftRpc,assertShiftReadback,
  isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
-import {processGovernedEmployeeShiftTick}
+import {processGovernedEmployeeShiftTick,isIsolatedOriginalProviderOutage}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
 import {createOneOpenAICombinedRoleCoordinator}
  from '../../src/reality-one-openai-combined-role-handoff-v1.js';
@@ -837,8 +837,8 @@ export default async function handler(req,res){
    // Current shift graph has already passed owner/identity validation.
    // Preserve the uncertain original, never replay its side effect here.
    // An unavailable database remains a whole-worker infrastructure failure.
-   if(isShiftDatabaseTransportUnreachable(error))throw error;
-   console.warn('REALITY_SHIFT_ONE_ORIGINAL_TICK_UNVERIFIED');
+   if(!isIsolatedOriginalProviderOutage(error))throw error;
+   console.warn('REALITY_SHIFT_ONE_ORIGINAL_PROVIDER_UNAVAILABLE');
    return {ok:false,
     status:'EXACT_SHIFT_ORIGINAL_TICK_BLOCKED_OTHER_WORK_CONTINUES',
     shift_id:initialGraph.shift_id,original_job_completed:false,
