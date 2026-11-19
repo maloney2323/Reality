@@ -5,7 +5,7 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {readFreshEmployeeInquirySource}
  from './reality-dynamic-employee-inquiry-worker-v1.js';
-const UUID=/^[a-f0-9]{8}-(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/;
 const ACTION='REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI';
