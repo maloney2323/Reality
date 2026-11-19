@@ -1,7 +1,7 @@
 // Independent GitHub Actions execution of a claim-bound maintenance diagnostic.
 // It deliberately does NOT convert a passing generic regression suite or
 // an ordinary failing CI run into the owner's case-specific frozen RED.
-import {readFileSync,writeFileSync,mkdirSync,readdirSync,existsSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 const sha256=x=>'sha256:'+createHash('sha256').update(x).digest('hex');
@@ -38,18 +38,22 @@ if(env.GITHUB_EVENT_NAME==='push'){
   fail('PR_HEAD_AND_OWNER_REPOSITORY_MUST_MATCH');
 }
 const directory='reality-maintenance-ci-triggers';
-if(!existsSync(directory)){
- console.log('NO_CLAIM_BOUND_MAINTENANCE_CI_TRIGGER_SOURCE');
- process.exit(0);
-}
-const changed=readdirSync(directory).filter(x=>x.endsWith('.json'));
+const delta=spawnSync('git',['diff','--name-status','HEAD^','HEAD','--',
+ directory+'/'],{encoding:'utf8',timeout:6000});
+if(delta.status!==0)fail('SIGNED_MAINTENANCE_TRIGGER_COMMIT_DIFF_UNVERIFIED');
+const changed=String(delta.stdout||'').trim().split('\n').filter(Boolean);
 if(changed.length===0){
- console.log('NO_CLAIM_BOUND_MAINTENANCE_CI_TRIGGER_SOURCE');
+ console.log('NO_NEW_CLAIM_BOUND_MAINTENANCE_CI_TRIGGER_IN_HEAD');
  process.exit(0);
 }
-if(changed.length!==1||!UUID.test(changed[0].slice(0,-5)))
- fail('EXACT_SINGLE_OWNER_SIGNED_MAINTENANCE_TRIGGER_REQUIRED');
-const path=directory+'/'+changed[0];
+// Existing claim JSONs are immutable evidence. A later incident creates its
+// own new file, and only THAT file runs for the exact signed head commit.
+if(changed.length!==1||!/^A\treality-maintenance-ci-triggers\/[a-f0-9-]{36}\.json$/.test(changed[0]))
+ fail('EXACT_ONE_NEW_APPEND_ONLY_MAINTENANCE_TRIGGER_REQUIRED');
+const path=changed[0].slice(2);
+const stem=path.slice(directory.length+1,-5);
+if(!UUID.test(stem)||!existsSync(path))
+ fail('NEW_SIGNED_TRIGGER_FILE_IDENTITY_UNVERIFIED');
 const item=JSON.parse(readFileSync(path,'utf8'));
 if(item?.schema!=='reality-signed-maintenance-case-ci-trigger-v1'||
  !UUID.test(item.maintenance_id||'')||!UUID.test(item.shift_id||'')||
