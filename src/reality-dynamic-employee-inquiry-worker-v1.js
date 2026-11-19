@@ -89,21 +89,35 @@ export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=
   evidence.comment_coverage=x.comments>8?'LATEST_EIGHT_ONLY':'ALL_AT_READBACK';
   let raw=[];
   if(x.comments>0){
-   let commentsResponse;
-   try{commentsResponse=await fetchImpl(
-    api+'/issues/'+n+'/comments?per_page=8&sort=created&direction=desc',{
-     method:'GET',cache:'no-store',redirect:'error',
-     headers:{accept:'application/vnd.github+json',
-      'x-github-api-version':'2022-11-28',
-      'user-agent':'Reality-Dynamic-Employee-Inquiry/1.0',
-      ...(token?{authorization:'Bearer '+token}:{})},
-     signal:AbortSignal.timeout(10000)
-    })}catch{fail('COMMENT_SOURCE_REOBSERVATION_FAILED')}
-   if(!commentsResponse?.ok)fail('COMMENT_SOURCE_PROVIDER_READ_UNVERIFIED');
-   raw=await commentsResponse.json().catch(()=>null);
-   if(!Array.isArray(raw)||raw.length>8||
-      raw.length!==Math.min(8,x.comments))
-    fail('COMMENT_SOURCE_RESPONSE_UNVERIFIED');
+   // GitHub's issue-comment endpoint returns chronological pages; do not
+   // assume a sort=desc parameter puts the latest comments first.
+   const pageSize=20,lastPage=Math.ceil(x.comments/pageSize);
+   const readPage=async page=>{
+    let response;
+    try{response=await fetchImpl(
+     api+'/issues/'+n+'/comments?per_page='+pageSize+'&page='+page,{
+      method:'GET',cache:'no-store',redirect:'error',
+      headers:{accept:'application/vnd.github+json',
+       'x-github-api-version':'2022-11-28',
+       'user-agent':'Reality-Dynamic-Employee-Inquiry/1.0',
+       ...(token?{authorization:'Bearer '+token}:{})},
+      signal:AbortSignal.timeout(10000)
+     })}catch{fail('COMMENT_SOURCE_REOBSERVATION_FAILED')}
+    if(!response?.ok)fail('COMMENT_SOURCE_PROVIDER_READ_UNVERIFIED');
+    const pageData=await response.json().catch(()=>null);
+    const expected=page===lastPage?
+     x.comments-pageSize*(lastPage-1):pageSize;
+    if(!Array.isArray(pageData)||pageData.length!==expected)
+     fail('COMMENT_SOURCE_RESPONSE_UNVERIFIED');
+    return pageData;
+   };
+   const tail=await readPage(lastPage);
+   if(tail.length<8&&lastPage>1){
+    const prior=await readPage(lastPage-1);
+    raw=prior.slice(-(8-tail.length)).concat(tail);
+   }else raw=tail.slice(-8);
+   // Newest-first, bounded to eight provider-backed comments.
+   raw.reverse();
   }
   evidence.recent_source_comments=raw.map(c=>{
    if(!Number.isSafeInteger(c?.id)||c.id<1||
