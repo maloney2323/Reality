@@ -1811,6 +1811,18 @@ export default async function handler(req,res){
  }finally{
   // Independently attest actual completion or failure even when a worker
   // response has already been sent. No false 'successful job' claim.
+  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
+   const result=res.statusCode>=500?'FAILED':'COMPLETED';
+   const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
+    workerStage:'UNCLASSIFIED_STAGE';
+   try{
+    await shiftRpc(activePulseDb,'reality_record_signed_worker_actual_run_v1',{
+     p_run_id:actualWorkerRunId,p_status:result,p_stage:stage
+    });
+   }catch{
+    console.warn('REALITY_SIGNED_WORKER_FINAL_ATTESTATION_UNAVAILABLE');
+   }
+  }
   // A failed release leaves a bounded lease, not another concurrent worker.
   // This does not settle customer work or change any authorization.
   if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
@@ -1822,18 +1834,6 @@ export default async function handler(req,res){
      console.warn('REALITY_SHIFT_WORKER_WAKE_LEASE_NOT_RELEASED');
    }catch{
     console.warn('REALITY_SHIFT_WORKER_WAKE_LEASE_RELEASE_UNVERIFIED');
-   }
-  }
-  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
-   const result=res.statusCode>=500?'FAILED':'COMPLETED';
-   const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
-    workerStage:'UNCLASSIFIED_STAGE';
-   try{
-    await shiftRpc(activePulseDb,'reality_record_signed_worker_actual_run_v1',{
-     p_run_id:actualWorkerRunId,p_status:result,p_stage:stage
-    });
-   }catch{
-    console.warn('REALITY_SIGNED_WORKER_FINAL_ATTESTATION_UNAVAILABLE');
    }
   }
  }
