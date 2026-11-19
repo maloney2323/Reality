@@ -103,7 +103,7 @@ test('CI broker, workflow and DB close no customer original and cannot invent a 
  const broker=read('supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts');
  const worker=read('api/reality/governed-employee-shift-worker.js');
  const runner=read('scripts/reality-maintenance-signed-case-ci-runner-v1.mjs');
- const workflow=read('.github/workflows/reality-signed-maintenance-case-ci-v1.yml');
+ const workflow=read('.github/workflows/reality-registered-signed-maintenance-executor-v1.yml');
  assert.match(sql,/independent_frozen_test_receipt_sha256 is null/);
  assert.match(sql,/reality_read_signed_maintenance_ci_dispatch_scope_v1/);
  assert.match(sql,/reality_record_signed_maintenance_ci_dispatch_v1/);
