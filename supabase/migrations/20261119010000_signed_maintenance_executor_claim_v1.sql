@@ -9,8 +9,10 @@ CREATE TABLE IF NOT EXISTS reality_internal.signed_maintenance_executor_claims_v
  action text NOT NULL CHECK (action IN
   ('RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
    'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI')),
- state text NOT NULL DEFAULT 'CLAIMED' CHECK (state='CLAIMED'),
- claimed_at timestamptz NOT NULL DEFAULT now()
+ state text NOT NULL DEFAULT 'CLAIMED' CHECK (state IN ('CLAIMED','FAILED_RETRYABLE','COMPLETED')),
+ claimed_at timestamptz NOT NULL DEFAULT now(),
+ lease_expires_at timestamptz NOT NULL DEFAULT (now()+interval '10 minutes'),
+ attempt_count integer NOT NULL DEFAULT 1 CHECK (attempt_count BETWEEN 1 AND 3)
 );
 REVOKE ALL ON reality_internal.signed_maintenance_executor_claims_v1 FROM PUBLIC, anon, authenticated;
 CREATE OR REPLACE FUNCTION public.reality_claim_signed_maintenance_executor_v1(
@@ -49,7 +51,9 @@ BEGIN
       AND sc.entry->>'origin_shift_id'=m.origin_shift_id::text
       AND sc.entry->>'independent_review_receipt_sha256'=m.independent_review_receipt_sha256)
    AND NOT EXISTS (SELECT 1 FROM reality_internal.signed_maintenance_executor_claims_v1 c
-                   WHERE c.maintenance_id=ep.maintenance_id)
+                   WHERE c.maintenance_id=ep.maintenance_id
+                     AND (c.state='COMPLETED' OR c.attempt_count>=3 OR
+                          (c.state='CLAIMED' AND c.lease_expires_at>now())))
  ORDER BY ep.recorded_at,ep.maintenance_id LIMIT 1 FOR UPDATE OF ep SKIP LOCKED;
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
   'status','NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR',
@@ -64,7 +68,16 @@ BEGIN
  source_epoch_receipt_sha256,action)
  VALUES(e.maintenance_id,e.owner_id,e.shift_id,p_worker_run_id,
         e.source_ref,e.receipt_sha256,a)
- ON CONFLICT DO NOTHING RETURNING * INTO claimed;
+ ON CONFLICT (maintenance_id) DO UPDATE SET
+  worker_run_id=EXCLUDED.worker_run_id,
+  claimed_at=now(),lease_expires_at=now()+interval '10 minutes',
+  attempt_count=reality_internal.signed_maintenance_executor_claims_v1.attempt_count+1,
+  state='CLAIMED'
+ WHERE reality_internal.signed_maintenance_executor_claims_v1.attempt_count<3
+   AND reality_internal.signed_maintenance_executor_claims_v1.state<>'COMPLETED'
+   AND (reality_internal.signed_maintenance_executor_claims_v1.state='FAILED_RETRYABLE'
+     OR reality_internal.signed_maintenance_executor_claims_v1.lease_expires_at<=now())
+ RETURNING * INTO claimed;
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
   'status','MAINTENANCE_EXECUTOR_ALREADY_CLAIMED',
   'handoff_executed',false,'independent_frozen_ci_red_verified',false,
@@ -75,7 +88,8 @@ BEGIN
   'maintenance_id',claimed.maintenance_id,'shift_id',claimed.shift_id,
   'worker_run_id',claimed.worker_run_id,'source_ref',claimed.source_ref,
   'source_epoch_receipt_sha256',claimed.source_epoch_receipt_sha256,
-  'next_action',claimed.action,'handoff_executed',false,
+  'next_action',claimed.action,'claim_attempt',claimed.attempt_count,
+  'lease_expires_at',claimed.lease_expires_at,'handoff_executed',false,
   'independent_frozen_ci_red_verified',false,'original_job_completed',false,
   'installation_authorized',false,'production_changed',false);
 END $$;
