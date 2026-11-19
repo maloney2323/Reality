@@ -5,7 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
-import {shiftDatabase,shiftRpc,assertShiftReadback}
+import {shiftDatabase,shiftRpc,assertShiftReadback,
+ isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
 import {processGovernedEmployeeShiftTick}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
@@ -1809,8 +1810,7 @@ export default async function handler(req,res){
   console.warn('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage);
   // Classify transport failure without exposing RPC credentials or sending
   // another database write while the boundary is demonstrably unavailable.
-  shiftDbTransportUnreachable=/^SHIFT_DATABASE_RPC_[A-Z0-9_]+_(TIMEOUT|UNAVAILABLE)$/
-    .test(String(error?.message||''));
+  shiftDbTransportUnreachable=isShiftDatabaseTransportUnreachable(error);
   if(shiftDbTransportUnreachable)
    console.warn('REALITY_SHIFT_WORKER_DATABASE_TRANSPORT_UNAVAILABLE');
   const safeStage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
