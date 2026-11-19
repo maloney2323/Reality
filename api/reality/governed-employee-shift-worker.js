@@ -395,8 +395,8 @@ export default async function handler(req,res){
   workerStage='SIGNED_MAINTENANCE_EPOCH_HANDOFF_CLASSIFICATION';
   const maintenanceEpochHandoff=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-   maintenanceCiSourceEpoch?.receipt_sha256&&
-   /^sha256:[a-f0-9]{64}$/.test(maintenanceCiSourceEpoch.receipt_sha256)&&
+   maintenanceCiSourceEpoch?.source_epoch_receipt_sha256&&
+   /^sha256:[a-f0-9]{64}$/.test(maintenanceCiSourceEpoch.source_epoch_receipt_sha256)&&
    maintenanceCiSourceEpoch?.installation_authorized===false&&
    maintenanceCiSourceEpoch?.production_changed===false?
     Object.freeze({
@@ -407,7 +407,7 @@ export default async function handler(req,res){
       'SOURCE_EPOCH_CHANGED_REQUALIFICATION_REQUIRED'?
        'MAINTENANCE_SOURCE_REQUALIFICATION_HANDOFF_REQUIRES_EXECUTOR':
        'MAINTENANCE_EPOCH_HANDOFF_NOT_QUALIFIED',
-     source_epoch_receipt_sha256:maintenanceCiSourceEpoch.receipt_sha256,
+     source_epoch_receipt_sha256:maintenanceCiSourceEpoch.source_epoch_receipt_sha256,
      executable_frozen_ci_red_verified:false,
      handoff_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false
