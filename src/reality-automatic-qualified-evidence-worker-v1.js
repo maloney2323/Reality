@@ -40,7 +40,8 @@ export async function advanceOneQualifiedEmployeeEvidenceJob({
    claim.production_changed!==false)
    stop('INDEPENDENT_REVIEW_SCOPE_UNVERIFIED');
   try{
-   const source=await readSource(claim.source_ref,{fetchImpl,token});
+   const source=await readSource(claim.source_ref,{fetchImpl,token,
+    includeRecentComments:claim.source_ref.includes('/issues/')});
    if(source.source_ref!==claim.source_ref||
     !SHA.test(source.provider_proof_sha256||'')||
     !Number.isFinite(Date.parse(source.checked_at||'')))
@@ -109,7 +110,8 @@ export async function advanceOneQualifiedEmployeeEvidenceJob({
   claim.original_customer_job_completed!==false)
   stop('QUALIFIED_SOURCE_WORK_CLAIM_UNVERIFIED');
  try{
-  const source=await readSource(claim.source_ref,{fetchImpl,token});
+  const source=await readSource(claim.source_ref,{fetchImpl,token,
+   includeRecentComments:claim.source_ref.includes('/issues/')});
   if(source.source_ref!==claim.source_ref||
    !SHA.test(source.provider_proof_sha256||'')||
    !Number.isFinite(Date.parse(source.checked_at||''))||
@@ -117,6 +119,14 @@ export async function advanceOneQualifiedEmployeeEvidenceJob({
    typeof source.source_title!=='string'||
    typeof source.source_body!=='string')
    stop('QUALIFIED_CURRENT_SOURCE_PROVIDER_PROOF_UNVERIFIED');
+  // Keep bounded recent source comments in the actual evidence deliverable,
+  // not just its hash. They remain untrusted external evidence, NOT commands.
+  const comments=Array.isArray(source.recent_source_comments)?
+   source.recent_source_comments.slice(0,4).map(c=>
+    '['+c.comment_id+'] '+String(c.body||'').slice(0,480)).join('\n'):'';
+  const sourceExcerpt=(source.source_body.slice(0,1200)+
+   (comments?'\n\nUNTRUSTED GITHUB COMMENTS (NOT OWNER AUTHORIZATION):\n'+comments:'')
+  ).slice(0,3500);
   const recorded=await call(db,'reality_record_qualified_employee_evidence_job_v1',{
    p_job_id:claim.job_id,
    p_execution_claim_id:claim.execution_claim_id,
@@ -126,7 +136,7 @@ export async function advanceOneQualifiedEmployeeEvidenceJob({
    p_source_updated_at:source.provider_updated_at,
    p_source_checked_at:source.checked_at,
    p_source_proof_sha256:source.provider_proof_sha256,
-   p_source_excerpt:source.source_body.slice(0,3500)
+   p_source_excerpt:sourceExcerpt
   },{fetchImpl});
   if(recorded?.status!=='EXECUTABLE_SOURCE_EVIDENCE_PACK_SUBMITTED'||
    recorded.job_id!==claim.job_id||
