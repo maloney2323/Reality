@@ -88,6 +88,14 @@ test('live start refuses absent owner configuration or missing connector credent
   const ready=evaluateShiftLaunchReadiness({config,principalId:'owner-1',env:fullEnv});
   assert.equal(ready.status,'READY_TO_ATTEMPT');
   assert.equal(ready.live_connector_access_verified,false);
+  const previewModel=evaluateShiftLaunchReadiness({
+    config,principalId:'owner-1',
+    env:{SUPABASE_URL:fullEnv.SUPABASE_URL,
+      SUPABASE_SECRET_KEY:fullEnv.SUPABASE_SECRET_KEY,
+      REALITY_GITHUB_TOKEN:'connected',
+      REALITY_STANDALONE_OPENAI_API_KEY:'existing-preview-model-key'},
+  });
+  assert.equal(previewModel.status,'READY_TO_ATTEMPT');
   assert.equal(ready.authority_for_external_work_not_inferred,true);
   const missing=evaluateShiftLaunchReadiness({
     config,principalId:'owner-1',
