@@ -1,0 +1,19 @@
+name: Reality immutable maintenance external CI evidence
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261119200000_maintenance_external_frozen_evidence_v1.sql'
+      - 'test/reality-maintenance-external-ci-evidence.test.js'
+      - '.github/workflows/reality-maintenance-external-ci-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  maintenance-ci-evidence-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify external evidence never implies self-repair or install
+        run: node --test test/reality-maintenance-external-ci-evidence.test.js
