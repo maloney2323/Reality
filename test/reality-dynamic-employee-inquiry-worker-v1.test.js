@@ -164,7 +164,7 @@ test('GitHub issue comments are provider-verified evidence only, never owner aut
     title:'Unfinished repair',body:'Original issue text',updated_at:checked,
     comments:1
    })};
-   assert.match(url,/\/issues\/12\/comments\?per_page=8&sort=created&direction=desc$/);
+   assert.match(url,/\/issues\/12\/comments\?per_page=20&page=1$/);
    return {ok:true,json:async()=>[{
     id:7016689201,html_url:ref+'#issuecomment-7016689201',
     user:{login:'maloney2323'},created_at:checked,
@@ -180,6 +180,38 @@ test('GitHub issue comments are provider-verified evidence only, never owner aut
  assert.equal(out.recent_source_comments[0].installation_authorized,false);
  assert.match(out.provider_proof_sha256,/^sha256:[a-f0-9]{64}$/);
 });
+test('source comment intake selects the newest eight across paginated GitHub history',async()=>{
+ const checked=now();
+ const mk=(i)=>({
+  id:7000000000+i,html_url:ref+'#issuecomment-'+(7000000000+i),
+  user:{login:'maloney2323'},created_at:checked,body:'Source evidence #'+i
+ });
+ const pages=[];
+ const out=await readFreshEmployeeInquirySource(ref,{
+  includeRecentComments:true,fetchImpl:async url=>{
+   if(url.endsWith('/issues/12'))return {ok:true,json:async()=>({
+    number:12,html_url:ref,state:'open',
+    repository_url:'https://api.github.com/repos/example/repo',
+    title:'Continuity test',body:'Original issue',updated_at:checked,
+    comments:22
+   })};
+   pages.push(url);
+   if(url.endsWith('per_page=20&page=2'))
+    return {ok:true,json:async()=>[mk(21),mk(22)]};
+   assert.match(url,/per_page=20&page=1$/);
+   return {ok:true,json:async()=>Array.from({length:20},(_,i)=>mk(i+1))};
+  }
+ });
+ assert.equal(pages.length,2);
+ assert.equal(out.comment_coverage,'LATEST_EIGHT_ONLY');
+ assert.deepEqual(out.recent_source_comments.map(x=>x.comment_id),
+  [22,21,20,19,18,17,16,15].map(x=>7000000000+x));
+ assert.equal(out.recent_source_comments.some(x=>x.comment_id===7000000001),false);
+ assert.equal(out.recent_source_comments.every(x=>
+  x.evidence_only_not_owner_authentication===true&&
+  x.installation_authorized===false),true);
+});
+
 test('spoofed issue-comment provenance or absent comment readback fails closed',async()=>{
  const checked=now();
  const issue={number:12,html_url:ref,state:'open',
