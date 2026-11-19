@@ -5,6 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
+import {attestOneSignedMaintenanceCiSourceEpoch}
+ from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback,
  isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
@@ -358,6 +360,31 @@ export default async function handler(req,res){
     })):
     {status:'NO_CURRENT_SIGNED_MAINTENANCE_CI_PREFLIGHT',
      read_only:true,executable_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // The existing signed worker independently reads the currently observed
+  // GitHub source twice and durably binds the exact maintenance incident
+  // and review/baseline to that source epoch. An epoch change is recorded,
+  // not silently treated as executable frozen CI RED or a completed repair.
+  workerStage='SIGNED_MAINTENANCE_CI_CURRENT_PROVIDER_SOURCE_ATTESTATION';
+  const maintenanceCiSourceEpoch=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await attestOneSignedMaintenanceCiSourceEpoch({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,
+     preflight:signedMaintenanceCiPreflight,fetchImpl:fetch
+    }).catch(error=>({
+     status:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_MAINTENANCE_CI_SOURCE_DATABASE_UNAVAILABLE':
+      'SIGNED_MAINTENANCE_CI_SOURCE_PROOF_UNVERIFIED',
+     source_current_epoch_verified:false,
+     independent_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_CI_SOURCE_SCOPE',
+     source_current_epoch_verified:false,
+     independent_frozen_ci_red_verified:false,
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
   // The same evidence job is allowed ONE bounded requalification when
@@ -1751,6 +1778,7 @@ export default async function handler(req,res){
     signed_internal_maintenance_work:internalMaintenanceWork,
     signed_maintenance_failure_baseline:maintenanceFailureBaseline,
     signed_maintenance_ci_preflight:signedMaintenanceCiPreflight,
+    signed_maintenance_ci_source_epoch:maintenanceCiSourceEpoch,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
