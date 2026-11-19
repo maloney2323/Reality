@@ -152,3 +152,23 @@ test('owner service receipt migration joins only same owner maintenance claim',(
  assert.match(sql,/current_user<>'service_role'/);
  assert.doesNotMatch(sql,/\bUPDATE reality_internal\b|\bINSERT INTO reality_internal\b/i);
 });
+
+test('source requalification remains owner-verifiable after same incident advances to CI',()=>{
+ const prior={...maintenance[1],
+  signed_executor_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+  signed_executor_state:'CLAIMED',signed_executor_attempt_count:1,
+  source_requalification_receipt_sha256:hash};
+ const pending=projectOwnerInternalMaintenanceContinuity(
+  {...readback,items:[prior],count:1},{ownerId:owner,shifts:[]});
+ assert.equal(pending.open_count,1);
+ assert.equal(pending.items[0].source_requalification_receipt_sha256,hash);
+ assert.equal(pending.items[0].repair_verified,false);
+ const completed=projectOwnerInternalMaintenanceContinuity(
+  {...readback,items:[{...prior,signed_executor_state:'COMPLETED',
+   ci_dispatch_receipt_sha256:hash,ci_github_trigger_commit_sha:'a'.repeat(40)}],
+   count:1},{ownerId:owner,shifts:[]});
+ assert.equal(completed.items[0].ci_dispatch_receipt_sha256,hash);
+ assert.equal(completed.items[0].source_requalification_receipt_sha256,hash);
+ assert.equal(completed.customer_job_completed,false);
+ assert.equal(completed.owner_authority_granted,false);
+});
