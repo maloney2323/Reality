@@ -131,9 +131,23 @@ export async function generateOneSignedMaintenanceRepairCandidate({
    p_release_sha:env.VERCEL_GIT_COMMIT_SHA
   },{fetchImpl});
  }
+ if(c?.status==='NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY'&&
+    c.model_invocation_authorized===false&&
+    c.installation_authorized===false&&c.production_changed===false&&
+    c.original_job_completed===false&&c.new_shift_started===false){
+  // A DIFFERENT signed reviewer must have verified that the prior model
+  // source path is outside this executor's real dependency graph.
+  // One revisable candidate may be reselected against the constrained
+  // source manifest; the rejected source patch stays in immutable history.
+  c=await call(db,'reality_revise_signed_offtarget_maintenance_candidate_v1',{
+   p_shift_id:shiftId,p_worker_run_id:workerRunId,
+   p_release_sha:env.VERCEL_GIT_COMMIT_SHA
+  },{fetchImpl});
+ }
  if(['NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY',
      'SIGNED_MAINTENANCE_MODEL_CANDIDATE_ALREADY_CLAIMED_NO_REPLAY',
-     'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY'].includes(c?.status)){
+     'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY',
+     'NO_SIGNED_OFFTARGET_MODEL_REVISION_READY'].includes(c?.status)){
   if(c.model_invocation_authorized!==false||
      c.installation_authorized!==false||c.production_changed!==false||
      c.original_job_completed!==false||c.new_shift_started!==false)
