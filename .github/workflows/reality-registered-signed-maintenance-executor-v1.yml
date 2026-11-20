@@ -43,6 +43,7 @@ on:
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
       - 'scripts/reality-maintenance-sourcebound-case-ci-v1.mjs'
       - 'scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs'
+      - 'reality-maintenance-ci-triggers/**'
       - 'reality-maintenance-case-specs/**'
       - 'test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js'
       - 'src/reality-qualified-source-requalification-v1.js'
