@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 import {isProportionalReadOnlyChat}
  from '../src/reality-chat-proportional-readonly-v1.js';
 import {CHAT_WORK_CAPABILITIES,isExplicitSignedShiftContinuation,
- continueSignedExistingEmployeeShift,processSignedSavedChatWork}
+ continueSignedExistingEmployeeShift,readSignedExistingShiftWakeStatus,
+ processSignedSavedChatWork}
  from '../src/reality-saved-chat-work-adapter-v1.js';
 
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -146,4 +147,57 @@ test('Chat composer and cognition both classify explicit same-shift continuation
   '../src/reality-saved-chat-work-adapter-v1.js',import.meta.url),'utf8');
  assert.match(adapter,/if\(isExplicitSignedShiftContinuation\(signed\.text\)\)/);
  assert.match(adapter,/return await continueExistingShift\(args\)/);
+});
+
+test('saved Chat shift wake can be independently read back after reload, with no replay',async()=>{
+ let calls=0;
+ const result=await readSignedExistingShiftWakeStatus({...args,env,
+  dbFactory:()=>db,
+  callRpc:async(_db,name,payload)=>{
+   calls++;
+   assert.equal(name,'reality_read_existing_chat_maintenance_wake_v1');
+   assert.deepEqual(payload,{p_owner_id:owner,p_conversation_id:conversationId,
+    p_request_id:requestId});
+   return {...verifiedReceipt('CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED'),
+    conversation_id:conversationId,wake_enqueued:true,
+    worker_execution_verified_for_this_request:false,
+    shift_status:'AWAITING_EXACT_ORIGINAL_WORK',
+    wake_count:396,
+    last_worker_safe_result:
+     'SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED'};
+  }
+ });
+ assert.equal(calls,1);
+ assert.equal(result.status,'CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED');
+ assert.equal(result.wake_enqueued,true);
+ assert.equal(result.shift_id,shiftId);
+ assert.equal(result.worker_execution_verified,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.new_shift_started,false);
+});
+test('readback cannot interpret another owner receipt or installation as authorized',async()=>{
+ await assert.rejects(()=>readSignedExistingShiftWakeStatus({...args,env,
+  dbFactory:()=>db,callRpc:async()=>({
+   ...verifiedReceipt('CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED'),
+   conversation_id:conversationId,wake_enqueued:true,
+   worker_execution_verified_for_this_request:false,owner_id:requestId
+  })}),/CHAT_WORK_EXISTING_SHIFT_READBACK_UNVERIFIED/);
+});
+test('reload timeline renders persisted signed shift receipt, not a second work action',()=>{
+ const js=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',
+  import.meta.url),'utf8');
+ assert.match(js,/READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS/);
+ assert.match(js,/CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED/);
+ assert.match(js,/const signedShiftCommand=text=>/);
+ assert.match(js,/signedShiftCommand\(m\.text\)/);
+ const api=readFileSync(new URL('../api/reality/personal-chat-work.js',
+  import.meta.url),'utf8');
+ assert.match(api,/await readSignedExistingShiftWakeStatus\(args\)/);
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261120025000_read_signed_existing_chat_maintenance_wake_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/reality_chat_messages m/);
+ assert.match(sql,/revoke all on function/);
+ assert.doesNotMatch(sql,/net\.http_post|insert into|update reality_internal/);
 });
