@@ -10,6 +10,16 @@ on:
       - 'test/reality-governed-continuity-evidence-classifier-v1.test.js'
       - 'reality-chat-maintenance-continuation-v1.js'
       - '.github/workflows/reality-signed-maintenance-target-continuation-v1.yml'
+      - 'src/reality-signed-maintenance-approved-install-bridge-v1.js'
+      - 'src/reality-signed-maintenance-postinstall-verification-bridge-v1.js'
+      - 'api/reality/signed-maintenance-exact-install-approval.js'
+      - 'api/reality/personal-governed-employee-shift.js'
+      - 'supabase/functions/reality-governed-general-original-installer-v1/**'
+      - 'supabase/functions/reality-governed-general-original-postinstall-verifier-v1/**'
+      - 'supabase/migrations/20261120214500_signed_existing_maintenance_exact_owner_install_v1.sql'
+      - 'supabase/migrations/20261120215000_signed_existing_maintenance_independent_postinstall_v1.sql'
+      - 'supabase/migrations/20261120215200_signed_install_continue_next_maintenance_v2.sql'
+      - 'test/reality-signed-maintenance-exact-full-loop-v1.test.js'
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,8 +41,13 @@ jobs:
           node --check api/reality/governed-employee-shift-worker.js
           node --check src/reality-governed-continuity-evidence-classifier-v1.js
           node --check reality-chat-maintenance-continuation-v1.js
+          node --check src/reality-signed-maintenance-approved-install-bridge-v1.js
+          node --check src/reality-signed-maintenance-postinstall-verification-bridge-v1.js
+          node --check api/reality/signed-maintenance-exact-install-approval.js
+          node --check api/reality/personal-governed-employee-shift.js
           node --test test/reality-signed-maintenance-install-target-review-v1.test.js
           node --test test/reality-governed-continuity-evidence-classifier-v1.test.js
           node --test test/reality-unified-chat-maintenance-continuation-v1.test.js
+          node --test test/reality-signed-maintenance-exact-full-loop-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
