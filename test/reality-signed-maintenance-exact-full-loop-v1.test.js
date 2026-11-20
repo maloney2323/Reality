@@ -138,6 +138,9 @@ test('independent verifier requires real installed source, push workflow and Ver
  assert.match(p,/run\.head_sha|head_sha===s\.installed_commit_sha/);
  assert.match(p,/x\.event==='push'/);
  assert.match(p,/x\.app\?\.slug==='vercel'/);
+ assert.match(p,/providerStatus\?\.state==='success'/);
+ assert.match(p,/x\.context==='Vercel'/);
+ assert.match(p,/x\.target_url/);
  assert.match(p,/source\(token,s\.source_path,s\.installed_commit_sha\)/);
  assert.match(p,/reality_record_signed_maintenance_independent_postinstall_v1/);
  assert.match(p,/original_job_completed:false/);
