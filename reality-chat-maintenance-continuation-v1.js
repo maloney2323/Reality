@@ -638,6 +638,60 @@
   // which freshly re-reads the scope and refuses an uncertain duplicate.
   if(!inlineContinue.disabled&&!authorize.disabled)authorize.click();
  });
+ installApprove.addEventListener('click',async()=>{
+  // No model, assistant message or ordinary Chat reply can press this.
+  // Each click re-reads the owner's exact signed artifact before one POST.
+  if(!signedIn()||loading||authorizing||installAuthorizing||
+   installUncertain||installApprove.disabled||!approvedScope?.exactInstallCard)
+   return;
+  const prior=approvedScope.exactInstallCard;
+  installAuthorizing=true;installApprove.disabled=true;reload.disabled=true;
+  try{
+   const fresh=await read();
+   const c=fresh.exactInstallCard;
+   if(!c||c.shift_id!==prior.shift_id||
+    c.maintenance_id!==prior.maintenance_id||
+    c.candidate_commit_sha!==prior.candidate_commit_sha||
+    c.target_head_sha!==prior.target_head_sha||
+    c.target_review_receipt_sha256!==prior.target_review_receipt_sha256||
+    c.artifact_receipt_sha256!==prior.artifact_receipt_sha256)
+    fail('EXACT_INSTALL_ARTIFACT_CHANGED_REFRESH_BEFORE_APPROVAL');
+   if(typeof crypto?.randomUUID!=='function')
+    fail('SECURE_REQUEST_ID_UNAVAILABLE');
+   feedback.textContent='Recording one exact preview installation approval. The existing shift will continue automatically.';
+   const response=await fetch('/api/reality/signed-maintenance-exact-install-approval',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+     maintenance_id:c.maintenance_id,shift_id:c.shift_id,
+     candidate_commit_sha:c.candidate_commit_sha,
+     target_review_receipt_sha256:c.target_review_receipt_sha256,
+     intent:'OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR',
+     request_id:crypto.randomUUID()
+    }),signal:AbortSignal.timeout(25000)
+   });
+   const r=await response.json().catch(()=>null);
+   if(!response.ok||r?.ok!==true||
+    r.status!=='EXACT_SIGNED_OWNER_APPROVAL_RECORDED_AUTO_CONTINUATION'||
+    r.shift_id!==c.shift_id||r.maintenance_id!==c.maintenance_id||
+    !UUID.test(r.approval_id||'')||!SHA.test(r.approval_receipt_sha256||'')||
+    r.installation_authorized!==true||
+    r.installation_completed!==false||r.original_job_completed!==false||
+    r.production_changed!==false||r.new_shift_started!==false||
+    r.no_third_confirmation!==true)
+    fail('EXACT_INSTALL_APPROVAL_OUTCOME_UNVERIFIED');
+   installUncertain=true;
+   installApprove.hidden=true;installApprove.disabled=true;
+   hintLabel.textContent='Reality recorded the exact owner approval. The SAME signed shift must now install, independently verify and resume the unfinished work.';
+   feedback.textContent='Owner approval receipt '+r.approval_receipt_sha256+
+    ' recorded. No repeat approval or shift restart. Installation and final job verification are pending.';
+   void refresh();
+  }catch(e){
+   installUncertain=true;installApprove.disabled=true;
+   feedback.textContent='The exact installation decision could not be independently confirmed ('+
+    safeError(e)+'). Use Check status before any further action. No automatic retry.';
+  }finally{installAuthorizing=false;reload.disabled=false}
+ });
  reload.addEventListener('click',()=>{if(!authorizing)void refresh()});
  authorize.addEventListener('click',async()=>{
   // The only POST path in this module is this REAL owner button event.
