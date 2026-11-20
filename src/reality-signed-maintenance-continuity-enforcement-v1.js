@@ -226,6 +226,86 @@ export async function enforceSignedMaintenanceReceiptContinuity({
   e.payload?.signed_maintenance_step==='OWNER_EXACT_APPROVAL'&&
   e.payload?.receipt_sha256===card.approval_receipt_sha256);
  if(!approved)bad('APPROVAL_NOT_IN_DURABLE_CONTINUITY');
+ // A recorded installer source write is NOT an independently accepted
+ // repair. Preserve that distinction and let the separate postinstall
+ // verifier establish actual bytes, GitHub CI and preview delivery.
+ if(card.decision_state==='INSTALLED')
+  return safe('CONTINUITY_INSTALLED_PENDING_INDEPENDENT_POSTINSTALL',{
+   continuity_committed:true,continuity_root_id:spine.continuity_root_id,
+   latest_event_id:authority.event_id,newly_recorded_events:newlyRecorded,
+   next_authorized_action:'VERIFY_INSTALLED_SOURCE_WITH_SEPARATE_PROVIDER'
+  });
+ if(card.decision_state==='VERIFIED'){
+  // The service-only owner readback is joined to the same exact previously
+  // fenced one-use decision. This receipt is written only after the verifier
+  // independently accepts installed bytes, GitHub CI and Vercel delivery.
+  if(!GIT.test(card.installed_commit_sha||'')||
+   !HASH.test(card.independent_postinstall_receipt_sha256||'')||
+   !Number.isSafeInteger(card.independent_ci_run_id)||
+   card.independent_ci_run_id<1||
+   !Number.isSafeInteger(card.independent_vercel_check_id)||
+   card.independent_vercel_check_id<1||
+   card.repair_installed!==true)
+   bad('INDEPENDENT_POSTINSTALL_RECEIPT_INCOMPLETE');
+  const final=await commit({
+   stage:'VERIFICATION',step:'INDEPENDENT_POSTINSTALL_ACCEPTED',
+   receipt:card.independent_postinstall_receipt_sha256,
+   refs:[card.target_review_receipt_sha256,card.approval_receipt_sha256,
+    card.independent_postinstall_receipt_sha256],
+   payload:{
+    verified_fact:'INDEPENDENT_INSTALLED_SOURCE_GITHUB_CI_AND_VERCEL',
+    installed_commit_sha:card.installed_commit_sha,
+    independent_ci_run_id:card.independent_ci_run_id,
+    independent_vercel_check_id:card.independent_vercel_check_id,
+    // Repairing an internal capability does NOT settle a customer original.
+    repair_verified:true,original_customer_job_completed:false,
+    next_required_action:'RECONCILE_UNFINISHED_SAME_SIGNED_SHIFT'
+   }
+  });
+  // Classifier consumes the verified receipt; the signed original-work
+  // gate alone supplies the next obligation. Never invent an executable
+  // customer job or grant additional authority from the classifier.
+  const next=originalGate.next_action;
+  const validNext=new Set([
+   'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
+   'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+   'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'
+  ]);
+  if(validNext.has(next)&&
+   /^work:[a-f0-9]{32}$/.test(originalGate.original_work_id||'')&&
+   /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(
+    originalGate.source_ref||'')){
+   const nextWork=await commit({
+    stage:'WORK',step:'NEXT_SIGNED_ORIGINAL_OBLIGATION_RECONCILED',
+    receipt:card.independent_postinstall_receipt_sha256,
+    refs:[final.event_id,card.independent_postinstall_receipt_sha256],
+    payload:{
+     verified_fact:'CURRENT_ORIGINAL_REMAINS_UNFINISHED',
+     original_work_id:originalGate.original_work_id,
+     original_source_ref:originalGate.source_ref,
+     next_required_action:next,
+     work_executed_by_classification:false,
+     next_external_action_authorized_by_classification:false,
+     original_customer_job_completed:false
+    }
+   });
+   return safe('CONTINUITY_INDEPENDENT_REPAIR_VERIFIED_SAME_SHIFT_RECONCILED',{
+    continuity_committed:true,
+    verified_maintenance_repair_only:true,
+    continuity_root_id:spine.continuity_root_id,
+    latest_event_id:nextWork.event_id,
+    newly_recorded_events:newlyRecorded,
+    next_authorized_action:next,
+    original_work_id:originalGate.original_work_id
+   });
+  }
+  return safe('CONTINUITY_INDEPENDENT_REPAIR_VERIFIED_NEXT_WORK_UNQUALIFIED',{
+   continuity_committed:true,verified_maintenance_repair_only:true,
+   continuity_root_id:spine.continuity_root_id,
+   latest_event_id:final.event_id,newly_recorded_events:newlyRecorded,
+   next_authorized_action:'VERIFY_ORIGINAL_WORK_SCOPE_BEFORE_NEXT_EXECUTION'
+  });
+ }
  return safe(card.decision_state==='APPROVED'?
   'CONTINUITY_VERIFIED_APPROVAL_RECEIPTED_INSTALL_ELIGIBLE':
   'CONTINUITY_VERIFIED_APPROVAL_FENCED_OR_INSTALLED',{
