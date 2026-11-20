@@ -126,6 +126,7 @@ export async function enforceSignedMaintenanceReceiptContinuity({
    spine,stage,
    entityId:'maintenance:'+identity,
    eventId:'reality:signed-maintenance:'+shiftId+':'+identity+':'+receipt,
+   parentEventId:spine.last_event_id,priorLineageHash:spine.last_lineage_hash,
    evidenceRefs:refs,epistemicStatus:'VERIFIED',
    effectiveTime:attestedAt,assertionTime:attestedAt,
    payload:Object.freeze({
