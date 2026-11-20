@@ -130,6 +130,8 @@ import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
+import {generateOneSignedMaintenanceRepairCandidate}
+ from '../../src/reality-signed-maintenance-repair-model-candidate-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -605,6 +607,27 @@ export default async function handler(req,res){
     })):
     {status:'NO_AUTHORIZED_MAINTENANCE_REPAIR_HANDOFF_WAKE',
      work_order_created:false,frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false};
+  // One source-pinned LLM candidate for the existing warrant/maintenance
+  // work order, never an installation, frozen CI verdict, or final receipt.
+  workerStage='SIGNED_MAINTENANCE_REPAIR_MODEL_SOURCE_CANDIDATE';
+  const signedMaintenanceRepairModelCandidate=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await generateOneSignedMaintenanceRepairCandidate({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_REPAIR_MODEL_STAGE_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,120),
+     model_generated:false,independent_ci_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_AUTHORIZED_MAINTENANCE_MODEL_WORKER_WAKE',
+     model_generated:false,independent_ci_verified:false,
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false,
      new_shift_started:false};
@@ -2050,6 +2073,7 @@ export default async function handler(req,res){
     signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
     signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
+    signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
