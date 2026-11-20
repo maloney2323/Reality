@@ -9,8 +9,9 @@
  if(!/^\/chat\/?$/.test(window.location.pathname))return;
  const get=id=>document.getElementById(id);
  const ready=get('privateReady'),inbox=get('realityChatApprovalInbox'),
-  thread=get('privateTranscript'),center=get('realityChatConversation');
- if(!ready||!inbox||!thread||!center||get('realityChatMaintenanceContinuation'))return;
+  thread=get('privateTranscript');
+ // Require only actual signed-in Chat anchors; a removed container id must not hide approval.
+ if(!ready||!inbox||!thread||get('realityChatMaintenanceContinuation'))return;
  const URL='/api/reality/personal-governed-employee-shift';
  const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
  const SHA=/^sha256:[0-9a-f]{64}$/;
