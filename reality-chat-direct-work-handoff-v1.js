@@ -293,6 +293,13 @@
  function explain(result){
   const id=WORK.test(result.original_work_id||'')?
    result.original_work_id:null;
+  if(result.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')
+   return 'SIGNED EXISTING SHIFT HANDOFF VERIFIED · '+String(result.shift_id||'')+
+    ' · Network request '+String(result.network_request_id||'')+
+    '. Reality accepted this saved instruction without another shift or approval. '+
+    'Latest signed worker status: '+String(result.last_worker_safe_result||
+     'awaiting independent worker readback').replaceAll('_',' ')+
+    '. This is not an original-job completion receipt.';
   if(result.status==='CHAT_EXISTING_SHIFT_WAKE_ENQUEUED')
    return 'EXISTING AUTHORIZED SHIFT WAKE QUEUED · '+String(result.shift_id||'')+
     ' · Request '+String(result.network_request_id||'')+
@@ -555,12 +562,16 @@
   if(restoring||!UUID.test(x.conversation_id||'')||
      window.realityActiveConversationId?.()!==x.conversation_id||
      !Array.isArray(x.messages))return;
+  const signedShiftCommand=text=>
+   /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+.{0,140}(?:shift|existing|original)/i.test(text)&&
+   !/\b(?:install|deploy|production|approve)\b/i.test(text);
   const recent=x.messages.filter(m=>m?.role==='user'&&
    UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||'')&&
    typeof m.text==='string'&&
-   /\b(?:build|implement|code|repair|fix|develop|upgrade|generate)\b/i.test(m.text))
+   (signedShiftCommand(m.text)||
+    /\b(?:build|implement|code|repair|fix|develop|upgrade|generate)\b/i.test(m.text)))
    .sort((a,b)=>Date.parse(b.created_at||'')-Date.parse(a.created_at||''))
-   .slice(0,3);
+   .slice(0,4);
   if(!recent.length)return;
   restoring=true;
   try{
@@ -569,8 +580,14 @@
      request_id:m.request_id,source_ref:m.source_ref};
     if(lastRestored===key(ref.conversation_id,ref.request_id)&&activeRef?.request_id===ref.request_id)
      return;
-    const result=await call('READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
-    if(result.status!=='CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')
+    const existingShift=signedShiftCommand(m.text);
+    const result=await call(existingShift?
+     'READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS':
+     'READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
+    if(!((existingShift&&result.status===
+      'CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')||
+      (!existingShift&&result.status===
+      'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')))
      continue;
     lastRestored=key(ref.conversation_id,ref.request_id);
     showCheckedResult(result,ref);
