@@ -130,6 +130,8 @@ import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
+import {reconcileSignedVerifiedMaintenanceArtifact}
+ from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
@@ -685,6 +687,25 @@ export default async function handler(req,res){
      repair_installed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false,
      new_shift_started:false};
+  // The EXISTING Reality controller independently reconciles a GitHub
+  // source repair artifact into the same owner-shift ledger. Never install
+  // or approve on the model's behalf; the owner decision remains separate.
+  workerStage='SIGNED_MAINTENANCE_VERIFIED_REPAIR_ARTIFACT_RECONCILIATION';
+  const signedMaintenanceArtifactHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await reconcileSignedVerifiedMaintenanceArtifact({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'EXACT_SIGNED_REPAIR_ARTIFACT_RECONCILIATION_UNVERIFIED',
+     verified_repair_artifact:false,installation_authorized:false,
+     repair_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_ARTIFACT_WORKER_WAKE',
+     verified_repair_artifact:false,installation_authorized:false,
+     repair_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false};
   // A claimed lease cannot be reported as executed or verified.
   // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
@@ -2027,6 +2048,8 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    signedMaintenanceArtifactHandoff?.verified_repair_artifact===true?
+    'SIGNED_MAINTENANCE_EXACT_REPAIR_ARTIFACT_REVIEW_READY':
     signedMaintenanceCanonicalBusinessLineageMissing?
     'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
     signedMaintenanceAuthorizedCaseRedOutstanding?
@@ -2138,6 +2161,7 @@ export default async function handler(req,res){
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
+    signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
