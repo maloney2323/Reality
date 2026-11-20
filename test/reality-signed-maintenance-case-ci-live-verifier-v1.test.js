@@ -124,11 +124,10 @@ test('signed live case CI only records verified GitHub evidence under original w
  for(const phrase of [
   "REALITY_GITHUB_BROKER_TOKEN",
   "verifyOneCase",
-  "case_spec_sha256",
+  "signed_case_spec_blob_sha",
   "verifySuite(red,{expectsRed:true",
   "EXACT_SIGNED_MAINTENANCE_SOURCE_CI_RED_GREEN_INDEPENDENTLY_ATTESTED"
- ])assert.ok(broker.includes(phrase)||phrase==='case_spec_sha256',
-  phrase);
+ ])assert.ok(broker.includes(phrase),phrase);
  assert.doesNotMatch(broker,/method:'PUT'|method:'DELETE'|method:'PATCH'/);
  const worker=readFileSync(new URL(
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
