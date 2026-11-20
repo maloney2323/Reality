@@ -128,6 +128,8 @@ import {executeOneRegisteredMaintenanceAction}
  from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
 import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
+import {continueSignedMaintenanceCaseCiVerification}
+ from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
 import {generateOneSignedMaintenanceRepairCandidate}
@@ -655,6 +657,30 @@ export default async function handler(req,res){
     {status:'NO_AUTHORIZED_MAINTENANCE_MODEL_WORKER_WAKE',
      model_generated:false,independent_ci_verified:false,
      repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false};
+  // Consume actual pinned GitHub RED/GREEN evidence under the same owner
+  // warrant. It is a durable CI proof, not approval to install or a final
+  // original-job completion. The earlier source-bound trigger is reused.
+  workerStage='SIGNED_MAINTENANCE_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION';
+  const signedMaintenanceCaseCiReconciliation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await continueSignedMaintenanceCaseCiVerification({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,100),
+     case_specific_frozen_red_attested:false,
+     code_regression_green_verified:false,
+     repair_installed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_CASE_CI_WAKE',
+     case_specific_frozen_red_attested:false,
+     code_regression_green_verified:false,
+     repair_installed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false,
      new_shift_started:false};
   // A claimed lease cannot be reported as executed or verified.
@@ -2098,6 +2124,7 @@ export default async function handler(req,res){
     signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
     signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
     signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
+    signed_maintenance_sourcecase_ci_reconciliation:signedMaintenanceCaseCiReconciliation,
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
