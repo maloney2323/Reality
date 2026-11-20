@@ -14,7 +14,7 @@ const path='src/reality-shift-business-qualification-review-v1.js';
 const source='// Original signed business qualification worker\n'
  +'export function guardSignedQualifiedWork(){\n'
  +'  return {original_execution_admitted:false,validation_required:true};\n}\n'
- +'// source ending with the actual deterministic guard for the original job\n';
+ +'// source ending with the actual deterministic guard for the original job\n'\n +'// frozen independent source baseline is retained and the model may not change shift authority\n'\n +'// this extra comment keeps this test fixture above the pinned Github minimum source size\n';
 const buf=Buffer.from(source);
 const blob=createHash('sha1').update('blob '+buf.length+'\0')
  .update(buf).digest('hex');
