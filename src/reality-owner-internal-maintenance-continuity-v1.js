@@ -20,7 +20,7 @@ const HANDLING=new Set([
 ]);
 const fail=x=>{throw Error('OWNER_MAINTENANCE_CONTINUITY_'+x)};
 export function projectOwnerInternalMaintenanceContinuity(readback,{ownerId,shifts=[]}={}){
- if(!UUID.test(ownerId||'')||!Array.isArray(shifts)||shifts.length>5||
+ if(!UUID.test(ownerId||'')||!Array.isArray(shifts)||shifts.length>25||
     !readback||readback.status!=='OWNER_VERIFIED_INTERNAL_MAINTENANCE_READ_ONLY'||
     readback.owner_id!==ownerId||readback.read_only!==true||
     readback.shift_started_by_read!==false||
