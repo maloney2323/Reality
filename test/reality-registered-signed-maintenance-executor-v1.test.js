@@ -154,3 +154,22 @@ test('worker is actually wired to registered action and SQL cannot report code r
  assert.match(sql,/revoke all on function public.reality_claim_registered_maintenance_action_v2/);
  assert.doesNotMatch(sql,/update reality_internal.owner_internal_maintenance_jobs_v1\s+set phase='INTERNAL_REPAIR_VERIFIED_CLOSED'/);
 });
+
+test('signed worker recognizes existing warrant and reports next real RED rather than repeat owner approval',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const begin=worker.indexOf('const signedMaintenanceAuthorizedCaseRedOutstanding=');
+ const mode=worker.indexOf('const outcomeCode=',begin);
+ const fall=worker.indexOf('signedReviewStillNeedsOriginalAuthorization?',mode);
+ assert.ok(begin>0&&mode>begin&&fall>mode,
+  'exact current signed-warrant decision must be evaluated before stale denial');
+ const bounded=worker.slice(begin,fall);
+ assert.match(bounded,/EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE/);
+ assert.match(bounded,/RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED/);
+ assert.match(bounded,/original_job_completed===false/);
+ assert.match(bounded,/installation_authorized===false/);
+ assert.match(bounded,/production_changed===false/);
+ assert.match(bounded,/SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED/);
+ assert.match(bounded,/SIGNED_MAINTENANCE_AUTHORIZED_SOURCE_REQUALIFICATION_PENDING/);
+ assert.doesNotMatch(bounded,/authorize_employee_shift_v1|approve_general_original_install/);
+});
