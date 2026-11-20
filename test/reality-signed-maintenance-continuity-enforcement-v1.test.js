@@ -17,6 +17,9 @@ const gate={
  owner_id:owner,shift_id:shift,
  warrant_mode:'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS',
  read_only:true,installation_authorized:false,original_job_completed:false,
+ original_work_id:'work:315562fe1bd66b30a48bb9be4f1d162a',
+ source_ref:'https://github.com/maloney2323/Reality/pull/307',
+ next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
  production_changed:false
 };
 const ready={
@@ -163,4 +166,55 @@ test('worker must refuse automatic installation until canonical approval receipt
  assert.match(worker,/signedMaintenanceCanonicalContinuity\.installer_reconcile_only_from_continuity===true/);
  assert.match(worker,/signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity/);
  assert.doesNotMatch(worker,/source_installed:true,original_job_completed:true/);
+});
+
+test('independent install proof returns to Universe and carries next original work in same shift',async()=>{
+ const verified={...approved,decision_state:'VERIFIED',
+  repair_installed:true,installed_commit_sha:'d'.repeat(40),
+  independent_postinstall_receipt_sha256:HASH('5'),
+  independent_ci_run_id:44809001999,independent_vercel_check_id:981203};
+ const f=fixture(verified);
+ const x=await f.callLoop();
+ assert.equal(x.status,'CONTINUITY_INDEPENDENT_REPAIR_VERIFIED_SAME_SHIFT_RECONCILED');
+ assert.equal(x.verified_maintenance_repair_only,true);
+ assert.equal(x.original_job_completed,false);
+ assert.equal(x.original_work_id,gate.original_work_id);
+ assert.equal(x.next_authorized_action,gate.next_action);
+ assert.equal(x.install_eligible_from_continuity,false);
+ assert.deepEqual(f.events.map(e=>e.event_kind),[
+  'RAW_SIGNAL','VERIFICATION','AUTHORITY','VERIFICATION','WORK'
+ ]);
+ assert.equal(f.events[3].payload.installed_commit_sha,verified.installed_commit_sha);
+ assert.equal(f.events[3].payload.independent_ci_run_id,verified.independent_ci_run_id);
+ assert.equal(f.events[3].payload.receipt_sha256,
+  verified.independent_postinstall_receipt_sha256);
+ assert.equal(f.events[4].payload.original_work_id,gate.original_work_id);
+ assert.equal(f.events[4].payload.work_executed_by_classification,false);
+ assert.equal(f.events[4].payload.original_customer_job_completed,false);
+ assert.equal(orderContinuityHistory(f.events).length,5);
+ const repeat=await f.callLoop();
+ assert.equal(repeat.newly_recorded_events,0);
+ assert.equal(f.events.length,5);
+});
+test('missing postinstall independent receipt fails closed instead of pretending original work resumed',async()=>{
+ for(const v of [
+  {...approved,decision_state:'VERIFIED',repair_installed:true},
+  {...approved,decision_state:'VERIFIED',repair_installed:true,
+   installed_commit_sha:'d'.repeat(40),
+   independent_postinstall_receipt_sha256:HASH('5'),
+   independent_ci_run_id:0,independent_vercel_check_id:981203}
+ ]){
+  const f=fixture(v);
+  await assert.rejects(f.callLoop(),/SIGNED_CONTINUITY_INDEPENDENT_POSTINSTALL_RECEIPT_INCOMPLETE/);
+  assert.equal(f.events.length,3,'only original signal, target and approval can be committed');
+ }
+});
+test('signed worker reconciles independent repair receipt into Universe after verifier but before classifier',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const verification=worker.indexOf('EXACT_SIGNED_MAINTENANCE_INDEPENDENT_POSTINSTALL_VERIFICATION');
+ const universe=worker.indexOf('SIGNED_MAINTENANCE_POSTINSTALL_UNIVERSE_RECONCILIATION');
+ const classification=worker.indexOf('GOVERNED_CONTINUITY_VERIFIED_EVIDENCE_CLASSIFICATION');
+ assert.ok(verification>=0&&universe>verification&&classification>universe);
+ assert.match(worker,/signedMaintenanceIndependentPostinstall\.repair_verified===true/);
+ assert.match(worker,/signed_maintenance_universe_postinstall_return:signedMaintenanceUniverseReconciliation/);
 });
