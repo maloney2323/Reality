@@ -132,6 +132,8 @@ import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
 import {generateOneSignedMaintenanceRepairCandidate}
  from '../../src/reality-signed-maintenance-repair-model-candidate-v1.js';
+import {independentlyReviewSignedMaintenanceTarget}
+ from '../../src/reality-signed-maintenance-candidate-target-review-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -610,6 +612,30 @@ export default async function handler(req,res){
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false,
      new_shift_started:false};
+  // A DISTINCT signed worker checks a saved model candidate against the
+  // pinned module graph of this actual executor. It cannot approve the patch,
+  // call it an independently reproduced RED, install, or settle the original.
+  workerStage='SIGNED_MAINTENANCE_MODEL_CANDIDATE_INDEPENDENT_TARGET_REVIEW';
+  const signedMaintenanceCandidateTargetReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReviewSignedMaintenanceTarget({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_CANDIDATE_TARGET_REVIEW_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,120),
+     independent_target_review_recorded:false,
+     candidate_is_verified_repair:false,
+     independent_frozen_red_verified:false,
+     independent_ci_verified:false,repair_executed:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_AUTHORIZED_SIGNED_CANDIDATE_TARGET_REVIEW_WAKE',
+     candidate_is_verified_repair:false,
+     independent_frozen_red_verified:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
   // One source-pinned LLM candidate for the existing warrant/maintenance
   // work order, never an installation, frozen CI verdict, or final receipt.
   workerStage='SIGNED_MAINTENANCE_REPAIR_MODEL_SOURCE_CANDIDATE';
@@ -2074,6 +2100,7 @@ export default async function handler(req,res){
     signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
+    signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
