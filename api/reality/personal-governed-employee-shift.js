@@ -612,9 +612,12 @@ export default async function handler(req,res){
       'MAINTENANCE_CONTINUATION_EXACT_SCOPE_UNAVAILABLE';
     }
    }
+   // Presentation-only legacy views accept five shifts. The owner ledger
+   // and exact signed maintenance warrant retain ALL authenticated shifts.
+   const presentationShifts=read.shifts.slice(0,5);
    const shift_briefing=buildRealityShiftConversationBrief(
-    read.shifts,handoffs,new Date(),shift_source_native_receipts);
-   const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
+    presentationShifts,handoffs,new Date(),shift_source_native_receipts);
+   const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:presentationShifts,handoffs});
    let draft=null;
    if(hours!==null){
      const catalog=await buildRealityWorkCatalog();
