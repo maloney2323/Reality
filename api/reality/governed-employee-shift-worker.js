@@ -128,6 +128,8 @@ import {executeOneRegisteredMaintenanceAction}
  from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
 import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
+import {advanceSignedExistingMaintenanceRepairHandoff}
+ from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -584,6 +586,28 @@ export default async function handler(req,res){
      independent_diagnostic_verified:false,
      original_job_completed:false,repair_executed:false,
      installation_authorized:false,production_changed:false};
+  // The existing signed executor now preserves a source-bound repair
+  // obligation after real independent diagnostics. Admission is not RED,
+  // code generation, installation, or an original job completion.
+  workerStage='SIGNED_MAINTENANCE_DIAGNOSTIC_TO_REPAIR_HANDOFF';
+  const signedMaintenanceRepairHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceSignedExistingMaintenanceRepairHandoff({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_REPAIR_HANDOFF_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,125),
+     work_order_created:false,frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_AUTHORIZED_MAINTENANCE_REPAIR_HANDOFF_WAKE',
+     work_order_created:false,frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false};
   // A claimed lease cannot be reported as executed or verified.
   // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
@@ -2025,6 +2049,7 @@ export default async function handler(req,res){
     signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
     signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
     signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
+    signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
