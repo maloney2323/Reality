@@ -125,7 +125,7 @@ test('unavailable goal-state provider produces transparent non-durable advisory,
  assert.ok(read>=0&&model>read&&transient>model&&atomic>transient,
   'temporary answer must use the existing model and remain before atomic publication');
  const branch=api.slice(read,atomic);
- assert.match(branch,/if\\(Number\\(epochError\\?\\.status\\)!==503\\)throw epochError/);
+ assert.ok(branch.includes('if(Number(epochError?.status)!==503)throw epochError;'));
  assert.match(branch,/readPrivateChatGoalPublicationEpoch/);
  assert.match(branch,/current_answer_persisted:false/);
  assert.match(branch,/goal_publication_atomicity:'UNAVAILABLE'/);
@@ -134,10 +134,10 @@ test('unavailable goal-state provider produces transparent non-durable advisory,
  assert.match(branch,/reply_recovery_requires_exact_saved_request:true/);
  assert.doesNotMatch(branch,/queueOwnerGovernedBuild|approveOwnerInstall|executeOneRegisteredMaintenanceAction/);
  assert.match(ui,/REALITY · TEMPORARY ANSWER · NOT SAVED · NO EXECUTION/);
- assert.match(ui,/if\\(transientAnswer\\)/);
- assert.match(ui,/No work was authorized\\. Retry this same saved reply/);
- assert.match(ui,/outcome\\.original_request_id===message\\.request_id/);
- assert.match(ui,/outcome\\.execution\\?\\.installation_authorized===false/);
+ assert.ok(ui.includes('if(transientAnswer){'));
+ assert.ok(ui.includes('No work was authorized. Retry this same saved reply'));
+ assert.ok(ui.includes('outcome.original_request_id===message.request_id'));
+ assert.ok(ui.includes('outcome.execution?.installation_authorized===false'));
 });
 
 test('read-only HTTP publication uses existing atomic owner-goal CAS and exact RLS, not a new action engine',()=>{
