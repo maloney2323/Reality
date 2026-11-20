@@ -114,12 +114,26 @@ export async function generateOneSignedMaintenanceRepairCandidate({
  const model=String(env.REALITY_OPENAI_MODEL||'gpt-5.4');
  if(apiKey.length<20||!/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,70}$/.test(model))
   return hold('SIGNED_MAINTENANCE_MODEL_PROVIDER_NOT_CONFIGURED');
- const c=await call(db,'reality_claim_signed_maintenance_repair_candidate_v1',{
+ let c=await call(db,'reality_claim_signed_maintenance_repair_candidate_v1',{
   p_shift_id:shiftId,p_worker_run_id:workerRunId,
   p_release_sha:env.VERCEL_GIT_COMMIT_SHA
  },{fetchImpl});
- if(c?.status==='NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY'||
-    c?.status==='SIGNED_MAINTENANCE_MODEL_CANDIDATE_ALREADY_CLAIMED_NO_REPLAY'){
+ if(c?.status==='NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY'&&
+    c.model_invocation_authorized===false&&
+    c.installation_authorized===false&&c.production_changed===false&&
+    c.original_job_completed===false&&c.new_shift_started===false){
+  // A prior definite SOURCE GET failure may be retried only on a
+  // DIFFERENT pinned release, with the old attempt preserved in history.
+  // SQL atomically fences this to exactly one recovery; never silently
+  // replays an unknown external installation or reuses a consumed claim.
+  c=await call(db,'reality_recover_signed_maintenance_repair_candidate_source_v1',{
+   p_shift_id:shiftId,p_worker_run_id:workerRunId,
+   p_release_sha:env.VERCEL_GIT_COMMIT_SHA
+  },{fetchImpl});
+ }
+ if(['NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY',
+     'SIGNED_MAINTENANCE_MODEL_CANDIDATE_ALREADY_CLAIMED_NO_REPLAY',
+     'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY'].includes(c?.status)){
   if(c.model_invocation_authorized!==false||
      c.installation_authorized!==false||c.production_changed!==false||
      c.original_job_completed!==false||c.new_shift_started!==false)
