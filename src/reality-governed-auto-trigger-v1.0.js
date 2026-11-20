@@ -192,3 +192,98 @@ export async function runAuthorizedShiftSourceRepairAutoTrigger({
 // no model prompt or Chat answer can mint a shift, job, install or settlement.
 export {continueSameOriginalRecoveryAfterVerifiedFailure}
  from './reality-same-original-recovery-attempt-v2.js';
+
+// Existing signed maintenance Universe -> Governed Trigger policy.
+// This DOES NOT create a trigger service, owner authority, or another shift.
+// It consumes a *durably admitted and independently read* Spine transition.
+// Only a real one-use owner receipt permits the existing installer to be
+// dispatched; the installer still performs its own atomic authorization fence.
+export function routeSignedMaintenanceContinuityTrigger({
+ continuity,originalGate,ownerId,shiftId
+}={}){
+ const blocked=(reason)=>Object.freeze({
+  status:'SIGNED_MAINTENANCE_TRIGGER_BLOCKED',
+  reason,trigger_source:'CANONICAL_CONTINUITY_SPINE',
+  owner_action_required:false,installer_dispatch_permitted:false,
+  installer_reconcile_only:false,independent_postinstall_due:false,
+  same_original_work_due:false,execution_authorized_by_trigger:false,
+  original_job_completed:false,new_shift_started:false,
+  production_changed:false
+ });
+ if(!signedShiftUUID.test(ownerId||'')||!signedShiftUUID.test(shiftId||'')||
+  originalGate?.owner_id!==ownerId||originalGate?.shift_id!==shiftId||
+  originalGate?.status!=='EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'||
+  originalGate.read_only!==true||
+  originalGate.warrant_mode!=='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'||
+  originalGate.installation_authorized!==false||
+  originalGate.original_job_completed!==false||
+  originalGate.production_changed!==false)
+  return blocked('ORIGINAL_SIGNED_OWNER_SHIFT_NOT_VERIFIED');
+ if(continuity?.continuity_committed!==true||
+  !signedShiftUUID.test(continuity.continuity_root_id||'')||
+  !signedShiftUUID.test(continuity.latest_event_id||'')||
+  continuity.original_job_completed!==false||
+  continuity.new_shift_started!==false||continuity.production_changed!==false)
+  return blocked('INDEPENDENT_UNIVERSE_CONTINUITY_RECEIPT_REQUIRED');
+ const routes={
+  CONTINUITY_VERIFIED_TARGET_AWAITING_OWNER_CLICK:{
+   next_action:'AWAIT_EXACT_OWNER_APPROVAL',owner_action_required:true
+  },
+  CONTINUITY_VERIFIED_APPROVAL_RECEIPTED_INSTALL_ELIGIBLE:{
+   next_action:'CONTINUE_PREVIOUSLY_APPROVED_EXACT_INSTALL',
+   installer_dispatch_permitted:true
+  },
+  CONTINUITY_VERIFIED_APPROVAL_FENCED_OR_INSTALLED:{
+   next_action:'GET_ONLY_RECONCILE_PREVIOUSLY_FENCED_INSTALL',
+   installer_reconcile_only:true
+  },
+  CONTINUITY_INSTALLED_PENDING_INDEPENDENT_POSTINSTALL:{
+   next_action:'VERIFY_INSTALLED_SOURCE_WITH_SEPARATE_PROVIDER',
+   independent_postinstall_due:true
+  },
+  CONTINUITY_INDEPENDENT_REPAIR_VERIFIED_SAME_SHIFT_RECONCILED:{
+   next_action:originalGate.next_action,same_original_work_due:true
+  },
+  CONTINUITY_INDEPENDENT_REPAIR_VERIFIED_NEXT_WORK_UNQUALIFIED:{
+   next_action:'VERIFY_ORIGINAL_WORK_SCOPE_BEFORE_NEXT_EXECUTION'
+  }
+ };
+ const stage=routes[continuity.status];
+ if(!stage||continuity.next_authorized_action!==stage.next_action)
+  return blocked('UNRECOGNIZED_OR_CONTRADICTORY_LEDGER_TRANSITION');
+ if(stage.installer_dispatch_permitted&&
+    continuity.install_eligible_from_continuity!==true||
+   stage.installer_reconcile_only&&
+    continuity.installer_reconcile_only_from_continuity!==true||
+   !stage.installer_dispatch_permitted&&
+    continuity.install_eligible_from_continuity===true||
+   !stage.installer_reconcile_only&&
+    continuity.installer_reconcile_only_from_continuity===true)
+  return blocked('INSTALL_SCOPE_NOT_MATCHED_TO_DURABLE_AUTHORITY');
+ if(stage.same_original_work_due&&
+  (!signedShiftWORK.test(continuity.original_work_id||'')||
+   continuity.original_work_id!==originalGate.original_work_id||
+   !['VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
+    'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+    'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'].includes(
+     originalGate.next_action)))
+  return blocked('ORIGINAL_JOB_RESTART_SCOPE_NOT_VERIFIED');
+ return Object.freeze({
+  status:'SIGNED_MAINTENANCE_GOVERNED_TRIGGER_READY',
+  trigger_source:'CANONICAL_CONTINUITY_SPINE',
+  continuity_root_id:continuity.continuity_root_id,
+  continuity_event_id:continuity.latest_event_id,
+  shift_id:shiftId,owner_id:ownerId,
+  next_action:stage.next_action,
+  owner_action_required:stage.owner_action_required===true,
+  installer_dispatch_permitted:stage.installer_dispatch_permitted===true,
+  installer_reconcile_only:stage.installer_reconcile_only===true,
+  independent_postinstall_due:stage.independent_postinstall_due===true,
+  same_original_work_due:stage.same_original_work_due===true,
+  original_work_id:stage.same_original_work_due?continuity.original_work_id:null,
+  // Triggers may route an already authorized action, never grant authority.
+  execution_authorized_by_trigger:false,
+  original_job_completed:false,new_shift_started:false,
+  production_changed:false
+ });
+}
