@@ -30,8 +30,23 @@ begin
    and m.claimed_shift_id=c.shift_id and m.source_ref=c.source_ref
  where c.maintenance_id=p_maintenance_id and c.request_id=p_request_id
   and c.release_sha=p_release_sha
-  and c.state='CLAIMED'
-  and c.claimed_at>clock_timestamp()-interval '8 minutes'
+  and (
+   (c.state='CLAIMED'
+    and c.claimed_at>clock_timestamp()-interval '8 minutes')
+   or
+   (c.state='MODEL_CANDIDATE_RECORDED'
+    and exists (
+     select 1 from reality_internal.owner_maintenance_candidate_target_reviews_v1 rv
+     where rv.maintenance_id=c.maintenance_id
+      and rv.owner_id=c.owner_id and rv.shift_id=c.shift_id
+      and rv.source_ref=c.source_ref
+      and rv.original_model_request_id=c.request_id
+      and rv.original_release_sha=c.release_sha
+      and rv.original_candidate_receipt_sha256=c.candidate_receipt_sha256
+      and rv.state='CLAIMED'
+      and rv.claimed_at>clock_timestamp()-interval '5 minutes'
+    ))
+  )
   and w.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
   and w.state='ACTIVE' and s.authorized_at is not null
   and s.closed_at is null and
