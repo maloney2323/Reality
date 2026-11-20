@@ -11,9 +11,8 @@ const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const fail=(s:string):never=>{throw Error('SIGNED_MAINTENANCE_POSTINSTALL_'+s)};
 const result=(status:string,extra:Record<string,unknown>={},http=200)=>
- new Response(JSON.stringify({status,...extra,
-  repair_verified:false,original_job_completed:false,
-  production_changed:false,new_shift_started:false}),
+ new Response(JSON.stringify({status,repair_verified:false,...extra,
+  original_job_completed:false,production_changed:false,new_shift_started:false}),
   {status:http,headers:{'content-type':'application/json','cache-control':'no-store'}});
 async function rpc(base:string,key:string,name:string,args:Record<string,unknown>={}){
  if(!['reality_read_signed_maintenance_postinstall_scope_v1',
