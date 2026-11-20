@@ -67,6 +67,11 @@
   'Continue exact unfinished repairs');
  inlineContinue.id='realityChatMaintenanceInlineAuthorize';
  inlineContinue.type='button';inlineContinue.disabled=true;
+ const installApprove=make('button','reality-chat-maintenance-inline-authorize','Approve exact verified preview repair');
+ installApprove.id='realityChatMaintenanceExactInstallApprove';
+ installApprove.type='button';installApprove.hidden=true;installApprove.disabled=true;
+ const installDetails=make('p','reality-chat-maintenance-dialogue-proof','');
+ installDetails.id='realityChatMaintenanceExactInstallDetails';installDetails.hidden=true;
  const watch=make('button','reality-chat-maintenance-watch','Follow live repairs');
  watch.id='realityChatMaintenanceWatch';watch.type='button';watch.hidden=true;
  const timeline=make('section','reality-chat-maintenance-live');
@@ -79,8 +84,8 @@
  reply.id='realityChatMaintenanceReply';reply.type='button';
  const dialogueProof=make('p','reality-chat-maintenance-dialogue-proof',
   'Source: owner-scoped signed shift and independent maintenance ledger. No installation authority is implied.');
- dialogueActions.append(inlineContinue,watch,reply,review);
- hint.append(verifiedLabel,hintLabel,dialogueJobs,dialogueActions,timeline,dialogueProof);
+ dialogueActions.append(inlineContinue,installApprove,watch,reply,review);
+ hint.append(verifiedLabel,hintLabel,dialogueJobs,installDetails,dialogueActions,timeline,dialogueProof);
  thread.append(hint);
  // The saved Chat history uses replaceChildren(). Re-attach this owner-ledger
  // projection once after each transcript reload. No new AI message or shift.
@@ -90,7 +95,7 @@
    thread.append(hint);
  });
  threadObserver.observe(thread,{childList:true});
- let loading=false,authorizing=false,uncertain=false;
+ let loading=false,authorizing=false,uncertain=false,installAuthorizing=false,installUncertain=false;
  let approvedScope=null,initialized=false,watching=false;
  const signedIn=()=>ready.style.display==='block';
  const safeError=e=>String(e?.message||'SOURCE_NOT_VERIFIED').slice(0,120);
@@ -267,6 +272,36 @@
     a.original_job_completed===false))
     verifiedArtifacts=artifacts.items;
   }
+  let exactInstallCard=null,exactInstallDecision=null;
+  const ci=data.exact_signed_maintenance_install_review;
+  if(ci?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
+   ci.owner_approval_ready===true&&ci.installation_authorized===false&&
+   ci.repair_installed===false&&ci.original_job_completed===false&&
+   ci.production_changed===false&&ci.new_shift_started===false&&
+   ci.shift_id===c.current_shift_id&&
+   c.signed_maintenance_incident_ids.includes(ci.maintenance_id)&&
+   c.items.some(j=>j.origin_incident_id===ci.maintenance_id&&j.source_ref===ci.source_ref)&&
+   verifiedArtifacts.some(a=>a.maintenance_id===ci.maintenance_id&&
+    a.install_target_verified===true&&
+    a.target_review_receipt_sha256===ci.target_review_receipt_sha256&&
+    a.candidate_commit_sha===ci.candidate_commit_sha)&&
+   UUID.test(ci.maintenance_id||'')&&UUID.test(ci.shift_id||'')&&
+   GIT.test(ci.candidate_commit_sha||'')&&
+   GIT.test(ci.candidate_source_blob_sha||'')&&
+   GIT.test(ci.target_head_sha||'')&&
+   ci.target_branch==='reality/chat-direct-work-handoff-20261115'&&
+   /^src\/[a-z0-9_./-]+\.js$/.test(ci.target_path||'')&&
+   SHA.test(ci.target_review_receipt_sha256||'')&&
+   SHA.test(ci.artifact_receipt_sha256||'')&&
+   SHA.test(ci.case_ci_receipt_sha256||''))
+   exactInstallCard=ci;
+  if(ci?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED'&&
+   ci.shift_id===c.current_shift_id&&
+   c.signed_maintenance_incident_ids.includes(ci.maintenance_id)&&
+   UUID.test(ci.approval_id||'')&&SHA.test(ci.approval_receipt_sha256||'')&&
+   ci.installation_authorized===true&&ci.owner_approval_ready===false&&
+   ci.original_job_completed===false&&ci.production_changed===false)
+   exactInstallDecision=ci;
   // Universe projection of Reality's verified classifier only. A lane is
   // evidence + NEXT governed action, never an executor or approval button.
   const route=data.governed_continuity_evidence_classification;
@@ -298,7 +333,7 @@
    classifiedLanes=route.lanes;
   return Object.freeze({
    count:c.open_count,jobs:c.items,activeId:c.current_shift_id,
-   verifiedArtifacts,classifiedLanes,
+   verifiedArtifacts,classifiedLanes,exactInstallCard,exactInstallDecision,
    activity,shiftReadback:shift,finalReceipt:terminal?{
     shift_id:terminal.shift_id,
     count:terminal.close_report.independently_verified_internal_maintenance_jobs,
@@ -317,6 +352,16 @@
  }
  function render(scope){
   approvedScope=scope;
+  installApprove.hidden=!scope.exactInstallCard;
+  installApprove.disabled=!scope.exactInstallCard||installAuthorizing||installUncertain||loading||authorizing;
+  installDetails.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
+  installDetails.textContent=scope.exactInstallCard?
+   'One-use exact approval · PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
+   ' · file '+scope.exactInstallCard.target_path+
+   ' · independently tested candidate '+scope.exactInstallCard.candidate_commit_sha.slice(0,12)+
+   ' · isolated preview installation ONLY.':
+   scope.exactInstallDecision?
+   'One exact owner approval recorded. Reality must now install, verify and resume the same shift. No completion claimed.':'';
   list.replaceChildren();
   root.hidden=scope.count===0;
   hint.hidden=scope.count===0&&!scope.finalReceipt;
@@ -364,13 +409,15 @@
    'I will ask separately before installing any code. You can reply to ask questions.':
    'I found unfinished employee repairs, but I cannot verify an exact signed authorization scope yet. '+
    'Ask me about the blockers or review the source evidence.';
+  if(scope.exactInstallCard)hintLabel.textContent+=' An independently tested repair is ready for exact one-time installation approval below.';
+  if(scope.exactInstallDecision)hintLabel.textContent+=' Exact installation permission is already recorded; no additional approval is needed.';
   if(scope.verifiedArtifacts?.length)
    hintLabel.textContent+=' Reality independently recorded '+
     scope.verifiedArtifacts.length+' exact tested repair artifact'+
     (scope.verifiedArtifacts.length===1?'':'s')+
     '. '+scope.verifiedArtifacts.filter(a=>a.install_target_verified===true).length+
     ' have a separate independent installation-target receipt. '+
-    'Exact owner approval and original-resumption proof are still required. No installation was authorized.';
+    (scope.exactInstallDecision?'Exact owner permission is recorded; independent installation and original-job proof are still required.':'Exact owner approval and original-resumption proof are still required. No installation was authorized.');
   dialogueJobs.replaceChildren();
   for(const item of scope.jobs){
    dialogueJobs.append(make('p','',
@@ -476,12 +523,13 @@
   for(const a of scope.verifiedArtifacts||[]){
    const n=a.source_ref.split('/').pop();
    line('Independent repair artifact:', 'PR #'+n+
-    ' · exact source tested; install target review still needed.');
+    (a.install_target_verified===true?' · exact target independently reviewed.':' · exact source tested; install target review still needed.'));
    line('Candidate commit:',a.candidate_commit_sha);
    line('Independent CI run:',String(a.github_run_id));
    digest('Review artifact receipt:',a.review_receipt_sha256);
    digest('Frozen RED/GREEN:',a.case_ci_receipt_sha256);
-   line('Authority:', 'No installation approval; no original-job completion.');
+   if(a.install_target_verified===true)digest('Independent target proof:',a.target_review_receipt_sha256);
+   line('Authority:',scope.exactInstallDecision?'Owner install permission recorded; original not completed.':'No installation approval; no original-job completion.');
   }
   if(scope.classifiedLanes?.length){
    const header=make('strong','reality-chat-maintenance-live-title',
@@ -553,16 +601,16 @@
   return parse(data);
  }
  async function refresh(){
-  if(!signedIn()||loading||authorizing)return;
+  if(!signedIn()||loading||authorizing||installAuthorizing)return;
   loading=true;reload.disabled=true;
   try{
    const scope=await read();
    // A previous uncertain POST is never silently retried. This button is
    // only unlocked after an explicit source-backed Check status.
-   uncertain=false;
+   uncertain=false;installUncertain=false;
    render(scope);
   }catch(e){
-   approvedScope=null;authorize.disabled=true;
+   approvedScope=null;authorize.disabled=true;installApprove.disabled=true;
    inlineContinue.disabled=true;root.hidden=false;hint.hidden=true;
    title.textContent='Maintenance verification unavailable';
    list.replaceChildren();
@@ -679,6 +727,7 @@
    initialized=false;approvedScope=null;watching=false;
    root.hidden=true;hint.hidden=true;timeline.hidden=true;
    authorize.disabled=true;inlineContinue.disabled=true;watch.disabled=true;
+   installApprove.hidden=true;installApprove.disabled=true;
   }
  });
  signObserver.observe(ready,{attributes:true,attributeFilter:['style']});
