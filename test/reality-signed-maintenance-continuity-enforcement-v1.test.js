@@ -161,9 +161,10 @@ test('worker must refuse automatic installation until canonical approval receipt
  const i=worker.indexOf('SIGNED_VERIFIED_MAINTENANCE_CONTINUITY_RECEIPT_ADMISSION');
  const j=worker.indexOf('EXACT_OWNER_APPROVED_MAINTENANCE_AUTOMATIC_INSTALL');
  assert.ok(i>=0&&j>i,'canonical continuity stage precedes installer');
- assert.match(worker,/signedMaintenanceCanonicalContinuity\.continuity_committed===true/);
- assert.match(worker,/signedMaintenanceCanonicalContinuity\.install_eligible_from_continuity===true/);
- assert.match(worker,/signedMaintenanceCanonicalContinuity\.installer_reconcile_only_from_continuity===true/);
+ assert.match(worker,/routeSignedMaintenanceContinuityTrigger\(/);
+ assert.match(worker,/signedMaintenanceGovernedTrigger\.status==='SIGNED_MAINTENANCE_GOVERNED_TRIGGER_READY'/);
+ assert.match(worker,/signedMaintenanceGovernedTrigger\.installer_dispatch_permitted===true/);
+ assert.match(worker,/signedMaintenanceGovernedTrigger\.installer_reconcile_only===true/);
  assert.match(worker,/signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity/);
  assert.doesNotMatch(worker,/source_installed:true,original_job_completed:true/);
 });
