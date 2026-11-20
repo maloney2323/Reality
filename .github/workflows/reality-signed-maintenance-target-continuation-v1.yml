@@ -6,6 +6,9 @@ on:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'supabase/migrations/20261120202000_signed_maintenance_artifact_install_target_review_v1.sql'
       - 'test/reality-signed-maintenance-install-target-review-v1.test.js'
+      - 'src/reality-governed-continuity-evidence-classifier-v1.js'
+      - 'test/reality-governed-continuity-evidence-classifier-v1.test.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
       - '.github/workflows/reality-signed-maintenance-target-continuation-v1.yml'
   workflow_dispatch:
 permissions:
@@ -26,6 +29,10 @@ jobs:
           set -euo pipefail
           node --check src/reality-signed-maintenance-verified-artifact-handoff-v1.js
           node --check api/reality/governed-employee-shift-worker.js
+          node --check src/reality-governed-continuity-evidence-classifier-v1.js
+          node --check reality-chat-maintenance-continuation-v1.js
           node --test test/reality-signed-maintenance-install-target-review-v1.test.js
+          node --test test/reality-governed-continuity-evidence-classifier-v1.test.js
+          node --test test/reality-unified-chat-maintenance-continuation-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
