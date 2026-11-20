@@ -44,6 +44,8 @@ export async function continueSignedMaintenanceCaseCiVerification({
  if(!r||Array.isArray(r)||r.ok!==true||
   r.source_read_only!==true||
   r.model_generated!==false||
+  r.independent_frozen_red_verified!==false||
+  r.repair_executed!==false||
   r.original_job_completed!==false||
   r.installation_authorized!==false||
   r.production_changed!==false||
