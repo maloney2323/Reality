@@ -6,6 +6,9 @@ on:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
+      - 'supabase/migrations/20261120172000_existing_shift_sourcecase_ci_attestation_v1.sql'
       - 'src/reality-signed-maintenance-repair-handoff-v1.js'
       - 'src/reality-signed-maintenance-repair-model-candidate-v1.js'
       - 'supabase/migrations/20261120133000_signed_maintenance_repair_candidate_stage_v1.sql'
@@ -46,6 +49,9 @@ on:
       - 'api/reality/governed-employee-shift-worker.js'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
+      - 'supabase/migrations/20261120172000_existing_shift_sourcecase_ci_attestation_v1.sql'
       - 'src/reality-signed-maintenance-repair-handoff-v1.js'
       - 'src/reality-signed-maintenance-repair-model-candidate-v1.js'
       - 'supabase/migrations/20261120133000_signed_maintenance_repair_candidate_stage_v1.sql'
@@ -104,6 +110,8 @@ jobs:
           node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
           node --check src/reality-signed-maintenance-external-review-v1.js
           node --test test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js
+          node --check src/reality-signed-maintenance-case-ci-live-verifier-v1.js
+          node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
           node --check src/reality-signed-maintenance-repair-handoff-v1.js
           node --test test/reality-signed-maintenance-diagnostic-to-repair-handoff-v1.test.js
           node --check src/reality-signed-maintenance-repair-model-candidate-v1.js
