@@ -37,6 +37,7 @@ on:
       - 'reality-maintenance-ci-triggers/**'
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
       - 'scripts/reality-maintenance-sourcebound-case-ci-v1.mjs'
+      - 'scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs'
       - 'reality-maintenance-case-specs/**'
       - 'test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js'
       - 'src/reality-qualified-source-requalification-v1.js'
@@ -83,6 +84,7 @@ on:
       - 'supabase/migrations/20261120001000_signed_maintenance_requalified_ci_continuation_v1.sql'
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
       - 'scripts/reality-maintenance-sourcebound-case-ci-v1.mjs'
+      - 'scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs'
       - 'reality-maintenance-case-specs/**'
       - 'test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js'
       - 'src/reality-qualified-source-requalification-v1.js'
@@ -148,6 +150,19 @@ jobs:
           set -euo pipefail
           node --check scripts/reality-maintenance-sourcebound-case-ci-v1.mjs
           node scripts/reality-maintenance-sourcebound-case-ci-v1.mjs
+      - name: Build exact reviewed candidate source artifact after independent RED GREEN
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs
+          node scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs
+      - name: Preserve owner-reviewable source artifact, not installation authority
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-maintenance-exact-repair-approval-packet-${{ github.run_id }}
+          path: |
+            artifact/maintenance-verified-repair-*.json
+            artifact/maintenance-verified-repair-*.js
+          if-no-files-found: error
       - name: Preserve exact signed source-case RED GREEN evidence without claiming original settlement
         if: always()
         uses: actions/upload-artifact@v4
