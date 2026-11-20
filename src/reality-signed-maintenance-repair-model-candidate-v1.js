@@ -176,7 +176,11 @@ export async function generateOneSignedMaintenanceRepairCandidate({
   // service broker, never copied into the Vercel preview environment.
   const tree=await sourceBroker('manifest',{
    db,claim:c,fetchImpl});
-  if(!SHA.test(tree.source_tree_sha||'')||!Array.isArray(tree.files))
+  if(!SHA.test(tree.source_tree_sha||'')||
+     !SHA.test(tree.worker_source_blob_sha||'')||
+     !Number.isSafeInteger(tree.runtime_imports_count)||
+     tree.runtime_imports_count<1||tree.runtime_imports_count>350||
+     !Array.isArray(tree.files)||tree.files.length>tree.runtime_imports_count)
    fail('PINNED_BROKER_SOURCE_TREE_UNVERIFIED');
   const files=tree.files.filter(f=>TARGET.test(f?.path||'')&&
    !f.path.includes('..')&&SHA.test(f.sha||'')&&
