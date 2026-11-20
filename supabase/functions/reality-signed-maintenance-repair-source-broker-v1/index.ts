@@ -35,7 +35,9 @@ async function rpc(c:{url:string,key:string},name:string,args:Record<string,unkn
  if(![
   'reality_read_signed_maintenance_repair_source_scope_v1',
   'reality_read_signed_existing_maintenance_case_ci_scope_v1',
-  'reality_record_signed_existing_maintenance_case_ci_v1'
+  'reality_record_signed_existing_maintenance_case_ci_v1',
+  'reality_read_signed_existing_maintenance_artifact_scope_v1',
+  'reality_record_signed_existing_maintenance_artifact_v1'
  ].includes(name))fail('UNREGISTERED_SOURCE_RPC');
  const r=await fetch(c.url+'/rest/v1/rpc/'+name,{
   method:'POST',redirect:'error',cache:'no-store',
@@ -278,6 +280,164 @@ async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
   reviewed_count:0,expected_sha:b.release_sha});
 }
 
+
+// The existing signed shift controller re-observes a real verified artifact.
+// No GitHub write, independent install permission or customer settlement.
+async function verifiedArtifact(c:{url:string,key:string,github:string},b:any){
+ if(!b||Array.isArray(b)||typeof b!=='object'||
+ Object.keys(b).sort().join(',')!=='mode,release_sha,shift_id,worker_run_id'||
+ !UUID.test(b.shift_id||'')||!UUID.test(b.worker_run_id||'')||
+ !SHA.test(b.release_sha||''))
+  return response(400,'ARTIFACT_SIGNED_WORKER_REQUEST_INVALID');
+ const scope=await rpc(c,'reality_read_signed_existing_maintenance_artifact_scope_v1',{
+  p_shift_id:b.shift_id,p_worker_run_id:b.worker_run_id});
+ if(['NO_SIGNED_MAINTENANCE_ARTIFACT_WORKER_SCOPE',
+  'NO_UNRECONCILED_VERIFIED_MAINTENANCE_ARTIFACT'].includes(scope.status))
+  return response(200,scope.status,{reconciled_count:0});
+ if(scope.status!=='SIGNED_MAINTENANCE_VERIFIED_ARTIFACT_CANDIDATE_READY'||
+  scope.shift_id!==b.shift_id||!UUID.test(scope.owner_id||'')||
+  !Array.isArray(scope.cases)||scope.candidate_count!==scope.cases.length||
+  scope.candidate_count<1||scope.candidate_count>4||
+  scope.installation_authorized!==false||
+  scope.original_job_completed!==false||scope.production_changed!==false)
+   fail('ARTIFACT_SIGNED_LEDGER_SCOPE_INVALID');
+ const runs=await github(c,'/actions/runs?branch='+
+  encodeURIComponent(EXECUTOR_BRANCH)+'&per_page=100');
+ const eligible=(runs?.workflow_runs||[]).filter((r:any)=>
+  r.name==='Reality registered signed maintenance executor'&&
+  r.path===WORKFLOW&&r.head_branch===EXECUTOR_BRANCH&&
+  r.head_sha===b.release_sha&&r.status==='completed'&&
+  r.conclusion==='success'&&['push','pull_request'].includes(r.event)&&
+  Number.isSafeInteger(r.id)&&r.id>10000&&
+  r.html_url==='https://github.com/maloney2323/Reality/actions/runs/'+r.id);
+ if(!eligible.length)return response(200,'NO_PINNED_MAINTENANCE_ARTIFACT_CI_YET');
+ const run=eligible.sort((x:any,y:any)=>y.id-x.id)[0];
+ const [jobs,arts,builder,workflow]=await Promise.all([
+  github(c,'/actions/runs/'+run.id+'/jobs?per_page=100'),
+  github(c,'/actions/runs/'+run.id+'/artifacts?per_page=100'),
+  verifiedGithubBlob(c,
+   'scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs',
+   b.release_sha),
+  verifiedGithubBlob(c,WORKFLOW,b.release_sha)]);
+ if(!builder||!workflow||
+  !builder.text.includes('REALITY_SIGNED_MAINTENANCE_EXACT_ARTIFACT_BUILT')||
+  !builder.text.includes('case_specific_source_epoch_regression_verified')||
+  !workflow.text.includes('node scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs'))
+  fail('ARTIFACT_SIGNED_BUILDER_SOURCE_UNVERIFIED');
+ const jobsMatched=(jobs?.jobs||[]).filter((j:any)=>
+  j.run_id===run.id&&j.name==='verify-exact-registered-handoff'&&
+  j.head_sha===b.release_sha&&j.conclusion==='success'&&
+  j.status==='completed'&&Array.isArray(j.steps)&&[
+   'Execute SAME signed maintenance source-epoch frozen regression on historical RED and corrected GREEN',
+   'Build exact reviewed candidate source artifact after independent RED GREEN',
+   'Preserve owner-reviewable source artifact, not installation authority'
+  ].every(name=>j.steps.some((z:any)=>z.name===name&&z.conclusion==='success')));
+ if(jobsMatched.length!==1)
+  return response(200,'ARTIFACT_PINNED_CI_STEPS_MISSING');
+ for(const item of scope.cases){
+  if(!UUID.test(item.maintenance_id||'')||
+   item.owner_id!==scope.owner_id||item.shift_id!==b.shift_id||
+   !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(item.source_ref||'')||
+   !HASH.test(item.case_ci_receipt_sha256||'')||
+   !SHA.test(item.frozen_test_blob_sha||''))
+   fail('ARTIFACT_SIGNED_CASE_MISMATCH');
+  const specFile=await verifiedGithubBlob(c,
+   'reality-maintenance-case-specs/'+item.maintenance_id+'.json',
+   b.release_sha);
+  if(!specFile)continue;
+  const triggerFile=await verifiedGithubBlob(c,
+   'reality-maintenance-ci-triggers/'+item.maintenance_id+'.json',
+   b.release_sha);
+  if(!triggerFile)fail('ARTIFACT_SIGNED_TRIGGER_ABSENT');
+  let spec:any,trigger:any;
+  try{spec=JSON.parse(specFile.text);trigger=JSON.parse(triggerFile.text)}
+  catch{fail('ARTIFACT_SIGNED_SPEC_JSON_INVALID')}
+  if(spec.schema!=='reality-maintenance-case-frozen-ci-v1'||
+   spec.maintenance_id!==item.maintenance_id||
+   spec.shift_id!==b.shift_id||spec.source_ref!==item.source_ref||
+   spec.historical_failure_kind!==item.historical_failure_kind||
+   !SHA.test(spec.historical_commit_sha||'')||
+   !/^src\/[a-z0-9._/-]+\.js$/.test(spec.target_source_path||'')||
+   String(spec.target_source_path).includes('..')||
+   !/^test\/reality-frozen-regressions\/[a-z0-9._-]+\.test\.js$/.test(spec.frozen_test_path||'')||
+   String(spec.frozen_test_path).includes('..')||
+   spec.installation_authorized!==false||
+   spec.original_customer_execution_proven!==false||
+   spec.case_regression_only!==true||
+   trigger.maintenance_id!==item.maintenance_id||
+   trigger.shift_id!==b.shift_id||trigger.source_ref!==item.source_ref||
+   trigger.historical_failure_kind!==item.historical_failure_kind||
+   trigger.installation_authorized!==false||
+   trigger.production_changed!==false||
+   trigger.original_job_completed!==false||
+   trigger.repair_executed!==false)
+   fail('ARTIFACT_SIGNED_CASE_SOURCE_DRIFT');
+  const matches=(arts?.artifacts||[]).filter((a:any)=>
+   a.name==='reality-maintenance-exact-repair-approval-packet-'+run.id&&
+   a.expired===false&&HASH.test(a.digest||'')&&
+   Number.isSafeInteger(a.id)&&a.id>10000&&
+   Number.isSafeInteger(a.size_in_bytes)&&
+   a.size_in_bytes>=500&&a.size_in_bytes<=150000&&
+   (!a.workflow_run?.head_sha||a.workflow_run.head_sha===b.release_sha));
+  if(matches.length!==1)continue;
+  const [corrected,historical,test]=await Promise.all([
+   verifiedGithubBlob(c,spec.target_source_path,b.release_sha),
+   verifiedGithubBlob(c,spec.target_source_path,spec.historical_commit_sha),
+   verifiedGithubBlob(c,spec.frozen_test_path,b.release_sha)]);
+  if(!corrected||!historical||!test||
+   test.sha!==item.frozen_test_blob_sha||
+   historical.sha===corrected.sha||
+   !historical.text.includes(spec.historical_defect_marker)||
+   historical.text.includes(spec.corrected_defect_guard)||
+   !corrected.text.includes(spec.corrected_defect_guard))
+   fail('ARTIFACT_SOURCE_AND_FROZEN_FAILURE_UNVERIFIED');
+  const record=await rpc(c,'reality_record_signed_existing_maintenance_artifact_v1',{
+   p_shift_id:b.shift_id,p_worker_run_id:b.worker_run_id,
+   p_maintenance_id:item.maintenance_id,
+   p_case_ci_receipt_sha256:item.case_ci_receipt_sha256,
+   p_candidate_commit_sha:b.release_sha,
+   p_source_path:spec.target_source_path,
+   p_candidate_blob_sha:corrected.sha,
+   p_historical_blob_sha:historical.sha,
+   p_frozen_test_blob_sha:test.sha,p_builder_blob_sha:builder.sha,
+   p_github_run_id:run.id,p_github_job_id:jobsMatched[0].id,
+   p_github_artifact_id:matches[0].id,
+   p_github_artifact_digest:matches[0].digest,
+   p_artifact_packet_sha256:matches[0].digest});
+  if(record.status!=='EXACT_MAINTENANCE_SOURCE_REPAIR_ARTIFACT_RECORDED'||
+   record.maintenance_id!==item.maintenance_id||
+   record.shift_id!==b.shift_id||record.owner_id!==scope.owner_id||
+   record.candidate_commit_sha!==b.release_sha||
+   record.source_blob_sha!==corrected.sha||
+   record.github_run_id!==run.id||
+   record.github_artifact_id!==matches[0].id||
+   record.github_artifact_digest!==matches[0].digest||
+   !HASH.test(record.review_receipt_sha256||'')||
+   record.install_target_verified!==false||
+   record.owner_approval_ready!==false||
+   record.installation_authorized!==false||
+   record.repair_installed!==false||
+   record.original_job_completed!==false||
+   record.production_changed!==false)
+   fail('ARTIFACT_RECORD_NOT_INDEPENDENTLY_ATTESTED');
+  return response(200,record.status,{
+   owner_id:record.owner_id,shift_id:record.shift_id,
+   maintenance_id:record.maintenance_id,source_ref:record.source_ref,
+   candidate_commit_sha:record.candidate_commit_sha,
+   source_blob_sha:record.source_blob_sha,
+   github_run_id:record.github_run_id,
+   github_artifact_id:record.github_artifact_id,
+   github_artifact_digest:record.github_artifact_digest,
+   review_receipt_sha256:record.review_receipt_sha256,
+   case_ci_receipt_sha256:record.case_ci_receipt_sha256,
+   exact_artifact_review_verified:true,
+   owner_approval_ready:false,install_target_verified:false,
+   repair_installed:false,
+   next_action:'INDEPENDENT_INSTALL_TARGET_AND_OWNER_APPROVAL_REVIEW_REQUIRED'});
+ }
+ return response(200,'NO_PINNED_VERIFIED_REPAIR_ARTIFACT_MATCHED_CASE');
+}
+
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return response(405,'SIGNED_SOURCE_BROKER_POST_ONLY');
@@ -293,6 +453,9 @@ Deno.serve(async req=>{
   const b=JSON.parse(raw);
   if(b?.mode==='case_ci'){
    return await verifiedCaseCi(c,b);
+  }
+  if(b?.mode==='artifact'){
+   return await verifiedArtifact(c,b);
   }
   if(!b||Array.isArray(b)||typeof b!=='object'||
      !['manifest','source'].includes(b.mode)||
