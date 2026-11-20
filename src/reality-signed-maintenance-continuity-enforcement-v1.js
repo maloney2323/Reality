@@ -19,6 +19,7 @@ const safe=(status,extra={})=>Object.freeze({
  status,continuity_committed:false,
  next_authorized_action:'NO_NEW_AUTHORITY',
  install_eligible_from_continuity:false,
+ installer_reconcile_only_from_continuity:false,
  original_job_completed:false,new_shift_started:false,
  production_changed:false,...extra
 });
@@ -236,6 +237,7 @@ export async function enforceSignedMaintenanceReceiptContinuity({
     'GET_ONLY_RECONCILE_PREVIOUSLY_FENCED_INSTALL',
    // The independent install service STILL atomically fences the exact
    // source write. This does not install, approve or authorize other work.
-   install_eligible_from_continuity:card.decision_state==='APPROVED'
+   install_eligible_from_continuity:card.decision_state==='APPROVED',
+   installer_reconcile_only_from_continuity:card.decision_state==='FENCED'
  });
 }
