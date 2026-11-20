@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'src/reality-chat-work-intent-v1.js'
+      - 'src/reality-chat-proportional-readonly-v1.js'
+      - 'test/reality-chat-proportional-readonly-v1.test.js'
       - 'src/reality-saved-chat-work-adapter-v1.js'
       - 'api/reality/personal-chat-work.js'
       - 'test/reality-chat-work-intent-v1.test.js'
@@ -54,6 +56,7 @@ jobs:
       - name: Verify saved-intent isolation, capability matching and authorization boundary
         run: |
           node --test test/reality-chat-work-intent-v1.test.js
+          node --test test/reality-chat-proportional-readonly-v1.test.js
           node --test test/reality-saved-chat-work-adapter-v1.test.js
           node --test test/reality-chat-scoped-engineering-continuation-v1.test.js
           node --test test/reality-chat-new-development-v1.test.js
@@ -67,6 +70,7 @@ jobs:
       - name: Check authenticated Chat route and live status syntax
         run: |
           node --check api/reality/personal-chat-work.js
+          node --check src/reality-chat-proportional-readonly-v1.js
           node --check src/reality-saved-chat-work-adapter-v1.js
           node --check reality-chat-request-status-v1.js
           node --check reality-chat-direct-work-handoff-v1.js
