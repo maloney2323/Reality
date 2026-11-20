@@ -55,7 +55,8 @@ begin
  join reality_internal.signed_worker_actual_runs_v1 run
   on run.run_id=p_worker_run_id
  where c.shift_id=p_shift_id and c.state='PROVIDER_UNVERIFIED'
-  and c.failure_reason='SIGNED_MAINTENANCE_MODEL_GITHUB_SOURCE_UNVERIFIED'
+  and c.failure_reason in ('SIGNED_MAINTENANCE_MODEL_GITHUB_SOURCE_UNVERIFIED',
+   'MODEL_SOURCE_OR_TRANSPORT_UNVERIFIED')
   and c.recovery_attempts=0 and c.release_sha<>p_release_sha
   and c.claimed_at<clock_timestamp()-interval '1 minute'
   and m.independent_frozen_test_receipt_sha256 is null
