@@ -15,6 +15,10 @@ on:
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
       - 'src/reality-signed-maintenance-verified-artifact-handoff-v1.js'
+      - 'src/reality-governed-continuity-evidence-classifier-v1.js'
+      - 'test/reality-governed-continuity-evidence-classifier-v1.test.js'
+      - 'api/reality/personal-governed-employee-shift.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
       - 'test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js'
       - 'supabase/migrations/20261120193000_signed_existing_maintenance_verified_artifact_handoff_v1.sql'
       - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
@@ -85,6 +89,10 @@ jobs:
           node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
           node --check src/reality-signed-maintenance-verified-artifact-handoff-v1.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
+          node --check src/reality-governed-continuity-evidence-classifier-v1.js
+          node --test test/reality-governed-continuity-evidence-classifier-v1.test.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check reality-chat-maintenance-continuation-v1.js
           node --check src/reality-signed-maintenance-repair-handoff-v1.js
           node --test test/reality-signed-maintenance-diagnostic-to-repair-handoff-v1.test.js
           node --check src/reality-signed-maintenance-repair-model-candidate-v1.js
