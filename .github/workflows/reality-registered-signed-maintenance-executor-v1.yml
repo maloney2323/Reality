@@ -4,6 +4,10 @@ on:
     branches: ['repair/maintenance-warrant-scope-handoff-20261119']
     paths:
       - 'api/reality/governed-employee-shift-worker.js'
+      - 'src/reality-signed-maintenance-original-lineage-boundary-v1.js'
+      - 'test/reality-signed-maintenance-original-lineage-boundary-v1.test.js'
+      - 'supabase/migrations/20261120184500_existing_original_business_linkage_gate_v1.sql'
+      - 'supabase/migrations/20261120175500_existing_original_case_ci_receipt_readback_v1.sql'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
@@ -47,6 +51,10 @@ on:
     branches: ['reality/**']
     paths:
       - 'api/reality/governed-employee-shift-worker.js'
+      - 'src/reality-signed-maintenance-original-lineage-boundary-v1.js'
+      - 'test/reality-signed-maintenance-original-lineage-boundary-v1.test.js'
+      - 'supabase/migrations/20261120184500_existing_original_business_linkage_gate_v1.sql'
+      - 'supabase/migrations/20261120175500_existing_original_case_ci_receipt_readback_v1.sql'
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
@@ -104,6 +112,8 @@ jobs:
           set -euo pipefail
           node --check src/reality-signed-maintenance-source-requalification-executor-v1.js
           node --check api/reality/governed-employee-shift-worker.js
+          node --check src/reality-signed-maintenance-original-lineage-boundary-v1.js
+          node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
           node --test test/reality-registered-signed-maintenance-executor-v1.test.js
           node --check src/reality-signed-maintenance-case-ci-executor-v1.js
           node --check scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
