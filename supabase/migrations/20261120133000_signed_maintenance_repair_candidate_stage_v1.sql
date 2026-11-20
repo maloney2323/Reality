@@ -68,7 +68,7 @@ begin
   and run.status='STARTED'
   and run.started_at>clock_timestamp()-interval '3 minutes'
   and not exists(select 1 from reality_internal.owner_maintenance_repair_candidates_v1 prior where prior.maintenance_id=h.maintenance_id)
- order by h.recorded_at,h.maintenance_id limit 1 for update of h skip locked;
+ order by h.recorded_at,h.maintenance_id limit 1;
  if not found then return pg_catalog.jsonb_build_object(
   'status','NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY',
   'model_invocation_authorized',false,
