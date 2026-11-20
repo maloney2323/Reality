@@ -61,7 +61,7 @@ const provider={
  provider_proof_sha256:hash('8'),checked_at:new Date().toISOString()
 };
 function scenario({
- leased=claim,recovered=null,selectedPath=path,patchBody=patch,
+ leased=claim,recovered=null,revised=null,selectedPath=path,patchBody=patch,
  recorded=result,changedSource=false,throwProvider=false
 }={}){
  const calls=[],modelCalls=[],urls=[];
@@ -106,6 +106,12 @@ function scenario({
   if(name==='reality_recover_signed_maintenance_repair_candidate_source_v1')
    return recovered||{
     status:'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY',
+    model_invocation_authorized:false,
+    installation_authorized:false,production_changed:false,
+    original_job_completed:false,new_shift_started:false};
+  if(name==='reality_revise_signed_offtarget_maintenance_candidate_v1')
+   return revised||{
+    status:'NO_SIGNED_OFFTARGET_MODEL_REVISION_READY',
     model_invocation_authorized:false,
     installation_authorized:false,production_changed:false,
     original_job_completed:false,new_shift_started:false};
@@ -225,8 +231,8 @@ test('no eligible new or recoverable original produces no model call or external
  const r=await f.run();
  assert.equal(r.model_generated,false);
  assert.equal(f.modelCalls.length,0);
- assert.equal(f.calls.length,2);
- assert.equal(r.status,'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY');
+ assert.equal(f.calls.length,3);
+ assert.equal(r.status,'NO_SIGNED_OFFTARGET_MODEL_REVISION_READY');
 });
 test('source broker reuses existing credential without exposing it to preview or anonymous clients',()=>{
  const broker=readFileSync(new URL(
@@ -262,4 +268,48 @@ test('source broker reuses existing credential without exposing it to preview or
  assert.match(recovery,/recovery_attempts=1/);
  assert.match(recovery,/revoke all on function/);
  assert.doesNotMatch(recovery,/update reality_internal\.governed_employee_shifts_v1/);
+});
+
+test('an independently rejected off-target source may be replaced ONCE, without new original or installation',async()=>{
+ const f=scenario({
+  leased:{status:'NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY',
+   model_invocation_authorized:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,new_shift_started:false},
+  revised:{...claim,target_revision_attempts:1,
+   old_failed_offtarget_candidate_preserved:true}
+ });
+ const r=await f.run();
+ assert.equal(r.status,'SIGNED_MAINTENANCE_REPAIR_CODE_CANDIDATE_RECORDED');
+ assert.equal(r.model_generated,true);
+ assert.equal(r.independent_ci_verified,false);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.new_shift_started,false);
+ assert.equal(f.calls[2].name,'reality_revise_signed_offtarget_maintenance_candidate_v1');
+ assert.deepEqual(f.calls.map(x=>x.name),[
+  'reality_claim_signed_maintenance_repair_candidate_v1',
+  'reality_recover_signed_maintenance_repair_candidate_source_v1',
+  'reality_revise_signed_offtarget_maintenance_candidate_v1',
+  'reality_record_signed_maintenance_repair_candidate_v1'
+ ]);
+});
+test('SQL preserves rejected model patch and independent off-target review before any new model lease',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261120160000_signed_maintenance_offtarget_candidate_revision_v1.sql',
+  import.meta.url),'utf8');
+ for(const term of [
+  "current_user<>'service_role'",
+  "rv.target_in_worker_graph=false",
+  "rv.verdict='OFF_TARGET_NOT_SIGNED_WORKER_EXECUTOR_DEPENDENCY'",
+  "rv.review_receipt_sha256~'^sha256:[a-f0-9]{64}$'",
+  "c.target_revision_attempts=0",
+  "c.release_sha<>p_release_sha",
+  "rejected_candidate_patch",
+  "rejected_model_response_id",
+  "independent_reviewer_receipt_sha256",
+  "for update of c skip locked",
+  "target_revision_attempts=1",
+  "on conflict(maintenance_id,original_model_request_id) do nothing",
+  "revoke all on function public.reality_revise_signed_offtarget_maintenance_candidate_v1"
+ ])assert.ok(sql.includes(term),term);
+ assert.doesNotMatch(sql,/net\\.http_post|insert into reality_internal\\.governed_employee_shifts_v1/);
 });
