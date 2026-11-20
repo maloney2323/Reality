@@ -12,6 +12,7 @@ on:
       - '.github/workflows/reality-signed-maintenance-target-continuation-v1.yml'
       - 'src/reality-signed-maintenance-continuity-enforcement-v1.js'
       - 'test/reality-signed-maintenance-continuity-enforcement-v1.test.js'
+      - 'supabase/migrations/20261120222500_signed_maintenance_postinstall_universe_readback_v1.sql'
       - 'src/reality-signed-maintenance-approved-install-bridge-v1.js'
       - 'src/reality-signed-maintenance-postinstall-verification-bridge-v1.js'
       - 'api/reality/signed-maintenance-exact-install-approval.js'
