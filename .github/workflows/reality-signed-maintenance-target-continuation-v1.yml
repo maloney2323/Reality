@@ -19,6 +19,7 @@ on:
       - 'supabase/migrations/20261120214500_signed_existing_maintenance_exact_owner_install_v1.sql'
       - 'supabase/migrations/20261120215000_signed_existing_maintenance_independent_postinstall_v1.sql'
       - 'supabase/migrations/20261120215200_signed_install_continue_next_maintenance_v2.sql'
+      - 'supabase/migrations/20261120215300_signed_owner_next_ready_repair_priority_v3.sql'
       - 'test/reality-signed-maintenance-exact-full-loop-v1.test.js'
   workflow_dispatch:
 permissions:
