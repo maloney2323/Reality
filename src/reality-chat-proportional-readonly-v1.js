@@ -8,7 +8,11 @@ import {buildGovernedChatSignal}
 import {runRealityCognitiveRuntime}
  from './reality-cognitive-runtime-v1.0.js';
 
-const ACTION=/^(?:(?:reality[, :]+|please\s+|go ahead and\s+|i (?:want|need) you to\s+|can you\s+){0,2})(?:start|run|execute|install|deploy|merge|publish|send|transfer|delete|pay|purchase|authorize|approve|build|code|fix|upgrade|schedule|create)\b/i;
+// Questions about capability or feasibility are conversation, not execution.
+// The independently authenticated work-intake adapter still classifies saved
+// instructions and enforces the exact approval gate; Chat must answer without
+// borrowing that adapter's authority or waiting for full operational replay.
+const ACTION=/^(?:(?:reality[, :]+|please\s+|go ahead and\s+|i (?:want|need) you to\s+){0,2})(?:start|run|execute|install|deploy|merge|publish|send|transfer|delete|pay|purchase|authorize|approve|build|code|fix|upgrade|schedule|create)\b/i;
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SOURCE=/^supabase:reality_chat_messages:[0-9a-f-]{36}$/i;
 const fail=code=>{throw Error('CHAT_READ_ONLY_'+code)};
