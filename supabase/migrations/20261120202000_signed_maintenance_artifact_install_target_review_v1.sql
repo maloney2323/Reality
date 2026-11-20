@@ -191,3 +191,67 @@ REVOKE ALL ON TABLE reality_internal.owner_maintenance_verified_artifact_handoff
  FROM PUBLIC,anon,authenticated;
 GRANT SELECT,UPDATE ON TABLE reality_internal.owner_maintenance_verified_artifact_handoffs_v1
  TO service_role;
+
+
+-- Reuse the SAME existing owner maintenance artifact readback. A successful
+-- target review is visible in Reality Chat and the Universe classifier on
+-- subsequent wakes; it is never promoted into owner approval automatically.
+CREATE OR REPLACE FUNCTION public.reality_read_owner_maintenance_verified_artifacts_v1(
+ p_owner_id uuid
+) RETURNS jsonb LANGUAGE plpgsql SET search_path TO '' AS $function$
+DECLARE items jsonb;
+BEGIN
+ IF current_user<>'service_role' OR p_owner_id IS NULL THEN
+  RAISE EXCEPTION 'MAINTENANCE_ARTIFACT_OWNER_SERVICE_REQUIRED'; END IF;
+ SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'maintenance_id',x.maintenance_id,'shift_id',x.shift_id,
+  'source_ref',x.source_ref,'source_path',x.source_path,
+  'candidate_commit_sha',x.exact_candidate_commit_sha,
+  'candidate_source_blob_sha',x.candidate_source_blob_sha,
+  'historical_source_blob_sha',x.historical_source_blob_sha,
+  'review_receipt_sha256',x.review_receipt_sha256,
+  'case_ci_receipt_sha256',x.source_case_ci_receipt_sha256,
+  'github_run_id',x.github_run_id,'github_artifact_id',x.github_artifact_id,
+  'github_artifact_digest',x.github_artifact_digest,
+  'target_review_receipt_sha256',x.target_review_receipt_sha256,
+  'target_review_worker_run_id',x.target_review_worker_run_id,
+  'target_review_branch',x.target_review_branch,
+  'target_review_head_sha',x.target_review_head_sha,
+  'target_review_existing_blob_sha',x.target_review_existing_blob_sha,
+  'install_target_verified',(
+   x.target_review_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
+   AND x.target_review_worker_run_id IS NOT NULL
+   AND x.target_review_worker_run_id<>x.observed_worker_run_id
+   AND x.target_review_branch='reality/chat-direct-work-handoff-20261115'
+   AND x.target_review_head_sha ~ '^[a-f0-9]{40}$'
+   AND x.target_review_existing_blob_sha=x.historical_source_blob_sha
+  ),
+  'owner_approval_ready',false,
+  'installation_authorized',false,'repair_installed',false,
+  'original_job_completed',false,'next_action',
+  CASE WHEN x.target_review_receipt_sha256 IS NOT NULL
+   THEN 'EXACT_OWNER_APPROVAL_AND_ORIGINAL_RESUME_CONTRACT_REQUIRED'
+   ELSE 'INDEPENDENT_INSTALL_TARGET_AND_OWNER_APPROVAL_REVIEW_REQUIRED'
+  END
+ ) ORDER BY x.reviewed_at DESC),'[]'::jsonb)
+ INTO items
+ FROM reality_internal.owner_maintenance_verified_artifact_handoffs_v1 x
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w
+  ON w.shift_id=x.shift_id AND w.owner_id=x.owner_id
+ WHERE x.owner_id=p_owner_id AND w.state='ACTIVE'
+ AND w.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
+ AND EXISTS (SELECT 1 FROM pg_catalog.jsonb_array_elements(
+  CASE WHEN pg_catalog.jsonb_typeof(w.source_scope)='array'
+   THEN w.source_scope ELSE '[]'::jsonb END) sc
+  WHERE sc->>'maintenance_id'=x.maintenance_id::text
+   AND sc->>'source_ref'=x.source_ref);
+ RETURN pg_catalog.jsonb_build_object(
+  'status','OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY',
+  'owner_id',p_owner_id,'count',pg_catalog.jsonb_array_length(items),
+  'items',items,'installation_authorized',false,
+  'production_changed',false);
+END $function$;
+REVOKE ALL ON FUNCTION public.reality_read_owner_maintenance_verified_artifacts_v1(uuid)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_read_owner_maintenance_verified_artifacts_v1(uuid)
+ TO service_role;
