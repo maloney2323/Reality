@@ -24,20 +24,39 @@ const hold=(status,more={})=>Object.freeze({
  repair_executed:false,original_job_completed:false,
  installation_authorized:false,production_changed:false,
  new_shift_started:false});
-async function github(path,{token,fetchImpl}){
+async function sourceBroker(mode,{db,claim,fetchImpl,path=null}){
+ if(typeof db.url!=='string'||!db.url.startsWith('https://')||
+    typeof db.secretKey!=='string'||db.secretKey.length<24)
+  fail('SIGNED_SOURCE_BROKER_SERVICE_CONFIG_REQUIRED');
  let r;
- try{r=await fetchImpl(API+path,{
-  method:'GET',redirect:'error',cache:'no-store',
-  signal:AbortSignal.timeout(9000),
-  headers:{accept:'application/vnd.github+json',
-   'x-github-api-version':'2022-11-28',
-   'user-agent':'Reality-signed-maintenance-model-candidate-v1',
-   ...(token?{authorization:'Bearer '+token}:{})}
- })}catch{fail('GITHUB_SOURCE_UNAVAILABLE')}
- if(!r?.ok)fail('GITHUB_SOURCE_UNVERIFIED');
+ try{r=await fetchImpl(db.url+
+   '/functions/v1/reality-signed-maintenance-repair-source-broker-v1',{
+  method:'POST',cache:'no-store',redirect:'error',
+  signal:AbortSignal.timeout(27000),
+  headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+   'content-type':'application/json'},
+  body:JSON.stringify({
+   mode,maintenance_id:claim.maintenance_id,
+   request_id:claim.request_id,release_sha:claim.release_sha,
+   ...(mode==='source'?{target_path:path}:{})
+  })
+ })}catch{fail('SIGNED_SOURCE_BROKER_UNAVAILABLE')}
+ if(!r?.ok)fail('SIGNED_SOURCE_BROKER_UNVERIFIED');
  const v=await r.json().catch(()=>null);
- if(!v||Array.isArray(v)||typeof v!=='object')
-  fail('GITHUB_SOURCE_INVALID');
+ if(!v||Array.isArray(v)||v.ok!==true||
+    v.maintenance_id!==claim.maintenance_id||
+    v.request_id!==claim.request_id||
+    v.release_sha!==claim.release_sha||
+    v.source_read_only!==true||
+    v.independent_frozen_red_verified!==false||
+    v.independent_ci_verified!==false||
+    v.installation_authorized!==false||
+    v.original_job_completed!==false||
+    v.production_changed!==false||
+    v.new_shift_started!==false||
+    (mode==='manifest'&&v.status!=='SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED')||
+    (mode==='source'&&v.status!=='SIGNED_MAINTENANCE_SOURCE_FILE_VERIFIED'))
+  fail('SIGNED_SOURCE_BROKER_SCOPE_UNVERIFIED');
  return v;
 }
 async function ask({apiKey,model,requestId,role,input,fetchImpl}){
@@ -139,19 +158,25 @@ export async function generateOneSignedMaintenanceRepairCandidate({
      !HASH.test(first.provider_proof_sha256||'')||
      first.provider_proof_sha256!==second.provider_proof_sha256)
    fail('PROVIDER_SOURCE_EPOCH_UNSTABLE');
-  const commit=await github('/git/commits/'+c.release_sha,{token,fetchImpl});
-  if(commit.sha!==c.release_sha||!SHA.test(commit.tree?.sha||''))
-   fail('RELEASE_COMMIT_UNVERIFIED');
-  const tree=await github('/git/trees/'+commit.tree.sha+'?recursive=1',{
-   token,fetchImpl});
-  if(tree.sha!==commit.tree.sha||tree.truncated===true||
-     !Array.isArray(tree.tree))fail('RELEASE_SOURCE_TREE_UNVERIFIED');
-  const files=tree.tree.filter(f=>f?.type==='blob'&&
-   TARGET.test(f.path||'')&&!f.path.includes('..')&&
-   SHA.test(f.sha||'')&&Number.isSafeInteger(f.size)&&
-   f.size>=300&&f.size<=60000);
+  // The existing Supabase GitHub credential is held by a READ-ONLY
+  // service broker, never copied into the Vercel preview environment.
+  const tree=await sourceBroker('manifest',{
+   db,claim:c,fetchImpl});
+  if(!SHA.test(tree.source_tree_sha||'')||!Array.isArray(tree.files))
+   fail('PINNED_BROKER_SOURCE_TREE_UNVERIFIED');
+  const files=tree.files.filter(f=>TARGET.test(f?.path||'')&&
+   !f.path.includes('..')&&SHA.test(f.sha||'')&&
+   Number.isSafeInteger(f.size)&&f.size>=300&&f.size<=60000);
   if(!files.length)fail('RELEASE_ELIGIBLE_SOURCE_UNAVAILABLE');
-  // Model may select ONLY an independently listed pinned source path.
+  // Rank actual repository files using the CURRENT maintenance evidence.
+  // No fixed incident number, employee, or hard-coded target module.
+  const words=new Set((c.maintenance_kind+' '+c.historical_failure_kind+
+    ' '+second.source_title+' '+second.source_body.slice(0,1400))
+   .toLowerCase().split(/[^a-z0-9]+/).filter(x=>x.length>=5));
+  const score=p=>p.toLowerCase().split(/[^a-z0-9]+/)
+   .reduce((n,x)=>n+(words.has(x)?2:0),0);
+  files.sort((a,b)=>score(b.path)-score(a.path)||
+   a.path.localeCompare(b.path));
   const manifest=files.slice(0,300).map(x=>x.path);
   const context='Existing authorized maintenance shift: '+shiftId+
    '\nMaintenance identity: '+c.maintenance_id+
@@ -175,8 +200,8 @@ export async function generateOneSignedMaintenanceRepairCandidate({
      target.value.reason.length<8||target.value.reason.length>650)
    fail('MODEL_TARGET_NOT_PINNED');
   const meta=files.find(f=>f.path===path);
-  const file=await github('/contents/'+path+'?ref='+c.release_sha,{
-   token,fetchImpl});
+  const file=await sourceBroker('source',{
+   db,claim:c,fetchImpl,path});
   if(file.path!==path||file.encoding!=='base64'||
      file.sha!==meta.sha||!Number.isSafeInteger(file.size)||
      file.size!==meta.size||typeof file.content!=='string')
