@@ -130,6 +130,8 @@ import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
+import {isSignedMaintenanceOriginalLineageMissing}
+ from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
 import {generateOneSignedMaintenanceRepairCandidate}
@@ -2005,15 +2007,7 @@ export default async function handler(req,res){
    // requesting a code RED for a UI draft with NO canonical owner job.
    // This remains under the exact existing signed maintenance warrant.
    const signedMaintenanceCanonicalBusinessLineageMissing=
-    sameOriginalPostmaintenanceGate?.status===
-      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
-    sameOriginalPostmaintenanceGate.next_action===
-      'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'&&
-    sameOriginalPostmaintenanceGate.canonical_owner_business_original_missing===true&&
-    sameOriginalPostmaintenanceGate.case_specific_maintenance_ci_red_attested===false&&
-    sameOriginalPostmaintenanceGate.original_job_completed===false&&
-    sameOriginalPostmaintenanceGate.installation_authorized===false&&
-    sameOriginalPostmaintenanceGate.production_changed===false;
+    isSignedMaintenanceOriginalLineageMissing(sameOriginalPostmaintenanceGate);
    const signedMaintenanceAuthorizedCaseRedOutstanding=
     sameOriginalPostmaintenanceGate?.status===
       'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
