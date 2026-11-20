@@ -7708,19 +7708,39 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     const code=String(data?.error||'CHAT_RESPONSE_UNAVAILABLE');
     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_RESPONSE_UNAVAILABLE');
    }
+   const transientAnswer=data.transient_answer_only===true&&
+    data.read_only_conversation===true&&
+    data.original_request_id===sentRequest&&
+    data.continuity?.current_answer_persisted===false&&
+    data.continuity?.goal_publication_atomicity==='UNAVAILABLE'&&
+    data.reliability?.chat_lane==='PROPORTIONAL_READ_ONLY'&&
+    data.reliability?.transient_answer_not_a_receipt===true&&
+    data.execution?.external_actions_authorized===false&&
+    data.execution?.installation_authorized===false;
    if(typeof data.answer!=='string'||!data.answer.trim()||
-      data.continuity?.current_answer_persisted!==true)
+      (!transientAnswer&&data.continuity?.current_answer_persisted!==true))
     throw Error('CHAT_ANSWER_DURABILITY_NOT_VERIFIED');
    el('privateGoalCommand').value='';
    if(pendingBubble.isConnected)
-    pendingBubble.querySelector('.label').textContent='YOU · RETURNED WITH VERIFIED ANSWER';
+    pendingBubble.querySelector('.label').textContent=transientAnswer?
+     'YOU · SAVED · ANSWER NOT YET PERSISTED':
+     'YOU · RETURNED WITH VERIFIED ANSWER';
    // The server independently verified its saved answer before returning 200.
    // Display it now; the GET readback below replaces temporary DOM entries
    // with the exact authenticated history when available.
    if(el('privateTranscript').contains(pendingBubble)){
     const answerBubble=bubble('assistant',data.answer);
-    answerBubble.querySelector('.label').textContent='REALITY · VERIFIED SAVED ANSWER';
+    answerBubble.querySelector('.label').textContent=transientAnswer?
+     'REALITY · TEMPORARY ANSWER · NOT SAVED · NO EXECUTION':
+     'REALITY · VERIFIED SAVED ANSWER';
     el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+   }
+   if(transientAnswer){
+    // Do not reload history here: the temporary answer is intentionally not
+    // persisted, and a reload would silently erase it. The original user turn
+    // remains saved and is eligible for the existing exact-ID recovery control.
+    status('Reality answered, but its goal-state provider could not verify a saved reply. This is temporary advice, not an approval or work receipt. Use Retry this saved reply under the original message after recovery.');
+    return;
    }
    void Promise.allSettled([loadSaved(),loadConversations()]).then(results=>{
     if(results.some(x=>x.status==='rejected'))
