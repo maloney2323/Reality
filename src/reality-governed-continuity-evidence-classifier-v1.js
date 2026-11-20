@@ -94,7 +94,7 @@ export function classifyRealityGovernedContinuityEvidence({
     GIT.test(x.historical_source_blob_sha||'')&&
     x.target_review_existing_blob_sha===x.historical_source_blob_sha;
    const pendingTarget=x?.install_target_verified===false&&
-    x.target_review_receipt_sha256===null;
+    x.target_review_receipt_sha256==null;
    if(!x||!UUID.test(x.maintenance_id||'')||
     x.shift_id!==shiftId||!PR.test(x.source_ref||'')||
     seen.has(x.maintenance_id)||x.maintenance_id===g.existing_maintenance_id||
