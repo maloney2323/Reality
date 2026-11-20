@@ -99,12 +99,12 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
  const inbox=new El();inbox.id='realityChatApprovalInbox';
  const itemsAnchor=new El();itemsAnchor.id='realityChatApprovalItems';
  inbox.append(itemsAnchor);
- const center=new El();center.id='realityChatConversation';
- const thread=new El();thread.id='privateTranscript';center.append(thread);
+ // Mirror the REAL /chat DOM: the transcript has no legacy conversation-center wrapper.
+ const thread=new El();thread.id='privateTranscript';
  const open=new El();open.id='realityChatOpenInspector';
  const approvals=new El();approvals.id='realityChatTabApprovals';
  const prompt=new El('textarea');prompt.id='privatePrompt';
- const nodes=[ready,inbox,center,open,approvals,prompt];
+ const nodes=[ready,inbox,thread,open,approvals,prompt];
  const locate=(id)=>{
   function scan(n){if(n.id===id)return n;
    for(const c of n.children){const found=scan(c);if(found)return found;}
@@ -141,7 +141,7 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
    }},Date,console};
  runInNewContext(ui,context);
  const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
- return {ready,inbox,thread,center,locate,calls,events,flush,observers,
+ return {ready,inbox,thread,locate,calls,events,flush,observers,
   click:id=>locate(id)?.click()};
 }
 test('unified signed-in Chat actually loads existing maintenance controls, not old chat-simple',()=>{
@@ -150,7 +150,9 @@ test('unified signed-in Chat actually loads existing maintenance controls, not o
  assert.ok(html.indexOf('reality-chat-maintenance-continuation-v1.css')>
   html.indexOf('reality-chat-mobile-usable-v3.css'));
  assert.match(ui,/get\('realityChatApprovalInbox'\)/);
- assert.match(ui,/get\('realityChatConversation'\)/);
+ assert.match(html,/id="privateTranscript"/);
+ assert.doesNotMatch(html,/id="realityChatConversation"/);
+ assert.doesNotMatch(ui,/get\('realityChatConversation'\)/);
  assert.match(ui,/get\('realityChatTabApprovals'\)/);
  assert.match(ui,/get\('realityChatOpenInspector'\)/);
  assert.doesNotMatch(ui,/reality-chat-simple\.html|\/chat-simple/);
@@ -475,4 +477,68 @@ test('owner Chat exposes executed maintenance stages, not a fabricated final rep
  assert.match(screen,/original frozen RED still required/);
  assert.match(screen,/No independently verified repair yet/);
  assert.ok(v.calls.every(c=>c.options.method==='GET'));
+});
+
+
+test('an actual current-owner signed repair target is visible on the real Chat DOM without the removed wrapper',async()=>{
+ const c=runningOwnerMaintenance();
+ const target='sha256:'+'9'.repeat(64);
+ const candidate='6'.repeat(40),blob='a'.repeat(40),original='b'.repeat(40);
+ c.signed_verified_maintenance_repair_artifacts={
+  status:'OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY',
+  owner_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
+  count:1,installation_authorized:false,production_changed:false,
+  items:[{
+   maintenance_id:items[1].origin_incident_id,shift_id:signedShiftId,
+   source_ref:items[1].source_ref,
+   candidate_commit_sha:candidate,candidate_source_blob_sha:blob,
+   historical_source_blob_sha:original,
+   review_receipt_sha256:HASH('a'),case_ci_receipt_sha256:HASH('b'),
+   github_run_id:44800111234,github_artifact_id:99201111,
+   owner_approval_ready:false,
+   install_target_verified:true,target_review_receipt_sha256:target,
+   target_review_branch:'reality/chat-direct-work-handoff-20261115',
+   target_review_head_sha:'c'.repeat(40),
+   target_review_existing_blob_sha:original,
+   installation_authorized:false,repair_installed:false,
+   original_job_completed:false
+  }]
+ };
+ c.exact_signed_maintenance_install_review={
+  status:'EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY',
+  owner_id:c.signed_verified_maintenance_repair_artifacts.owner_id,
+  owner_approval_ready:true,installation_authorized:false,
+  repair_installed:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false,
+  shift_id:signedShiftId,maintenance_id:items[1].origin_incident_id,
+  source_ref:items[1].source_ref,
+  candidate_commit_sha:candidate,candidate_source_blob_sha:blob,
+  target_head_sha:'c'.repeat(40),
+  target_branch:'reality/chat-direct-work-handoff-20261115',
+  target_path:'src/reality-qualified-source-requalification-v1.js',
+  target_review_receipt_sha256:target,
+  artifact_receipt_sha256:HASH('a'),
+  case_ci_receipt_sha256:HASH('b')
+ };
+ const x=setup({readback:c});await x.flush();
+ assert.equal(x.calls.length,1);
+ assert.equal(x.locate('realityChatMaintenanceNudge').hidden,false);
+ const approve=x.locate('realityChatMaintenanceExactInstallApprove');
+ assert.ok(approve,'owner approval button must exist in the actual Chat DOM');
+ assert.equal(approve.hidden,false);
+ assert.equal(approve.disabled,false);
+ assert.equal(approve.parentElement?.id,'','exact approval is in the chat message actions');
+ assert.match(x.locate('realityChatMaintenanceExactInstallDetails').textContent,
+  /One-use exact approval/);
+ assert.equal(x.locate('realityChatMaintenanceContinuation').parentElement,x.inbox);
+ // Read-only rendering never causes installation, approval, or a new shift.
+ assert.deepEqual(x.calls.map(x=>x.options.method),['GET']);
+});
+test('the exact install approval button remains hidden for unsigned / missing target review',async()=>{
+ const c=runningOwnerMaintenance();
+ const missing=setup({readback:c});await missing.flush();
+ const button=missing.locate('realityChatMaintenanceExactInstallApprove');
+ assert.equal(button.hidden,true);
+ assert.equal(button.disabled,true);
+ assert.deepEqual(missing.calls.map(x=>x.options.method),['GET']);
 });
