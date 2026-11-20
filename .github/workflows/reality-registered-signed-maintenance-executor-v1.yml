@@ -29,6 +29,10 @@ on:
       - 'supabase/migrations/20261120001000_signed_maintenance_requalified_ci_continuation_v1.sql'
       - 'reality-maintenance-ci-triggers/**'
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
+      - 'scripts/reality-maintenance-sourcebound-case-ci-v1.mjs'
+      - 'reality-maintenance-case-specs/**'
+      - 'test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js'
+      - 'src/reality-qualified-source-requalification-v1.js'
       - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
       - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
@@ -64,6 +68,10 @@ on:
       - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
       - 'supabase/migrations/20261120001000_signed_maintenance_requalified_ci_continuation_v1.sql'
       - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
+      - 'scripts/reality-maintenance-sourcebound-case-ci-v1.mjs'
+      - 'reality-maintenance-case-specs/**'
+      - 'test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js'
+      - 'src/reality-qualified-source-requalification-v1.js'
       - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
       - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
@@ -117,6 +125,18 @@ jobs:
       - name: Run independent claim-bound case-CI diagnostics on GitHub trigger
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: node scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
+      - name: Execute SAME signed maintenance source-epoch frozen regression on historical RED and corrected GREEN
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-maintenance-sourcebound-case-ci-v1.mjs
+          node scripts/reality-maintenance-sourcebound-case-ci-v1.mjs
+      - name: Preserve exact signed source-case RED GREEN evidence without claiming original settlement
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-maintenance-sourcebound-case-red-green-${{ github.run_id }}
+          path: artifact/maintenance-sourcebound-red-green-*.json
+          if-no-files-found: warn
       - name: Preserve independent diagnostic artifact without claiming RED
         if: always()
         uses: actions/upload-artifact@v4
