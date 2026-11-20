@@ -61,7 +61,7 @@ const provider={
  provider_proof_sha256:hash('8'),checked_at:new Date().toISOString()
 };
 function scenario({
- leased=claim,selectedPath=path,patchBody=patch,
+ leased=claim,recovered=null,selectedPath=path,patchBody=patch,
  recorded=result,changedSource=false,throwProvider=false
 }={}){
  const calls=[],modelCalls=[],urls=[];
@@ -102,6 +102,12 @@ function scenario({
   calls.push({name,args});
   if(name==='reality_claim_signed_maintenance_repair_candidate_v1')
    return leased;
+  if(name==='reality_recover_signed_maintenance_repair_candidate_source_v1')
+   return recovered||{
+    status:'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY',
+    model_invocation_authorized:false,
+    installation_authorized:false,production_changed:false,
+    original_job_completed:false,new_shift_started:false};
   if(name==='reality_record_signed_maintenance_repair_candidate_v1')
    return {...recorded,proposed_source_sha256:args.p_proposed_source_sha256};
   if(name==='reality_mark_signed_maintenance_repair_candidate_unverified_v1')
@@ -193,4 +199,63 @@ test('SQL enforces exact signed worker, immutable source, one model claim, and p
  const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.match(worker,/generateOneSignedMaintenanceRepairCandidate\(\{/);
  assert.match(worker,/signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate/);
+});
+
+test('a corrected pinned release retries only through the one-use signed history-preserving recovery',async()=>{
+ const f=scenario({
+  leased:{status:'NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY',
+   model_invocation_authorized:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,new_shift_started:false},
+  recovered:{...claim,recovery_attempts:1,old_failed_attempt_preserved:true}
+ });
+ const r=await f.run();
+ assert.equal(r.status,'SIGNED_MAINTENANCE_REPAIR_CODE_CANDIDATE_RECORDED');
+ assert.equal(r.independent_ci_verified,false);
+ assert.deepEqual(f.calls.map(x=>x.name),[
+  'reality_claim_signed_maintenance_repair_candidate_v1',
+  'reality_recover_signed_maintenance_repair_candidate_source_v1',
+  'reality_record_signed_maintenance_repair_candidate_v1']);
+});
+test('no eligible new or recoverable original produces no model call or external mutation',async()=>{
+ const f=scenario({leased:{
+  status:'NO_SIGNED_MAINTENANCE_REPAIR_CANDIDATE_READY',
+  model_invocation_authorized:false,installation_authorized:false,
+  production_changed:false,original_job_completed:false,new_shift_started:false}});
+ const r=await f.run();
+ assert.equal(r.model_generated,false);
+ assert.equal(f.modelCalls.length,0);
+ assert.equal(f.calls.length,2);
+ assert.equal(r.status,'NO_SIGNED_MAINTENANCE_SOURCE_RECOVERY_READY');
+});
+test('source broker reuses existing credential without exposing it to preview or anonymous clients',()=>{
+ const broker=readFileSync(new URL(
+ '../supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts',
+ import.meta.url),'utf8');
+ for(const term of [
+  'REALITY_GITHUB_BROKER_TOKEN',
+  "same(req.headers.get('apikey')||'',c.key)",
+  "reality_read_signed_maintenance_repair_source_scope_v1",
+  "scope.source_read_authorized!==true",
+  "FILE.test(b.target_path",
+  "await gitBlobSha(data)!==match.sha"
+ ])assert.ok(broker.includes(term),term);
+ assert.doesNotMatch(broker,/method:'PUT'|method:'PATCH'|method:'DELETE'|\/git\/refs\/heads/);
+ const scope=readFileSync(new URL(
+ '../supabase/migrations/20261120140500_signed_maintenance_source_broker_scope_v1.sql',
+ import.meta.url),'utf8');
+ assert.match(scope,/current_user<>'service_role'/);
+ assert.match(scope,/c.state='CLAIMED'/);
+ assert.match(scope,/c.release_sha=p_release_sha/);
+ assert.match(scope,/w.state='ACTIVE'/);
+ assert.match(scope,/revoke all on function/);
+ const recovery=readFileSync(new URL(
+ '../supabase/migrations/20261120143000_signed_maintenance_model_bounded_source_recovery_v1.sql',
+ import.meta.url),'utf8');
+ assert.match(recovery,/original_failure_reason/);
+ assert.match(recovery,/c.recovery_attempts=0/);
+ assert.match(recovery,/c.release_sha<>p_release_sha/);
+ assert.match(recovery,/for update of c skip locked/);
+ assert.match(recovery,/recovery_attempts=1/);
+ assert.match(recovery,/revoke all on function/);
+ assert.doesNotMatch(recovery,/update reality_internal\.governed_employee_shifts_v1/);
 });
