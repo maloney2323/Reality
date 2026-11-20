@@ -53,7 +53,7 @@ function fixture(initial=ready){
   appendEvent:async n=>{
    if(failed)throw Error('PROVIDER_NOT_RELIABLE');
    writes++;
-   events.push({...n,
+   events.push({...n,payload:structuredClone(n.payload),
     provenance:{...n.provenance,continuity_spine:{
      prior_lineage_hash:n.prior_lineage_hash,
      transformation_receipt_id:n.transformation_receipt_id
