@@ -20,6 +20,14 @@ const workId=x=>/^work:[a-f0-9]{32}$/.test(String(x||''));
 const SOURCE=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
 const fail=(code,status=409)=>{throw Object.assign(new Error(code),{status})};
 
+// A precise saved owner command, never a model-only explanation or approval.
+export function isExplicitSignedShiftContinuation(message){
+ const t=String(message||'').trim();
+ return t.length>0&&t.length<=6000&&
+  /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+.{0,140}(?:shift|existing|original)/i.test(t)&&
+  !/\b(?:install|deploy|production|approve)\b/i.test(t);
+}
+
 // These are INSTALLED server adapters, not model-suggested permissions.
 // A new capability can register its adapter without adding job numbers or
 // client-side branch/path rules. "Website edit" isn't registered yet.
@@ -33,6 +41,9 @@ export const CHAT_WORK_CAPABILITIES=Object.freeze([
  Object.freeze({id:'governed-chat-new-development',
   description:'Create a genuinely new isolated Reality code development task from the currently saved explicit owner build instruction. No prior job or shift borrowed. Model code generation and independent verification are separate; production installation never authorized.',
   effect:'new isolated development admission only',authorizes_installation:false}),
+ Object.freeze({id:'governed-existing-shift-continuation',
+  description:'Continue the SAME already-authorized owner maintenance shift via its existing signed worker. No new shift, installation approval or completion.',
+  effect:'signed existing-worker wake only',authorizes_installation:false}),
  Object.freeze({id:'owner-employee-shift-briefing',
   description:'Read actual employee shift authorization, current work and steps from the owner-scoped independent ledger. Read only.',
   effect:'read only',authorizes_installation:false}),
@@ -367,6 +378,62 @@ export async function authorizeSavedChatNewDevelopment({
 }
 
 
+// A signed Chat turn routes through Reality's installed worker transport.
+// It does not create a new executor or allow model-written authority.
+export async function continueSignedExistingEmployeeShift({
+ session,conversationId,requestId,messages,
+ env=process.env,dbFactory=shiftDatabase,callRpc=shiftRpc
+}={}){
+ const source=sourceTurn({session,conversationId,requestId,messages});
+ if(!isExplicitSignedShiftContinuation(source.text))
+  fail('CHAT_WORK_EXISTING_SHIFT_EXPLICIT_CONTINUATION_REQUIRED',409);
+ if(env.VERCEL_ENV!=='preview')
+  fail('CHAT_WORK_EXISTING_SHIFT_PREVIEW_ONLY',403);
+ const db=dbFactory(env);
+ if(!db?.strictSecrets||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    db.url!==session.config?.url)
+  fail('CHAT_WORK_EXISTING_SHIFT_OWNER_DATABASE_REQUIRED',403);
+ const result=await callRpc(db,'reality_dispatch_existing_chat_maintenance_shift_v1',{
+  p_owner_id:session.user_id,p_conversation_id:conversationId,
+  p_request_id:requestId
+ });
+ const statuses=new Set(['CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
+  'CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED']);
+ if(statuses.has(result?.status)){
+  if(result.owner_id!==session.user_id||result.request_id!==requestId||
+     result.source_ref!==source.source_ref||!validUuid(result.shift_id)||
+     !Number.isSafeInteger(result.network_request_id)||
+     result.network_request_id<1||
+     result.installation_authorized!==false||
+     result.production_changed!==false||
+     result.original_job_completed!==false||
+     result.new_shift_started!==false||
+     result.worker_execution_verified!==false)
+   fail('CHAT_WORK_EXISTING_SHIFT_WAKE_RECEIPT_UNVERIFIED',503);
+  return Object.freeze({
+   status:result.status,capability_id:'governed-existing-shift-continuation',
+   request_id:requestId,source_ref:source.source_ref,
+   shift_id:result.shift_id,network_request_id:result.network_request_id,
+   wake_enqueued:true,worker_execution_verified:false,
+   execution_started:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,new_shift_started:false
+  });
+ }
+ if(typeof result?.status==='string'&&
+    /^CHAT_EXISTING_SHIFT_[A-Z0-9_]{6,120}$/.test(result.status)&&
+    result.installation_authorized===false&&
+    result.original_job_completed===false&&
+    result.production_changed===false&&result.new_shift_started===false)
+  return Object.freeze({
+   status:result.status,capability_id:'governed-existing-shift-continuation',
+   request_id:requestId,source_ref:source.source_ref,
+   wake_enqueued:false,worker_execution_verified:false,
+   execution_started:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,new_shift_started:false
+  });
+ fail('CHAT_WORK_EXISTING_SHIFT_PROVIDER_RECEIPT_UNVERIFIED',503);
+}
+
 // One signed Chat instruction -> exactly one installed governed work adapter.
 // The model chooses only among registered capabilities; it cannot mint a
 // warrant. Reuse the SAME inspection in the chosen adapter, instead of
@@ -378,10 +445,15 @@ export async function processSignedSavedChatWork({
  admitNew=authorizeSavedChatNewDevelopment,
  readNew=readOwnerNewDevelopment,
  queueOriginal=authorizeSavedChatExistingOriginal,
- continueEngineering=continueVerifiedChatEngineering
+ continueEngineering=continueVerifiedChatEngineering,
+ continueExistingShift=continueSignedExistingEmployeeShift
 }={}){
  const signed=sourceTurn({session,conversationId,requestId,messages});
  const args={session,conversationId,requestId,messages};
+ // Existing shift work is NEVER routed into unrelated new development.
+ // A service-only signed-warrant readback is required before dispatch.
+ if(isExplicitSignedShiftContinuation(signed.text))
+  return await continueExistingShift(args);
  const eligible=await inspect(args);
  if(!eligible||typeof eligible.status!=='string')
   fail('CHAT_WORK_PROCESS_INSPECTION_UNVERIFIED',503);
