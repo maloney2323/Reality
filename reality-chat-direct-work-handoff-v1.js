@@ -87,8 +87,11 @@
   actions.style.cssText='display:flex;gap:9px;flex-wrap:wrap;margin-top:12px';
   const label=document.createElement('div');
   label.style.cssText='font-size:12px;opacity:.86';
+  const isExistingShift=result?.capability_id==='governed-existing-shift-continuation';
   const work=result?.original_work_id;
-  label.textContent=WORK.test(work||'')?work:
+  label.textContent=isExistingShift?
+   'Existing authorized shift · '+String(result.shift_id||'verification pending'):
+   WORK.test(work||'')?work:
    'Original work ID will appear only after durable admission';
   if(typeof result?.objective==='string'&&result.objective.trim()){
    const objective=document.createElement('p');
@@ -109,11 +112,20 @@
     result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED'?'CANDIDATE_STAGED':
     result.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED'?'CI_VERIFIED':null);
    const idx=phaseOrder.indexOf(phase);
-   for(let i=0;i<steps.length;i++){
+   const displayedSteps=isExistingShift?[
+    'Authenticated owner instruction saved',
+    'Existing active shift warrant and maintenance scope verified',
+    'Existing signed worker wake enqueued (not execution)',
+    'Independent signed worker run and original failure evidence',
+    'Independent repair, original resumption and final receipts'
+   ]:steps;
+   for(let i=0;i<displayedSteps.length;i++){
     const row=document.createElement('div');
-    let mark=i<4&&idx>=i?'✓':'○';
-    if(i===4&&verifiedComplete)mark='✓';
-    row.textContent=mark+' '+steps[i];
+    let mark=isExistingShift?
+     (i<3&&result.wake_enqueued===true?'✓':'○'):
+     (i<4&&idx>=i?'✓':'○');
+    if(!isExistingShift&&i===4&&verifiedComplete)mark='✓';
+    row.textContent=mark+' '+displayedSteps[i];
     row.style.opacity=mark==='✓'?'1':'.70';
     timeline.append(row);
    }
@@ -125,7 +137,7 @@
     link.style.cssText='color:#9edfff;text-decoration:underline;min-height:40px';
     actions.append(link);
    }
-   if(idx>=3&&!verifiedComplete){
+   if(!isExistingShift&&idx>=3&&!verifiedComplete){
     const note=document.createElement('p');
     note.style.cssText='font-size:12px;margin:5px 0;opacity:.85';
     note.textContent='Source/syntax checks are not installation or full-job acceptance. Final completion and economic savings remain unverified until independent settlement.';
