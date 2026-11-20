@@ -17,6 +17,8 @@ on:
       - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
       - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
+      - 'test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js'
+      - 'scripts/reality-maintenance-pr308-independent-red-green-v1.mjs'
       - '.github/workflows/reality-registered-signed-maintenance-executor-v1.yml'
   pull_request:
     types: [opened,reopened,synchronize]
@@ -35,6 +37,8 @@ on:
       - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
       - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
       - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
+      - 'test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js'
+      - 'scripts/reality-maintenance-pr308-independent-red-green-v1.mjs'
       - '.github/workflows/reality-registered-signed-maintenance-executor-v1.yml'
 permissions:
   contents: read
@@ -47,7 +51,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
@@ -62,6 +66,18 @@ jobs:
           node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
           node --check src/reality-signed-maintenance-external-review-v1.js
           node --test test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js
+      - name: Independently prove PR308 frozen handoff RED on ancestor and GREEN on candidate
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-maintenance-pr308-independent-red-green-v1.mjs
+          node scripts/reality-maintenance-pr308-independent-red-green-v1.mjs
+      - name: Preserve PR308 frozen RED/GREEN artifact without claiming final business repair
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-pr308-frozen-handoff-red-green-${{ github.run_id }}
+          path: artifact/maintenance-pr308-frozen-red-green.json
+          if-no-files-found: ignore
       - name: Run independent claim-bound case-CI diagnostics on GitHub trigger
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: node scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
