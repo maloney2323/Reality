@@ -115,6 +115,31 @@ test('owner session and genuine saved message are prerequisites to any model cal
  }
  assert.equal(calls,0);
 });
+test('unavailable goal-state provider produces transparent non-durable advisory, not silent Chat failure',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const read=api.indexOf("stage='READ_ONLY_OWNER_GOAL_EPOCH'");
+ const model=api.indexOf("stage='READ_ONLY_MODEL_COGNITION'",read);
+ const transient=api.indexOf('if(!goalEpoch){',model);
+ const atomic=api.indexOf("stage='READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION'",transient);
+ assert.ok(read>=0&&model>read&&transient>model&&atomic>transient,
+  'temporary answer must use the existing model and remain before atomic publication');
+ const branch=api.slice(read,atomic);
+ assert.match(branch,/if\\(Number\\(epochError\\?\\.status\\)!==503\\)throw epochError/);
+ assert.match(branch,/readPrivateChatGoalPublicationEpoch/);
+ assert.match(branch,/current_answer_persisted:false/);
+ assert.match(branch,/goal_publication_atomicity:'UNAVAILABLE'/);
+ assert.match(branch,/transient_answer_only:true/);
+ assert.match(branch,/installation_authorized:false/);
+ assert.match(branch,/reply_recovery_requires_exact_saved_request:true/);
+ assert.doesNotMatch(branch,/queueOwnerGovernedBuild|approveOwnerInstall|executeOneRegisteredMaintenanceAction/);
+ assert.match(ui,/REALITY · TEMPORARY ANSWER · NOT SAVED · NO EXECUTION/);
+ assert.match(ui,/if\\(transientAnswer\\)/);
+ assert.match(ui,/No work was authorized\\. Retry this same saved reply/);
+ assert.match(ui,/outcome\\.original_request_id===message\\.request_id/);
+ assert.match(ui,/outcome\\.execution\\?\\.installation_authorized===false/);
+});
+
 test('read-only HTTP publication uses existing atomic owner-goal CAS and exact RLS, not a new action engine',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  const helper=readFileSync(new URL('../src/reality-chat-proportional-readonly-v1.js',import.meta.url),'utf8');
