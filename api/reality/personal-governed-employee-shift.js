@@ -32,6 +32,8 @@ import {projectOwnerInternalMaintenanceContinuity}
  from '../../src/reality-owner-internal-maintenance-continuity-v1.js';
 import {buildOwnerMaintenanceContinuationDraft}
  from '../../src/reality-owner-maintenance-continuation-plan-v1.js';
+import {classifyRealityGovernedContinuityEvidence}
+ from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
@@ -530,6 +532,30 @@ export default async function handler(req,res){
       x.original_job_completed===false))
      signed_verified_maintenance_repair_artifacts=result;
    }catch{/* Never infer approval from an unavailable owner read. */}
+   // Re-project the same independent verifier evidence into the Universe
+   // through Reality's governed classifier, without modifying state on GET.
+   // Keep source-repair and business-original identities separate.
+   let governed_continuity_evidence_classification=
+    classifyRealityGovernedContinuityEvidence({
+     ownerId:session.user_id,shiftId:chosen?.shift_id||'',
+     originalGate:null,
+     artifactReadback:signed_verified_maintenance_repair_artifacts
+    });
+   if(chosen?.planned_end_at==='infinity'&&
+    ['RUNNING','QUEUED','AWAITING_EXACT_ORIGINAL_WORK'].includes(chosen.status)){
+    try{
+     const original=await shiftRpc(db,
+      'reality_read_same_original_postmaintenance_gate_v1',{
+       p_shift_id:chosen.shift_id
+      });
+     governed_continuity_evidence_classification=
+      classifyRealityGovernedContinuityEvidence({
+       ownerId:session.user_id,shiftId:chosen.shift_id,
+       originalGate:original,
+       artifactReadback:signed_verified_maintenance_repair_artifacts
+      });
+    }catch{/* Unverifiable receipt remains classified as unavailable. */}
+   }
    let requested_maintenance_draft=null;
    let requested_maintenance_draft_status='NO_VERIFIED_MAINTENANCE_CONTINUATION_READY';
    if(!active&&internal_maintenance_continuity?.status===
@@ -580,6 +606,7 @@ export default async function handler(req,res){
     requested_shift_draft:draft,
     internal_maintenance_continuity,internal_maintenance_continuity_status,
      signed_verified_maintenance_repair_artifacts,
+     governed_continuity_evidence_classification,
     requested_maintenance_draft,requested_maintenance_draft_status,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
