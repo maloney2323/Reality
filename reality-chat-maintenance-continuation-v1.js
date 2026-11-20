@@ -256,7 +256,7 @@
     Number.isSafeInteger(a?.github_run_id)&&a.github_run_id>10000&&
     Number.isSafeInteger(a?.github_artifact_id)&&a.github_artifact_id>10000&&
     a.owner_approval_ready===false&&
-    ((a.install_target_verified===false&&a.target_review_receipt_sha256===null)||
+    ((a.install_target_verified===false&&a.target_review_receipt_sha256==null)||
      (a.install_target_verified===true&&
       SHA.test(a.target_review_receipt_sha256||'')&&
       a.target_review_branch==='reality/chat-direct-work-handoff-20261115'&&
