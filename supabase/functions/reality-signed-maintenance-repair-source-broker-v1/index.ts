@@ -37,7 +37,9 @@ async function rpc(c:{url:string,key:string},name:string,args:Record<string,unkn
   'reality_read_signed_existing_maintenance_case_ci_scope_v1',
   'reality_record_signed_existing_maintenance_case_ci_v1',
   'reality_read_signed_existing_maintenance_artifact_scope_v1',
-  'reality_record_signed_existing_maintenance_artifact_v1'
+  'reality_record_signed_existing_maintenance_artifact_v1',
+  'reality_read_signed_maintenance_install_target_review_v1',
+  'reality_record_signed_maintenance_install_target_review_v1'
  ].includes(name))fail('UNREGISTERED_SOURCE_RPC');
  const r=await fetch(c.url+'/rest/v1/rpc/'+name,{
   method:'POST',redirect:'error',cache:'no-store',
@@ -438,6 +440,83 @@ async function verifiedArtifact(c:{url:string,key:string,github:string},b:any){
  return response(200,'NO_PINNED_VERIFIED_REPAIR_ARTIFACT_MATCHED_CASE');
 }
 
+
+const TARGET_BRANCH='reality/chat-direct-work-handoff-20261115';
+// Existing broker performs read-only GitHub target and rollback inspection;
+// its independent service-role receipt NEVER creates owner approval.
+async function verifiedTarget(c:{url:string,key:string,github:string},b:any){
+ if(!b||Object.keys(b).sort().join(',')!=='mode,release_sha,shift_id,worker_run_id'||
+  !UUID.test(b.shift_id||'')||!UUID.test(b.worker_run_id||'')||!SHA.test(b.release_sha||''))
+  return response(400,'TARGET_REVIEW_EXACT_SIGNED_REQUEST_REQUIRED');
+ const x=await rpc(c,'reality_read_signed_maintenance_install_target_review_v1',{
+  p_shift_id:b.shift_id,p_worker_run_id:b.worker_run_id});
+ if(x.status==='NO_SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_DUE'&&
+  x.installation_authorized===false&&x.repair_installed===false&&
+  x.original_job_completed===false&&x.production_changed===false)
+  return response(200,x.status);
+ if(x.status!=='SIGNED_MAINTENANCE_EXACT_INSTALL_TARGET_REVIEW_DUE'||
+  x.shift_id!==b.shift_id||!UUID.test(x.owner_id||'')||
+  !UUID.test(x.maintenance_id||'')||
+  x.reviewer_worker_run_id!==b.worker_run_id||
+  x.artifact_worker_run_id===b.worker_run_id||
+  !UUID.test(x.artifact_worker_run_id||'')||
+  x.target_branch!==TARGET_BRANCH||
+  !/^src\/[a-z0-9_./-]+\.js$/.test(x.source_path||'')||
+  x.source_path.includes('..')||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(x.source_ref||'')||
+  !SHA.test(x.candidate_commit_sha||'')||
+  !SHA.test(x.candidate_source_blob_sha||'')||
+  !SHA.test(x.historical_source_blob_sha||'')||
+  !HASH.test(x.case_ci_receipt_sha256||'')||
+  !HASH.test(x.artifact_receipt_sha256||'')||
+  x.installation_authorized!==false||x.original_job_completed!==false||
+  x.owner_approval_ready!==false||x.production_changed!==false||
+  x.new_shift_started!==false)
+  fail('TARGET_REVIEW_OWNER_WARRANT_OR_ARTIFACT_UNVERIFIED');
+ const ref=await github(c,'/git/ref/heads/'+TARGET_BRANCH);
+ if(ref.ref!=='refs/heads/'+TARGET_BRANCH||!SHA.test(ref.object?.sha||''))
+  fail('TARGET_REVIEW_TARGET_BRANCH_UNVERIFIED');
+ const [candidate,target]=await Promise.all([
+  verifiedGithubBlob(c,x.source_path,x.candidate_commit_sha),
+  verifiedGithubBlob(c,x.source_path,ref.object.sha)
+ ]);
+ if(!candidate||!target||candidate.sha!==x.candidate_source_blob_sha)
+  return response(200,'SIGNED_MAINTENANCE_INSTALL_TARGET_PROVIDER_PROOF_UNAVAILABLE',{
+   maintenance_id:x.maintenance_id});
+ if(target.sha!==x.historical_source_blob_sha)
+  return response(200,'SIGNED_MAINTENANCE_INSTALL_TARGET_SOURCE_DRIFT_REQUALIFICATION_REQUIRED',{
+   maintenance_id:x.maintenance_id});
+ const second=await github(c,'/git/ref/heads/'+TARGET_BRANCH);
+ if(second.ref!==ref.ref||second.object?.sha!==ref.object.sha)
+  return response(200,'SIGNED_MAINTENANCE_INSTALL_TARGET_SOURCE_DRIFT_REQUALIFICATION_REQUIRED',{
+   maintenance_id:x.maintenance_id});
+ const y=await rpc(c,'reality_record_signed_maintenance_install_target_review_v1',{
+  p_shift_id:b.shift_id,p_worker_run_id:b.worker_run_id,
+  p_maintenance_id:x.maintenance_id,p_candidate_blob_sha:candidate.sha,
+  p_target_branch:TARGET_BRANCH,p_target_head_sha:ref.object.sha,
+  p_target_existing_blob_sha:target.sha});
+ if(y.status!=='EXACT_SIGNED_MAINTENANCE_INSTALL_TARGET_INDEPENDENTLY_REVIEWED'||
+  y.shift_id!==b.shift_id||y.owner_id!==x.owner_id||
+  y.maintenance_id!==x.maintenance_id||
+  y.candidate_commit_sha!==x.candidate_commit_sha||
+  y.candidate_source_blob_sha!==candidate.sha||
+  y.target_branch!==TARGET_BRANCH||y.target_head_sha!==ref.object.sha||
+  y.target_existing_blob_sha!==target.sha||
+  !HASH.test(y.target_review_receipt_sha256||'')||
+  y.owner_approval_ready!==false||y.installation_authorized!==false||
+  y.repair_installed!==false||y.original_job_completed!==false||
+  y.production_changed!==false||y.new_shift_started!==false)
+  fail('TARGET_REVIEW_DURABLE_INDEPENDENT_RECEIPT_UNVERIFIED');
+ return response(200,y.status,{
+  maintenance_id:y.maintenance_id,owner_id:y.owner_id,shift_id:y.shift_id,
+  candidate_commit_sha:y.candidate_commit_sha,
+  candidate_source_blob_sha:y.candidate_source_blob_sha,
+  target_branch:y.target_branch,target_head_sha:y.target_head_sha,
+  target_existing_blob_sha:y.target_existing_blob_sha,
+  target_review_receipt_sha256:y.target_review_receipt_sha256,
+  install_target_verified:true,owner_approval_ready:false,repair_installed:false});
+}
+
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return response(405,'SIGNED_SOURCE_BROKER_POST_ONLY');
@@ -456,6 +535,9 @@ Deno.serve(async req=>{
   }
   if(b?.mode==='artifact'){
    return await verifiedArtifact(c,b);
+  }
+  if(b?.mode==='target'){
+   return await verifiedTarget(c,b);
   }
   if(!b||Array.isArray(b)||typeof b!=='object'||
      !['manifest','source'].includes(b.mode)||
