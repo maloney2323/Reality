@@ -128,6 +128,7 @@ test('privileged GitHub installer is exact-once fenced and reconcilable by GET, 
  assert.ok(guarded.indexOf('reality_claim_signed_maintenance_approved_install_v1')<
   guarded.indexOf("'/git/refs/heads/'+BRANCH,'PATCH'"));
  assert.match(guarded,/x\.target_branch===BRANCH/);
+ assert.match(guarded,/source_installed:false,\.\.\.rest,original_job_completed:false/);
  assert.match(guarded,/base!=='https:\/\/'\+PROJECT\+'\.supabase\.co'/);
 });
 test('independent verifier requires real installed source, push workflow and Vercel app result before recording',()=>{
@@ -144,6 +145,7 @@ test('independent verifier requires real installed source, push workflow and Ver
  assert.match(p,/source\(token,s\.source_path,s\.installed_commit_sha\)/);
  assert.match(p,/reality_record_signed_maintenance_independent_postinstall_v1/);
  assert.match(p,/original_job_completed:false/);
+ assert.match(p,/repair_verified:false,\.\.\.extra,/);
 });
 test('database preserves real signed original job identities and rejects duplicate permission',()=>{
  const sql=read('supabase/migrations/20261120214500_signed_existing_maintenance_exact_owner_install_v1.sql');
