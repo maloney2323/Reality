@@ -7605,7 +7605,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
        /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
        /work:[a-f0-9]{32}/i.test(value)),
     // Presentation hint only: don't poll a worker inbox on normal Chat.
-    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install|create|generate|investigate|assign|prepare|research|deploy)\b/i.test(value)}
+    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install|create|generate|investigate|assign|prepare|research|deploy)\b/i.test(value)||
+      /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|finish)\s+.{0,140}(?:shift|existing|original)/i.test(value)}
   }));
   el('privateSend').disabled=true;
   let intakeVerified=false,responseFailureStage=null;
