@@ -635,6 +635,55 @@ export async function advanceSignedChatDevelopment({
 // Owner-scoped, READ-ONLY reconstruction of an exact signed Chat
 // development request. This permits persisted status on reload without
 // reclassifying, starting a worker, approving or claiming completion.
+// Recovery-safe readback of the exact signed employee-shift wake. It never
+// replays an HTTP wake, asks for approval, or translates a model's prose
+// into executable authority. Chat can rehydrate this after conversation reload.
+export async function readSignedExistingShiftWakeStatus({
+ session,conversationId,requestId,messages,
+ env=process.env,dbFactory=shiftDatabase,callRpc=shiftRpc
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ if(!isExplicitSignedShiftContinuation(signed.text))
+  fail('CHAT_WORK_EXISTING_SHIFT_NOT_A_CONTINUATION',409);
+ if(env.VERCEL_ENV!=='preview')
+  fail('CHAT_WORK_EXISTING_SHIFT_PREVIEW_ONLY',403);
+ const db=dbFactory(env);
+ if(!db?.strictSecrets||
+    db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    db.url!==session.config?.url)
+  fail('CHAT_WORK_EXISTING_SHIFT_OWNER_DATABASE_REQUIRED',403);
+ const result=await callRpc(db,'reality_read_existing_chat_maintenance_wake_v1',{
+  p_owner_id:session.user_id,p_conversation_id:conversationId,
+  p_request_id:requestId
+ });
+ if(result?.status==='CHAT_EXISTING_SHIFT_NO_WAKE_RECEIPT'&&
+    result.installation_authorized===false&&
+    result.original_job_completed===false&&
+    result.production_changed===false&&result.new_shift_started===false)
+  return Object.freeze({...result,request_id:requestId,
+   source_ref:signed.source_ref,wake_enqueued:false,
+   worker_execution_verified:false});
+ if(result?.status!=='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED'||
+    result.owner_id!==session.user_id||
+    result.conversation_id!==conversationId||
+    result.request_id!==requestId||
+    result.source_ref!==signed.source_ref||
+    !validUuid(result.shift_id)||
+    !Number.isSafeInteger(result.network_request_id)||
+    result.network_request_id<1||
+    result.wake_enqueued!==true||
+    result.worker_execution_verified_for_this_request!==false||
+    result.installation_authorized!==false||
+    result.original_job_completed!==false||
+    result.production_changed!==false||
+    result.new_shift_started!==false)
+  fail('CHAT_WORK_EXISTING_SHIFT_READBACK_UNVERIFIED',503);
+ return Object.freeze({...result,
+  capability_id:'governed-existing-shift-continuation',
+  worker_execution_verified:false,
+  execution_started:false});
+}
+
 export async function readSignedChatDevelopmentStatus({
  session,conversationId,requestId,messages,
  readNew=readOwnerNewDevelopment
