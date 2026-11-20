@@ -135,6 +135,8 @@ import {reconcileSignedVerifiedMaintenanceArtifact,
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
+import {routeSignedMaintenanceContinuityTrigger}
+ from '../../src/reality-governed-auto-trigger-v1.0.js';
 import {enforceSignedMaintenanceReceiptContinuity}
  from '../../src/reality-signed-maintenance-continuity-enforcement-v1.js';
 import {independentlyReconcileSignedMaintenanceInstall}
@@ -765,15 +767,26 @@ export default async function handler(req,res){
      installer_reconcile_only_from_continuity:false,
      original_job_completed:false,new_shift_started:false,
      production_changed:false};
+  // Reality's EXISTING governed trigger consumes the verified durable
+  // Continuity transition and routes only the NEXT eligible action.
+  // It neither grants owner authority nor authorizes a new job/shift.
+  workerStage='SIGNED_MAINTENANCE_GOVERNED_TRIGGER_ROUTING';
+  const signedMaintenanceGovernedTrigger=
+   routeSignedMaintenanceContinuityTrigger({
+    continuity:signedMaintenanceCanonicalContinuity,
+    originalGate:sameOriginalPostmaintenanceGate,
+    ownerId:sameOriginalPostmaintenanceGate?.owner_id,
+    shiftId:wakeReceipt.shift_id
+   });
   // The existing signed worker can now advance an exact owner-approved
   // maintenance repair WITHOUT any further human step. The privileged broker
   // independently reads approval and atomically fences GitHub source write.
   workerStage='EXACT_OWNER_APPROVED_MAINTENANCE_AUTOMATIC_INSTALL';
   const signedMaintenanceApprovedInstall=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-   signedMaintenanceCanonicalContinuity.continuity_committed===true&&
-   (signedMaintenanceCanonicalContinuity.install_eligible_from_continuity===true||
-    signedMaintenanceCanonicalContinuity.installer_reconcile_only_from_continuity===true)?
+   signedMaintenanceGovernedTrigger.status==='SIGNED_MAINTENANCE_GOVERNED_TRIGGER_READY'&&
+   (signedMaintenanceGovernedTrigger.installer_dispatch_permitted===true||
+    signedMaintenanceGovernedTrigger.installer_reconcile_only===true)?
     await continueExactOwnerApprovedMaintenanceInstall({
      db,env:process.env,fetchImpl:fetch
     }).catch(()=>({
@@ -824,6 +837,16 @@ export default async function handler(req,res){
      continuity_committed:false,
      next_authorized_action:'NO_NEW_AUTHORITY',
      original_job_completed:false,production_changed:false};
+  // On a later signed wake the VERIFIED Universe return becomes a governed
+  // next-work trigger; the existing qualified executor independently checks
+  // original work identity and its own authority before doing anything.
+  const signedMaintenanceReturnTrigger=
+   routeSignedMaintenanceContinuityTrigger({
+    continuity:signedMaintenanceUniverseReconciliation,
+    originalGate:sameOriginalPostmaintenanceGate,
+    ownerId:sameOriginalPostmaintenanceGate?.owner_id,
+    shiftId:wakeReceipt.shift_id
+   });
   // Independent verifier facts -> Reality-governed classification ->
   // existing Continuity Ledger. A classification cannot create execution
   // authority, install code, reopen an original, or mutate the Universe.
@@ -2329,6 +2352,8 @@ export default async function handler(req,res){
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
     signed_maintenance_install_target_review:signedMaintenanceInstallTargetReview,
     signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity,
+    signed_maintenance_governed_trigger:signedMaintenanceGovernedTrigger,
+    signed_maintenance_universe_return_trigger:signedMaintenanceReturnTrigger,
     signed_maintenance_universe_postinstall_return:signedMaintenanceUniverseReconciliation,
     signed_maintenance_approved_auto_install:signedMaintenanceApprovedInstall,
     signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
