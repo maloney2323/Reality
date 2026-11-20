@@ -209,7 +209,9 @@ export default async function handler(req,res){
    fail('CHAT_GOAL_COMMAND_SAME_ORIGIN_REQUIRED',403);
   if(goalCommand&&text.length>700)
    fail('CHAT_GOAL_COMMAND_TEXT_TOO_LONG',400);
-  const existing=history.messages.filter(m=>m.request_id===requestId);
+  // A short conversational window cannot certify a replay or authorization.
+  // Read one exact owner-RLS request, including older saved instructions.
+  const existing=(await readPrivateChatRequest(session,{conversationId,requestId})).messages;
   const previouslySavedUser=existing.find(x=>x.role==='user'&&x.text===text);
   if(existing.length&&(!previouslySavedUser||
      existing.some(x=>x.role==='user'&&x.text!==text)))
@@ -800,13 +802,15 @@ export default async function handler(req,res){
       goalAtGeneration.recent_transition_receipts.at(-1)?.event_id||null,
   });
   stage='ASSISTANT_DURABILITY_READBACK';
-  const check=await readPrivateChat(session,conversationId);
+  // Verify the exact committed assistant publication without another
+  // full-conversation fetch. This is readback evidence, never work authority.
+  const check=await readPrivateChatRequest(session,{conversationId,requestId});
   if(!check.messages.some(x=>x.role==='assistant'&&x.request_id===requestId&&x.text===answer))
    fail('CHAT_ASSISTANT_DURABILITY_NOT_VERIFIED',503);
   return res.status(200).json({ok:true,conversation_id:conversationId,answer,replayed:false,
    continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',
-    recovered_messages:check.messages.length,coverage:check.history_status,
-    older_messages_may_be_missing:check.older_missing,
+    recovered_messages:check.messages.length,coverage:check.status,
+    older_messages_may_be_missing:null,
     current_answer_persisted:true,
     goal_publication_atomicity:publication?.atomic_goal_revision_checked===true?
       'ATOMIC_DATABASE_GOAL_REVISION_AND_ASSISTANT_INSERT':
