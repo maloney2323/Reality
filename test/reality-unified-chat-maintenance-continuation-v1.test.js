@@ -527,6 +527,11 @@ test('an actual current-owner signed repair target is visible on the real Chat D
  assert.ok(approve,'owner approval button must exist in the actual Chat DOM');
  assert.equal(approve.hidden,false,'Approval visibility diagnostic: '+JSON.stringify({feedback:x.locate('realityChatMaintenanceFeedback')?.textContent,details:x.locate('realityChatMaintenanceExactInstallDetails')?.textContent,ownerCard:c.exact_signed_maintenance_install_review?.status,artifactCount:c.signed_verified_maintenance_repair_artifacts?.count}));
  assert.equal(approve.disabled,false);
+ const decisionButton=x.locate('realityChatMaintenanceApprovalInboxInstall');
+ assert.ok(decisionButton);
+ assert.equal(decisionButton.hidden,false);
+ assert.equal(decisionButton.disabled,false);
+ assert.ok(x.locate('realityChatMaintenanceContinuation').contains(decisionButton));
  assert.equal(approve.parentElement?.id,'','exact approval is in the chat message actions');
  assert.match(x.locate('realityChatMaintenanceExactInstallDetails').textContent,
   /One-use exact approval/);
@@ -540,5 +545,7 @@ test('the exact install approval button remains hidden for unsigned / missing ta
  const button=missing.locate('realityChatMaintenanceExactInstallApprove');
  assert.equal(button.hidden,true);
  assert.equal(button.disabled,true);
+ assert.equal(missing.locate('realityChatMaintenanceApprovalInboxInstall').hidden,true);
+ assert.equal(missing.locate('realityChatMaintenanceApprovalInboxInstall').disabled,true);
  assert.deepEqual(missing.calls.map(x=>x.options.method),['GET']);
 });
