@@ -90,6 +90,9 @@ test('Reality Chat exact approval requires fresh signed read, explicit click and
  const ui=read('reality-chat-maintenance-continuation-v1.js');
  const api=read('api/reality/signed-maintenance-exact-install-approval.js');
  assert.match(ui,/installApprove\.addEventListener\('click',async/);
+ assert.match(ui,/installApproveInInbox\.addEventListener\('click'/);
+ assert.match(ui,/installApprove\.click\(\)/);
+ assert.match(ui,/installApproveInInbox\.disabled=installApprove\.disabled/);
  assert.match(ui,/const fresh=await read\(\)/);
  assert.match(ui,/!approvedScope\?\.exactInstallCard/);
  assert.match(ui,/crypto\.randomUUID\(\)/);
