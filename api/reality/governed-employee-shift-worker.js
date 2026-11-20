@@ -135,6 +135,8 @@ import {reconcileSignedVerifiedMaintenanceArtifact,
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
+import {independentlyReconcileSignedMaintenanceInstall}
+ from '../../src/reality-signed-maintenance-postinstall-verification-bridge-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
 import {classifyRealityGovernedContinuityEvidence}
@@ -747,6 +749,21 @@ export default async function handler(req,res){
     })):
     {status:'NO_SIGNED_MAINTENANCE_AUTOMATIC_INSTALL_WAKE',
      source_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false};
+  // Different signed provider independently rechecks the actual installed
+  // bytes, GitHub acceptance and Vercel status BEFORE maintenance closure.
+  workerStage='EXACT_SIGNED_MAINTENANCE_INDEPENDENT_POSTINSTALL_VERIFICATION';
+  const signedMaintenanceIndependentPostinstall=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReconcileSignedMaintenanceInstall({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'EXACT_SIGNED_MAINTENANCE_POSTINSTALL_UNVERIFIED',
+     repair_verified:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_POSTINSTALL_WAKE',
+     repair_verified:false,original_job_completed:false,
      production_changed:false,new_shift_started:false};
   // Independent verifier facts -> Reality-governed classification ->
   // existing Continuity Ledger. A classification cannot create execution
@@ -2253,6 +2270,7 @@ export default async function handler(req,res){
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
     signed_maintenance_install_target_review:signedMaintenanceInstallTargetReview,
     signed_maintenance_approved_auto_install:signedMaintenanceApprovedInstall,
+    signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
     governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     signed_schedule_evidence_admission:signedScheduleAdmission,
