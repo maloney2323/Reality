@@ -7341,6 +7341,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      retry.disabled=true;
      explanation.textContent='Retrying the exact saved request ID; no additional user message or job authorization…';
      try{
+      notice.querySelector('.reality-chat-transient-answer')?.remove();
       const recovered=await fetch('/api/reality/personal-chat',{
        method:'POST',credentials:'same-origin',cache:'no-store',
        signal:AbortSignal.timeout(95000),
@@ -7349,6 +7350,26 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
         request_id:message.request_id,message:message.text})
       });
       const outcome=await recovered.json().catch(()=>null);
+      // A signed-in, source-backed temporary answer can be shown even when
+      // the exact goal-CAS publication provider is down. Never display it as
+      // a saved reply or an approval; keep the same recovery control active.
+      if(recovered.ok&&outcome?.ok===true&&
+         outcome.transient_answer_only===true&&
+         outcome.original_request_id===message.request_id&&
+         outcome.read_only_conversation===true&&
+         outcome.continuity?.current_answer_persisted===false&&
+         outcome.reliability?.transient_answer_not_a_receipt===true&&
+         outcome.execution?.external_actions_authorized===false&&
+         outcome.execution?.installation_authorized===false&&
+         typeof outcome.answer==='string'&&outcome.answer.trim()){
+       explanation.textContent='Reality answered temporarily. The reply was NOT saved or independently verified against the current goal epoch. No work was authorized. Retry this same saved reply when the provider recovers.';
+       const temporary=document.createElement('div');
+       temporary.className='reality-chat-transient-answer';
+       temporary.textContent='REALITY · TEMPORARY ANSWER · NOT SAVED: '+outcome.answer;
+       notice.insertBefore(temporary,retry);
+       retry.disabled=false;
+       return;
+      }
       if(!recovered.ok||outcome?.ok!==true||
          outcome.continuity?.current_answer_persisted!==true){
        const code=String(outcome?.error||'CHAT_RESPONSE_UNAVAILABLE');
