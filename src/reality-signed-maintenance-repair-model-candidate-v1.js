@@ -200,16 +200,24 @@ export async function generateOneSignedMaintenanceRepairCandidate({
    !f.path.includes('..')&&SHA.test(f.sha||'')&&
    Number.isSafeInteger(f.size)&&f.size>=300&&f.size<=60000);
   if(!files.length)fail('RELEASE_ELIGIBLE_SOURCE_UNAVAILABLE');
-  // Rank actual repository files using the CURRENT maintenance evidence.
-  // No fixed incident number, employee, or hard-coded target module.
-  const words=new Set((c.maintenance_kind+' '+c.historical_failure_kind+
-    ' '+second.source_title+' '+second.source_body.slice(0,1400))
-   .toLowerCase().split(/[^a-z0-9]+/).filter(x=>x.length>=5));
-  const score=p=>p.toLowerCase().split(/[^a-z0-9]+/)
-   .reduce((n,x)=>n+(words.has(x)?2:0),0);
-  files.sort((a,b)=>score(b.path)-score(a.path)||
-   a.path.localeCompare(b.path));
-  const manifest=files.slice(0,300).map(x=>x.path);
+  // Rank from the authenticated maintenance FAILURE class, not the
+  // untrusted PR feature description. No incident ID/path is hard-coded.
+  const domainWords=new Set(
+   (c.maintenance_kind+' '+c.historical_failure_kind)
+    .toLowerCase().split(/[^a-z0-9]+/)
+    .filter(w=>w.length>=6&&![
+      'historical','independently','reobserved','failure',
+      'blocked','signed','worker','required'
+    ].includes(w)).map(w=>w.slice(0,6))
+  );
+  const relevance=path=>path.toLowerCase().split(/[^a-z0-9]+/)
+   .filter(w=>w.length>=6)
+   .reduce((n,w)=>n+(domainWords.has(w.slice(0,6))?1:0),0);
+  const related=files.filter(f=>relevance(f.path)>0);
+  if(!related.length)fail('NO_PINNED_FAILURE_DOMAIN_EXECUTOR_MODULE');
+  related.sort((x,y)=>relevance(y.path)-relevance(x.path)||
+    x.path.localeCompare(y.path));
+  const manifest=related.slice(0,90).map(f=>f.path);
   const context='Existing authorized maintenance shift: '+shiftId+
    '\nMaintenance identity: '+c.maintenance_id+
    '\nExisting original: '+(c.original_work_id||'NO_PREEXISTING_EXECUTABLE_ORIGINAL')+
@@ -224,8 +232,10 @@ export async function generateOneSignedMaintenanceRepairCandidate({
       second.source_body.slice(0,2500);
   const target=await ask({apiKey,model,requestId:c.request_id,
    role:'target',fetchImpl,input:context+
-   '\nSelect exactly ONE appropriate source file from this pinned list. '+
-   'Do not select a test or an unrelated file:\n'+manifest.join('\n')});
+   '\nSelect the source module that implements the LEDGER FAILURE KIND, not '+
+   'the PR display feature. A qualification or source-requalification failure '+
+   'is not a UI/ROI projection bug. Select exactly ONE relevant real signed '+
+   'executor dependency from the source-constrained list:\n'+manifest.join('\n')});
   const path=target.value?.path;
   if(!TARGET.test(path||'')||!manifest.includes(path)||
      typeof target.value?.reason!=='string'||
