@@ -121,13 +121,37 @@ Deno.serve(async req=>{
    .map((x:any)=>({path:x.path,sha:x.sha,size:x.size}));
   if(!files.length||files.length>2500)
    fail('PINNED_SOURCE_LIST_OUT_OF_BOUNDS');
+  // Source selection is restricted to the RUNNING signed executor's
+  // own exact static dependency graph, not incidental UI/projection
+  // files whose vocabulary happens to resemble a GitHub PR description.
+  const workerPath='api/reality/governed-employee-shift-worker.js';
+  const worker=await github(c,'/contents/'+workerPath+
+   '?ref='+b.release_sha);
+  if(worker.path!==workerPath||worker.encoding!=='base64'||
+     !SHA.test(worker.sha||'')||
+     !Number.isSafeInteger(worker.size)||worker.size<1000||
+     worker.size>190000||typeof worker.content!=='string')
+   fail('PINNED_SIGNED_WORKER_SOURCE_UNVERIFIED');
+  const workerBytes=Uint8Array.from(
+   atob(worker.content.replace(/\s/g,'')),v=>v.charCodeAt(0));
+  if(workerBytes.length!==worker.size||
+     await gitBlobSha(workerBytes)!==worker.sha)
+   fail('SIGNED_WORKER_GIT_SOURCE_HASH_INVALID');
+  const workerText=new TextDecoder().decode(workerBytes);
+  const imported=new Set([...workerText.matchAll(
+   /from\s+['"]\.\.\/\.\.\/(src\/[A-Za-z0-9_./-]+\.js)['"]/g
+  )].map(m=>m[1]).filter(x=>!x.includes('..')));
+  const eligible=files.filter((x:{path:string})=>imported.has(x.path));
+  if(!eligible.length||eligible.length>350)
+   fail('SIGNED_WORKER_EXECUTABLE_MODULE_GRAPH_UNVERIFIED');
   if(b.mode==='manifest')
    return response(200,'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',{
     maintenance_id:b.maintenance_id,request_id:b.request_id,
     release_sha:b.release_sha,source_tree_sha:tree.sha,
-    files
+    worker_source_blob_sha:worker.sha,runtime_imports_count:eligible.length,
+    files:eligible
    });
-  const match=files.find((x:{path:string})=>x.path===b.target_path);
+  const match=eligible.find((x:{path:string})=>x.path===b.target_path);
   if(!match)fail('SOURCE_FILE_NOT_IN_PINNED_TREE');
   const file=await github(c,'/contents/'+b.target_path+
    '?ref='+b.release_sha);
