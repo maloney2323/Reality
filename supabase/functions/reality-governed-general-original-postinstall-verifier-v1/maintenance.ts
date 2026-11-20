@@ -81,12 +81,13 @@ export async function independentlyAcceptInstalledMaintenance(base:string,key:st
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<25)
    return result('SIGNED_MAINTENANCE_POSTINSTALL_GITHUB_CREDENTIAL_UNAVAILABLE',{},503);
-  const [ref,installed,commit,checks,runs]=await Promise.all([
+  const [ref,installed,commit,checks,runs,providerStatus]=await Promise.all([
    gh(token,'/git/ref/heads/'+BRANCH),
    source(token,s.source_path,s.installed_commit_sha),
    gh(token,'/commits/'+s.installed_commit_sha),
    gh(token,'/commits/'+s.installed_commit_sha+'/check-runs?per_page=100'),
-   gh(token,'/actions/runs?head_sha='+s.installed_commit_sha+'&event=push&per_page=100')
+   gh(token,'/actions/runs?head_sha='+s.installed_commit_sha+'&event=push&per_page=100'),
+   gh(token,'/commits/'+s.installed_commit_sha+'/status')
   ]);
   if(ref.ref!=='refs/heads/'+BRANCH||
    ref.object?.sha!==s.installed_commit_sha||
@@ -108,7 +109,14 @@ export async function independentlyAcceptInstalledMaintenance(base:string,key:st
    x.head_sha===s.installed_commit_sha&&x.app?.slug==='vercel'&&
    x.status==='completed'&&x.conclusion==='success'&&
    Number.isSafeInteger(x.id)&&x.id>10000);
-  if(eligible.length!==1||vercel.length<1)
+  // "Vercel Preview Comments" alone is NOT deployment proof: require
+  // the separate Vercel GitHub deployment commit status on the same SHA.
+  const ready=providerStatus?.state==='success'&&
+   Array.isArray(providerStatus.statuses)&&
+   providerStatus.statuses.some((x:any)=>
+    x.context==='Vercel'&&x.state==='success'&&
+    /^https:\/\/vercel\.com\/[a-zA-Z0-9_-]+\/reality\/[a-zA-Z0-9_-]{10,100}$/.test(x.target_url||''));
+  if(eligible.length!==1||vercel.length<1||!ready)
    return result('SIGNED_MAINTENANCE_POSTINSTALL_WAITING_FOR_INDEPENDENT_CI_AND_PREVIEW');
   const run=eligible[0];
   const jobs=await gh(token,'/actions/runs/'+run.id+'/jobs?per_page=100');
