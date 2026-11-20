@@ -130,7 +130,8 @@ import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
-import {reconcileSignedVerifiedMaintenanceArtifact}
+import {reconcileSignedVerifiedMaintenanceArtifact,
+ independentlyReviewSignedMaintenanceInstallTarget}
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
@@ -708,6 +709,27 @@ export default async function handler(req,res){
      verified_repair_artifact:false,installation_authorized:false,
      repair_installed:false,original_job_completed:false,
      production_changed:false,new_shift_started:false};
+  // Exact frozen code artifact -> independent target / rollback inspection.
+  // This is the SAME already authorized signed shift on a DIFFERENT worker
+  // from artifact acceptance. It may record a review receipt, never install.
+  workerStage='SIGNED_MAINTENANCE_INDEPENDENT_INSTALL_TARGET_REVIEW';
+  const signedMaintenanceInstallTargetReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReviewSignedMaintenanceInstallTarget({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_UNVERIFIED',
+     install_target_verified:false,owner_approval_ready:false,
+     installation_authorized:false,repair_installed:false,
+     original_job_completed:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_WAKE',
+     install_target_verified:false,owner_approval_ready:false,
+     installation_authorized:false,repair_installed:false,
+     original_job_completed:false,production_changed:false,
+     new_shift_started:false};
   // Independent verifier facts -> Reality-governed classification ->
   // existing Continuity Ledger. A classification cannot create execution
   // authority, install code, reopen an original, or mutate the Universe.
@@ -2211,6 +2233,7 @@ export default async function handler(req,res){
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
+    signed_maintenance_install_target_review:signedMaintenanceInstallTargetReview,
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
     governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     signed_schedule_evidence_admission:signedScheduleAdmission,
