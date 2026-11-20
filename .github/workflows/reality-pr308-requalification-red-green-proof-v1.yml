@@ -82,6 +82,9 @@ jobs:
             echo 'HISTORICAL_RED_IS_NOT_A_TEST_ASSERTION'; exit 1;
           }
           echo "EXPECTED_HISTORICAL_PR308_HANDOFF_RED=${HISTORICAL}"
+          # Historical source did not track this frozen test. Remove the
+          # temporary injected file before checking out the repaired source.
+          rm -f "${FROZEN}"
       - name: Repaired source passes the identical frozen PR308 handoff
         env:
           FROZEN: test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js
