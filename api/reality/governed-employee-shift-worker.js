@@ -134,6 +134,8 @@ import {reconcileSignedVerifiedMaintenanceArtifact}
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
+import {classifyRealityGovernedContinuityEvidence}
+ from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
 import {generateOneSignedMaintenanceRepairCandidate}
@@ -706,6 +708,46 @@ export default async function handler(req,res){
      verified_repair_artifact:false,installation_authorized:false,
      repair_installed:false,original_job_completed:false,
      production_changed:false,new_shift_started:false};
+  // Independent verifier facts -> Reality-governed classification ->
+  // existing Continuity Ledger. A classification cannot create execution
+  // authority, install code, reopen an original, or mutate the Universe.
+  // Crucially, read the DURABLE artifact on subsequent signed worker wakes,
+  // not only the one-time artifact acceptance response.
+  workerStage='GOVERNED_CONTINUITY_VERIFIED_EVIDENCE_CLASSIFICATION';
+  let signedMaintenanceArtifactLedger={
+   status:'OWNER_MAINTENANCE_ARTIFACT_READBACK_UNVERIFIED',
+   owner_id:sameOriginalPostmaintenanceGate?.owner_id||null,
+   count:0,items:[],installation_authorized:false,
+   production_changed:false
+  };
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   sameOriginalPostmaintenanceGate?.status===
+    'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+   sameOriginalPostmaintenanceGate?.shift_id===wakeReceipt.shift_id&&
+   /^[a-f0-9-]{36}$/i.test(
+    sameOriginalPostmaintenanceGate?.owner_id||'')){
+   try{
+    const read=await shiftRpc(db,
+     'reality_read_owner_maintenance_verified_artifacts_v1',{
+      p_owner_id:sameOriginalPostmaintenanceGate.owner_id
+     });
+    if(read?.status==='OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY'&&
+     read.owner_id===sameOriginalPostmaintenanceGate.owner_id&&
+     read.installation_authorized===false&&
+     read.production_changed===false&&
+     Array.isArray(read.items)&&
+     Number.isSafeInteger(read.count)&&read.count===read.items.length&&
+     read.count>=0&&read.count<=4)
+      signedMaintenanceArtifactLedger=read;
+   }catch{/* Failed independent read cannot grant work authority. */}
+  }
+  const governedContinuityEvidenceClassification=
+   classifyRealityGovernedContinuityEvidence({
+    ownerId:sameOriginalPostmaintenanceGate?.owner_id,
+    shiftId:wakeReceipt.shift_id,
+    originalGate:sameOriginalPostmaintenanceGate,
+    artifactReadback:signedMaintenanceArtifactLedger
+   });
   // A claimed lease cannot be reported as executed or verified.
   // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
@@ -2048,6 +2090,13 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    governedContinuityEvidenceClassification?.status===
+     'GOVERNED_CONTINUITY_EVIDENCE_SEPARATED_AND_ROUTED'&&
+    governedContinuityEvidenceClassification.lanes.some(l=>
+     l.lane_kind==='INTERNAL_CAPABILITY_REPAIR')&&
+    governedContinuityEvidenceClassification.lanes.some(l=>
+     l.lane_kind==='CANONICAL_BUSINESS_ORIGINAL')?
+    'SIGNED_MAINTENANCE_REPAIR_AND_ORIGINAL_LINEAGE_SEPARATELY_ROUTED':
     signedMaintenanceArtifactHandoff?.verified_repair_artifact===true?
     'SIGNED_MAINTENANCE_EXACT_REPAIR_ARTIFACT_REVIEW_READY':
     signedMaintenanceCanonicalBusinessLineageMissing?
@@ -2162,6 +2211,8 @@ export default async function handler(req,res){
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
+    signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
+    governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
