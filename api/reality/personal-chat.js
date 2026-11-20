@@ -493,11 +493,21 @@ export default async function handler(req,res){
    stage='READ_ONLY_OWNER_GOAL_EPOCH';
    // Single existing DB RPC (indexed per owner/conversation) provides the
    // same atomic revision check used by the production execution engine.
-   const goalEpoch=await readPrivateChatGoalPublicationEpoch(session,{
-    conversationId,requestId,isolatedDb:isolated
-   });
-   const expectedRevision=goalEpoch.expected_revision;
-   const expectedLastGoalEventId=goalEpoch.expected_last_goal_event_id;
+   // A temporarily unavailable goal-epoch provider must not silence an
+   // authenticated owner's ordinary question. Without the exact CAS epoch,
+   // no assistant message may be persisted and no work action is permitted.
+   // A transient, clearly non-durable advisory can still be shown in Chat.
+   // Never swallow a 409 (newer user turn / changed goal) as a provider outage.
+   let goalEpoch=null;
+   try{
+    goalEpoch=await readPrivateChatGoalPublicationEpoch(session,{
+     conversationId,requestId,isolatedDb:isolated
+    });
+   }catch(epochError){
+    if(Number(epochError?.status)!==503)throw epochError;
+   }
+   const expectedRevision=goalEpoch?.expected_revision;
+   const expectedLastGoalEventId=goalEpoch?.expected_last_goal_event_id;
    stage='READ_ONLY_BOUNDED_UNIVERSE_HISTORY';
    const authoritySpine=createContinuitySpine({
     continuityRootId:scopedRoot,worldlineId:scopedRoot,
@@ -526,15 +536,21 @@ export default async function handler(req,res){
     // Missing optional history does not reset, revise or delete any
     // Continuity, user goal, original job or installed capability.
    }
-   const currentGoal={
+   const currentGoal=goalEpoch?{
     status:'EXACT_OWNER_ATOMIC_GOAL_EPOCH_READBACK',
     transition_count:goalEpoch.expected_revision,
     last_transition_event_id:goalEpoch.expected_last_goal_event_id,
     source:goalEpoch.source,
     detailed_goal_history_available:Array.isArray(priorGoals)
+   }:{
+    status:'OWNER_GOAL_EPOCH_UNAVAILABLE_READ_ONLY_REPLY_NOT_DURABLE',
+    transition_count:null,last_transition_event_id:null,
+    source:'UNAVAILABLE_NOT_AUTHORITY',
+    detailed_goal_history_available:Array.isArray(priorGoals),
+    execution_authorized:false,installation_authorized:false
    };
-   if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||
-      (expectedLastGoalEventId!==null&&!validUuid(expectedLastGoalEventId)))
+   if(goalEpoch&&(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||
+      (expectedLastGoalEventId!==null&&!validUuid(expectedLastGoalEventId))))
     fail('CHAT_READ_ONLY_OWNER_GOAL_SNAPSHOT_UNVERIFIED',503);
    stage='READ_ONLY_UNIVERSE_COGNITIVE_PROJECTION';
    let ownerUniverse;
@@ -577,6 +593,35 @@ export default async function handler(req,res){
     verifiedUniverseObservations:ownerUniverse.observations
    });
    governedCognitionMs=Date.now()-quickStart;
+   if(!goalEpoch){
+    // Session + signed user turn were verified before model cognition.
+    // This is NOT saved, not an owner approval, not a verified outcome, and
+    // cannot stand in for the existing exact goal-CAS publication receipt.
+    // The original request stays pending for an idempotent saved-reply retry.
+    return res.status(200).json({
+     ok:true,conversation_id:conversationId,answer:advisory.answer,
+     read_only_conversation:true,transient_answer_only:true,
+     original_request_id:requestId,
+     continuity:{
+      history_source:'AUTHENTICATED_SUPABASE_RLS',
+      current_answer_persisted:false,goal_publication_atomicity:'UNAVAILABLE',
+      reply_recovery_requires_exact_saved_request:true,
+      recovered_messages:history.messages.length,
+      coverage:history.history_status,
+      older_messages_may_be_missing:history.older_missing
+     },
+     reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',
+      transient_answer_not_a_receipt:true,
+      owner_goal_epoch_independently_verified:false,
+      business_outcome_verified:false,
+      external_actions_authorized:false},
+     execution:{status:'NOT_EXECUTED',external_actions_authorized:false,
+      installation_authorized:false},
+     response_timing:{total_ms:Date.now()-chatStartedAt,
+      optional_context_wait_ms:optionalContextWaitMs,
+      governed_cognition_ms:governedCognitionMs}
+    });
+   }
    // An answer is not independent evidence that an action happened.
    stage='READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION';
    const publication=await publishPrivateAssistantAtomically(session,{
