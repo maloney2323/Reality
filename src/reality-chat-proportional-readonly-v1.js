@@ -13,6 +13,9 @@ import {runRealityCognitiveRuntime}
 // instructions and enforces the exact approval gate; Chat must answer without
 // borrowing that adapter's authority or waiting for full operational replay.
 const ACTION=/^(?:(?:reality[, :]+|please\s+|go ahead and\s+|i (?:want|need) you to\s+){0,2})(?:start|run|execute|install|deploy|merge|publish|send|transfer|delete|pay|purchase|authorize|approve|build|code|fix|upgrade|schedule|create)\b/i;
+// Saved, explicit continuation of existing authorized work goes to the
+// signed work adapter; ordinary discussion remains read-only.
+const SIGNED_EXISTING_SHIFT_ACTION=/^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|finish)\s+.{0,140}(?:shift|existing|original)/i;
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SOURCE=/^supabase:reality_chat_messages:[0-9a-f-]{36}$/i;
 const fail=code=>{throw Error('CHAT_READ_ONLY_'+code)};
@@ -59,7 +62,8 @@ export function reconcileReadOnlyOperationalAnswer({answer,ownerContext}={}){
 export function isProportionalReadOnlyChat({message,goalCommand=null,publicResearch=false}={}){
  return goalCommand==null&&publicResearch!==true&&
   typeof message==='string'&&message.trim().length>0&&
-  !ACTION.test(message.trim());
+  !ACTION.test(message.trim())&&
+  !SIGNED_EXISTING_SHIFT_ACTION.test(message.trim());
 }
 export async function generateProportionalReadOnlyReply({
  message,conversationId,requestId,ownerId,sourceRef,
