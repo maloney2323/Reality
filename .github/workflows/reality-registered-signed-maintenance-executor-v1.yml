@@ -11,6 +11,9 @@ on:
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'src/reality-signed-maintenance-verified-artifact-handoff-v1.js'
+      - 'test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js'
+      - 'supabase/migrations/20261120193000_signed_existing_maintenance_verified_artifact_handoff_v1.sql'
       - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
       - 'supabase/migrations/20261120172000_existing_shift_sourcecase_ci_attestation_v1.sql'
       - 'src/reality-signed-maintenance-repair-handoff-v1.js'
@@ -59,6 +62,9 @@ on:
       - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
       - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'src/reality-signed-maintenance-verified-artifact-handoff-v1.js'
+      - 'test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js'
+      - 'supabase/migrations/20261120193000_signed_existing_maintenance_verified_artifact_handoff_v1.sql'
       - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
       - 'supabase/migrations/20261120172000_existing_shift_sourcecase_ci_attestation_v1.sql'
       - 'src/reality-signed-maintenance-repair-handoff-v1.js'
@@ -124,6 +130,8 @@ jobs:
           node --test test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js
           node --check src/reality-signed-maintenance-case-ci-live-verifier-v1.js
           node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
+          node --check src/reality-signed-maintenance-verified-artifact-handoff-v1.js
+          node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --check src/reality-signed-maintenance-repair-handoff-v1.js
           node --test test/reality-signed-maintenance-diagnostic-to-repair-handoff-v1.test.js
           node --check src/reality-signed-maintenance-repair-model-candidate-v1.js
