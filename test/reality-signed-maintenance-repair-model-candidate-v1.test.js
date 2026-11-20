@@ -22,6 +22,7 @@ const blob=createHash('sha1').update('blob '+buf.length+'\0')
  .update(buf).digest('hex');
 const hash=x=>'sha256:'+x.repeat(64);
 const db={strictSecrets:true,project:'hvkfreoagbrphwghjajw',
+ url:'https://hvkfreoagbrphwghjajw.supabase.co',
  secretKey:'local-fixture-service-key-unused'};
 const env={VERCEL_ENV:'preview',
  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:db.project,
@@ -67,15 +68,23 @@ function scenario({
  const fetchImpl=async(url,opts={})=>{
   urls.push({url,method:opts.method||'GET'});
   if(throwProvider)throw Error('PROVIDER_DOWN');
-  if(url.includes('/git/commits/'))
-   return {ok:true,json:async()=>({sha,tree:{sha:treeSha}})};
-  if(url.includes('/git/trees/'))
-   return {ok:true,json:async()=>({sha:treeSha,truncated:false,
-    tree:[{path,type:'blob',sha:blob,size:buf.length}]})};
-  if(url.includes('/contents/'))
-   return {ok:true,json:async()=>({
-    path,sha:blob,size:buf.length,encoding:'base64',
-    content:buf.toString('base64')})};
+  if(url.includes('/functions/v1/reality-signed-maintenance-repair-source-broker-v1')){
+   const body=JSON.parse(opts.body);
+   assert.equal(body.maintenance_id,maint);
+   assert.equal(body.request_id,req);
+   assert.equal(body.release_sha,sha);
+   const base={ok:true,maintenance_id:maint,request_id:req,
+    release_sha:sha,source_read_only:true,
+    independent_frozen_red_verified:false,independent_ci_verified:false,
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false};
+   return {ok:true,json:async()=>body.mode==='manifest'?
+    {...base,status:'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',
+     source_tree_sha:treeSha,files:[{path,sha:blob,size:buf.length}]}:
+    {...base,status:'SIGNED_MAINTENANCE_SOURCE_FILE_VERIFIED',
+     path,sha:blob,size:buf.length,encoding:'base64',
+     source_tree_sha:treeSha,content:buf.toString('base64')}};
+  }
   if(url==='https://api.openai.com/v1/responses'){
    const request=JSON.parse(opts.body);
    modelCalls.push(request);
@@ -124,7 +133,9 @@ test('existing warrant produces a real pinned model patch proposal, not a test p
   'reality_record_signed_maintenance_repair_candidate_v1'
  ]);
  assert.deepEqual(f.urls.filter(x=>x.method==='POST').map(x=>x.url),[
+  db.url+'/functions/v1/reality-signed-maintenance-repair-source-broker-v1',
   'https://api.openai.com/v1/responses',
+  db.url+'/functions/v1/reality-signed-maintenance-repair-source-broker-v1',
   'https://api.openai.com/v1/responses']);
  assert.equal(f.calls[1].args.p_source_path,path);
  assert.equal(f.calls[1].args.p_candidate_patch.find,patch.find);
