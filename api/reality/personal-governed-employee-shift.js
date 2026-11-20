@@ -527,11 +527,53 @@ export default async function handler(req,res){
       /^[a-f0-9]{40}$/.test(x?.candidate_source_blob_sha||'')&&
       Number.isSafeInteger(x?.github_run_id)&&x.github_run_id>10000&&
       Number.isSafeInteger(x?.github_artifact_id)&&x.github_artifact_id>10000&&
-      x.install_target_verified===false&&x.owner_approval_ready===false&&
+      ((x.install_target_verified===false&&
+        x.target_review_receipt_sha256==null)||
+       (x.install_target_verified===true&&
+        /^sha256:[a-f0-9]{64}$/.test(x.target_review_receipt_sha256||'')&&
+        x.target_review_branch==='reality/chat-direct-work-handoff-20261115'&&
+        /^[a-f0-9]{40}$/.test(x.target_review_head_sha||'')&&
+        x.target_review_existing_blob_sha===x.historical_source_blob_sha))&&
+      x.owner_approval_ready===false&&
       x.installation_authorized===false&&x.repair_installed===false&&
       x.original_job_completed===false))
      signed_verified_maintenance_repair_artifacts=result;
    }catch{/* Never infer approval from an unavailable owner read. */}
+   // Only exact independently signed artifact+target review may produce an
+   // owner-click readiness card. GET has NO approval or execution authority.
+   let exact_signed_maintenance_install_review={
+    status:'SIGNED_MAINTENANCE_OWNER_INSTALL_REVIEW_UNVERIFIED',
+    owner_approval_ready:false,installation_authorized:false,
+    repair_installed:false,original_job_completed:false,
+    production_changed:false
+   };
+   try{
+    const card=await shiftRpc(db,
+     'reality_read_owner_signed_maintenance_install_decision_v1',{
+      p_owner_id:session.user_id
+     });
+    const ready=card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY';
+    const decided=card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED';
+    if((ready||decided)&&card.owner_id===session.user_id&&
+     /^[a-f0-9-]{36}$/i.test(card.maintenance_id||'')&&
+     /^[a-f0-9-]{36}$/i.test(card.shift_id||'')&&
+     /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(card.source_ref||'')&&
+     /^[a-f0-9]{40}$/.test(card.candidate_commit_sha||'')&&
+     /^[a-f0-9]{40}$/.test(card.candidate_source_blob_sha||'')&&
+     /^sha256:[a-f0-9]{64}$/.test(card.artifact_receipt_sha256||'')&&
+     /^sha256:[a-f0-9]{64}$/.test(card.case_ci_receipt_sha256||'')&&
+     /^sha256:[a-f0-9]{64}$/.test(card.target_review_receipt_sha256||'')&&
+     card.target_branch==='reality/chat-direct-work-handoff-20261115'&&
+     card.original_job_completed===false&&card.production_changed===false&&
+     card.new_shift_started===false&&
+     card.owner_approval_ready===ready&&card.installation_authorized===decided&&
+     (ready?card.repair_installed===false:true))
+      exact_signed_maintenance_install_review=card;
+    else if(card?.status==='NO_EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_READY'&&
+     card.owner_approval_ready===false&&
+     card.installation_authorized===false)
+      exact_signed_maintenance_install_review=card;
+   }catch{/* No verified owner card => no clickable installation. */}
    // Re-project the same independent verifier evidence into the Universe
    // through Reality's governed classifier, without modifying state on GET.
    // Keep source-repair and business-original identities separate.
@@ -606,6 +648,7 @@ export default async function handler(req,res){
     requested_shift_draft:draft,
     internal_maintenance_continuity,internal_maintenance_continuity_status,
      signed_verified_maintenance_repair_artifacts,
+     exact_signed_maintenance_install_review,
      governed_continuity_evidence_classification,
     requested_maintenance_draft,requested_maintenance_draft_status,
     recovery_diagnosis,
