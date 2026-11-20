@@ -1,4 +1,5 @@
 // General isolated-only exact owner-approved original repair installer.
+import {installApprovedMaintenance} from './maintenance.ts';
 // Uses GitHub atomic non-forced fast-forward of one immutable source blob.
 // One durable claim before any provider mutation; later wakes are GET-only.
 // No model, browser, shift-start or green CI event can create approval.
@@ -226,7 +227,9 @@ Deno.serve(async req=>{
  try{
   if(req.method!=='POST'||req.headers.get('content-type')!=='application/json')
    return safe('GENERAL_INSTALL_EXACT_SERVICE_POST_ONLY',{},405);
-  if(await req.text()!=='{"version":1,"action":"execute_previously_owner_approved_original_install"}')
+  const action=await req.text();
+  if(action!=='{"version":1,"action":"execute_previously_owner_approved_original_install"}'&&
+     action!=='{"version":1,"action":"execute_previously_owner_approved_maintenance_install"}')
    return safe('GENERAL_INSTALL_SIGNED_ORIGINAL_ACTION_REQUIRED',{},400);
   const key=req.headers.get('apikey')||'';
   if(key.length<25||req.headers.get('authorization')!=='Bearer '+key)
@@ -237,6 +240,8 @@ Deno.serve(async req=>{
     parsed.pathname!=='/'||parsed.search||parsed.hash)
    return safe('GENERAL_INSTALL_ISOLATED_PROJECT_UNVERIFIED',{},503);
   const base=parsed.origin;
+  if(action==='{"version":1,"action":"execute_previously_owner_approved_maintenance_install"}')
+   return await installApprovedMaintenance(base,key);
   const scope=await rpc(base,key,'reality_read_general_original_install_scope_v1');
   if(scope.status==='GENERAL_INSTALL_AWAITING_EXACT_OWNER_APPROVAL'||
      scope.status==='GENERAL_INSTALL_AUTHORIZED_SHIFT_NOT_CURRENT')
