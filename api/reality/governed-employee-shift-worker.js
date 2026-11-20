@@ -2000,6 +2000,20 @@ export default async function handler(req,res){
    // next-action in the signed worker pulse instead of instructing the owner
    // to authorize the already-authorized shift again. This is read-only:
    // worker diagnostics and a pulse never manufacture a repair receipt.
+   // The owner-facing work controller must distinguish investigation
+   // evidence from an actually admitted business original. Do not keep
+   // requesting a code RED for a UI draft with NO canonical owner job.
+   // This remains under the exact existing signed maintenance warrant.
+   const signedMaintenanceCanonicalBusinessLineageMissing=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+    sameOriginalPostmaintenanceGate.next_action===
+      'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'&&
+    sameOriginalPostmaintenanceGate.canonical_owner_business_original_missing===true&&
+    sameOriginalPostmaintenanceGate.case_specific_maintenance_ci_red_attested===false&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.installation_authorized===false&&
+    sameOriginalPostmaintenanceGate.production_changed===false;
    const signedMaintenanceAuthorizedCaseRedOutstanding=
     sameOriginalPostmaintenanceGate?.status===
       'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
@@ -2019,6 +2033,8 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    signedMaintenanceCanonicalBusinessLineageMissing?
+    'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
     signedMaintenanceAuthorizedCaseRedOutstanding?
     'SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED':
     signedMaintenanceAuthorizedSourceRequalificationPending?
