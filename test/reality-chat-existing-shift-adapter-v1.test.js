@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {isProportionalReadOnlyChat}
+ from '../src/reality-chat-proportional-readonly-v1.js';
 import {CHAT_WORK_CAPABILITIES,isExplicitSignedShiftContinuation,
  continueSignedExistingEmployeeShift,processSignedSavedChatWork}
  from '../src/reality-saved-chat-work-adapter-v1.js';
@@ -130,4 +132,18 @@ test('transport is an idempotent signed service-only adaptation, never an instal
  const rpc=readFileSync(new URL('../src/reality-governed-shift-boundary-v1.js',
   import.meta.url),'utf8');
  assert.match(rpc,/dispatch_existing_chat_maintenance_shift_v1/);
+});
+
+test('Chat composer and cognition both classify explicit same-shift continuation as governed work',()=>{
+ assert.equal(isProportionalReadOnlyChat({message}),false);
+ assert.equal(isProportionalReadOnlyChat({message:'Please resume the existing shift'}),false);
+ assert.equal(isProportionalReadOnlyChat({message:'Can we discuss the shift?'}),true);
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/work_status_requested:/);
+ assert.match(html,/\(\?:continue\|resume\|finish\)/);
+ assert.match(html,/reality:chat-intake-saved/);
+ const adapter=readFileSync(new URL(
+  '../src/reality-saved-chat-work-adapter-v1.js',import.meta.url),'utf8');
+ assert.match(adapter,/if\(isExplicitSignedShiftContinuation\(signed\.text\)\)/);
+ assert.match(adapter,/return await continueExistingShift\(args\)/);
 });
