@@ -54,7 +54,9 @@ export default async function handler(req,res){
   // A non-actionable signed message remains an inspected conversation, not
   // a claimed build or a job authorization.
   const transition=action==='PROCESS_SIGNED_WORK_REQUEST'&&
-   ['CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
+   ['CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
+    'CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED',
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK',
     'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_READBACK_PENDING',
     'CHAT_WORK_ENGINEERING_CI_DISPATCH_VERIFIED',
     'CHAT_WORK_ORIGINAL_DISCOVERY_DISPATCHED',
