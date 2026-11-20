@@ -11,6 +11,8 @@ on:
       - 'reality-chat-maintenance-continuation-v1.js'
       - '.github/workflows/reality-signed-maintenance-target-continuation-v1.yml'
       - 'src/reality-signed-maintenance-continuity-enforcement-v1.js'
+      - 'src/reality-governed-auto-trigger-v1.0.js'
+      - 'test/reality-signed-maintenance-governed-auto-trigger-v1.test.js'
       - 'test/reality-signed-maintenance-continuity-enforcement-v1.test.js'
       - 'supabase/migrations/20261120222500_signed_maintenance_postinstall_universe_readback_v1.sql'
       - 'src/reality-signed-maintenance-approved-install-bridge-v1.js'
@@ -46,6 +48,7 @@ jobs:
           node --check src/reality-governed-continuity-evidence-classifier-v1.js
           node --check reality-chat-maintenance-continuation-v1.js
           node --check src/reality-signed-maintenance-continuity-enforcement-v1.js
+          node --check src/reality-governed-auto-trigger-v1.0.js
           node --check src/reality-signed-maintenance-approved-install-bridge-v1.js
           node --check src/reality-signed-maintenance-postinstall-verification-bridge-v1.js
           node --check api/reality/signed-maintenance-exact-install-approval.js
@@ -55,5 +58,6 @@ jobs:
           node --test test/reality-unified-chat-maintenance-continuation-v1.test.js
           node --test test/reality-signed-maintenance-exact-full-loop-v1.test.js
           node --test test/reality-signed-maintenance-continuity-enforcement-v1.test.js
+          node --test test/reality-signed-maintenance-governed-auto-trigger-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
