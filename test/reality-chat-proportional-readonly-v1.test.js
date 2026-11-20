@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
+import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply,
+ reconcileReadOnlyOperationalAnswer}
  from '../src/reality-chat-proportional-readonly-v1.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const conv='9d5b6de1-ecf0-42d8-a86a-b9c5396a4139';
@@ -88,6 +89,39 @@ test('existing Signal Cleaner and model receive exact saved question and owner h
  assert.equal(result.execution_authorized,false);
  assert.equal(result.installation_authorized,false);
  assert.equal(result.semantic_correctness_independently_verified,false);
+});
+test('authenticated Chat rejects fictional sandbox results and redundant shift authorization',async()=>{
+ const shift={owner_shift_authorization_recorded:true,
+  shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',
+  active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const cases=[
+  'Sandbox deployment simulation completed successfully. All independent acceptance tests passed.',
+  'Owner approval has been recorded here in chat. Please confirm installation again.',
+  'No authorized active shift exists; you must formally start an authorized shift.',
+  'I will now execute a sandbox deployment simulation and publish results.'
+ ];
+ for(const claim of cases){
+  const checked=reconcileReadOnlyOperationalAnswer({
+   answer:claim,ownerContext:{currently_authorized_shift:shift}
+  });
+  assert.equal(checked.disposition,'UNSUPPORTED_OPERATIONAL_CLAIM_REPLACED_WITH_OWNER_SCOPED_TRUTH');
+  assert.match(checked.answer,/existing owner-authorized shift/);
+  assert.match(checked.answer,/did not run a sandbox simulation/);
+  assert.match(checked.answer,/does not need a second start/);
+  assert.doesNotMatch(checked.answer,/simulation completed successfully/);
+ }
+ const valid=reconcileReadOnlyOperationalAnswer({answer:'The existing shift is still open; the test artifact has not been independently verified.',
+  ownerContext:{currently_authorized_shift:shift}});
+ assert.equal(valid.disposition,'CONVERSATIONAL_CLAIMS_UNCHANGED');
+ const result=await generateProportionalReadOnlyReply({...args,
+  ownerContext:{currently_authorized_shift:shift},
+  runtime:async()=>({mode:'FAST',authority_granted:false,
+   execution_authorized:false,answer:cases[0]})
+ });
+ assert.match(result.answer,/did not run a sandbox simulation/);
+ assert.equal(result.execution_authorized,false);
+ assert.equal(result.installation_authorized,false);
 });
 test('assistant cannot publish an action receipt or a forged authority through read-only cognition',async()=>{
  for(const bad of [
