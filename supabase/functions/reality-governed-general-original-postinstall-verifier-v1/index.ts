@@ -1,4 +1,5 @@
 // The previously authorized original job settles ONLY after its exact
+import {independentlyAcceptInstalledMaintenance} from './maintenance.ts';
 // owner-approved isolated source commit independently executes the frozen
 // original acceptance job AND the Vercel GitHub App corroborates deployment.
 // No extra owner confirmation, manual resume, or fabricated ROI is allowed.
@@ -96,7 +97,9 @@ Deno.serve(async req=>{
  try{
   if(req.method!=='POST'||req.headers.get('content-type')!=='application/json')
    return safe('GENERAL_POSTINSTALL_SIGNED_SERVICE_POST_ONLY',{},405);
-  if(await req.text()!=='{"version":1,"action":"verify_and_settle_previously_owner_approved_original"}')
+  const action=await req.text();
+  if(action!=='{"version":1,"action":"verify_and_settle_previously_owner_approved_original"}'&&
+     action!=='{"version":1,"action":"verify_and_reconcile_owner_approved_maintenance_install"}')
    return safe('GENERAL_POSTINSTALL_EXACT_RECONCILIATION_ACTION_REQUIRED',{},400);
   const key=req.headers.get('apikey')||'';
   if(key.length<25||req.headers.get('authorization')!=='Bearer '+key)
@@ -106,6 +109,8 @@ Deno.serve(async req=>{
   if(url.protocol!=='https:'||!url.hostname.endsWith('.supabase.co')||
     url.pathname!=='/'||url.search||url.hash)
    return safe('GENERAL_POSTINSTALL_ISOLATED_PROJECT_UNVERIFIED',{},503);
+  if(action==='{"version":1,"action":"verify_and_reconcile_owner_approved_maintenance_install"}')
+   return await independentlyAcceptInstalledMaintenance(url.origin,key);
   const context=await rpc(url.origin,key,'reality_read_general_original_postinstall_scope_v1');
   if(context.status==='GENERAL_POSTINSTALL_NO_INSTALLED_ORIGINAL'||
      context.status==='GENERAL_POSTINSTALL_OWNER_SHIFT_NOT_CURRENT')
