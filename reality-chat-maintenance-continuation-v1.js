@@ -259,9 +259,38 @@
     a.original_job_completed===false))
     verifiedArtifacts=artifacts.items;
   }
+  // Universe projection of Reality's verified classifier only. A lane is
+  // evidence + NEXT governed action, never an executor or approval button.
+  const route=data.governed_continuity_evidence_classification;
+  let classifiedLanes=[];
+  if(route&&[
+    'GOVERNED_CONTINUITY_EVIDENCE_SEPARATED_AND_ROUTED',
+    'GOVERNED_CONTINUITY_PARTIAL_EVIDENCE_CLASSIFIED'
+   ].includes(route.status)&&
+   route.shift_id===c.current_shift_id&&
+   route.classifier_grants_authority===false&&
+   route.ledger_mutated===false&&route.universe_state_mutated===false&&
+   route.installation_authorized===false&&
+   route.original_job_completed===false&&
+   route.production_changed===false&&
+   Number.isSafeInteger(route.lane_count)&&route.lane_count>=0&&
+   route.lane_count<=4&&Array.isArray(route.lanes)&&
+   route.lanes.length===route.lane_count&&
+   route.lanes.every(l=>
+    ['INTERNAL_CAPABILITY_REPAIR','CANONICAL_BUSINESS_ORIGINAL']
+      .includes(l?.lane_kind)&&
+    REF.test(l?.source_ref||'')&&
+    UUID.test(l?.maintenance_id||'')&&
+    c.items.some(j=>j.origin_incident_id===l.maintenance_id&&
+      j.source_ref===l.source_ref)&&
+    l.execution_permitted_by_classification===false&&
+    l.approval_permitted_by_classification===false&&
+    l.authority_status==='NO_NEW_ACTION_AUTHORITY'&&
+    SHA.test(l?.independent_evidence_receipt_sha256||'')))
+   classifiedLanes=route.lanes;
   return Object.freeze({
    count:c.open_count,jobs:c.items,activeId:c.current_shift_id,
-   verifiedArtifacts,
+   verifiedArtifacts,classifiedLanes,
    activity,shiftReadback:shift,finalReceipt:terminal?{
     shift_id:terminal.shift_id,
     count:terminal.close_report.independently_verified_internal_maintenance_jobs,
@@ -443,6 +472,20 @@
    digest('Review artifact receipt:',a.review_receipt_sha256);
    digest('Frozen RED/GREEN:',a.case_ci_receipt_sha256);
    line('Authority:', 'No installation approval; no original-job completion.');
+  }
+  if(scope.classifiedLanes?.length){
+   const header=make('strong','reality-chat-maintenance-live-title',
+    'Reality · Governed Evidence Classification');
+   timeline.append(header);
+   for(const lane of scope.classifiedLanes){
+    line(lane.lane_kind==='INTERNAL_CAPABILITY_REPAIR'?
+     'Capability repair lane:':'Business original lane:',
+     lane.source_ref.split('/').slice(-2).join(' #'));
+    line('Verified state:',lane.classified_state.replaceAll('_',' ').toLowerCase());
+    line('Next governed action:',lane.next_governed_action.replaceAll('_',' ').toLowerCase());
+    digest('Independent evidence:',lane.independent_evidence_receipt_sha256);
+   }
+   line('Classifier authority:','Evidence routing only. No approval, installation or final settlement.');
   }
   const covered=new Set(scope.signedIds);
   for(const job of scope.jobs.filter(x=>covered.has(x.origin_incident_id))){
