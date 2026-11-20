@@ -281,6 +281,16 @@
  function explain(result){
   const id=WORK.test(result.original_work_id||'')?
    result.original_work_id:null;
+  if(result.status==='CHAT_EXISTING_SHIFT_WAKE_ENQUEUED')
+   return 'EXISTING AUTHORIZED SHIFT WAKE QUEUED · '+String(result.shift_id||'')+
+    ' · Request '+String(result.network_request_id||'')+
+    '. The signed worker will independently claim the wake. No new shift, approval, installation or completed job was inferred.';
+  if(result.status==='CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED')
+   return 'EXISTING SHIFT WAKE ALREADY QUEUED · '+String(result.shift_id||'')+
+    '. Same saved instruction, no duplicate request or new approval. Check the signed worker and original-job receipts.';
+  if(typeof result.status==='string'&&result.status.startsWith('CHAT_EXISTING_SHIFT_'))
+   return 'EXISTING SHIFT HANDOFF · '+result.status.replaceAll('_',' ')+
+    '. The saved message is preserved; no worker execution or installation was claimed.';
   if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')
    return 'SAVED BUILD STATUS · '+id+
     ' · phase '+String(result.development_phase||'UNKNOWN')+
