@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../src/reality-signed-maintenance-approved-install-bridge-v1.js';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {independentlyReconcileSignedMaintenanceInstall}
  from '../src/reality-signed-maintenance-postinstall-verification-bridge-v1.js';
 const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
@@ -171,4 +172,48 @@ test('database preserves real signed original job identities and rejects duplica
  assert.match(post,/original_job_completed',false/);
  assert.match(next,/WHERE x\.state IN\('APPROVED','FENCED','INSTALLED'\)/);
  assert.doesNotMatch(sql,/INSERT INTO reality_internal\.governed_employee_shifts_v1/);
+});
+
+
+test('actual exact owner review and approval RPCs are in the original allowlist, not silently swallowed',async()=>{
+ const entries=[
+  ['reality_read_owner_signed_maintenance_install_decision_v1',
+   {p_owner_id:'85eeae0b-2988-43c4-b20c-590fb51da70d'}],
+  ['reality_record_owner_signed_maintenance_install_decision_v1',{
+   p_owner_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
+   p_shift_id:shift,p_maintenance_id:id,
+   p_request_id:'a1111111-1111-4111-8111-111111111111',
+   p_candidate_commit_sha:'6'.repeat(40),
+   p_target_review_receipt_sha256:'sha256:'+'9'.repeat(64),
+   p_intent:'OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR'
+  }]
+ ];
+ for(const [name,params] of entries){
+  let calls=0;
+  const out=await shiftRpc(db,name,params,{fetchImpl:async(url,opt)=>{
+   calls++;
+   assert.equal(url,db.url+'/rest/v1/rpc/'+name);
+   assert.equal(opt.method,'POST');
+   assert.equal(opt.headers.authorization,'Bearer '+db.secretKey);
+   assert.deepEqual(JSON.parse(opt.body),params);
+   return {ok:true,json:async()=>({status:'FIXTURE_AUTHORITY_NOT_GRANTED'})};
+  }});
+  assert.equal(calls,1,'both exact one-use RPC paths must be reachable');
+  assert.equal(out.status,'FIXTURE_AUTHORITY_NOT_GRANTED');
+ }
+ await assert.rejects(shiftRpc(db,'reality_unauthorized_install_rpc_v1',{}),
+  /SHIFT_RPC_NOT_ALLOWLISTED/);
+});
+test('legacy five-shift presentation cannot block seven owner-authenticated shifts from exact approval',()=>{
+ const api=read('api/reality/personal-governed-employee-shift.js');
+ const continuity=read('src/reality-owner-internal-maintenance-continuity-v1.js');
+ const brief=read('src/reality-shift-conversation-brief-v1.js');
+ const recover=read('src/reality-employee-recovery-route-v1.js');
+ assert.match(brief,/shifts\.length>5/);
+ assert.match(recover,/shifts\.length>5/);
+ assert.match(api,/const presentationShifts=read\.shifts\.slice\(0,5\)/);
+ assert.match(api,/presentationShifts,handoffs,new Date\(\),shift_source_native_receipts/);
+ assert.match(api,/diagnoseRealityEmployeeRecovery\(\{shifts:presentationShifts,handoffs\}\)/);
+ assert.match(api,/projectOwnerInternalMaintenanceContinuity\(\s*maintenance,\{ownerId:session\.user_id,shifts:read\.shifts\}\)/);
+ assert.match(continuity,/shifts\.length>25/);
 });
