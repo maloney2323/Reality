@@ -135,6 +135,8 @@ import {reconcileSignedVerifiedMaintenanceArtifact,
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
+import {enforceSignedMaintenanceReceiptContinuity}
+ from '../../src/reality-signed-maintenance-continuity-enforcement-v1.js';
 import {independentlyReconcileSignedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-postinstall-verification-bridge-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
@@ -734,12 +736,44 @@ export default async function handler(req,res){
      installation_authorized:false,repair_installed:false,
      original_job_completed:false,production_changed:false,
      new_shift_started:false};
+  // ENFORCE the existing canonical Spine before any installation effect.
+  // The independently verified exact target and one-use owner approval must
+  // be durably hash-linked and independently reread from the Universe ledger.
+  // A classifier label or successful worker wake cannot mint authority.
+  workerStage='SIGNED_VERIFIED_MAINTENANCE_CONTINUITY_RECEIPT_ADMISSION';
+  const signedMaintenanceCanonicalContinuity=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await enforceSignedMaintenanceReceiptContinuity({
+     db,env:process.env,originalGate:sameOriginalPostmaintenanceGate,
+     shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_CONTINUITY_RECEIPT_NOT_DURABLY_VERIFIED',
+     failure_code:/^SIGNED_CONTINUITY_[A-Z0-9_]+$/.test(
+      String(error?.message||''))?String(error.message):
+      'SIGNED_CONTINUITY_RECONCILIATION_PROVIDER_UNAVAILABLE',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     install_eligible_from_continuity:false,
+     installer_reconcile_only_from_continuity:false,
+     original_job_completed:false,new_shift_started:false,
+     production_changed:false
+    })):
+    {status:'NO_SIGNED_CONTINUITY_RECEIPT_WAKE',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     install_eligible_from_continuity:false,
+     installer_reconcile_only_from_continuity:false,
+     original_job_completed:false,new_shift_started:false,
+     production_changed:false};
   // The existing signed worker can now advance an exact owner-approved
   // maintenance repair WITHOUT any further human step. The privileged broker
   // independently reads approval and atomically fences GitHub source write.
   workerStage='EXACT_OWNER_APPROVED_MAINTENANCE_AUTOMATIC_INSTALL';
   const signedMaintenanceApprovedInstall=
-   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   signedMaintenanceCanonicalContinuity.continuity_committed===true&&
+   (signedMaintenanceCanonicalContinuity.install_eligible_from_continuity===true||
+    signedMaintenanceCanonicalContinuity.installer_reconcile_only_from_continuity===true)?
     await continueExactOwnerApprovedMaintenanceInstall({
      db,env:process.env,fetchImpl:fetch
     }).catch(()=>({
@@ -747,7 +781,7 @@ export default async function handler(req,res){
      source_installed:false,original_job_completed:false,
      production_changed:false,new_shift_started:false
     })):
-    {status:'NO_SIGNED_MAINTENANCE_AUTOMATIC_INSTALL_WAKE',
+    {status:'NO_SIGNED_VERIFIED_CONTINUITY_AUTHORITY_FOR_INSTALL',
      source_installed:false,original_job_completed:false,
      production_changed:false,new_shift_started:false};
   // Different signed provider independently rechecks the actual installed
@@ -2270,6 +2304,7 @@ export default async function handler(req,res){
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
     signed_maintenance_install_target_review:signedMaintenanceInstallTargetReview,
+    signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity,
     signed_maintenance_approved_auto_install:signedMaintenanceApprovedInstall,
     signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
