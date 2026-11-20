@@ -21,6 +21,10 @@ test('conversation and planning do not need a work approval or a new engine',()=
  for(const q of [
   message,
   'Can you tell me if our employees have a full week of work?',
+  'Can you build it? Or are you missing the capability to build right now?',
+  'Can you deploy the application?',
+  'Could you explain how to fix the shift handoff?',
+  'What is your governed opinion on whether this can be built?',
   'I think we need to fill the employee categories with useful work each week.',
   'Why does Reality keep asking for authorization to answer me?',
   'Show me the current job backlog and explain its readiness.'
@@ -30,13 +34,35 @@ test('actual action requests, explicit goal mutation and web research retain gov
  for(const q of [
   'Reality, build an employee dashboard now',
   'Please install the verified repair',
-  'Can you deploy the application?',
+  'Deploy the application now',
   'Go ahead and start the authorized shift',
   'Approve this exact installation',
   'Run the workers now'
  ])assert.equal(isProportionalReadOnlyChat({message:q}),false,q);
  assert.equal(isProportionalReadOnlyChat({message,goalCommand:'replace_goal'}),false);
  assert.equal(isProportionalReadOnlyChat({message,publicResearch:true}),false);
+});
+test('ability question gets a verified model response without assuming any build authority',async()=>{
+ const q='Can you build it? Or are you missing the capability to build right now?';
+ assert.equal(isProportionalReadOnlyChat({message:q}),true);
+ let invoked=0;
+ const response=await generateProportionalReadOnlyReply({...args,message:q,
+  runtime:async params=>{
+   invoked++;
+   assert.equal(params.message,q);
+   assert.equal(params.systemContext.governance_proportionality.mode,
+    'READ_ONLY_CONVERSATION');
+   assert.equal(params.systemContext.governance_proportionality.execution_authorized,false);
+   assert.equal(params.systemContext.governance_proportionality.installation_authorized,false);
+   assert.equal(params.publicResearchEnabled,false);
+   return {mode:'FAST',authority_granted:false,execution_authorized:false,
+    answer:'I can help prepare a tested candidate, but live install readiness is not proven.'};
+  }
+ });
+ assert.equal(invoked,1);
+ assert.match(response.answer,/not proven/);
+ assert.equal(response.execution_authorized,false);
+ assert.equal(response.installation_authorized,false);
 });
 test('existing Signal Cleaner and model receive exact saved question and owner history without worker write',async()=>{
  let calls=0;
