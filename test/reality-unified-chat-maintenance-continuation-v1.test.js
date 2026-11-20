@@ -525,7 +525,7 @@ test('an actual current-owner signed repair target is visible on the real Chat D
  assert.equal(x.locate('realityChatMaintenanceNudge').hidden,false);
  const approve=x.locate('realityChatMaintenanceExactInstallApprove');
  assert.ok(approve,'owner approval button must exist in the actual Chat DOM');
- assert.equal(approve.hidden,false);
+ assert.equal(approve.hidden,false,'Approval visibility diagnostic: '+JSON.stringify({feedback:x.locate('realityChatMaintenanceFeedback')?.textContent,details:x.locate('realityChatMaintenanceExactInstallDetails')?.textContent,ownerCard:c.exact_signed_maintenance_install_review?.status,artifactCount:c.signed_verified_maintenance_repair_artifacts?.count}));
  assert.equal(approve.disabled,false);
  assert.equal(approve.parentElement?.id,'','exact approval is in the chat message actions');
  assert.match(x.locate('realityChatMaintenanceExactInstallDetails').textContent,
