@@ -1,0 +1,101 @@
+name: Reality PR308 frozen requalification RED GREEN proof
+on:
+  push:
+    branches:
+      - 'repair/maintenance-warrant-scope-handoff-20261119'
+    paths:
+      - '.github/workflows/reality-pr308-requalification-red-green-proof-v1.yml'
+      - 'test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js'
+      - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+permissions:
+  contents: read
+concurrency:
+  group: reality-pr308-red-green-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  historical-and-repaired-frozen-evidence:
+    name: Historical RED then repaired GREEN (same frozen test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout exact source history without write credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Pinned Node runner
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Freeze exact owner-scoped PR308 maintenance regression
+        env:
+          HISTORICAL: e9177227682c589b9308b17aa6b672e7501313f6
+          FROZEN: test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js
+        run: |
+          set -eu
+          test "${GITHUB_REF}" = 'refs/heads/repair/maintenance-warrant-scope-handoff-20261119'
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          git cat-file -e "${HISTORICAL}^{commit}"
+          test -f "${FROZEN}"
+          cp "${FROZEN}" "${RUNNER_TEMP}/pr308-frozen.test.js"
+          sha256sum "${RUNNER_TEMP}/pr308-frozen.test.js" | tee "${RUNNER_TEMP}/frozen-test-sha.txt"
+          git show "${HISTORICAL}:src/reality-signed-maintenance-case-ci-executor-v1.js" |
+            grep -q 'reality_claim_registered_maintenance_action_v2'
+          if git show "${HISTORICAL}:src/reality-signed-maintenance-case-ci-executor-v1.js" |
+             grep -q 'reality_promote_requalified_maintenance_to_ci_claim_v1'; then
+            echo 'Historical code already contains the proposed fix'; exit 1
+          fi
+          grep -q 'reality_promote_requalified_maintenance_to_ci_claim_v1'             src/reality-signed-maintenance-case-ci-executor-v1.js
+      - name: Historical original source fails the exact frozen PR308 handoff
+        env:
+          HISTORICAL: e9177227682c589b9308b17aa6b672e7501313f6
+          FROZEN: test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js
+        run: |
+          set -eu
+          git checkout --detach "${HISTORICAL}"
+          mkdir -p test/reality-frozen-regressions
+          cp "${RUNNER_TEMP}/pr308-frozen.test.js" "${FROZEN}"
+          set +e
+          node --test "${FROZEN}" >"${RUNNER_TEMP}/pr308-historical-red.tap" 2>&1
+          code=$?
+          set -e
+          cat "${RUNNER_TEMP}/pr308-historical-red.tap"
+          if test "${code}" -eq 0; then
+            echo 'HISTORICAL_SOURCE_UNEXPECTEDLY_GREEN'; exit 1
+          fi
+          grep -Fq 'frozen PR308 regression: a completed requalification must not strand CI'             "${RUNNER_TEMP}/pr308-historical-red.tap" || {
+            echo 'HISTORICAL_RED_IS_NOT_THE_EXPECTED_ORIGINAL_HANDOFF_FAILURE'; exit 1;
+          }
+          grep -Eq 'ERR_ASSERTION|AssertionError' "${RUNNER_TEMP}/pr308-historical-red.tap" || {
+            echo 'HISTORICAL_RED_IS_NOT_A_TEST_ASSERTION'; exit 1;
+          }
+          echo "EXPECTED_HISTORICAL_PR308_HANDOFF_RED=${HISTORICAL}"
+      - name: Repaired source passes the identical frozen PR308 handoff
+        env:
+          FROZEN: test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js
+        run: |
+          set -eu
+          git checkout --detach "${GITHUB_SHA}"
+          cmp "${RUNNER_TEMP}/pr308-frozen.test.js" "${FROZEN}"
+          node --test "${FROZEN}" 2>&1 | tee "${RUNNER_TEMP}/pr308-repaired-green.tap"
+          grep -q '^# fail 0$' "${RUNNER_TEMP}/pr308-repaired-green.tap"
+          grep -q '^# pass 1$' "${RUNNER_TEMP}/pr308-repaired-green.tap"
+          echo "EXPECTED_REPAIRED_PR308_HANDOFF_GREEN=${GITHUB_SHA}"
+      - name: Preserve actual original RED and repaired GREEN output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-pr308-historical-red-repaired-green-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/pr308-historical-red.tap
+            ${{ runner.temp }}/pr308-repaired-green.tap
+            ${{ runner.temp }}/frozen-test-sha.txt
+      - name: Case scope remains unchanged and no false repair settlement
+        run: |
+          echo 'Source: https://github.com/maloney2323/Reality/pull/308'
+          echo 'Authorized shift: ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'
+          echo 'Original incident: 05d1e1a9-8f9e-43a5-94ba-acd367cc2611'
+          echo 'FROZEN_HANDOFF_REGRESSION_RED_GREEN_PROVEN'
+          echo 'NOT_A_CASE_SPECIFIC_ORIGINAL_FAILURE_RECEIPT'
+          echo 'NOT_INSTALLATION_OR_ORIGINAL_SHIFT_SETTLEMENT'
