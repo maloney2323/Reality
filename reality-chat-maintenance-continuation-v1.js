@@ -47,7 +47,13 @@
  feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
  const limits=make('p','reality-chat-maintenance-limits',
   'Continuing a shift is NOT approval to install code. Each independently tested installation requires its own exact authorization.');
- actions.append(authorize,reload);
+ // One owner decision, visible in both the Chat message and owner inbox.
+ const installApproveInInbox=make('button','reality-chat-maintenance-approve',
+  'Approve exact verified preview repair');
+ installApproveInInbox.id='realityChatMaintenanceApprovalInboxInstall';
+ installApproveInInbox.type='button';installApproveInInbox.hidden=true;
+ installApproveInInbox.disabled=true;
+ actions.append(authorize,installApproveInInbox,reload);
  root.append(title,description,list,actions,feedback,limits);
  const anchor=get('realityChatApprovalItems');
  if(anchor)inbox.insertBefore(root,anchor);
@@ -357,6 +363,8 @@
   // Readback renders while loading=true; a verified approval must be
   // enabled AFTER render, while the click handler itself guards loading.
   installApprove.disabled=!scope.exactInstallCard||installAuthorizing||installUncertain||authorizing;
+  installApproveInInbox.hidden=installApprove.hidden;
+  installApproveInInbox.disabled=installApprove.disabled;
   installDetails.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   installDetails.textContent=scope.exactInstallCard?
    'One-use exact approval · PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
@@ -614,6 +622,7 @@
    render(scope);
   }catch(e){
    approvedScope=null;authorize.disabled=true;installApprove.disabled=true;
+   installApproveInInbox.disabled=true;
    inlineContinue.disabled=true;root.hidden=false;hint.hidden=true;
    title.textContent='Maintenance verification unavailable';
    list.replaceChildren();
@@ -641,6 +650,10 @@
   // which freshly re-reads the scope and refuses an uncertain duplicate.
   if(!inlineContinue.disabled&&!authorize.disabled)authorize.click();
  });
+ installApproveInInbox.addEventListener('click',()=>{
+  // Delegate to EXACT same owner click transport; no second approval request.
+  if(!installApproveInInbox.disabled&&!installApprove.disabled)installApprove.click();
+ });
  installApprove.addEventListener('click',async()=>{
   // No model, assistant message or ordinary Chat reply can press this.
   // Each click re-reads the owner's exact signed artifact before one POST.
@@ -648,7 +661,7 @@
    installUncertain||installApprove.disabled||!approvedScope?.exactInstallCard)
    return;
   const prior=approvedScope.exactInstallCard;
-  installAuthorizing=true;installApprove.disabled=true;reload.disabled=true;
+  installAuthorizing=true;installApprove.disabled=true;installApproveInInbox.disabled=true;reload.disabled=true;
   try{
    const fresh=await read();
    const c=fresh.exactInstallCard;
@@ -685,12 +698,13 @@
     fail('EXACT_INSTALL_APPROVAL_OUTCOME_UNVERIFIED');
    installUncertain=true;
    installApprove.hidden=true;installApprove.disabled=true;
+   installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
    hintLabel.textContent='Reality recorded the exact owner approval. The SAME signed shift must now install, independently verify and resume the unfinished work.';
    feedback.textContent='Owner approval receipt '+r.approval_receipt_sha256+
     ' recorded. No repeat approval or shift restart. Installation and final job verification are pending.';
    void refresh();
   }catch(e){
-   installUncertain=true;installApprove.disabled=true;
+   installUncertain=true;installApprove.disabled=true;installApproveInInbox.disabled=true;
    feedback.textContent='The exact installation decision could not be independently confirmed ('+
     safeError(e)+'). Use Check status before any further action. No automatic retry.';
   }finally{installAuthorizing=false;reload.disabled=false}
@@ -785,6 +799,7 @@
    root.hidden=true;hint.hidden=true;timeline.hidden=true;
    authorize.disabled=true;inlineContinue.disabled=true;watch.disabled=true;
    installApprove.hidden=true;installApprove.disabled=true;
+   installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
   }
  });
  signObserver.observe(ready,{attributes:true,attributeFilter:['style']});
