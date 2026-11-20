@@ -80,7 +80,8 @@ function scenario({
     production_changed:false,new_shift_started:false};
    return {ok:true,json:async()=>body.mode==='manifest'?
     {...base,status:'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',
-     source_tree_sha:treeSha,files:[{path,sha:blob,size:buf.length}]}:
+     source_tree_sha:treeSha,worker_source_blob_sha:'c'.repeat(40),
+     runtime_imports_count:1,files:[{path,sha:blob,size:buf.length}]}:
     {...base,status:'SIGNED_MAINTENANCE_SOURCE_FILE_VERIFIED',
      path,sha:blob,size:buf.length,encoding:'base64',
      source_tree_sha:treeSha,content:buf.toString('base64')}};
@@ -233,6 +234,9 @@ test('source broker reuses existing credential without exposing it to preview or
  import.meta.url),'utf8');
  for(const term of [
   'REALITY_GITHUB_BROKER_TOKEN',
+  "workerPath='api/reality/governed-employee-shift-worker.js'",
+  'await gitBlobSha(workerBytes)',
+  'eligible=files.filter',
   "same(req.headers.get('apikey')||'',c.key)",
   "reality_read_signed_maintenance_repair_source_scope_v1",
   "scope.source_read_authorized!==true",
