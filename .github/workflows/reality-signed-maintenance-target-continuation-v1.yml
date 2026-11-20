@@ -1,0 +1,31 @@
+name: Reality signed maintenance artifact-to-shift continuation proof
+on:
+  pull_request:
+    paths:
+      - 'src/reality-signed-maintenance-verified-artifact-handoff-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'supabase/migrations/20261120202000_signed_maintenance_artifact_install_target_review_v1.sql'
+      - 'test/reality-signed-maintenance-install-target-review-v1.test.js'
+      - '.github/workflows/reality-signed-maintenance-target-continuation-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-owner-shift-target-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact frozen repair target and original-shift continuation boundary
+        run: |
+          set -euo pipefail
+          node --check src/reality-signed-maintenance-verified-artifact-handoff-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --test test/reality-signed-maintenance-install-target-review-v1.test.js
+          node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
+          node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
