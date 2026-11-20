@@ -87,8 +87,11 @@
   actions.style.cssText='display:flex;gap:9px;flex-wrap:wrap;margin-top:12px';
   const label=document.createElement('div');
   label.style.cssText='font-size:12px;opacity:.86';
+  const isExistingShift=result?.capability_id==='governed-existing-shift-continuation';
   const work=result?.original_work_id;
-  label.textContent=WORK.test(work||'')?work:
+  label.textContent=isExistingShift?
+   'Existing authorized shift · '+String(result.shift_id||'verification pending'):
+   WORK.test(work||'')?work:
    'Original work ID will appear only after durable admission';
   if(typeof result?.objective==='string'&&result.objective.trim()){
    const objective=document.createElement('p');
@@ -109,11 +112,20 @@
     result.status==='CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED'?'CANDIDATE_STAGED':
     result.status==='CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED'?'CI_VERIFIED':null);
    const idx=phaseOrder.indexOf(phase);
-   for(let i=0;i<steps.length;i++){
+   const displayedSteps=isExistingShift?[
+    'Authenticated owner instruction saved',
+    'Existing active shift warrant and maintenance scope verified',
+    'Existing signed worker wake enqueued (not execution)',
+    'Independent signed worker run and original failure evidence',
+    'Independent repair, original resumption and final receipts'
+   ]:steps;
+   for(let i=0;i<displayedSteps.length;i++){
     const row=document.createElement('div');
-    let mark=i<4&&idx>=i?'✓':'○';
-    if(i===4&&verifiedComplete)mark='✓';
-    row.textContent=mark+' '+steps[i];
+    let mark=isExistingShift?
+     (i<3&&result.wake_enqueued===true?'✓':'○'):
+     (i<4&&idx>=i?'✓':'○');
+    if(!isExistingShift&&i===4&&verifiedComplete)mark='✓';
+    row.textContent=mark+' '+displayedSteps[i];
     row.style.opacity=mark==='✓'?'1':'.70';
     timeline.append(row);
    }
@@ -125,7 +137,7 @@
     link.style.cssText='color:#9edfff;text-decoration:underline;min-height:40px';
     actions.append(link);
    }
-   if(idx>=3&&!verifiedComplete){
+   if(!isExistingShift&&idx>=3&&!verifiedComplete){
     const note=document.createElement('p');
     note.style.cssText='font-size:12px;margin:5px 0;opacity:.85';
     note.textContent='Source/syntax checks are not installation or full-job acceptance. Final completion and economic savings remain unverified until independent settlement.';
@@ -281,6 +293,23 @@
  function explain(result){
   const id=WORK.test(result.original_work_id||'')?
    result.original_work_id:null;
+  if(result.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')
+   return 'SIGNED EXISTING SHIFT HANDOFF VERIFIED · '+String(result.shift_id||'')+
+    ' · Network request '+String(result.network_request_id||'')+
+    '. Reality accepted this saved instruction without another shift or approval. '+
+    'Latest signed worker status: '+String(result.last_worker_safe_result||
+     'awaiting independent worker readback').replaceAll('_',' ')+
+    '. This is not an original-job completion receipt.';
+  if(result.status==='CHAT_EXISTING_SHIFT_WAKE_ENQUEUED')
+   return 'EXISTING AUTHORIZED SHIFT WAKE QUEUED · '+String(result.shift_id||'')+
+    ' · Request '+String(result.network_request_id||'')+
+    '. The signed worker will independently claim the wake. No new shift, approval, installation or completed job was inferred.';
+  if(result.status==='CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED')
+   return 'EXISTING SHIFT WAKE ALREADY QUEUED · '+String(result.shift_id||'')+
+    '. Same saved instruction, no duplicate request or new approval. Check the signed worker and original-job receipts.';
+  if(typeof result.status==='string'&&result.status.startsWith('CHAT_EXISTING_SHIFT_'))
+   return 'EXISTING SHIFT HANDOFF · '+result.status.replaceAll('_',' ')+
+    '. The saved message is preserved; no worker execution or installation was claimed.';
   if(result.status==='CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')
    return 'SAVED BUILD STATUS · '+id+
     ' · phase '+String(result.development_phase||'UNKNOWN')+
@@ -533,12 +562,16 @@
   if(restoring||!UUID.test(x.conversation_id||'')||
      window.realityActiveConversationId?.()!==x.conversation_id||
      !Array.isArray(x.messages))return;
+  const signedShiftCommand=text=>
+   /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+.{0,140}(?:shift|existing|original)/i.test(text)&&
+   !/\b(?:install|deploy|production|approve)\b/i.test(text);
   const recent=x.messages.filter(m=>m?.role==='user'&&
    UUID.test(m.request_id||'')&&SOURCE.test(m.source_ref||'')&&
    typeof m.text==='string'&&
-   /\b(?:build|implement|code|repair|fix|develop|upgrade|generate)\b/i.test(m.text))
+   (signedShiftCommand(m.text)||
+    /\b(?:build|implement|code|repair|fix|develop|upgrade|generate)\b/i.test(m.text)))
    .sort((a,b)=>Date.parse(b.created_at||'')-Date.parse(a.created_at||''))
-   .slice(0,3);
+   .slice(0,4);
   if(!recent.length)return;
   restoring=true;
   try{
@@ -547,8 +580,14 @@
      request_id:m.request_id,source_ref:m.source_ref};
     if(lastRestored===key(ref.conversation_id,ref.request_id)&&activeRef?.request_id===ref.request_id)
      return;
-    const result=await call('READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
-    if(result.status!=='CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')
+    const existingShift=signedShiftCommand(m.text);
+    const result=await call(existingShift?
+     'READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS':
+     'READ_SIGNED_NEW_DEVELOPMENT_STATUS',ref);
+    if(!((existingShift&&result.status===
+      'CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')||
+      (!existingShift&&result.status===
+      'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK')))
      continue;
     lastRestored=key(ref.conversation_id,ref.request_id);
     showCheckedResult(result,ref);

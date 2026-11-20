@@ -166,3 +166,176 @@ export async function independentlyReviewOneStagedMaintenanceRegression({
   original_job_completed:false,installation_authorized:false,
   production_changed:false,new_shift_started:false});
 }
+
+
+const CASE_CI_WORKFLOW='.github/workflows/reality-registered-signed-maintenance-executor-v1.yml';
+const CASE_CI_BRANCH='repair/maintenance-warrant-scope-handoff-20261119';
+// A separate, later signed verifier consumes the ACTUAL GitHub Actions
+// diagnostics. It never upgrades a passing diagnostic into a reproduced RED.
+export async function independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
+ db,env=process.env,shiftId,workerRunId,
+ call=shiftRpc,fetchImpl=fetch
+}={}){
+ if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||
+  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+  !UUID.test(shiftId||'')||!UUID.test(workerRunId||'')||
+  typeof call!=='function'||typeof fetchImpl!=='function')
+  guard('CASE_CI_SIGNED_INDEPENDENT_REVIEW_SCOPE_REQUIRED');
+ const scope=await call(db,'reality_read_next_signed_maintenance_ci_diagnostic_v1',{
+  p_shift_id:shiftId,p_worker_run_id:workerRunId
+ },{fetchImpl});
+ if(scope?.status==='NO_SIGNED_MAINTENANCE_DIAGNOSTIC_TO_REVIEW'&&
+  scope.frozen_ci_red_verified===false&&
+  scope.repair_executed===false&&
+  scope.original_job_completed===false&&
+  scope.installation_authorized===false&&
+  scope.production_changed===false)
+  return safe(scope.status,{review_attempted:false});
+ if(scope?.status!=='SIGNED_MAINTENANCE_DIAGNOSTIC_NEEDS_INDEPENDENT_GITHUB_RECHECK'||
+  scope.shift_id!==shiftId||
+  !UUID.test(scope.maintenance_id||'')||
+  !UUID.test(scope.owner_id||'')||
+  !UUID.test(scope.first_worker_run_id||'')||
+  scope.first_worker_run_id===workerRunId||
+  scope.independent_worker_run_id!==workerRunId||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(scope.source_ref||'')||
+  !SHA.test(scope.trigger_commit_sha||'')||
+  !HASH.test(scope.trigger_receipt_sha256||'')||
+  !HASH.test(scope.source_epoch_receipt_sha256||'')||
+  !Number.isFinite(Date.parse(scope.ci_dispatched_at||''))||
+  scope.read_only!==true||
+  scope.frozen_ci_red_verified!==false||
+  scope.repair_executed!==false||
+  scope.original_job_completed!==false||
+  scope.installation_authorized!==false||
+  scope.production_changed!==false)
+  guard('CASE_CI_SIGNED_OWNER_SOURCE_OR_DISPATCH_UNTRUSTED');
+ const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
+ let result,run,jobs,artifacts,sourceFile,triggerFile;
+ try{
+  result=await getGithub({fetchImpl,token,
+   path:'/actions/runs?branch='+encodeURIComponent(CASE_CI_BRANCH)+
+    '&per_page=100'});
+  const candidates=(Array.isArray(result?.workflow_runs)?result.workflow_runs:[])
+   .filter(x=>x.name==='Reality registered signed maintenance executor'&&
+     x.path===CASE_CI_WORKFLOW&&x.event==='pull_request'&&
+     x.head_branch===CASE_CI_BRANCH&&
+     x.head_repository?.full_name==='maloney2323/Reality'&&
+     x.status==='completed'&&x.conclusion==='success'&&
+     x.head_sha===scope.trigger_commit_sha&&
+     Number.isSafeInteger(x.id)&&x.id>0&&
+     Number.isFinite(Date.parse(x.created_at||''))&&
+     Date.parse(x.created_at)>=Date.parse(scope.ci_dispatched_at)-120000&&
+     Date.parse(x.created_at)<=Date.now()+60000);
+  if(!candidates.length)return safe('MAINTENANCE_CI_DIAGNOSTIC_INDEPENDENT_RUN_NOT_YET_FOUND',{
+   maintenance_id:scope.maintenance_id,review_attempted:true});
+  candidates.sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
+  run=candidates[0];
+  [jobs,artifacts,sourceFile,triggerFile]=await Promise.all([
+   getGithub({fetchImpl,token,path:'/actions/runs/'+run.id+'/jobs?per_page=100'}),
+   getGithub({fetchImpl,token,path:'/actions/runs/'+run.id+'/artifacts?per_page=100'}),
+   getGithub({fetchImpl,token,path:'/contents/scripts/reality-maintenance-signed-case-ci-runner-v1.mjs?ref='+run.head_sha}),
+   getGithub({fetchImpl,token,path:'/contents/reality-maintenance-ci-triggers/'+scope.maintenance_id+'.json?ref='+run.head_sha})
+  ]);
+ }catch{
+  return safe('MAINTENANCE_CI_DIAGNOSTIC_GITHUB_PROOF_UNAVAILABLE',{
+   maintenance_id:scope.maintenance_id,review_attempted:true});
+ }
+ const triggerBytes=triggerFile?.encoding==='base64'&&
+  typeof triggerFile.content==='string'?
+  Buffer.from(triggerFile.content.replace(/\s/g,''),'base64'):null;
+ let trigger;
+ try{trigger=triggerBytes?JSON.parse(triggerBytes.toString('utf8')):null;}
+ catch{trigger=null;}
+ const triggerKeys='frozen_ci_red_verified,historical_failure_kind,'+
+  'installation_authorized,maintenance_id,original_job_completed,'+
+  'production_changed,repair_executed,schema,shift_id,'+
+  'source_epoch_receipt_sha256,source_ref,worker_run_id';
+ const triggerBlobSha=triggerBytes?createHash('sha1')
+  .update('blob '+triggerBytes.length)
+  .update(Buffer.from([0]))
+  .update(triggerBytes).digest('hex'):null;
+ if(triggerFile?.path!=='reality-maintenance-ci-triggers/'+
+    scope.maintenance_id+'.json'||
+   !SHA.test(triggerFile?.sha||'')||
+   triggerFile.sha!==triggerBlobSha||
+   !trigger||Object.keys(trigger).sort().join(',')!==triggerKeys||
+   trigger.schema!=='reality-signed-maintenance-case-ci-trigger-v1'||
+   trigger.maintenance_id!==scope.maintenance_id||
+   trigger.shift_id!==scope.shift_id||
+   trigger.worker_run_id!==scope.first_worker_run_id||
+   trigger.source_ref!==scope.source_ref||
+   trigger.source_epoch_receipt_sha256!==scope.source_epoch_receipt_sha256||
+   !['HISTORICAL_ZERO_ORIGINAL_CLAIMS_WITH_SIGNED_INQUIRIES',
+     'HISTORICAL_SOURCE_EPOCH_MISMATCH_INDEPENDENTLY_REOBSERVED']
+     .includes(trigger.historical_failure_kind)||
+   trigger.frozen_ci_red_verified!==false||
+   trigger.repair_executed!==false||
+   trigger.original_job_completed!==false||
+   trigger.installation_authorized!==false||
+   trigger.production_changed!==false)
+  return safe('MAINTENANCE_CI_DIAGNOSTIC_SIGNED_TRIGGER_IDENTITY_UNVERIFIED',{
+   maintenance_id:scope.maintenance_id,review_attempted:true});
+ const candidateJobs=Array.isArray(jobs?.jobs)?
+  jobs.jobs.filter(x=>x.run_id===run.id&&
+   x.name==='verify-exact-registered-handoff'&&x.status==='completed'&&
+   x.conclusion==='success'&&Array.isArray(x.steps)&&
+   x.steps.some(step=>step.name===
+    'Run independent claim-bound case-CI diagnostics on GitHub trigger'&&
+    step.conclusion==='success')&&
+   x.steps.some(step=>step.name===
+    'Preserve independent diagnostic artifact without claiming RED'&&
+    step.conclusion==='success')):[];
+ const validArtifacts=Array.isArray(artifacts?.artifacts)?
+  artifacts.artifacts.filter(x=>
+   x.name==='reality-maintenance-case-ci-diagnostic-'+run.id&&
+   Number.isSafeInteger(x.id)&&x.id>0&&
+   x.expired===false&&
+   Number.isSafeInteger(x.size_in_bytes)&&x.size_in_bytes>=200&&
+   x.size_in_bytes<=100000&&
+   HASH.test(x.digest||'')&&
+   x.workflow_run?.head_branch===CASE_CI_BRANCH&&
+   x.workflow_run?.head_sha===run.head_sha):[];
+ const script=sourceFile?.encoding==='base64'&&
+  typeof sourceFile.content==='string'?
+  Buffer.from(sourceFile.content.replace(/\s/g,''),'base64').toString('utf8'):'';
+ if(candidateJobs.length!==1||validArtifacts.length!==1||
+  sourceFile?.path!=='scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'||
+  !SHA.test(sourceFile?.sha||'')||
+  !script.includes('case_specific_original_failure_reproduced:false')||
+  !script.includes('executable_frozen_ci_red_verified:false')||
+  run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+run.id)
+  return safe('MAINTENANCE_CI_DIAGNOSTIC_CASE_EVIDENCE_UNTRUSTED',{
+   maintenance_id:scope.maintenance_id,review_attempted:true});
+ const evidence=validArtifacts[0];
+ const receipt=await call(db,'reality_record_signed_maintenance_ci_diagnostic_v1',{
+  p_shift_id:shiftId,p_maintenance_id:scope.maintenance_id,
+  p_worker_run_id:workerRunId,p_github_run_id:run.id,
+  p_artifact_id:evidence.id,p_artifact_digest:evidence.digest,
+  p_provider_verified_commit_sha:run.head_sha
+ },{fetchImpl});
+ if(receipt?.status!==
+     'SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEWED_CASE_RED_STILL_REQUIRED'||
+   receipt.maintenance_id!==scope.maintenance_id||
+   receipt.shift_id!==shiftId||
+   receipt.independent_worker_run_id!==workerRunId||
+   receipt.github_run_id!==run.id||
+   receipt.artifact_id!==evidence.id||
+   receipt.artifact_digest!==evidence.digest||
+   !HASH.test(receipt.independent_diagnostic_receipt_sha256||'')||
+   receipt.frozen_ci_red_verified!==false||
+   receipt.repair_executed!==false||
+   receipt.original_job_completed!==false||
+   receipt.installation_authorized!==false||
+   receipt.production_changed!==false)
+   guard('CASE_CI_INDEPENDENT_DURABLE_DIAGNOSTIC_NOT_VERIFIED');
+ return safe(receipt.status,{
+  maintenance_id:scope.maintenance_id,shift_id:shiftId,
+  github_run_id:run.id,github_run_url:run.html_url,
+  artifact_digest:evidence.digest,
+  independent_diagnostic_receipt_sha256:
+    receipt.independent_diagnostic_receipt_sha256,
+  review_attempted:true,independent_diagnostic_verified:true,
+  next_action:'CASE_SPECIFIC_EXECUTABLE_FROZEN_RED_STILL_REQUIRED'
+ });
+}

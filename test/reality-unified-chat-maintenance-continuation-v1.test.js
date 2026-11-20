@@ -349,3 +349,130 @@ test('compact notice does not block transcript or composer; original direct acco
  assert.match(ui,/authorizing\|\|loading\|\|uncertain/);
  assert.doesNotMatch(ui,/innerHTML\s*=|outerHTML\s*=|insertAdjacentHTML/);
 });
+
+function collectedText(node){
+ return [node.textContent,...node.children.map(collectedText)].join(' ');
+}
+function runningOwnerMaintenance(){
+ return {...data,requested_maintenance_draft:null,
+  requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
+  internal_maintenance_continuity:{...data.internal_maintenance_continuity,
+   current_shift_id:signedShiftId,signed_warrant_scope_verified:true,
+   signed_warrant_shift_id:signedShiftId,signed_unfinished_count:2,
+   signed_maintenance_incident_ids:items.map(i=>i.origin_incident_id),
+   newly_discovered_outside_warrant_count:0,outside_warrant_incident_ids:[],
+   items:[{...items[0],
+    independent_failure_baseline_receipt_sha256:HASH('c'),
+    independent_frozen_test_receipt_sha256:null,
+    independent_review_status:'NO_ORIGINAL_ADMISSION_CONFIRMED'},
+    {...items[1],
+    independent_failure_baseline_receipt_sha256:HASH('d'),
+    independent_frozen_test_receipt_sha256:null,
+    independent_review_status:'SOURCE_CHANGED_NEEDS_FROZEN_TEST'}]
+  },
+  shift_activity_status:'VERIFIED_OWNER_ACTIVITY',
+  shift_activity:{status:'OWNER_SHIFT_LIVE_ACTIVITY_INDEPENDENT_READBACK',
+   owner_bound:true,shift_id:signedShiftId,
+   installation_authorized:false,production_changed:false,
+   worker_wake_count:9,
+   last_worker_seen_at:'2026-11-19T21:57:34Z'}
+ };
+}
+test('existing signed shift provides in-chat live repair progress without demanding second approval',async()=>{
+ const v=setup({readback:runningOwnerMaintenance()});await v.flush();
+ const watch=v.locate('realityChatMaintenanceWatch');
+ assert.equal(watch.hidden,false);
+ assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
+ await v.click('realityChatMaintenanceWatch');await v.flush();
+ const live=v.locate('realityChatMaintenanceLive');
+ assert.equal(live.hidden,false);
+ const summary=collectedText(live);
+ assert.match(summary,/Live owner-authorized repair progress/);
+ assert.match(summary,/Original|Existing shift:/);
+ assert.match(summary,/Riley/);
+ assert.match(summary,/Taylor/);
+ assert.match(summary,/Requalify changed source before case-specific CI/);
+ assert.match(summary,/Run the case-specific executable frozen CI RED/);
+ assert.match(summary,/No independently verified repair yet/);
+ assert.match(summary,/Signed worker wakes:\s+9/);
+ assert.match(summary,/sha256:cccccccccccccccc/);
+ assert.ok(v.calls.every(c=>c.options.method==='GET'),
+  'watching signed work may never create a new shift or imply repair permission');
+});
+test('only independent steps six/seven/eight may produce a same-shift completed repair receipt',async()=>{
+ const finalShift={
+  shift_id:signedShiftId,status:'ENDED_WITH_VERIFIED_JOB',
+  closed_at:'2026-11-19T22:25:00Z',
+  close_report:{shift_id:signedShiftId,
+   completion_condition:'ALL_EXACT_INTERNAL_MAINTENANCE_REPAIR_RECEIPTS_VERIFIED',
+   completion_reason:'ALL_SELECTED_INTERNAL_MAINTENANCE_REPAIRS_INDEPENDENTLY_RECEIPTED',
+   independently_verified_internal_maintenance_jobs:2,
+   production_changed:false},
+  steps:Array.from({length:8},(_,i)=>({
+   step_index:i+1,
+   state:i<5?'SOURCE_CHECKED':i<7?
+    'INTERNAL_MAINTENANCE_RECEIPTS_VERIFIED':'REPORTED',
+   proof_sha256:HASH(String.fromCharCode(97+(i%6)))
+  }))
+ };
+ const closed={...data,
+  requested_maintenance_draft:null,
+  requested_maintenance_draft_status:'NO_VERIFIED_MAINTENANCE_CONTINUATION_READY',
+  internal_maintenance_continuity:{...data.internal_maintenance_continuity,
+   status:'OWNER_NO_OPEN_INTERNAL_MAINTENANCE',
+   open_count:0,items:[],current_shift_id:null,
+   signed_unfinished_count:0,signed_maintenance_incident_ids:[],
+   newly_discovered_outside_warrant_count:0,
+   outside_warrant_incident_ids:[]},
+  shifts:[finalShift]
+ };
+ const verified=setup({readback:closed});await verified.flush();
+ const message=verified.locate('realityChatMaintenanceNudge');
+ assert.equal(message.hidden,false);
+ assert.match(collectedText(message),/independently verified 2 exact maintenance repairs/);
+ await verified.click('realityChatMaintenanceWatch');await verified.flush();
+ const summary=collectedText(verified.locate('realityChatMaintenanceLive'));
+ assert.match(summary,/Independently verified completion receipt/);
+ assert.match(summary,/Execution:\s+sha256:ffffffff/);
+ assert.match(summary,/Independent verification:\s+sha256:aaaaaaaa/);
+ assert.match(summary,/Final report:\s+sha256:bbbbbbbb/);
+ assert.ok(verified.calls.every(c=>c.options.method==='GET'));
+ const unverified=setup({readback:{...closed,shifts:[{...finalShift,
+  steps:finalShift.steps.map((x,i)=>i===6?{...x,state:'AWAITING_EXACT_WORK'}:x)
+ }]}});
+ await unverified.flush();
+ assert.equal(unverified.locate('realityChatMaintenanceNudge').hidden,true,
+  'a final report without both independent maintenance steps is not proof');
+});
+
+test('owner Chat exposes executed maintenance stages, not a fabricated final repair',async()=>{
+ const current=runningOwnerMaintenance();
+ const sourceProof=HASH('e'),dispatch=HASH('f'),independent=HASH('a');
+ current.internal_maintenance_continuity.items[0]={
+  ...current.internal_maintenance_continuity.items[0],
+  signed_executor_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+  signed_executor_state:'COMPLETED',signed_executor_attempt_count:1,
+  ci_dispatch_receipt_sha256:dispatch,
+  ci_independent_diagnostic_receipt_sha256:independent,
+  ci_independent_artifact_digest:HASH('b'),
+  ci_independent_github_run_id:44633511608
+ };
+ current.internal_maintenance_continuity.items[1]={
+  ...current.internal_maintenance_continuity.items[1],
+  signed_executor_action:'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI',
+  signed_executor_state:'COMPLETED',
+  source_requalification_receipt_sha256:sourceProof
+ };
+ const v=setup({readback:current});await v.flush();
+ await v.click('realityChatMaintenanceWatch');await v.flush();
+ const screen=collectedText(v.locate('realityChatMaintenanceLive'));
+ assert.match(screen,/Source requalification:/);
+ assert.match(screen,/sha256:eeeeeeeeeeee/);
+ assert.match(screen,/Signed GitHub CI dispatch:/);
+ assert.match(screen,/sha256:ffffffffffff/);
+ assert.match(screen,/Independent GitHub diagnostics:/);
+ assert.match(screen,/44633511608/);
+ assert.match(screen,/original frozen RED still required/);
+ assert.match(screen,/No independently verified repair yet/);
+ assert.ok(v.calls.every(c=>c.options.method==='GET'));
+});

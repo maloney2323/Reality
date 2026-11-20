@@ -1,0 +1,16 @@
+{
+  "schema": "reality-maintenance-case-frozen-ci-v1",
+  "maintenance_id": "05d1e1a9-8f9e-43a5-94ba-acd367cc2611",
+  "shift_id": "ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce",
+  "source_ref": "https://github.com/maloney2323/Reality/pull/308",
+  "historical_failure_kind": "HISTORICAL_SOURCE_EPOCH_MISMATCH_INDEPENDENTLY_REOBSERVED",
+  "historical_commit_sha": "cfb7373b3103ee72164923cb999c234d192ba507",
+  "target_source_path": "src/reality-qualified-source-requalification-v1.js",
+  "frozen_test_path": "test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js",
+  "expected_red_test_name": "PR308 frozen RED: changed signed source between consecutive independent provider observations must not be requalified",
+  "historical_defect_marker": "let source;",
+  "corrected_defect_guard": "first.provider_proof_sha256!==claim.changed_review_sha256",
+  "case_regression_only": true,
+  "original_customer_execution_proven": false,
+  "installation_authorized": false
+}

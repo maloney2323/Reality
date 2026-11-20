@@ -1,0 +1,14 @@
+{
+  "schema": "reality-signed-maintenance-case-ci-trigger-v1",
+  "maintenance_id": "05d1e1a9-8f9e-43a5-94ba-acd367cc2611",
+  "shift_id": "ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce",
+  "worker_run_id": "924f0cae-97a0-4387-90f9-7ad7bb384a1b",
+  "source_ref": "https://github.com/maloney2323/Reality/pull/308",
+  "source_epoch_receipt_sha256": "sha256:6076b6c24cb1ec0385c822bf38c1fcccb404918f57fafc39b42ecff6cf81b7d1",
+  "historical_failure_kind": "HISTORICAL_SOURCE_EPOCH_MISMATCH_INDEPENDENTLY_REOBSERVED",
+  "frozen_ci_red_verified": false,
+  "repair_executed": false,
+  "original_job_completed": false,
+  "installation_authorized": false,
+  "production_changed": false
+}

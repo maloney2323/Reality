@@ -1,0 +1,148 @@
+name: Reality registered signed maintenance executor
+on:
+  push:
+    branches: ['repair/maintenance-warrant-scope-handoff-20261119']
+  pull_request:
+    types: [opened,reopened,synchronize]
+    branches: ['reality/**']
+    paths:
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'src/reality-signed-maintenance-original-lineage-boundary-v1.js'
+      - 'test/reality-signed-maintenance-original-lineage-boundary-v1.test.js'
+      - 'supabase/migrations/20261120184500_existing_original_business_linkage_gate_v1.sql'
+      - 'supabase/migrations/20261120175500_existing_original_case_ci_receipt_readback_v1.sql'
+      - 'src/reality-signed-maintenance-source-requalification-executor-v1.js'
+      - 'src/reality-signed-maintenance-case-ci-executor-v1.js'
+      - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'src/reality-signed-maintenance-verified-artifact-handoff-v1.js'
+      - 'src/reality-governed-continuity-evidence-classifier-v1.js'
+      - 'test/reality-governed-continuity-evidence-classifier-v1.test.js'
+      - 'api/reality/personal-governed-employee-shift.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js'
+      - 'supabase/migrations/20261120193000_signed_existing_maintenance_verified_artifact_handoff_v1.sql'
+      - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
+      - 'supabase/migrations/20261120172000_existing_shift_sourcecase_ci_attestation_v1.sql'
+      - 'src/reality-signed-maintenance-repair-handoff-v1.js'
+      - 'src/reality-signed-maintenance-repair-model-candidate-v1.js'
+      - 'supabase/migrations/20261120133000_signed_maintenance_repair_candidate_stage_v1.sql'
+      - 'test/reality-signed-maintenance-repair-model-candidate-v1.test.js'
+      - 'src/reality-signed-maintenance-candidate-target-review-v1.js'
+      - 'test/reality-signed-maintenance-candidate-target-review-v1.test.js'
+      - 'supabase/migrations/20261120152000_signed_maintenance_candidate_relevance_review_v1.sql'
+      - 'supabase/migrations/20261120154500_signed_maintenance_reviewer_source_read_v1.sql'
+      - 'supabase/migrations/20261120160000_signed_maintenance_offtarget_candidate_revision_v1.sql'
+      - 'supabase/migrations/20261120140500_signed_maintenance_source_broker_scope_v1.sql'
+      - 'supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts'
+      - 'supabase/migrations/20261120143000_signed_maintenance_model_bounded_source_recovery_v1.sql'
+      - 'supabase/migrations/20261120150200_signed_maintenance_candidate_readonly_provider_retry_v1.sql'
+      - 'supabase/migrations/20261120124000_signed_existing_maintenance_repair_handoff_v1.sql'
+      - 'test/reality-signed-maintenance-diagnostic-to-repair-handoff-v1.test.js'
+      - 'src/reality-signed-maintenance-external-review-v1.js'
+      - 'supabase/migrations/20261119235900_signed_maintenance_case_ci_independent_review_v1.sql'
+      - 'test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js'
+      - 'supabase/functions/reality-signed-maintenance-case-ci-broker-v1/index.ts'
+      - 'supabase/migrations/20261119235500_signed_maintenance_case_ci_dispatch_v1.sql'
+      - 'supabase/migrations/20261120001000_signed_maintenance_requalified_ci_continuation_v1.sql'
+      - 'scripts/reality-maintenance-signed-case-ci-runner-v1.mjs'
+      - 'scripts/reality-maintenance-sourcebound-case-ci-v1.mjs'
+      - 'scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs'
+      - 'reality-maintenance-ci-triggers/**'
+      - 'reality-maintenance-case-specs/**'
+      - 'test/reality-frozen-regressions/reality-pr308-source-epoch-double-read-v1.test.js'
+      - 'src/reality-qualified-source-requalification-v1.js'
+      - 'test/reality-maintenance-case-ci-broker-contract-v1.test.js'
+      - 'supabase/migrations/20261119234000_registered_signed_maintenance_source_executor_v1.sql'
+      - 'test/reality-registered-signed-maintenance-executor-v1.test.js'
+      - 'test/reality-frozen-regressions/reality-maintenance-pr308-requalification-ci-handoff-v1.test.js'
+      - 'scripts/reality-maintenance-pr308-independent-red-green-v1.mjs'
+      - '.github/workflows/reality-registered-signed-maintenance-executor-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify-exact-registered-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Test owner-signed maintenance source requalification without secrets
+        run: |
+          set -euo pipefail
+          node --check src/reality-signed-maintenance-source-requalification-executor-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --check src/reality-signed-maintenance-original-lineage-boundary-v1.js
+          node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
+          node --test test/reality-registered-signed-maintenance-executor-v1.test.js
+          node --check src/reality-signed-maintenance-case-ci-executor-v1.js
+          node --check scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
+          node --test test/reality-maintenance-case-ci-broker-contract-v1.test.js
+          node --check src/reality-signed-maintenance-external-review-v1.js
+          node --test test/reality-maintenance-case-ci-independent-diagnostic-v1.test.js
+          node --check src/reality-signed-maintenance-case-ci-live-verifier-v1.js
+          node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
+          node --check src/reality-signed-maintenance-verified-artifact-handoff-v1.js
+          node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
+          node --check src/reality-governed-continuity-evidence-classifier-v1.js
+          node --test test/reality-governed-continuity-evidence-classifier-v1.test.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check reality-chat-maintenance-continuation-v1.js
+          node --check src/reality-signed-maintenance-repair-handoff-v1.js
+          node --test test/reality-signed-maintenance-diagnostic-to-repair-handoff-v1.test.js
+          node --check src/reality-signed-maintenance-repair-model-candidate-v1.js
+          node --test test/reality-signed-maintenance-repair-model-candidate-v1.test.js
+          node --check src/reality-signed-maintenance-candidate-target-review-v1.js
+          node --test test/reality-signed-maintenance-candidate-target-review-v1.test.js
+      - name: Independently prove PR308 frozen handoff RED on ancestor and GREEN on candidate
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-maintenance-pr308-independent-red-green-v1.mjs
+          node scripts/reality-maintenance-pr308-independent-red-green-v1.mjs
+      - name: Preserve PR308 frozen RED/GREEN artifact without claiming final business repair
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-pr308-frozen-handoff-red-green-${{ github.run_id }}
+          path: artifact/maintenance-pr308-frozen-red-green.json
+          if-no-files-found: ignore
+      - name: Run independent claim-bound case-CI diagnostics on GitHub trigger
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: node scripts/reality-maintenance-signed-case-ci-runner-v1.mjs
+      - name: Execute SAME signed maintenance source-epoch frozen regression on historical RED and corrected GREEN
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-maintenance-sourcebound-case-ci-v1.mjs
+          node scripts/reality-maintenance-sourcebound-case-ci-v1.mjs
+      - name: Build exact reviewed candidate source artifact after independent RED GREEN
+        run: |
+          set -euo pipefail
+          node --check scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs
+          node scripts/reality-maintenance-build-verified-repair-artifact-v1.mjs
+      - name: Preserve owner-reviewable source artifact, not installation authority
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-maintenance-exact-repair-approval-packet-${{ github.run_id }}
+          path: |
+            artifact/maintenance-verified-repair-*.json
+            artifact/maintenance-verified-repair-*.js
+          if-no-files-found: error
+      - name: Preserve exact signed source-case RED GREEN evidence without claiming original settlement
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-maintenance-sourcebound-case-red-green-${{ github.run_id }}
+          path: artifact/maintenance-sourcebound-red-green-*.json
+          if-no-files-found: warn
+      - name: Preserve independent diagnostic artifact without claiming RED
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-maintenance-case-ci-diagnostic-${{ github.run_id }}
+          path: artifact/maintenance-case-ci-diagnostic.json
+          if-no-files-found: ignore

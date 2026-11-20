@@ -66,24 +66,31 @@
   'Continue exact unfinished repairs');
  inlineContinue.id='realityChatMaintenanceInlineAuthorize';
  inlineContinue.type='button';inlineContinue.disabled=true;
+ const watch=make('button','reality-chat-maintenance-watch','Follow live repairs');
+ watch.id='realityChatMaintenanceWatch';watch.type='button';watch.hidden=true;
+ const timeline=make('section','reality-chat-maintenance-live');
+ timeline.id='realityChatMaintenanceLive';timeline.hidden=true;
+ timeline.setAttribute('aria-label','Independent live repair evidence and completion receipts');
+ timeline.setAttribute('aria-live','polite');
  const review=make('button','reality-chat-maintenance-nudge-open','Review evidence');
  review.id='realityChatMaintenanceOpen';review.type='button';
  const reply=make('button','reality-chat-maintenance-reply','Reply to Reality');
  reply.id='realityChatMaintenanceReply';reply.type='button';
  const dialogueProof=make('p','reality-chat-maintenance-dialogue-proof',
   'Source: owner-scoped signed shift and independent maintenance ledger. No installation authority is implied.');
- dialogueActions.append(inlineContinue,reply,review);
- hint.append(verifiedLabel,hintLabel,dialogueJobs,dialogueActions,dialogueProof);
+ dialogueActions.append(inlineContinue,watch,reply,review);
+ hint.append(verifiedLabel,hintLabel,dialogueJobs,dialogueActions,timeline,dialogueProof);
  thread.append(hint);
  // The saved Chat history uses replaceChildren(). Re-attach this owner-ledger
  // projection once after each transcript reload. No new AI message or shift.
  const threadObserver=new MutationObserver(()=>{
-  if(signedIn()&&approvedScope?.count>0&&!thread.contains(hint))
+  if(signedIn()&&(approvedScope?.count>0||approvedScope?.finalReceipt)&&
+     !thread.contains(hint))
    thread.append(hint);
  });
  threadObserver.observe(thread,{childList:true});
  let loading=false,authorizing=false,uncertain=false;
- let approvedScope=null,initialized=false;
+ let approvedScope=null,initialized=false,watching=false;
  const signedIn=()=>ready.style.display==='block';
  const safeError=e=>String(e?.message||'SOURCE_NOT_VERIFIED').slice(0,120);
  const key=jobs=>jobs.map(j=>
@@ -191,8 +198,107 @@
     fail('DRAFT_AND_PREVIOUS_REPAIR_RECEIPTS_DIFFER');
    valid=true;
   }
+  // A terminal repair receipt is displayed only when the *same* owner
+  // shift ledger independently reports execution, verification AND final
+  // report steps. Neither a worker wake nor a model message qualifies.
+  const shifts=Array.isArray(data.shifts)?data.shifts:[];
+  const terminal=shifts.find(s=>{
+   const rep=s?.close_report,steps=s?.steps;
+   return UUID.test(s?.shift_id||'')&&s.status==='ENDED_WITH_VERIFIED_JOB'&&
+    Number.isFinite(Date.parse(s.closed_at||''))&&
+    rep?.shift_id===s.shift_id&&
+    rep.completion_condition===
+     'ALL_EXACT_INTERNAL_MAINTENANCE_REPAIR_RECEIPTS_VERIFIED'&&
+    rep.completion_reason===
+     'ALL_SELECTED_INTERNAL_MAINTENANCE_REPAIRS_INDEPENDENTLY_RECEIPTED'&&
+    Number.isSafeInteger(rep.independently_verified_internal_maintenance_jobs)&&
+    rep.independently_verified_internal_maintenance_jobs>0&&
+    rep.independently_verified_internal_maintenance_jobs<=4&&
+    rep.production_changed===false&&
+    Array.isArray(steps)&&steps.length===8&&
+    [5,6].every(i=>steps[i].step_index===i+1&&
+     steps[i].state==='INTERNAL_MAINTENANCE_RECEIPTS_VERIFIED'&&
+     SHA.test(steps[i].proof_sha256||''))&&
+    steps[7].step_index===8&&steps[7].state==='REPORTED'&&
+    SHA.test(steps[7].proof_sha256||'');
+  })||null;
+  const shift=shifts.find(x=>x?.shift_id===c.current_shift_id)||null;
+  const activity=data.shift_activity_status==='VERIFIED_OWNER_ACTIVITY'&&
+   data.shift_activity?.status===
+    'OWNER_SHIFT_LIVE_ACTIVITY_INDEPENDENT_READBACK'&&
+   data.shift_activity?.owner_bound===true&&
+   data.shift_activity?.shift_id===c.current_shift_id&&
+   data.shift_activity?.installation_authorized===false&&
+   data.shift_activity?.production_changed===false?
+    data.shift_activity:null;
+  // Reality's authenticated owner-shift GET is the only source of these
+  // independently receipted packets; never treat one as install approval.
+  let verifiedArtifacts=[];
+  const artifacts=data.signed_verified_maintenance_repair_artifacts;
+  if(artifacts?.status==='OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY'&&
+   UUID.test(artifacts.owner_id||'')&&
+   Number.isSafeInteger(artifacts.count)&&artifacts.count>=0&&
+   artifacts.count<=4&&Array.isArray(artifacts.items)&&
+   artifacts.count===artifacts.items.length&&
+   artifacts.installation_authorized===false&&
+   artifacts.production_changed===false){
+   const bound=c.items.filter(j=>signed.has(j.origin_incident_id));
+   if(artifacts.items.every(a=>
+    UUID.test(a?.maintenance_id||'')&&
+    a.shift_id===c.current_shift_id&&
+    bound.some(j=>j.origin_incident_id===a.maintenance_id&&
+     j.source_ref===a.source_ref)&&
+    /^[a-f0-9]{40}$/.test(a?.candidate_commit_sha||'')&&
+    /^[a-f0-9]{40}$/.test(a?.candidate_source_blob_sha||'')&&
+    SHA.test(a?.review_receipt_sha256||'')&&
+    SHA.test(a?.case_ci_receipt_sha256||'')&&
+    Number.isSafeInteger(a?.github_run_id)&&a.github_run_id>10000&&
+    Number.isSafeInteger(a?.github_artifact_id)&&a.github_artifact_id>10000&&
+    a.owner_approval_ready===false&&a.install_target_verified===false&&
+    a.installation_authorized===false&&a.repair_installed===false&&
+    a.original_job_completed===false))
+    verifiedArtifacts=artifacts.items;
+  }
+  // Universe projection of Reality's verified classifier only. A lane is
+  // evidence + NEXT governed action, never an executor or approval button.
+  const route=data.governed_continuity_evidence_classification;
+  let classifiedLanes=[];
+  if(route&&[
+    'GOVERNED_CONTINUITY_EVIDENCE_SEPARATED_AND_ROUTED',
+    'GOVERNED_CONTINUITY_PARTIAL_EVIDENCE_CLASSIFIED'
+   ].includes(route.status)&&
+   route.shift_id===c.current_shift_id&&
+   route.classifier_grants_authority===false&&
+   route.ledger_mutated===false&&route.universe_state_mutated===false&&
+   route.installation_authorized===false&&
+   route.original_job_completed===false&&
+   route.production_changed===false&&
+   Number.isSafeInteger(route.lane_count)&&route.lane_count>=0&&
+   route.lane_count<=4&&Array.isArray(route.lanes)&&
+   route.lanes.length===route.lane_count&&
+   route.lanes.every(l=>
+    ['INTERNAL_CAPABILITY_REPAIR','CANONICAL_BUSINESS_ORIGINAL']
+      .includes(l?.lane_kind)&&
+    REF.test(l?.source_ref||'')&&
+    UUID.test(l?.maintenance_id||'')&&
+    c.items.some(j=>j.origin_incident_id===l.maintenance_id&&
+      j.source_ref===l.source_ref)&&
+    l.execution_permitted_by_classification===false&&
+    l.approval_permitted_by_classification===false&&
+    l.authority_status==='NO_NEW_ACTION_AUTHORITY'&&
+    SHA.test(l?.independent_evidence_receipt_sha256||'')))
+   classifiedLanes=route.lanes;
   return Object.freeze({
    count:c.open_count,jobs:c.items,activeId:c.current_shift_id,
+   verifiedArtifacts,classifiedLanes,
+   activity,shiftReadback:shift,finalReceipt:terminal?{
+    shift_id:terminal.shift_id,
+    count:terminal.close_report.independently_verified_internal_maintenance_jobs,
+    closed_at:terminal.closed_at,
+    execution_receipt_sha256:terminal.steps[5].proof_sha256,
+    verification_receipt_sha256:terminal.steps[6].proof_sha256,
+    final_report_sha256:terminal.steps[7].proof_sha256
+   }:null,
    signedCount:c.signed_unfinished_count,
    outsideCount:c.newly_discovered_outside_warrant_count,
    signedIds:c.signed_maintenance_incident_ids,
@@ -205,10 +311,25 @@
   approvedScope=scope;
   list.replaceChildren();
   root.hidden=scope.count===0;
-  hint.hidden=scope.count===0;
+  hint.hidden=scope.count===0&&!scope.finalReceipt;
+  watch.hidden=!(scope.activeId&&scope.warrantVerified)&&!scope.finalReceipt;
+  watch.disabled=watch.hidden;
+  watch.textContent=watching?'Pause live updates':'Follow live repairs';
   if(!scope.count){
-   authorize.disabled=true;description.textContent='No unfinished maintenance repairs in the verified ledger.';
-   feedback.textContent='No maintenance shift was started by this read.';
+   authorize.disabled=true;inlineContinue.hidden=true;
+   description.textContent='No unfinished maintenance repairs in the verified ledger.';
+   feedback.textContent=scope.finalReceipt?
+    'Independent maintenance completion receipt available for shift '+
+     scope.finalReceipt.shift_id:'No maintenance shift was started by this read.';
+   if(scope.finalReceipt){
+    hintLabel.textContent='Reality independently verified '+scope.finalReceipt.count+
+     ' exact maintenance repairs and closed shift '+scope.finalReceipt.shift_id+
+     '. Your execution, verification and final-report receipts are available below.';
+    dialogueJobs.replaceChildren();
+    dialogueProof.textContent='Verified final maintenance receipt · no customer-original settlement implied.';
+    if(hint.parentElement!==thread)thread.append(hint);
+   }
+   renderLive(scope);
    return;
   }
   title.textContent=scope.count+' unfinished employee repair'+(scope.count===1?'':'s');
@@ -235,6 +356,11 @@
    'I will ask separately before installing any code. You can reply to ask questions.':
    'I found unfinished employee repairs, but I cannot verify an exact signed authorization scope yet. '+
    'Ask me about the blockers or review the source evidence.';
+  if(scope.verifiedArtifacts?.length)
+   hintLabel.textContent+=' Reality independently recorded '+
+    scope.verifiedArtifacts.length+' exact tested repair artifact'+
+    (scope.verifiedArtifacts.length===1?'':'s')+
+    '. Isolated installation review remains required; no approval was granted.';
   dialogueJobs.replaceChildren();
   for(const item of scope.jobs){
    dialogueJobs.append(make('p','',
@@ -283,6 +409,7 @@
    scope.valid?
     'These are the original independently reviewed jobs, not new customer work. One approval authorizes their completion-bound continuation.':
     'The source or current owner warrant is not independently verified. No approval is available.';
+  renderLive(scope);
   feedback.textContent=scope.activeId?
    'Existing shift: '+scope.activeId+' · '+scope.signedCount+
     ' exact signed repairs · '+scope.outsideCount+
@@ -290,6 +417,122 @@
    scope.valid?'No work is started by reading this card. Press Continue to authorize the exact preserved maintenance set.':
     'Could not prepare an exact continuation; review and refresh the signed maintenance readback.';
  }
+ function renderLive(scope){
+  timeline.hidden=!watching||!(scope?.activeId&&scope.warrantVerified||
+   scope?.finalReceipt);
+  timeline.replaceChildren();
+  if(timeline.hidden)return;
+  const heading=make('strong','reality-chat-maintenance-live-title',
+   scope.finalReceipt&&scope.count===0?
+    'Independently verified completion receipt':'Live owner-authorized repair progress');
+  timeline.append(heading);
+  const line=(label,value)=>{
+   const item=make('p','reality-chat-maintenance-live-line');
+   item.append(make('strong','',label+' '),make('span','',value));
+   timeline.append(item);
+  };
+  const digest=(label,value)=>{
+   if(!SHA.test(value||''))return;
+   const item=make('p','reality-chat-maintenance-live-proof');
+   item.append(make('strong','',label+' '),make('code','',value));
+   timeline.append(item);
+  };
+  if(scope.finalReceipt&&scope.count===0){
+   const r=scope.finalReceipt;
+   line('Original shift:',r.shift_id);
+   line('Independent repairs verified:',String(r.count));
+   line('Completed:',new Date(r.closed_at).toLocaleString());
+   digest('Execution:',r.execution_receipt_sha256);
+   digest('Independent verification:',r.verification_receipt_sha256);
+   digest('Final report:',r.final_report_sha256);
+   line('Authority:', 'Maintenance completion only; no customer job was automatically settled.');
+   return;
+  }
+  line('Existing shift:',scope.activeId);
+  line('Owner authorization:',scope.signedCount+' exact repairs covered; '+
+   scope.outsideCount+' later incidents not authorized by this warrant.');
+  const a=scope.activity;
+  if(a&&Number.isSafeInteger(a.worker_wake_count)&&a.worker_wake_count>=0){
+   line('Signed worker wakes:',String(a.worker_wake_count));
+   if(Number.isFinite(Date.parse(a.last_worker_seen_at||'')))
+    line('Last worker contact:',new Date(a.last_worker_seen_at).toLocaleString());
+   if(typeof a.last_worker_safe_result==='string'&&
+      /^[A-Z][A-Z0-9_]{4,150}$/.test(a.last_worker_safe_result))
+    line('Last verified worker disposition:',
+     a.last_worker_safe_result.replaceAll('_',' ').toLowerCase());
+  }else{
+   line('Worker progress:', 'No independently verified live worker activity in this readback.');
+  }
+  for(const a of scope.verifiedArtifacts||[]){
+   const n=a.source_ref.split('/').pop();
+   line('Independent repair artifact:', 'PR #'+n+
+    ' · exact source tested; install target review still needed.');
+   line('Candidate commit:',a.candidate_commit_sha);
+   line('Independent CI run:',String(a.github_run_id));
+   digest('Review artifact receipt:',a.review_receipt_sha256);
+   digest('Frozen RED/GREEN:',a.case_ci_receipt_sha256);
+   line('Authority:', 'No installation approval; no original-job completion.');
+  }
+  if(scope.classifiedLanes?.length){
+   const header=make('strong','reality-chat-maintenance-live-title',
+    'Reality · Governed Evidence Classification');
+   timeline.append(header);
+   for(const lane of scope.classifiedLanes){
+    line(lane.lane_kind==='INTERNAL_CAPABILITY_REPAIR'?
+     'Capability repair lane:':'Business original lane:',
+     lane.source_ref.split('/').slice(-2).join(' #'));
+    line('Verified state:',lane.classified_state.replaceAll('_',' ').toLowerCase());
+    line('Next governed action:',lane.next_governed_action.replaceAll('_',' ').toLowerCase());
+    digest('Independent evidence:',lane.independent_evidence_receipt_sha256);
+   }
+   line('Classifier authority:','Evidence routing only. No approval, installation or final settlement.');
+  }
+  const covered=new Set(scope.signedIds);
+  for(const job of scope.jobs.filter(x=>covered.has(x.origin_incident_id))){
+   const name=make('strong','reality-chat-maintenance-live-job',
+    job.assignee+' · '+job.source_ref.split('/').slice(-2).join(' #'));
+   timeline.append(name);
+   line('Independent reviewer:',job.independent_reviewer);
+   line('Investigation:',job.independent_failure_baseline_receipt_sha256?
+    'Historical failure baseline receipted':'Failure reproduction not yet independently receipted');
+   digest('Frozen baseline:',job.independent_failure_baseline_receipt_sha256);
+   if(job.source_requalification_receipt_sha256){
+    line('Source requalification:', 'Verified in this same shift.');
+    digest('Independent source requalification:',job.source_requalification_receipt_sha256);
+   }
+   if(job.ci_dispatch_receipt_sha256){
+    line('Signed GitHub CI dispatch:', 'Completed. This is transport proof, not a test verdict.');
+    digest('GitHub CI dispatch:',job.ci_dispatch_receipt_sha256);
+   }
+   if(job.ci_independent_diagnostic_receipt_sha256){
+    line('Independent GitHub diagnostics:', 'Verified execution; original frozen RED still required.');
+    if(Number.isSafeInteger(job.ci_independent_github_run_id))
+     line('GitHub Actions run:',String(job.ci_independent_github_run_id));
+    digest('Independent diagnostic receipt:',job.ci_independent_diagnostic_receipt_sha256);
+    digest('GitHub artifact:',job.ci_independent_artifact_digest);
+   }
+   if(job.source_requalification_receipt_sha256&&
+      !job.independent_frozen_test_receipt_sha256)
+    line('Required next action:', 'Run the case-specific executable frozen CI RED on the requalified source.');
+   else if(job.independent_review_status==='SOURCE_CHANGED_NEEDS_FROZEN_TEST')
+    line('Required next action:', 'Requalify changed source before case-specific CI.');
+   else if(!job.independent_frozen_test_receipt_sha256)
+    line('Required next action:', 'Run the case-specific executable frozen CI RED.');
+   else line('Frozen regression:', 'Independent evidence receipt recorded.');
+   digest('Independent frozen CI:',job.independent_frozen_test_receipt_sha256);
+   line('Repair:',job.repair_verified===true?
+    'Verified repair indicated by independent ledger':'No independently verified repair yet');
+  }
+  line('Completion:', 'The original shift stays open until every exact maintenance repair has its independently verified receipt.');
+  line('Installation:', 'A separate exact approval is required before any code installation.');
+ }
+ watch.addEventListener('click',()=>{
+  if(!signedIn()||watch.disabled||!approvedScope)return;
+  watching=!watching;
+  watch.textContent=watching?'Pause live updates':'Follow live repairs';
+  renderLive(approvedScope);
+  if(watching)void refresh();
+ });
  async function read(){
   const response=await fetch(URL,{
    method:'GET',credentials:'same-origin',cache:'no-store',
@@ -423,8 +666,9 @@
  const signObserver=new MutationObserver(()=>{
   if(signedIn()&&!initialized){initialized=true;void refresh()}
   if(!signedIn()){
-   initialized=false;approvedScope=null;root.hidden=true;hint.hidden=true;
-   authorize.disabled=true;inlineContinue.disabled=true;
+   initialized=false;approvedScope=null;watching=false;
+   root.hidden=true;hint.hidden=true;timeline.hidden=true;
+   authorize.disabled=true;inlineContinue.disabled=true;watch.disabled=true;
   }
  });
  signObserver.observe(ready,{attributes:true,attributeFilter:['style']});
@@ -436,6 +680,12 @@
  window.setInterval(()=>{
   if(document.visibilityState==='visible'&&signedIn()&&!authorizing)void refresh();
  },120000);
+ // While the owner is watching, poll independently verified readback only.
+ // No additional execution POST, new shift, model work or permission is minted.
+ window.setInterval(()=>{
+  if(watching&&document.visibilityState==='visible'&&signedIn()&&
+     !loading&&!authorizing)void refresh();
+ },20000);
  if(window.location.hash==='#unfinished-maintenance')
   window.addEventListener('load',()=>{
    if(signedIn())showApprovals();

@@ -32,6 +32,8 @@ import {projectOwnerInternalMaintenanceContinuity}
  from '../../src/reality-owner-internal-maintenance-continuity-v1.js';
 import {buildOwnerMaintenanceContinuationDraft}
  from '../../src/reality-owner-maintenance-continuation-plan-v1.js';
+import {classifyRealityGovernedContinuityEvidence}
+ from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
@@ -499,6 +501,61 @@ export default async function handler(req,res){
    }catch{
     // No work, approval, or settled receipt may be inferred from failed readback.
    }
+   // Existing authenticated Reality owner readback: actual independent repair
+   // artifact receipts stay source-bound. Readback cannot approve/install.
+   let signed_verified_maintenance_repair_artifacts={
+    status:'OWNER_MAINTENANCE_ARTIFACT_READBACK_UNVERIFIED',
+    owner_id:session.user_id,count:0,items:[],
+    installation_authorized:false,production_changed:false
+   };
+   try{
+    const result=await shiftRpc(db,'reality_read_owner_maintenance_verified_artifacts_v1',{
+     p_owner_id:session.user_id
+    });
+    if(result?.status==='OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY'&&
+     result.owner_id===session.user_id&&
+     Number.isSafeInteger(result.count)&&result.count>=0&&result.count<=4&&
+     Array.isArray(result.items)&&result.items.length===result.count&&
+     result.installation_authorized===false&&result.production_changed===false&&
+     result.items.every(x=>
+      /^[a-f0-9-]{36}$/i.test(x?.maintenance_id||'')&&
+      /^[a-f0-9-]{36}$/i.test(x?.shift_id||'')&&
+      /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(x?.source_ref||'')&&
+      /^sha256:[a-f0-9]{64}$/.test(x?.review_receipt_sha256||'')&&
+      /^sha256:[a-f0-9]{64}$/.test(x?.case_ci_receipt_sha256||'')&&
+      /^[a-f0-9]{40}$/.test(x?.candidate_commit_sha||'')&&
+      /^[a-f0-9]{40}$/.test(x?.candidate_source_blob_sha||'')&&
+      Number.isSafeInteger(x?.github_run_id)&&x.github_run_id>10000&&
+      Number.isSafeInteger(x?.github_artifact_id)&&x.github_artifact_id>10000&&
+      x.install_target_verified===false&&x.owner_approval_ready===false&&
+      x.installation_authorized===false&&x.repair_installed===false&&
+      x.original_job_completed===false))
+     signed_verified_maintenance_repair_artifacts=result;
+   }catch{/* Never infer approval from an unavailable owner read. */}
+   // Re-project the same independent verifier evidence into the Universe
+   // through Reality's governed classifier, without modifying state on GET.
+   // Keep source-repair and business-original identities separate.
+   let governed_continuity_evidence_classification=
+    classifyRealityGovernedContinuityEvidence({
+     ownerId:session.user_id,shiftId:chosen?.shift_id||'',
+     originalGate:null,
+     artifactReadback:signed_verified_maintenance_repair_artifacts
+    });
+   if(chosen?.planned_end_at==='infinity'&&
+    ['RUNNING','QUEUED','AWAITING_EXACT_ORIGINAL_WORK'].includes(chosen.status)){
+    try{
+     const original=await shiftRpc(db,
+      'reality_read_same_original_postmaintenance_gate_v1',{
+       p_shift_id:chosen.shift_id
+      });
+     governed_continuity_evidence_classification=
+      classifyRealityGovernedContinuityEvidence({
+       ownerId:session.user_id,shiftId:chosen.shift_id,
+       originalGate:original,
+       artifactReadback:signed_verified_maintenance_repair_artifacts
+      });
+    }catch{/* Unverifiable receipt remains classified as unavailable. */}
+   }
    let requested_maintenance_draft=null;
    let requested_maintenance_draft_status='NO_VERIFIED_MAINTENANCE_CONTINUATION_READY';
    if(!active&&internal_maintenance_continuity?.status===
@@ -548,6 +605,8 @@ export default async function handler(req,res){
     riley_native_batch_readiness,riley_native_model_tool_proof,
     requested_shift_draft:draft,
     internal_maintenance_continuity,internal_maintenance_continuity_status,
+     signed_verified_maintenance_repair_artifacts,
+     governed_continuity_evidence_classification,
     requested_maintenance_draft,requested_maintenance_draft_status,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,

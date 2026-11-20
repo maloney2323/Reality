@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
+import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply,
+ reconcileReadOnlyOperationalAnswer}
  from '../src/reality-chat-proportional-readonly-v1.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const conv='9d5b6de1-ecf0-42d8-a86a-b9c5396a4139';
@@ -21,6 +22,10 @@ test('conversation and planning do not need a work approval or a new engine',()=
  for(const q of [
   message,
   'Can you tell me if our employees have a full week of work?',
+  'Can you build it? Or are you missing the capability to build right now?',
+  'Can you deploy the application?',
+  'Could you explain how to fix the shift handoff?',
+  'What is your governed opinion on whether this can be built?',
   'I think we need to fill the employee categories with useful work each week.',
   'Why does Reality keep asking for authorization to answer me?',
   'Show me the current job backlog and explain its readiness.'
@@ -30,13 +35,35 @@ test('actual action requests, explicit goal mutation and web research retain gov
  for(const q of [
   'Reality, build an employee dashboard now',
   'Please install the verified repair',
-  'Can you deploy the application?',
+  'Deploy the application now',
   'Go ahead and start the authorized shift',
   'Approve this exact installation',
   'Run the workers now'
  ])assert.equal(isProportionalReadOnlyChat({message:q}),false,q);
  assert.equal(isProportionalReadOnlyChat({message,goalCommand:'replace_goal'}),false);
  assert.equal(isProportionalReadOnlyChat({message,publicResearch:true}),false);
+});
+test('ability question gets a verified model response without assuming any build authority',async()=>{
+ const q='Can you build it? Or are you missing the capability to build right now?';
+ assert.equal(isProportionalReadOnlyChat({message:q}),true);
+ let invoked=0;
+ const response=await generateProportionalReadOnlyReply({...args,message:q,
+  runtime:async params=>{
+   invoked++;
+   assert.equal(params.message,q);
+   assert.equal(params.systemContext.governance_proportionality.mode,
+    'READ_ONLY_CONVERSATION');
+   assert.equal(params.systemContext.governance_proportionality.execution_authorized,false);
+   assert.equal(params.systemContext.governance_proportionality.installation_authorized,false);
+   assert.equal(params.publicResearchEnabled,false);
+   return {mode:'FAST',authority_granted:false,execution_authorized:false,
+    answer:'I can help prepare a tested candidate, but live install readiness is not proven.'};
+  }
+ });
+ assert.equal(invoked,1);
+ assert.match(response.answer,/not proven/);
+ assert.equal(response.execution_authorized,false);
+ assert.equal(response.installation_authorized,false);
 });
 test('existing Signal Cleaner and model receive exact saved question and owner history without worker write',async()=>{
  let calls=0;
@@ -62,6 +89,39 @@ test('existing Signal Cleaner and model receive exact saved question and owner h
  assert.equal(result.execution_authorized,false);
  assert.equal(result.installation_authorized,false);
  assert.equal(result.semantic_correctness_independently_verified,false);
+});
+test('authenticated Chat rejects fictional sandbox results and redundant shift authorization',async()=>{
+ const shift={owner_shift_authorization_recorded:true,
+  shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',
+  active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const cases=[
+  'Sandbox deployment simulation completed successfully. All independent acceptance tests passed.',
+  'Owner approval has been recorded here in chat. Please confirm installation again.',
+  'No authorized active shift exists; you must formally start an authorized shift.',
+  'I will now execute a sandbox deployment simulation and publish results.'
+ ];
+ for(const claim of cases){
+  const checked=reconcileReadOnlyOperationalAnswer({
+   answer:claim,ownerContext:{currently_authorized_shift:shift}
+  });
+  assert.equal(checked.disposition,'UNSUPPORTED_OPERATIONAL_CLAIM_REPLACED_WITH_OWNER_SCOPED_TRUTH');
+  assert.match(checked.answer,/existing owner-authorized shift/);
+  assert.match(checked.answer,/did not run a sandbox simulation/);
+  assert.match(checked.answer,/does not need a second start/);
+  assert.doesNotMatch(checked.answer,/simulation completed successfully/);
+ }
+ const valid=reconcileReadOnlyOperationalAnswer({answer:'The existing shift is still open; the test artifact has not been independently verified.',
+  ownerContext:{currently_authorized_shift:shift}});
+ assert.equal(valid.disposition,'CONVERSATIONAL_CLAIMS_UNCHANGED');
+ const result=await generateProportionalReadOnlyReply({...args,
+  ownerContext:{currently_authorized_shift:shift},
+  runtime:async()=>({mode:'FAST',authority_granted:false,
+   execution_authorized:false,answer:cases[0]})
+ });
+ assert.match(result.answer,/did not run a sandbox simulation/);
+ assert.equal(result.execution_authorized,false);
+ assert.equal(result.installation_authorized,false);
 });
 test('assistant cannot publish an action receipt or a forged authority through read-only cognition',async()=>{
  for(const bad of [
@@ -89,6 +149,31 @@ test('owner session and genuine saved message are prerequisites to any model cal
  }
  assert.equal(calls,0);
 });
+test('unavailable goal-state provider produces transparent non-durable advisory, not silent Chat failure',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const read=api.indexOf("stage='READ_ONLY_OWNER_GOAL_EPOCH'");
+ const model=api.indexOf("stage='READ_ONLY_MODEL_COGNITION'",read);
+ const transient=api.indexOf('if(!goalEpoch){',model);
+ const atomic=api.indexOf("stage='READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION'",transient);
+ assert.ok(read>=0&&model>read&&transient>model&&atomic>transient,
+  'temporary answer must use the existing model and remain before atomic publication');
+ const branch=api.slice(read,atomic);
+ assert.ok(branch.includes('if(Number(epochError?.status)!==503)throw epochError;'));
+ assert.match(branch,/readPrivateChatGoalPublicationEpoch/);
+ assert.match(branch,/current_answer_persisted:false/);
+ assert.match(branch,/goal_publication_atomicity:'UNAVAILABLE'/);
+ assert.match(branch,/transient_answer_only:true/);
+ assert.match(branch,/installation_authorized:false/);
+ assert.match(branch,/reply_recovery_requires_exact_saved_request:true/);
+ assert.doesNotMatch(branch,/queueOwnerGovernedBuild|approveOwnerInstall|executeOneRegisteredMaintenanceAction/);
+ assert.match(ui,/REALITY · TEMPORARY ANSWER · NOT SAVED · NO EXECUTION/);
+ assert.ok(ui.includes('if(transientAnswer){'));
+ assert.ok(ui.includes('No work was authorized. Retry this same saved reply'));
+ assert.ok(ui.includes('outcome.original_request_id===message.request_id'));
+ assert.ok(ui.includes('outcome.execution?.installation_authorized===false'));
+});
+
 test('read-only HTTP publication uses existing atomic owner-goal CAS and exact RLS, not a new action engine',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  const helper=readFileSync(new URL('../src/reality-chat-proportional-readonly-v1.js',import.meta.url),'utf8');

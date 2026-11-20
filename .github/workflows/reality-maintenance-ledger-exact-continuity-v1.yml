@@ -1,0 +1,30 @@
+name: Reality maintenance exact same-shift continuity
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261119224500_maintenance_ledger_exact_receipt_continuation_v1.sql'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'test/reality-maintenance-ledger-exact-continuity-v1.test.js'
+      - '.github/workflows/reality-maintenance-ledger-exact-continuity-v1.yml'
+  push:
+    branches:
+      - 'repair/maintenance-warrant-scope-handoff-20261119'
+    paths:
+      - 'supabase/migrations/20261119224500_maintenance_ledger_exact_receipt_continuation_v1.sql'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'test/reality-maintenance-ledger-exact-continuity-v1.test.js'
+permissions:
+  contents: read
+jobs:
+  maintenance-receipt-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Assert exact signed receipt-bound maintenance ledger
+        run: node --test test/reality-maintenance-ledger-exact-continuity-v1.test.js

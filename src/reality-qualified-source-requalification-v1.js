@@ -46,23 +46,42 @@ export async function requalifyOneChangedEmployeeSource({
   claim.production_changed!==false||
   claim.original_customer_job_completed!==false)
   fail('EXACT_FAILED_SOURCE_AND_WARRANT_REQUIRED');
- let source;
+ // An original PR308 incident changed between independently signed
+ // executor/reviewer reads. A single fresh GET is not sufficient proof that
+ // another source transition has stopped. Re-observe the exact same source
+ // twice before consuming the ONE permitted recovery attempt. Do not
+ // modify the previous failed receipt or claim independent settlement.
+ let first,source;
  try{
-  source=await readSource(claim.source_ref,{
-   fetchImpl,token:String(env.REALITY_GITHUB_TOKEN||'').trim()
-  });
+  const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
+  first=await readSource(claim.source_ref,{fetchImpl,token});
+  source=await readSource(claim.source_ref,{fetchImpl,token});
  }catch{
   return safe('CHANGED_SOURCE_REQUALIFICATION_PROVIDER_BLOCKED',{
    job_id:claim.job_id,
    next_action:'WATCHDOG_FENCES_SINGLEFLIGHT_FAILED_SOURCE_REQUALIFICATION'
   });
  }
- if(source?.source_ref!==claim.source_ref||
+ if(first?.source_ref!==claim.source_ref||
+  source?.source_ref!==claim.source_ref||
+  !SHA.test(first?.provider_proof_sha256||'')||
   !SHA.test(source.provider_proof_sha256||'')||
+  typeof first.source_title!=='string'||
   typeof source.source_title!=='string'||
+  !Number.isFinite(Date.parse(first.provider_updated_at||''))||
   !Number.isFinite(Date.parse(source.provider_updated_at||''))||
+  !Number.isFinite(Date.parse(first.checked_at||''))||
   !Number.isFinite(Date.parse(source.checked_at||'')))
   fail('CURRENT_SOURCE_READBACK_UNVERIFIED');
+ if(first.provider_proof_sha256!==source.provider_proof_sha256||
+    first.provider_proof_sha256!==claim.changed_review_sha256||
+    first.source_title!==source.source_title||
+    first.provider_updated_at!==source.provider_updated_at||
+    Date.parse(source.checked_at)<Date.parse(first.checked_at))
+  return safe('CHANGED_SOURCE_REQUALIFICATION_NOT_STABLE',{
+   job_id:claim.job_id,
+   next_action:'SOURCE_CHANGED_AGAIN_OR_TITLE_CHANGED_REVIEW_REQUIRED'
+  });
  const receipt=await call(db,'reality_record_changed_qualified_evidence_source_v1',{
   p_job_id:claim.job_id,
   p_claim_id:claim.claim_id,

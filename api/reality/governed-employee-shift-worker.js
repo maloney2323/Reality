@@ -5,7 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
-import {independentlyReviewOneStagedMaintenanceRegression}
+import {independentlyReviewOneStagedMaintenanceRegression,
+ independentlyReviewOneClaimBoundMaintenanceCiDiagnostic}
  from '../../src/reality-signed-maintenance-external-review-v1.js';
 import {attestOneSignedMaintenanceCiSourceEpoch}
  from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
@@ -123,6 +124,24 @@ import {advanceOneSignedInternalMaintenanceJob}
  from '../../src/reality-signed-internal-maintenance-worker-v1.js';
 import {reproduceOneSignedMaintenanceFailureBaseline}
  from '../../src/reality-signed-maintenance-failure-baseline-v1.js';
+import {executeOneRegisteredMaintenanceAction}
+ from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
+import {executeOneRegisteredMaintenanceCiWake}
+ from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
+import {continueSignedMaintenanceCaseCiVerification}
+ from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
+import {reconcileSignedVerifiedMaintenanceArtifact}
+ from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
+import {isSignedMaintenanceOriginalLineageMissing}
+ from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
+import {classifyRealityGovernedContinuityEvidence}
+ from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
+import {advanceSignedExistingMaintenanceRepairHandoff}
+ from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
+import {generateOneSignedMaintenanceRepairCandidate}
+ from '../../src/reality-signed-maintenance-repair-model-candidate-v1.js';
+import {independentlyReviewSignedMaintenanceTarget}
+ from '../../src/reality-signed-maintenance-candidate-target-review-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
@@ -389,6 +408,33 @@ export default async function handler(req,res){
      independent_frozen_ci_red_verified:false,
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
+  // Governed maintenance handoff classifier. A source-epoch receipt is a
+  // prerequisite for routing, never proof that CI ran or repair succeeded.
+  // The actual executor must separately claim and verify this exact scope.
+  workerStage='SIGNED_MAINTENANCE_EPOCH_HANDOFF_CLASSIFICATION';
+  const maintenanceEpochHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   maintenanceCiSourceEpoch?.source_epoch_receipt_sha256&&
+   /^sha256:[a-f0-9]{64}$/.test(maintenanceCiSourceEpoch.source_epoch_receipt_sha256)&&
+   maintenanceCiSourceEpoch?.installation_authorized===false&&
+   maintenanceCiSourceEpoch?.production_changed===false?
+    Object.freeze({
+     status:maintenanceCiSourceEpoch.epoch_status===
+      'SOURCE_EPOCH_ATTESTED_EXECUTABLE_RED_REQUIRED'?
+       'MAINTENANCE_CI_RED_HANDOFF_REQUIRES_INDEPENDENT_EXECUTOR':
+      maintenanceCiSourceEpoch.epoch_status===
+      'SOURCE_EPOCH_CHANGED_REQUALIFICATION_REQUIRED'?
+       'MAINTENANCE_SOURCE_REQUALIFICATION_HANDOFF_REQUIRES_EXECUTOR':
+       'MAINTENANCE_EPOCH_HANDOFF_NOT_QUALIFIED',
+     source_epoch_receipt_sha256:maintenanceCiSourceEpoch.source_epoch_receipt_sha256,
+     executable_frozen_ci_red_verified:false,
+     handoff_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    }):
+    {status:'NO_VERIFIED_MAINTENANCE_EPOCH_HANDOFF',
+     executable_frozen_ci_red_verified:false,handoff_executed:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
   // Independent Quinn review of staged historical GitHub evidence under the
   // same signed maintenance warrant. Historical regression != case-specific RED.
   workerStage='SIGNED_INDEPENDENT_MAINTENANCE_EXTERNAL_EVIDENCE_REVIEW';
@@ -419,6 +465,7 @@ export default async function handler(req,res){
      if(![
       'EXISTING_ORIGINAL_HAS_INDEPENDENT_FINAL_RECEIPT',
       'EXISTING_ORIGINAL_NOT_AUTHORIZED_BY_MAINTENANCE_SHIFT',
+      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE',
       'EXISTING_ORIGINAL_BLOCKED_REQUALIFICATION_REQUIRED',
       'EXISTING_ORIGINAL_GOVERNED_EXECUTION_REQUIRES_FRESH_ACCEPTANCE',
       'NO_EXISTING_SAME_ORIGINAL_FOR_SHIFT'
@@ -440,6 +487,269 @@ export default async function handler(req,res){
      original_job_completed:false,
      independent_final_receipt_verified:false,
      installation_authorized:false,production_changed:false};
+  // Durable next-wake routing: the signed source-epoch is persisted, so
+  // a later wake must use the database readback, not replay the attestation.
+  // This is a classification receipt, NOT a claim that an executor ran.
+  workerStage='DURABLE_MAINTENANCE_HANDOFF_READBACK';
+  const durableMaintenanceHandoff=
+   sameOriginalPostmaintenanceGate?.status===
+     'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     sameOriginalPostmaintenanceGate.maintenance_source_epoch_receipt_sha256||'')&&
+   sameOriginalPostmaintenanceGate.original_job_completed===false&&
+   sameOriginalPostmaintenanceGate.installation_authorized===false&&
+   sameOriginalPostmaintenanceGate.production_changed===false&&
+   ['RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
+    'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'].includes(
+     sameOriginalPostmaintenanceGate.next_action)?
+    Object.freeze({
+     status:sameOriginalPostmaintenanceGate.next_action,
+     original_work_id:sameOriginalPostmaintenanceGate.original_work_id,
+     source_ref:sameOriginalPostmaintenanceGate.source_ref,
+     source_epoch_receipt_sha256:
+      sameOriginalPostmaintenanceGate.maintenance_source_epoch_receipt_sha256,
+     handoff_executed:false,independent_frozen_ci_red_verified:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    }):
+    {status:'NO_DURABLE_AUTHORIZED_MAINTENANCE_HANDOFF',
+     handoff_executed:false,independent_frozen_ci_red_verified:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
+  // Registered execution, not an empty claim-to-failure bridge:
+  // the service-role database first gates WHICH action has an executable
+  // handler. Unsupported frozen-CI work is never leased or charged retries.
+  // The currently registered action independently requalifies changed
+  // source ONLY; a full repair still needs real frozen CI and install approval.
+  workerStage='SIGNED_MAINTENANCE_REGISTERED_EXECUTOR_HANDOFF';
+  const signedMaintenanceExecutorHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
+   /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')?
+    await executeOneRegisteredMaintenanceAction({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_EXECUTOR_REQUALIFICATION_UNVERIFIED',
+     error_code:String(error?.message||'EXECUTOR_UNVERIFIED').slice(0,130),
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'SIGNED_MAINTENANCE_EXECUTOR_NOT_CONNECTED_OR_NO_AUTHORIZED_WAKE',
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // A real independent CI runner exists for the OTHER exact action.
+  // Selection occurs only if the source executor returned an unclaimed
+  // 'no registered handler' result. Reuse the original signed worker run.
+  workerStage='SIGNED_MAINTENANCE_CASE_CI_EXECUTOR';
+  const signedMaintenanceCaseCi=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
+   (signedMaintenanceExecutorHandoff.status===
+     'NO_UNCLAIMED_AUTHORIZED_MAINTENANCE_EXECUTOR'||
+    (signedMaintenanceExecutorHandoff.status===
+     'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'&&
+     signedMaintenanceExecutorHandoff.next_action===
+      'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'))?
+    await executeOneRegisteredMaintenanceCiWake({
+      db,env:process.env,shiftId:wakeReceipt.shift_id,
+      workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_CASE_CI_EXECUTOR_UNVERIFIED',
+     error_code:String(error?.message||'SIGNED_CI_UNVERIFIED').slice(0,115),
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_AUTHORIZED_CASE_CI_RUNNER_WAKE',
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  const signedMaintenanceResult=
+   signedMaintenanceCaseCi.status==='NO_AUTHORIZED_CASE_CI_RUNNER_WAKE'?
+    signedMaintenanceExecutorHandoff:signedMaintenanceCaseCi;
+  const signedMaintenanceExecutorClaim=
+   signedMaintenanceResult.claim||{
+    status:signedMaintenanceResult.status,
+    handoff_executed:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false};
+  const signedMaintenanceExecutorOutcome=
+   signedMaintenanceResult.outcome||{
+    status:signedMaintenanceResult.status,
+    repair_executed:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false};
+  // A distinct signed worker checks the real provider's GitHub Actions job
+  // AND artifact after claim-bound CI dispatch. This independently verifies
+  // diagnostic execution, NOT the case-specific frozen failure or a repair.
+  workerStage='SIGNED_MAINTENANCE_CASE_CI_INDEPENDENT_DIAGNOSTIC_REVIEW';
+  const signedMaintenanceCaseCiIndependentReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')?
+    await independentlyReviewOneClaimBoundMaintenanceCiDiagnostic({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEW_UNVERIFIED',
+     error_code:String(error?.message||'INDEPENDENT_REVIEW_UNVERIFIED')
+      .slice(0,145),
+     independent_diagnostic_verified:false,
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_CI_DIAGNOSTIC_REVIEW_WAKE',
+     independent_diagnostic_verified:false,
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false};
+  // The existing signed executor now preserves a source-bound repair
+  // obligation after real independent diagnostics. Admission is not RED,
+  // code generation, installation, or an original job completion.
+  workerStage='SIGNED_MAINTENANCE_DIAGNOSTIC_TO_REPAIR_HANDOFF';
+  const signedMaintenanceRepairHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceSignedExistingMaintenanceRepairHandoff({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_REPAIR_HANDOFF_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,125),
+     work_order_created:false,frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_AUTHORIZED_MAINTENANCE_REPAIR_HANDOFF_WAKE',
+     work_order_created:false,frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false};
+  // A DISTINCT signed worker checks a saved model candidate against the
+  // pinned module graph of this actual executor. It cannot approve the patch,
+  // call it an independently reproduced RED, install, or settle the original.
+  workerStage='SIGNED_MAINTENANCE_MODEL_CANDIDATE_INDEPENDENT_TARGET_REVIEW';
+  const signedMaintenanceCandidateTargetReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReviewSignedMaintenanceTarget({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_CANDIDATE_TARGET_REVIEW_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,120),
+     independent_target_review_recorded:false,
+     candidate_is_verified_repair:false,
+     independent_frozen_red_verified:false,
+     independent_ci_verified:false,repair_executed:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_AUTHORIZED_SIGNED_CANDIDATE_TARGET_REVIEW_WAKE',
+     candidate_is_verified_repair:false,
+     independent_frozen_red_verified:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
+  // One source-pinned LLM candidate for the existing warrant/maintenance
+  // work order, never an installation, frozen CI verdict, or final receipt.
+  workerStage='SIGNED_MAINTENANCE_REPAIR_MODEL_SOURCE_CANDIDATE';
+  const signedMaintenanceRepairModelCandidate=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await generateOneSignedMaintenanceRepairCandidate({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_REPAIR_MODEL_STAGE_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,120),
+     model_generated:false,independent_ci_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_AUTHORIZED_MAINTENANCE_MODEL_WORKER_WAKE',
+     model_generated:false,independent_ci_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false};
+  // Consume actual pinned GitHub RED/GREEN evidence under the same owner
+  // warrant. It is a durable CI proof, not approval to install or a final
+  // original-job completion. The earlier source-bound trigger is reused.
+  workerStage='SIGNED_MAINTENANCE_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION';
+  const signedMaintenanceCaseCiReconciliation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await continueSignedMaintenanceCaseCiVerification({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION_UNVERIFIED',
+     error_code:String(error?.message||'').slice(0,100),
+     case_specific_frozen_red_attested:false,
+     code_regression_green_verified:false,
+     repair_installed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_CASE_CI_WAKE',
+     case_specific_frozen_red_attested:false,
+     code_regression_green_verified:false,
+     repair_installed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false};
+  // The EXISTING Reality controller independently reconciles a GitHub
+  // source repair artifact into the same owner-shift ledger. Never install
+  // or approve on the model's behalf; the owner decision remains separate.
+  workerStage='SIGNED_MAINTENANCE_VERIFIED_REPAIR_ARTIFACT_RECONCILIATION';
+  const signedMaintenanceArtifactHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await reconcileSignedVerifiedMaintenanceArtifact({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'EXACT_SIGNED_REPAIR_ARTIFACT_RECONCILIATION_UNVERIFIED',
+     verified_repair_artifact:false,installation_authorized:false,
+     repair_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_ARTIFACT_WORKER_WAKE',
+     verified_repair_artifact:false,installation_authorized:false,
+     repair_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false};
+  // Independent verifier facts -> Reality-governed classification ->
+  // existing Continuity Ledger. A classification cannot create execution
+  // authority, install code, reopen an original, or mutate the Universe.
+  // Crucially, read the DURABLE artifact on subsequent signed worker wakes,
+  // not only the one-time artifact acceptance response.
+  workerStage='GOVERNED_CONTINUITY_VERIFIED_EVIDENCE_CLASSIFICATION';
+  let signedMaintenanceArtifactLedger={
+   status:'OWNER_MAINTENANCE_ARTIFACT_READBACK_UNVERIFIED',
+   owner_id:sameOriginalPostmaintenanceGate?.owner_id||null,
+   count:0,items:[],installation_authorized:false,
+   production_changed:false
+  };
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   sameOriginalPostmaintenanceGate?.status===
+    'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+   sameOriginalPostmaintenanceGate?.shift_id===wakeReceipt.shift_id&&
+   /^[a-f0-9-]{36}$/i.test(
+    sameOriginalPostmaintenanceGate?.owner_id||'')){
+   try{
+    const read=await shiftRpc(db,
+     'reality_read_owner_maintenance_verified_artifacts_v1',{
+      p_owner_id:sameOriginalPostmaintenanceGate.owner_id
+     });
+    if(read?.status==='OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY'&&
+     read.owner_id===sameOriginalPostmaintenanceGate.owner_id&&
+     read.installation_authorized===false&&
+     read.production_changed===false&&
+     Array.isArray(read.items)&&
+     Number.isSafeInteger(read.count)&&read.count===read.items.length&&
+     read.count>=0&&read.count<=4)
+      signedMaintenanceArtifactLedger=read;
+   }catch{/* Failed independent read cannot grant work authority. */}
+  }
+  const governedContinuityEvidenceClassification=
+   classifyRealityGovernedContinuityEvidence({
+    ownerId:sameOriginalPostmaintenanceGate?.owner_id,
+    shiftId:wakeReceipt.shift_id,
+    originalGate:sameOriginalPostmaintenanceGate,
+    artifactReadback:signedMaintenanceArtifactLedger
+   });
+  // A claimed lease cannot be reported as executed or verified.
+  // On a later wake the lease expires and can be reclaimed (max three attempts).
   // The same evidence job is allowed ONE bounded requalification when
   // its original Github source changed between two signed worker runs.
   // This is not a code repair. The first failure receipt remains immutable.
@@ -1750,8 +2060,51 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.original_job_completed===false&&
     sameOriginalPostmaintenanceGate.independent_final_receipt_verified===false&&
     sameOriginalPostmaintenanceGate.case_specific_maintenance_ci_red_attested===false;
+   // A scoped internal-maintenance warrant is still valid even when its
+   // case-specific original RED has not yet been proven. Expose that truthful
+   // next-action in the signed worker pulse instead of instructing the owner
+   // to authorize the already-authorized shift again. This is read-only:
+   // worker diagnostics and a pulse never manufacture a repair receipt.
+   // The owner-facing work controller must distinguish investigation
+   // evidence from an actually admitted business original. Do not keep
+   // requesting a code RED for a UI draft with NO canonical owner job.
+   // This remains under the exact existing signed maintenance warrant.
+   const signedMaintenanceCanonicalBusinessLineageMissing=
+    isSignedMaintenanceOriginalLineageMissing(sameOriginalPostmaintenanceGate);
+   const signedMaintenanceAuthorizedCaseRedOutstanding=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+    sameOriginalPostmaintenanceGate.next_action===
+      'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.independent_final_receipt_verified===false&&
+    sameOriginalPostmaintenanceGate.installation_authorized===false&&
+    sameOriginalPostmaintenanceGate.production_changed===false;
+   const signedMaintenanceAuthorizedSourceRequalificationPending=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+    sameOriginalPostmaintenanceGate.next_action===
+      'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.installation_authorized===false&&
+    sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    governedContinuityEvidenceClassification?.status===
+     'GOVERNED_CONTINUITY_EVIDENCE_SEPARATED_AND_ROUTED'&&
+    governedContinuityEvidenceClassification.lanes.some(l=>
+     l.lane_kind==='INTERNAL_CAPABILITY_REPAIR')&&
+    governedContinuityEvidenceClassification.lanes.some(l=>
+     l.lane_kind==='CANONICAL_BUSINESS_ORIGINAL')?
+    'SIGNED_MAINTENANCE_REPAIR_AND_ORIGINAL_LINEAGE_SEPARATELY_ROUTED':
+    signedMaintenanceArtifactHandoff?.verified_repair_artifact===true?
+    'SIGNED_MAINTENANCE_EXACT_REPAIR_ARTIFACT_REVIEW_READY':
+    signedMaintenanceCanonicalBusinessLineageMissing?
+    'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
+    signedMaintenanceAuthorizedCaseRedOutstanding?
+    'SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED':
+    signedMaintenanceAuthorizedSourceRequalificationPending?
+    'SIGNED_MAINTENANCE_AUTHORIZED_SOURCE_REQUALIFICATION_PENDING':
     signedReviewStillNeedsOriginalAuthorization?
     'SIGNED_EVIDENCE_REVIEWED_ORIGINAL_WORK_BLOCKED_BY_WARRANT':
     generalOriginalRecoveryPublication?.source_installed===true?
@@ -1845,8 +2198,21 @@ export default async function handler(req,res){
     signed_maintenance_failure_baseline:maintenanceFailureBaseline,
     signed_maintenance_ci_preflight:signedMaintenanceCiPreflight,
     signed_maintenance_ci_source_epoch:maintenanceCiSourceEpoch,
+    signed_maintenance_epoch_handoff:maintenanceEpochHandoff,
     signed_external_maintenance_review:signedExternalMaintenanceReview,
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
+    durable_maintenance_handoff:durableMaintenanceHandoff,
+    signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
+    signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
+    signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
+    signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
+    signed_maintenance_sourcecase_ci_reconciliation:signedMaintenanceCaseCiReconciliation,
+    signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
+    signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
+    signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
+    signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
+    signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
+    governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,

@@ -7341,6 +7341,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      retry.disabled=true;
      explanation.textContent='Retrying the exact saved request ID; no additional user message or job authorization…';
      try{
+      notice.querySelector('.reality-chat-transient-answer')?.remove();
       const recovered=await fetch('/api/reality/personal-chat',{
        method:'POST',credentials:'same-origin',cache:'no-store',
        signal:AbortSignal.timeout(95000),
@@ -7349,6 +7350,26 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
         request_id:message.request_id,message:message.text})
       });
       const outcome=await recovered.json().catch(()=>null);
+      // A signed-in, source-backed temporary answer can be shown even when
+      // the exact goal-CAS publication provider is down. Never display it as
+      // a saved reply or an approval; keep the same recovery control active.
+      if(recovered.ok&&outcome?.ok===true&&
+         outcome.transient_answer_only===true&&
+         outcome.original_request_id===message.request_id&&
+         outcome.read_only_conversation===true&&
+         outcome.continuity?.current_answer_persisted===false&&
+         outcome.reliability?.transient_answer_not_a_receipt===true&&
+         outcome.execution?.external_actions_authorized===false&&
+         outcome.execution?.installation_authorized===false&&
+         typeof outcome.answer==='string'&&outcome.answer.trim()){
+       explanation.textContent='Reality answered temporarily. The reply was NOT saved or independently verified against the current goal epoch. No work was authorized. Retry this same saved reply when the provider recovers.';
+       const temporary=document.createElement('div');
+       temporary.className='reality-chat-transient-answer';
+       temporary.textContent='REALITY · TEMPORARY ANSWER · NOT SAVED: '+outcome.answer;
+       notice.insertBefore(temporary,retry);
+       retry.disabled=false;
+       return;
+      }
       if(!recovered.ok||outcome?.ok!==true||
          outcome.continuity?.current_answer_persisted!==true){
        const code=String(outcome?.error||'CHAT_RESPONSE_UNAVAILABLE');
@@ -7584,7 +7605,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
        /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
        /work:[a-f0-9]{32}/i.test(value)),
     // Presentation hint only: don't poll a worker inbox on normal Chat.
-    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install|create|generate|investigate|assign|prepare|research|deploy)\b/i.test(value)}
+    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install|create|generate|investigate|assign|prepare|research|deploy)\b/i.test(value)||
+      /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|finish)\s+.{0,140}(?:shift|existing|original)/i.test(value)}
   }));
   el('privateSend').disabled=true;
   let intakeVerified=false,responseFailureStage=null;
@@ -7708,19 +7730,39 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     const code=String(data?.error||'CHAT_RESPONSE_UNAVAILABLE');
     throw Error(/^[A-Z][A-Z0-9_]{3,119}$/.test(code)?code:'CHAT_RESPONSE_UNAVAILABLE');
    }
+   const transientAnswer=data.transient_answer_only===true&&
+    data.read_only_conversation===true&&
+    data.original_request_id===sentRequest&&
+    data.continuity?.current_answer_persisted===false&&
+    data.continuity?.goal_publication_atomicity==='UNAVAILABLE'&&
+    data.reliability?.chat_lane==='PROPORTIONAL_READ_ONLY'&&
+    data.reliability?.transient_answer_not_a_receipt===true&&
+    data.execution?.external_actions_authorized===false&&
+    data.execution?.installation_authorized===false;
    if(typeof data.answer!=='string'||!data.answer.trim()||
-      data.continuity?.current_answer_persisted!==true)
+      (!transientAnswer&&data.continuity?.current_answer_persisted!==true))
     throw Error('CHAT_ANSWER_DURABILITY_NOT_VERIFIED');
    el('privateGoalCommand').value='';
    if(pendingBubble.isConnected)
-    pendingBubble.querySelector('.label').textContent='YOU · RETURNED WITH VERIFIED ANSWER';
+    pendingBubble.querySelector('.label').textContent=transientAnswer?
+     'YOU · SAVED · ANSWER NOT YET PERSISTED':
+     'YOU · RETURNED WITH VERIFIED ANSWER';
    // The server independently verified its saved answer before returning 200.
    // Display it now; the GET readback below replaces temporary DOM entries
    // with the exact authenticated history when available.
    if(el('privateTranscript').contains(pendingBubble)){
     const answerBubble=bubble('assistant',data.answer);
-    answerBubble.querySelector('.label').textContent='REALITY · VERIFIED SAVED ANSWER';
+    answerBubble.querySelector('.label').textContent=transientAnswer?
+     'REALITY · TEMPORARY ANSWER · NOT SAVED · NO EXECUTION':
+     'REALITY · VERIFIED SAVED ANSWER';
     el('privateTranscript').scrollTop=el('privateTranscript').scrollHeight;
+   }
+   if(transientAnswer){
+    // Do not reload history here: the temporary answer is intentionally not
+    // persisted, and a reload would silently erase it. The original user turn
+    // remains saved and is eligible for the existing exact-ID recovery control.
+    status('Reality answered, but its goal-state provider could not verify a saved reply. This is temporary advice, not an approval or work receipt. Use Retry this saved reply under the original message after recovery.');
+    return;
    }
    void Promise.allSettled([loadSaved(),loadConversations()]).then(results=>{
     if(results.some(x=>x.status==='rejected'))
@@ -7952,6 +7994,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  <script defer src="/reality-chat-proactive-operational-v1.js"></script>
 <script defer src="/reality-chat-operational-incident-briefing-v1.js"></script>
 <script defer src="/reality-chat-direct-work-handoff-v1.js"></script>
+<script defer src="/reality-chat-existing-shift-status-v1.js"></script>
 <script defer src="/reality-chat-employee-shift-card-v1.js"></script>
 <script defer src="/reality-chat-approved-assignments-v1.js"></script>
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
