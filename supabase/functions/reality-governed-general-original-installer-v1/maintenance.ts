@@ -10,8 +10,8 @@ const HASH=/^sha256:[a-f0-9]{64}$/;
 const BRANCH='reality/chat-direct-work-handoff-20261115';
 const bad=(x:string):never=>{throw Error('SIGNED_MAINTENANCE_INSTALL_'+x)};
 const safe=(status:string,rest:Record<string,unknown>={},http=200)=>
- new Response(JSON.stringify({ok:http===200,status,...rest,
-  source_installed:false,original_job_completed:false,production_changed:false,
+ new Response(JSON.stringify({ok:http===200,status,
+  source_installed:false,...rest,original_job_completed:false,production_changed:false,
   new_shift_started:false}),{status:http,headers:{'content-type':'application/json',
   'cache-control':'no-store'}});
 async function rpc(base:string,key:string,name:string,args:Record<string,unknown>={}){
