@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readPrivateChatRequest,readLatestPrivateChatUserTurn} from '../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChat,readPrivateChatRequest,readLatestPrivateChatUserTurn} from '../src/reality-private-chat-store-v0.1.js';
 const user='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const conversationId='a8c800f6-6848-492c-b6aa-e8deca0db3fe';
 const requestId='3a2978fc-3188-44ec-a75c-a51e201a8e5a';
@@ -124,4 +124,37 @@ test('latest user readback rejects another owner and a spoofed row role',async()
    fetchImpl:async()=>({ok:true,json:async()=>[invalid]})
   }),/CHAT_LATEST_USER_READBACK_INVALID/);
  }
+});
+
+test('ordinary Chat defaults to bounded recent context, not 240-message transcript replay',async()=>{
+ let observedUrl,observedSignal;
+ const result=await readPrivateChat(session,conversationId,{
+  fetchImpl:async(url,options)=>{
+   observedUrl=url;observedSignal=options.signal;
+   return {ok:true,json:async()=>[]};
+  }
+ });
+ assert.match(observedUrl,/limit=33(?:$|&)/);
+ assert.ok(observedSignal instanceof AbortSignal);
+ assert.equal(result.messages.length,0);
+ assert.equal(result.older_missing,false);
+});
+
+test('storage transport failure is bounded and never claims an unsaved turn is saved',async()=>{
+ await assert.rejects(()=>readPrivateChatRequest(session,args,{
+  fetchImpl:async(_url,options)=>{
+   assert.ok(options.signal instanceof AbortSignal);
+   throw Error('provider network timeout');
+  }
+ }),e=>e.message==='CHAT_STORAGE_UNAVAILABLE'&&e.status===503);
+});
+
+test('Chat uses exact saved-request and answer-publication readbacks, not transcript scans',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.match(api,/const existing=\(await readPrivateChatRequest\(session,\{conversationId,requestId\}\)\)\.messages;/);
+ assert.match(api,/const check=await readPrivateChatRequest\(session,\{conversationId,requestId\}\);/);
+ assert.doesNotMatch(api,/const existing=history\.messages\.filter/);
+ assert.doesNotMatch(api,/const check=await readPrivateChat\(session,conversationId\)/);
+ assert.match(api,/coverage:check\.status/);
+ assert.match(api,/publishPrivateAssistantAtomically\(session/);
 });
