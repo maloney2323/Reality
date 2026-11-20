@@ -1896,8 +1896,34 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.original_job_completed===false&&
     sameOriginalPostmaintenanceGate.independent_final_receipt_verified===false&&
     sameOriginalPostmaintenanceGate.case_specific_maintenance_ci_red_attested===false;
+   // A scoped internal-maintenance warrant is still valid even when its
+   // case-specific original RED has not yet been proven. Expose that truthful
+   // next-action in the signed worker pulse instead of instructing the owner
+   // to authorize the already-authorized shift again. This is read-only:
+   // worker diagnostics and a pulse never manufacture a repair receipt.
+   const signedMaintenanceAuthorizedCaseRedOutstanding=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+    sameOriginalPostmaintenanceGate.next_action===
+      'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.independent_final_receipt_verified===false&&
+    sameOriginalPostmaintenanceGate.installation_authorized===false&&
+    sameOriginalPostmaintenanceGate.production_changed===false;
+   const signedMaintenanceAuthorizedSourceRequalificationPending=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+    sameOriginalPostmaintenanceGate.next_action===
+      'REQUALIFY_CHANGED_MAINTENANCE_SOURCE_BEFORE_CI'&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.installation_authorized===false&&
+    sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    signedMaintenanceAuthorizedCaseRedOutstanding?
+    'SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED':
+    signedMaintenanceAuthorizedSourceRequalificationPending?
+    'SIGNED_MAINTENANCE_AUTHORIZED_SOURCE_REQUALIFICATION_PENDING':
     signedReviewStillNeedsOriginalAuthorization?
     'SIGNED_EVIDENCE_REVIEWED_ORIGINAL_WORK_BLOCKED_BY_WARRANT':
     generalOriginalRecoveryPublication?.source_installed===true?
