@@ -14,6 +14,7 @@
  const URL='/api/reality/personal-governed-employee-shift';
  const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
  const SHA=/^sha256:[0-9a-f]{64}$/;
+ const GIT=/^[0-9a-f]{40}$/;
  const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9][0-9]*$/;
  const KINDS=new Set(['EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
   'QUALIFIED_EVIDENCE_JOB_BLOCKED']);
@@ -254,7 +255,14 @@
     SHA.test(a?.case_ci_receipt_sha256||'')&&
     Number.isSafeInteger(a?.github_run_id)&&a.github_run_id>10000&&
     Number.isSafeInteger(a?.github_artifact_id)&&a.github_artifact_id>10000&&
-    a.owner_approval_ready===false&&a.install_target_verified===false&&
+    a.owner_approval_ready===false&&
+    ((a.install_target_verified===false&&a.target_review_receipt_sha256===null)||
+     (a.install_target_verified===true&&
+      SHA.test(a.target_review_receipt_sha256||'')&&
+      a.target_review_branch==='reality/chat-direct-work-handoff-20261115'&&
+      GIT.test(a.target_review_head_sha||'')&&
+      GIT.test(a.historical_source_blob_sha||'')&&
+      a.target_review_existing_blob_sha===a.historical_source_blob_sha))&&
     a.installation_authorized===false&&a.repair_installed===false&&
     a.original_job_completed===false))
     verifiedArtifacts=artifacts.items;
@@ -360,7 +368,9 @@
    hintLabel.textContent+=' Reality independently recorded '+
     scope.verifiedArtifacts.length+' exact tested repair artifact'+
     (scope.verifiedArtifacts.length===1?'':'s')+
-    '. Isolated installation review remains required; no approval was granted.';
+    '. '+scope.verifiedArtifacts.filter(a=>a.install_target_verified===true).length+
+    ' have a separate independent installation-target receipt. '+
+    'Exact owner approval and original-resumption proof are still required. No installation was authorized.';
   dialogueJobs.replaceChildren();
   for(const item of scope.jobs){
    dialogueJobs.append(make('p','',
