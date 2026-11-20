@@ -6,6 +6,8 @@ on:
       - 'src/reality-chat-proportional-readonly-v1.js'
       - 'test/reality-chat-proportional-readonly-v1.test.js'
       - 'src/reality-saved-chat-work-adapter-v1.js'
+      - 'supabase/migrations/20261120022000_owner_chat_existing_shift_wake_adapter_v1.sql'
+      - 'test/reality-chat-existing-shift-adapter-v1.test.js'
       - 'api/reality/personal-chat-work.js'
       - 'test/reality-chat-work-intent-v1.test.js'
       - 'test/reality-saved-chat-work-adapter-v1.test.js'
@@ -58,6 +60,7 @@ jobs:
           node --test test/reality-chat-work-intent-v1.test.js
           node --test test/reality-chat-proportional-readonly-v1.test.js
           node --test test/reality-saved-chat-work-adapter-v1.test.js
+          node --test test/reality-chat-existing-shift-adapter-v1.test.js
           node --test test/reality-chat-scoped-engineering-continuation-v1.test.js
           node --test test/reality-chat-new-development-v1.test.js
           node --test test/reality-chat-direct-work-handoff-v1.test.js
