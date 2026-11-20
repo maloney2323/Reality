@@ -354,7 +354,9 @@
  function render(scope){
   approvedScope=scope;
   installApprove.hidden=!scope.exactInstallCard;
-  installApprove.disabled=!scope.exactInstallCard||installAuthorizing||installUncertain||loading||authorizing;
+  // Readback renders while loading=true; a verified approval must be
+  // enabled AFTER render, while the click handler itself guards loading.
+  installApprove.disabled=!scope.exactInstallCard||installAuthorizing||installUncertain||authorizing;
   installDetails.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   installDetails.textContent=scope.exactInstallCard?
    'One-use exact approval · PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
