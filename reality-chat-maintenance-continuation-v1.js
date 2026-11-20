@@ -656,22 +656,20 @@
  });
  installApprove.addEventListener('click',async()=>{
   // No model, assistant message or ordinary Chat reply can press this.
-  // Each click re-reads the owner's exact signed artifact before one POST.
+  // The server independently re-reads and compares the exact current
+  // owner-scoped artifact before accepting a one-use approval. Do not insert
+  // an expensive/unreliable duplicate full-shift GET between an explicit
+  // owner click and its one authorized POST.
   if(!signedIn()||loading||authorizing||installAuthorizing||
    installUncertain||installApprove.disabled||!approvedScope?.exactInstallCard)
    return;
   const prior=approvedScope.exactInstallCard;
   installAuthorizing=true;installApprove.disabled=true;installApproveInInbox.disabled=true;reload.disabled=true;
   try{
-   const fresh=await read();
-   const c=fresh.exactInstallCard;
-   if(!c||c.shift_id!==prior.shift_id||
-    c.maintenance_id!==prior.maintenance_id||
-    c.candidate_commit_sha!==prior.candidate_commit_sha||
-    c.target_head_sha!==prior.target_head_sha||
-    c.target_review_receipt_sha256!==prior.target_review_receipt_sha256||
-    c.artifact_receipt_sha256!==prior.artifact_receipt_sha256)
-    fail('EXACT_INSTALL_ARTIFACT_CHANGED_REFRESH_BEFORE_APPROVAL');
+   // This is the exact receipt the owner reviewed; never replace it with
+   // model content. The service-only approval endpoint MUST recheck it
+   // against the live ledger before recording any installation authority.
+   const c=prior;
    if(typeof crypto?.randomUUID!=='function')
     fail('SECURE_REQUEST_ID_UNAVAILABLE');
    feedback.textContent='Recording one exact preview installation approval. The existing shift will continue automatically.';
