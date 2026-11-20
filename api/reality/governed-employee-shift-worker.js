@@ -754,7 +754,8 @@ export default async function handler(req,res){
   // bytes, GitHub acceptance and Vercel status BEFORE maintenance closure.
   workerStage='EXACT_SIGNED_MAINTENANCE_INDEPENDENT_POSTINSTALL_VERIFICATION';
   const signedMaintenanceIndependentPostinstall=
-   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   signedMaintenanceApprovedInstall.source_installed!==true?
     await independentlyReconcileSignedMaintenanceInstall({
      db,env:process.env,fetchImpl:fetch
     }).catch(()=>({
