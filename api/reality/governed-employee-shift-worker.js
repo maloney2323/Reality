@@ -800,6 +800,30 @@ export default async function handler(req,res){
     {status:'NO_SIGNED_MAINTENANCE_POSTINSTALL_WAKE',
      repair_verified:false,original_job_completed:false,
      production_changed:false,new_shift_started:false};
+  // After independent acceptance the SAME signed worker carries the
+  // postinstall receipt all the way through the canonical Universe ledger
+  // and back to the next unfinished original-work obligation. If the
+  // independent verifier has not accepted it, do NOT synthesize settlement.
+  workerStage='SIGNED_MAINTENANCE_POSTINSTALL_UNIVERSE_RECONCILIATION';
+  const signedMaintenanceUniverseReconciliation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   signedMaintenanceIndependentPostinstall.repair_verified===true?
+    await enforceSignedMaintenanceReceiptContinuity({
+     db,env:process.env,originalGate:sameOriginalPostmaintenanceGate,
+     shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+    }).catch(error=>({
+     status:'INDEPENDENT_POSTINSTALL_UNIVERSE_CONTINUITY_UNVERIFIED',
+     failure_code:/^SIGNED_CONTINUITY_[A-Z0-9_]+$/.test(
+      String(error?.message||''))?String(error.message):
+      'INDEPENDENT_POSTINSTALL_UNIVERSE_PROVIDER_UNAVAILABLE',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     original_job_completed:false,production_changed:false
+    })):
+    {status:'NO_NEW_INDEPENDENT_POSTINSTALL_SETTLEMENT_RECEIPT',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     original_job_completed:false,production_changed:false};
   // Independent verifier facts -> Reality-governed classification ->
   // existing Continuity Ledger. A classification cannot create execution
   // authority, install code, reopen an original, or mutate the Universe.
@@ -2305,6 +2329,7 @@ export default async function handler(req,res){
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
     signed_maintenance_install_target_review:signedMaintenanceInstallTargetReview,
     signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity,
+    signed_maintenance_universe_postinstall_return:signedMaintenanceUniverseReconciliation,
     signed_maintenance_approved_auto_install:signedMaintenanceApprovedInstall,
     signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
