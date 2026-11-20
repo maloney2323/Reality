@@ -231,8 +231,37 @@
    data.shift_activity?.installation_authorized===false&&
    data.shift_activity?.production_changed===false?
     data.shift_activity:null;
+  // Reality's authenticated owner-shift GET is the only source of these
+  // independently receipted packets; never treat one as install approval.
+  let verifiedArtifacts=[];
+  const artifacts=data.signed_verified_maintenance_repair_artifacts;
+  if(artifacts?.status==='OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY'&&
+   UUID.test(artifacts.owner_id||'')&&
+   Number.isSafeInteger(artifacts.count)&&artifacts.count>=0&&
+   artifacts.count<=4&&Array.isArray(artifacts.items)&&
+   artifacts.count===artifacts.items.length&&
+   artifacts.installation_authorized===false&&
+   artifacts.production_changed===false){
+   const bound=c.items.filter(j=>signed.has(j.origin_incident_id));
+   if(artifacts.items.every(a=>
+    UUID.test(a?.maintenance_id||'')&&
+    a.shift_id===c.current_shift_id&&
+    bound.some(j=>j.origin_incident_id===a.maintenance_id&&
+     j.source_ref===a.source_ref)&&
+    /^[a-f0-9]{40}$/.test(a?.candidate_commit_sha||'')&&
+    /^[a-f0-9]{40}$/.test(a?.candidate_source_blob_sha||'')&&
+    SHA.test(a?.review_receipt_sha256||'')&&
+    SHA.test(a?.case_ci_receipt_sha256||'')&&
+    Number.isSafeInteger(a?.github_run_id)&&a.github_run_id>10000&&
+    Number.isSafeInteger(a?.github_artifact_id)&&a.github_artifact_id>10000&&
+    a.owner_approval_ready===false&&a.install_target_verified===false&&
+    a.installation_authorized===false&&a.repair_installed===false&&
+    a.original_job_completed===false))
+    verifiedArtifacts=artifacts.items;
+  }
   return Object.freeze({
    count:c.open_count,jobs:c.items,activeId:c.current_shift_id,
+   verifiedArtifacts,
    activity,shiftReadback:shift,finalReceipt:terminal?{
     shift_id:terminal.shift_id,
     count:terminal.close_report.independently_verified_internal_maintenance_jobs,
@@ -298,6 +327,11 @@
    'I will ask separately before installing any code. You can reply to ask questions.':
    'I found unfinished employee repairs, but I cannot verify an exact signed authorization scope yet. '+
    'Ask me about the blockers or review the source evidence.';
+  if(scope.verifiedArtifacts?.length)
+   hintLabel.textContent+=' Reality independently recorded '+
+    scope.verifiedArtifacts.length+' exact tested repair artifact'+
+    (scope.verifiedArtifacts.length===1?'':'s')+
+    '. Isolated installation review remains required; no approval was granted.';
   dialogueJobs.replaceChildren();
   for(const item of scope.jobs){
    dialogueJobs.append(make('p','',
@@ -399,6 +433,16 @@
      a.last_worker_safe_result.replaceAll('_',' ').toLowerCase());
   }else{
    line('Worker progress:', 'No independently verified live worker activity in this readback.');
+  }
+  for(const a of scope.verifiedArtifacts||[]){
+   const n=a.source_ref.split('/').pop();
+   line('Independent repair artifact:', 'PR #'+n+
+    ' · exact source tested; install target review still needed.');
+   line('Candidate commit:',a.candidate_commit_sha);
+   line('Independent CI run:',String(a.github_run_id));
+   digest('Review artifact receipt:',a.review_receipt_sha256);
+   digest('Frozen RED/GREEN:',a.case_ci_receipt_sha256);
+   line('Authority:', 'No installation approval; no original-job completion.');
   }
   const covered=new Set(scope.signedIds);
   for(const job of scope.jobs.filter(x=>covered.has(x.origin_incident_id))){
