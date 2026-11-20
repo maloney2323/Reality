@@ -24,7 +24,7 @@ const hold=(status,more={})=>Object.freeze({
  repair_executed:false,original_job_completed:false,
  installation_authorized:false,production_changed:false,
  new_shift_started:false});
-async function sourceBroker(mode,{db,claim,fetchImpl,path=null}){
+export async function sourceBroker(mode,{db,claim,fetchImpl,path=null}){
  if(typeof db.url!=='string'||!db.url.startsWith('https://')||
     typeof db.secretKey!=='string'||db.secretKey.length<24)
   fail('SIGNED_SOURCE_BROKER_SERVICE_CONFIG_REQUIRED');
