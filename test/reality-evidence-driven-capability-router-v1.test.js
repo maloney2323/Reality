@@ -183,3 +183,18 @@ test('the signed worker routes a real registered capability and reports missing 
   '../src/reality-evidence-driven-capability-router-v1.js',import.meta.url),'utf8');
  assert.doesNotMatch(module,/#211|#307|#308|maloney2323|Reality\/pull\/211/);
 });
+
+test('owner Chat uses the generic plan to show missing and registered capability handoffs',()=>{
+ const api=readFileSync(new URL(
+  '../api/reality/personal-handoff-health.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL(
+  '../reality-chat-handoff-health-v1.js',import.meta.url),'utf8');
+ assert.match(api,/governed_capability_plan:plan/);
+ assert.match(api,/planGovernedCapabilitiesFromOwnerReceipts\(/);
+ assert.match(ui,/Generic capability routing/);
+ assert.match(ui,/registered executor/);
+ assert.match(ui,/missing executor/);
+ assert.match(ui,/OWNER_CLICK_REQUIRED/);
+ assert.match(ui,/candidate_count/);
+ assert.doesNotMatch(ui,/#211|#307|#308/);
+});
