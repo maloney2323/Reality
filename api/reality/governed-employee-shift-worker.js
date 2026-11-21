@@ -1323,7 +1323,29 @@ export default async function handler(req,res){
     new_shift_started:false
    }));
   }
-  const newDevelopmentAdvanced=publisherProgress.has(chatNewPublished.status)||
+  // Missing feature acceptance MUST become a durable same-original recovery
+  // action, not another silent successful wake. The service-only SQL RPC
+  // independently checks the saved signed owner source and CI receipt.
+  // No source execution, Chat approval, re-admission, install, or settlement.
+  workerStage='CHAT_DEVELOPMENT_FULL_GOAL_ACCEPTANCE_GAP';
+  const chatFeatureGap=await shiftRpc(db,
+   'reality_record_next_chat_development_goal_gap_v1',{}
+  ).catch(()=>({
+   status:'CHAT_DEVELOPMENT_GOAL_GAP_RECEIPT_UNVERIFIED',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false
+  }));
+  const goalGapRecorded=
+   chatFeatureGap?.status==='CHAT_DEVELOPMENT_GOAL_GAP_SOURCE_BOUND_RECEIPTED'&&
+   /^work:[a-f0-9]{32}$/.test(chatFeatureGap.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(chatFeatureGap.receipt_sha256||'')&&
+   chatFeatureGap.feature_acceptance_verified===false&&
+   chatFeatureGap.original_job_completed===false&&
+   chatFeatureGap.installation_authorized===false&&
+   chatFeatureGap.production_changed===false&&
+   chatFeatureGap.new_shift_started===false;
+  const newDevelopmentAdvanced=goalGapRecorded||
+   publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
   // This lane already owns its signed ledger. A successful or blocked feature
   // must not preempt the other employees in the same authorized shift.
@@ -1331,8 +1353,9 @@ export default async function handler(req,res){
   if(newDevelopmentAdvanced){
    chatNewDevelopmentCheckpoint={
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
-    development_result:publisherProgress.has(chatNewPublished.status)?
-     chatNewPublished:chatNewBuild,
+    development_result:goalGapRecorded?chatFeatureGap:
+     publisherProgress.has(chatNewPublished.status)?
+      chatNewPublished:chatNewBuild,
     original_job_completed:false,installation_authorized:false,
     production_changed:false,new_shift_started:false
    };
