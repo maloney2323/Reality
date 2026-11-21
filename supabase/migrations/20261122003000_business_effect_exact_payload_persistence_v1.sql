@@ -96,7 +96,7 @@ begin
   'execution_authorized',false,'effect_reserved',false,
   'original_job_completed',false,'installation_authorized',false,
   'production_changed',false,'new_shift_started',false);
-end $function$;
+end; $function$;
 revoke all on function public.reality_stage_exact_business_original_effect_review_v1(uuid,text,text,text,text,text,text)
  from public,anon,authenticated;
 grant execute on function public.reality_stage_exact_business_original_effect_review_v1(uuid,text,text,text,text,text,text)
