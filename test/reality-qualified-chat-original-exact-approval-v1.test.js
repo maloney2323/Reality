@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const sql=read('../supabase/migrations/20261121205000_qualified_chat_original_exact_approval_bridge_v1.sql');
 const continuity=read('../supabase/migrations/20261121210500_qualified_chat_original_continuity_return_v1.sql');
+const independent=read('../supabase/migrations/20261121212000_qualified_chat_independent_original_readback_v1.sql');
 const api=read('../api/reality/personal-qualified-chat-original-approval.js');
 const panel=read('../reality-chat-continuous-qualification-v1.js');
 const boundary=read('../src/reality-governed-shift-boundary-v1.js');
@@ -87,4 +88,15 @@ test('real signed worker sends exact owner admission back into SAME Continuity, 
  assert.doesNotMatch(continuity,/INSERT INTO reality_internal\.governed_employee_original_claims_v1/i);
  assert.doesNotMatch(continuity,/reality_authorize_employee_shift_v1/i);
  assert.ok(continuity.length<20000,'duplicate SQL replacement content detected');
+});
+
+test('separate owner receipt readback must match actual persisted original development',()=>{
+ assert.match(independent,/reality_read_owner_qualified_chat_original_reviews_v1/);
+ assert.match(independent,/left join reality_internal\.chat_work_handoffs_v1 h/);
+ assert.match(independent,/h\.development->>'original_work_id'=p\.original_work_id/);
+ assert.match(independent,/h\.development->>'source_sha256'=p\.signed_message_sha256/);
+ assert.match(independent,/h\.development->>'installation_authorized'='false'/);
+ assert.match(independent,/canonical_chat_original_readback_verified/);
+ assert.match(api,/x\.canonical_chat_original_readback_verified===true/);
+ assert.match(panel,/p\.canonical_chat_original_readback_verified===true/);
 });
