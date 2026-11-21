@@ -26,6 +26,8 @@ import {readVerifiedIndependentWorkerForChat}
  from '../../src/reality-independent-worker-chat-context-v1.js';
 import {summarizeSavedChatReplyReadback} from '../../src/reality-saved-chat-reply-readback-v1.js';
 import {readOwnerChatWorkHandoff} from '../../src/reality-private-chat-work-readback-v1.js';
+import {readOwnerOperationalIncidentChatBriefing,incidentChatUniverseObservations}
+ from '../../src/reality-owner-operational-incident-chat-v1.js';
 import {readOwnerOriginalWorkForChat,originalWorkObservation,
  readOwnerWeeklyCandidateQueueForChat,weeklyQueueObservation,
  scopeOwnerOriginalWorkToShift}
@@ -43,6 +45,8 @@ import {createUniversePostgresPersistence}
  from '../../src/reality-universe-postgres-persistence-v0.1.js';
 import {createContinuitySpine}
  from '../../src/reality-continuity-spine-v2.0.js';
+import {readFreshPersonalAccountMissionState}
+ from '../../src/reality-personal-goal-readback-v0.1.js';
 export const maxDuration=60;
 function fail(code,status){const e=new Error(code);e.status=status;throw e}
 export default async function handler(req,res){
@@ -63,6 +67,16 @@ export default async function handler(req,res){
   const conversationId=String((req.method==='GET'?req.query?.conversation_id:req.body?.conversation_id)||'');
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID',400);
   stage='AUTHENTICATED_HISTORY';
+  // Automatic owner-only operational incident read, no model or write.
+  if(req.method==='GET'&&String(req.query?.incident_readback||'')==='1'){
+   const result=await readOwnerOperationalIncidentChatBriefing({session});
+   return res.status(200).json({
+    ok:true,conversation_id:conversationId,
+    operational_incidents_readback:result,
+    execution_authorized_by_chat:false,
+    installation_authorized:false,production_changed:false
+   });
+  }
   // Progress polling is exact-request owner-RLS readback only, with
   // no model, worker, full-history reconstruction or dashboard lookups.
   if(req.method==='GET'&&String(req.query?.reply_readback||'')==='1'){
@@ -134,6 +148,11 @@ export default async function handler(req,res){
   const history=await readPrivateChat(session,conversationId);
   if(req.method==='GET'){
    const context=await collectOptionalChatEvidence([
+    {id:'operational_incidents',
+     read:()=>readOwnerOperationalIncidentChatBriefing({session}),
+     validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&
+      v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false,
+     fallback:null},
     {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({session,conversationId}),
      validate:v=>v!==null&&typeof v==='object',fallback:null},
     {id:'owner_originals',read:()=>readOwnerOriginalWorkForChat({session}),
@@ -147,6 +166,7 @@ export default async function handler(req,res){
     messages:history.messages,
     reply_readback:summarizeSavedChatReplyReadback(history.messages),
     work_handoff:context.values.work_handoff,
+    operational_incidents_readback:context.values.operational_incidents,
     original_work_readback:context.values.owner_originals,
     weekly_queue_readback:context.values.weekly_queue,
     contextual_readback_status:context.status,
@@ -250,6 +270,20 @@ export default async function handler(req,res){
   // optional sources and existing read-only governance.
   const wantsWorkerHealth=/(?:\bwatchdog\b|\bauto[ -]?wake\b|\bwake(?:up)?\s+(?:status|health|failure|trigger)\b|\bworker\s+(?:health|status|wake|failed)\b)/i.test(text);
   const optionalContextPromise=collectOptionalChatEvidence([
+   {id:'operational_incidents',
+    read:()=>readOwnerOperationalIncidentChatBriefing({session,db:isolated}),
+    validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&
+     v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false&&
+     v.installation_authorized===false,
+    fallback:null},
+   {id:'primary_mission',
+    read:()=>readFreshPersonalAccountMissionState({session}),
+    validate:x=>x?.version==='reality-account-primary-business-mission-v1'&&
+     x.principal_id===session.user_id&&
+     x.source==='OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY'&&
+     x.execution_authorized===false&&x.external_actions_authorized===false&&
+     x.state?.assistant_can_mutate_goals===false,
+    fallback:null},
    {id:'work_handoff',read:()=>readOwnerChatWorkHandoff({
       session,conversationId}),validate:v=>v!==null&&typeof v==='object',
       fallback:null},
@@ -335,6 +369,8 @@ export default async function handler(req,res){
   const optionalContext=await optionalContextPromise;
   optionalContextWaitMs=Date.now()-optionalContextWaitStart;
   const {
+   primary_mission:ownerMissionReadback,
+   operational_incidents:operationalIncidentsReadback,
    work_handoff:chatWorkReadback,
    market:marketStageObservations,upgrade:verifiedUpgradeObservations,
    employee_shift:employeeShiftObservations,worker_wake:workerWakeObservations,
@@ -400,14 +436,39 @@ export default async function handler(req,res){
   };
   // ONE authenticated Universe observation window supplies Reality and
   // its underlying model in both response modes. Not a second ledger.
+  const primaryMission=ownerMissionReadback?.state?.active_goal||null;
+  const activePrimaryMission=primaryMission?.goal_id&&
+   ownerMissionReadback.state.active_goal_id===primaryMission.goal_id&&
+   primaryMission.user_confirmed===true&&primaryMission.status==='ACTIVE'&&
+   typeof primaryMission.title==='string'&&primaryMission.title.length<=700&&
+   /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(
+    primaryMission.source_user_message_ref||'')?
+    primaryMission:null;
+  const primaryMissionObservation=activePrimaryMission?Object.freeze({
+   entry_id:'reality:owner-primary-business-mission',
+   event_kind:'owner_confirmed_account_primary_business_mission',
+   source_kind:'OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY',
+   source_ref:activePrimaryMission.source_user_message_ref,
+   epistemic_status:'OWNER_CONFIRMED_OBJECTIVE_NOT_BUSINESS_OUTCOME',
+   assertion_time:new Date().toISOString(),
+   summary:'Owner-confirmed standing business mission: '+
+    activePrimaryMission.title+
+    '. This defines long-term intent, NOT approval for external execution, '+
+    'employment actions, purchases, production deployment, or completion.',
+   execution_authorized:false,installation_authorized:false,
+   production_changed:false
+  }):null;
   const ownerCurrentUniverseObservations=[
+   ...(primaryMissionObservation?[primaryMissionObservation]:[]),
    buildRealityProposedEmployeeRoleDiscussionContext(),
    ...native263TemporalObservations,...ownerCompletedWorkObservations,
    ...marketStageObservations,...verifiedUpgradeObservations,
    ...employeeShiftObservations,...workerWakeObservations,
    ...companyWorkforceObservations,...rileySourceWorkObservations,
    ...weeklyWorkloadObservations,
-   ...selfVisibilityObservations,...originalWorkObservation(ownerOriginalWork),
+   ...selfVisibilityObservations,
+   ...incidentChatUniverseObservations(operationalIncidentsReadback),
+   ...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
   ];
   const makeOwnerUniverseReadModel=(priorHistory=null)=>{
@@ -498,7 +559,16 @@ export default async function handler(req,res){
      weekly_queue:ownerWeeklyQueue||null,
      weekly_workload_gap:weeklyWorkloadObservations[0]?.weekly_workload_insight||null,
      verified_workforce:companyWorkforceObservations.slice(0,12),
+     owner_operational_incidents:operationalIncidentsReadback?.items?.slice(0,3)||null,
+     owner_operational_incident_source_available:
+      operationalIncidentsReadback?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY',
      authoritative_goal_state:currentGoal,
+     verified_primary_business_mission:activePrimaryMission?Object.freeze({
+      goal_id:activePrimaryMission.goal_id,
+      owner_confirmed_text:activePrimaryMission.title,
+      source_user_message_ref:activePrimaryMission.source_user_message_ref,
+      grants_execution_authority:false
+     }):null,
      universe_cognitive_state_id:ownerUniverse.state_id,
      universe_read_model:'EXISTING_UNIVERSE_PLUS_CANONICAL_CONTINUITY',
      source_status:ownerContext.status,
@@ -610,6 +680,24 @@ export default async function handler(req,res){
       prior_settled_jobs_must_not_be_readmitted:true,
       existing_owner_action_uses_exact_owner_job_and_frozen_evidence:true,
       installed_capabilities_require_separate_exact_authorization:true,
+    },
+    // Reality is a proactive, conversational business operating partner.
+    // These are conversation instructions, never new authorization grants.
+    // Always prefer saved owner intent and verified state over a canned
+    // script; a newly signed-up customer has no proven connections yet.
+    owner_first_contact_and_conversational_onboarding:{
+      experience:'CHAT_IS_BUSINESS_HOME_FOR_SIGNED_IN_CUSTOMERS',
+      new_business_welcome_source:'FIRST_ASSISTANT_TURN_SAVED_ONCE_UNDER_SIGNED_OWNER_SERVICE',
+      prior_turns_source:'AUTHENTICATED_OWNER_RLS_CHAT',
+      when_new:'Walk through the customer business one question at a time. Start with business type and a current pain point. Explain automation plainly. Ask whether to connect relevant existing services, then verify actual provider access before examining data.',
+      when_setup_partial:'Resume the next unverified step from owner records. A connector setup request is NOT an authenticated connection.',
+      when_ready_for_work:'Explain existing source-backed opportunities and their evidence; do not invent hours, qualified jobs, completed work or ROI.',
+      when_returning:'Use established owner goal, Universe/continuity evidence, active shift warrants and unfinished repairs to initiate a human-feeling operational conversation. Mention what changed and only the specific permissions genuinely missing. Never ask to reauthorize still-covered work.',
+      conversation_flow:'The customer may ask why or skip a step; reply naturally in the SAME saved conversation, then resume from independently verified progress.',
+      direct_authority:'The model may explain and offer links or exact UI actions; ordinary messages cannot grant OAuth, install code, move money or broaden permissions.',
+      customer_past_expectations_are_only_known_when_grounded:true,
+      no_external_action_authorized:true,
+      no_customer_job_completion_implied:true
     },
     // Static published references already shown on Reality's homepage.
     // These are references, not evidence of measured business savings.

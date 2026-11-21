@@ -5,9 +5,14 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
-import {shiftDatabase,shiftRpc,assertShiftReadback}
+import {independentlyReviewOneStagedMaintenanceRegression}
+ from '../../src/reality-signed-maintenance-external-review-v1.js';
+import {attestOneSignedMaintenanceCiSourceEpoch}
+ from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
+import {shiftDatabase,shiftRpc,assertShiftReadback,
+ isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
-import {processGovernedEmployeeShiftTick}
+import {processGovernedEmployeeShiftTick,isIsolatedOriginalProviderOutage}
  from '../../src/reality-governed-employee-shift-worker-v1.js';
 import {createOneOpenAICombinedRoleCoordinator}
  from '../../src/reality-one-openai-combined-role-handoff-v1.js';
@@ -86,10 +91,40 @@ import {continueGeneralOwnerApprovedOriginalInstall}
  from '../../src/reality-general-original-auto-install-bridge-v1.js';
 import {settleGeneralOwnerApprovedOriginal}
  from '../../src/reality-general-original-auto-settlement-bridge-v1.js';
+import {continueGeneralOriginalOwnerApprovedRecovery}
+ from '../../src/reality-general-original-auto-recovery-publisher-v1.js';
+import {investigateGeneralOriginalFencedRecovery}
+ from '../../src/reality-general-original-fenced-investigator-v1.js';
 import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
+import {generateOneEmployeeTemporalInquiry}
+ from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
+import {runOneStandingEmployeeDiscovery}
+ from '../../src/reality-standing-employee-discovery-v1.js';
+import {scheduleOneStandingCapability,scheduleOneStandingOperationalRecovery}
+ from '../../src/reality-capability-role-schedule-worker-v1.js';
+import {advanceExistingOwnerIncidentOriginal}
+ from '../../src/reality-incident-existing-original-handoff-v1.js';
+import {advanceOneScheduledCapabilityInquiry}
+ from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
+import {investigateOneSignedShiftContinuityIncident,classifySignedContinuityClaimTransportError}
+ from '../../src/reality-shift-continuity-auto-investigation-v1.js';
+import {advanceOneQualifiedEmployeeEvidenceJob}
+ from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
+import {admitOneSignedScheduledEvidenceJob}
+ from '../../src/reality-signed-schedule-evidence-admission-v1.js';
+import {advanceOneShiftContinuityIndependentReview}
+ from '../../src/reality-shift-continuity-independent-review-v1.js';
+import {reviewOneSignedBusinessQualificationStall}
+ from '../../src/reality-shift-business-qualification-review-v1.js';
+import {advanceOneSignedInternalMaintenanceJob}
+ from '../../src/reality-signed-internal-maintenance-worker-v1.js';
+import {reproduceOneSignedMaintenanceFailureBaseline}
+ from '../../src/reality-signed-maintenance-failure-baseline-v1.js';
+import {requalifyOneChangedEmployeeSource}
+ from '../../src/reality-qualified-source-requalification-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -112,11 +147,53 @@ export default async function handler(req,res){
     Array.isArray(req.body)||Object.keys(req.body).length>0)))
   return res.status(400).json({ok:false,error:'SHIFT_WORKER_INPUT_FORBIDDEN'});
  let activePulseDb=null,activePulseShiftId=null;
+ let governedWakeClaimId=null;
+ let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
  let workerStage='SHIFT_DB_BOUNDARY';
+ let shiftDbTransportUnreachable=false;
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
+  // A standing shift or discovery grant is not a new execution event.
+  // Durable, service-role-only singleton claim prevents concurrent full
+  // workers even when a legacy cron wake arrives during active execution.
+  // Fail closed if the claim cannot be independently read back.
+  workerStage='SHIFT_WORKER_DURABLE_SINGLEFLIGHT';
+  const proposedWakeClaimId=crypto.randomUUID();
+  const governedWakeGate=await shiftRpc(
+   db,'reality_claim_governed_shift_worker_run_v1',
+   {p_claim_id:proposedWakeClaimId}
+  );
+  if(governedWakeGate?.status==='WAKE_COALESCED_ACTIVE_OR_COOLDOWN' &&
+     governedWakeGate.original_job_completed===false &&
+     governedWakeGate.installation_authorized===false)
+   return res.status(202).json({
+    status:'WAKE_COALESCED_ACTIVE_OR_COOLDOWN',
+    worker_started:false,work_completed:false,
+    installation_authorized:false,production_changed:false
+   });
+  if(governedWakeGate?.status!=='WAKE_CLAIMED' ||
+     governedWakeGate.claim_id!==proposedWakeClaimId ||
+     governedWakeGate.original_job_completed!==false ||
+     governedWakeGate.installation_authorized!==false)
+   throw Error('GOVERNED_SHIFT_WORKER_LEASE_READBACK_UNVERIFIED');
+  governedWakeClaimId=proposedWakeClaimId;
+  // Cron SQL success is only queued HTTP; this durable receipt proves the
+  // authenticated server worker actually entered its lifecycle.
+  actualWorkerRunId=crypto.randomUUID();
+  const realRun=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
+   p_run_id:actualWorkerRunId,
+   p_status:'STARTED',p_stage:'SHIFT_DB_BOUNDARY'
+  });
+  if(realRun?.status!=='SIGNED_WORKER_RUN_STARTED'||
+     realRun.run_id!==actualWorkerRunId||
+     realRun.actual_worker_process_seen!==true||
+     realRun.original_job_completed!==false||
+     realRun.repair_executed!==false||
+     realRun.installation_authorized!==false||
+     realRun.production_changed!==false)
+    throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
   // Existing owner-shift continuation, never another start or approval:
   // independently verify same installed Git/Vercel commit and TWO distinct
   // source+original acceptance CI runs before recording the final receipt.
@@ -137,6 +214,371 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // A detected stall is not a model guess or a reason to start another shift.
+  // It is a durable independently observed incident; investigate it on THIS
+  // signed wake before normal employee discovery, preserving exact authority.
+  workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
+  const shiftContinuityInvestigation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await investigateOneSignedShiftContinuityIncident({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
+     failure_code:classifySignedContinuityClaimTransportError(error),
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  // A DIFFERENT signed worker, not the diagnosing model, re-observes
+  // the actual provider source for the assigned independent reviewer.
+  workerStage='INDEPENDENT_SHIFT_CONTINUITY_SOURCE_REVIEW';
+  const continuityIndependentReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceOneShiftContinuityIndependentReview({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'CONTINUITY_INDEPENDENT_PROVIDER_REVIEW_UNVERIFIED',
+     failure_code:error?.message==='SHIFT_RPC_NOT_ALLOWLISTED'?
+      'SHARED_RPC_TRANSPORT_NOT_CONNECTED':
+      String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+       'SIGNED_DATABASE_RPC_UNAVAILABLE':
+       String(error?.message||'').startsWith('CONTINUITY_INDEPENDENT_REVIEW_')?
+        'SIGNED_REVIEW_PROOF_UNVERIFIED':'REVIEW_RUNTIME_UNVERIFIED',
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_CONTINUITY_REVIEW_SCOPE',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
+  // Business job qualification has a DISTINCT independent check: neither
+  // source-evidence jobs nor model proposals can be counted as originals.
+  // This reads the existing owner-scoped ledger and current provider source.
+  workerStage='INDEPENDENT_BUSINESS_ORIGINAL_QUALIFICATION_REVIEW';
+  const businessQualificationReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await reviewOneSignedBusinessQualificationStall({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'BUSINESS_QUALIFICATION_REVIEW_UNVERIFIED',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_BUSINESS_QUALIFICATION_RPC_UNAVAILABLE':
+      String(error?.message||'').startsWith('BUSINESS_QUALIFICATION_')?
+       'INDEPENDENT_BUSINESS_QUALIFICATION_SCOPE_INVALID':
+       'BUSINESS_QUALIFICATION_REVIEW_RUNTIME_UNVERIFIED',
+     original_job_completed:false,repair_executed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_ACTIVE_SIGNED_BUSINESS_QUALIFICATION_SCOPE',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false};
+  // Maintenance jobs survive their originating shift. A DIFFERENT active
+  // signed owner shift may investigate the SAME internal failure, but no
+  // permission to install code or settle customer work is created.
+  workerStage='SIGNED_INTERNAL_MAINTENANCE_EMPLOYEE_SOURCE_RECHECK';
+  const internalMaintenanceWork=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceOneSignedInternalMaintenanceJob({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_INTERNAL_MAINTENANCE_WORK_UNVERIFIED',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_MAINTENANCE_DATABASE_UNAVAILABLE':
+      String(error?.message||'').startsWith('SIGNED_INTERNAL_MAINTENANCE_')?
+       'SIGNED_MAINTENANCE_SCOPE_OR_PROOF_INVALID':
+       'SIGNED_MAINTENANCE_RUNTIME_UNVERIFIED',
+     customer_job_completed:false,new_customer_work_created:false,
+     repair_executed:false,installation_authorized:false,
+     production_changed:false
+    })):
+    {status:'NO_ACTIVE_OWNER_SHIFT_FOR_INTERNAL_MAINTENANCE',
+     customer_job_completed:false,new_customer_work_created:false,
+     repair_executed:false,installation_authorized:false,
+     production_changed:false};
+  // A SEPARATE signed worker run independently reconstructs one historical
+  // failure baseline. This does not prove a failing executable CI test, create
+  // a model patch, install code, or settle any customer original.
+  workerStage='SIGNED_INTERNAL_MAINTENANCE_INDEPENDENT_FAILURE_BASELINE';
+  const maintenanceFailureBaseline=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await reproduceOneSignedMaintenanceFailureBaseline({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_INDEPENDENT_BASELINE_UNVERIFIED',
+     failure_code:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_BASELINE_RPC_UNAVAILABLE':
+      String(error?.message||'').startsWith('SIGNED_MAINTENANCE_BASELINE_')?
+       'SIGNED_BASELINE_SCOPE_OR_PROVIDER_UNVERIFIED':
+       'SIGNED_BASELINE_RUNTIME_UNVERIFIED',
+     historical_baseline_verified:false,
+     executable_frozen_ci_red_verified:false,model_code_generated:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_ACTIVE_OWNER_SHIFT_FOR_MAINTENANCE_BASELINE',
+     historical_baseline_verified:false,
+     executable_frozen_ci_red_verified:false,model_code_generated:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // Owner-warranted maintenance CI preflight reads the SAME signed shift,
+  // signed worker and exact maintenance ID after the historical baseline.
+  // This is not the CI runner: a fresh pinned provider epoch and real
+  // independently failing frozen test still have to be obtained.
+  workerStage='SIGNED_INTERNAL_MAINTENANCE_CI_PREFLIGHT';
+  const signedMaintenanceCiPreflight=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_read_signed_maintenance_ci_preflight_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_worker_run_id:actualWorkerRunId
+    }).then(receipt=>{
+     if(![
+      'SIGNED_MAINTENANCE_CI_PREFLIGHT_NEEDS_SOURCE_ATTESTATION',
+      'NO_SIGNED_MAINTENANCE_FROZEN_CI_SCOPE'
+     ].includes(receipt?.status)||
+      receipt.read_only!==true||
+      receipt.executable_frozen_ci_red_verified!==false||
+      receipt.repair_executed!==false||
+      receipt.original_job_completed!==false||
+      receipt.installation_authorized!==false||
+      receipt.production_changed!==false||
+      (receipt.status==='SIGNED_MAINTENANCE_CI_PREFLIGHT_NEEDS_SOURCE_ATTESTATION'&&
+       (receipt.shift_id!==wakeReceipt.shift_id||
+        !/^[a-f0-9-]{36}$/i.test(receipt.maintenance_id||'')||
+        !/^sha256:[a-f0-9]{64}$/.test(receipt.independent_failure_baseline_receipt_sha256||'')||
+        receipt.source_current_epoch_verified!==false||
+        receipt.next_action!=='RECHECK_EXACT_PROVIDER_SOURCE_AND_RUN_INDEPENDENT_FROZEN_CI_RED')))
+      throw Error('SIGNED_MAINTENANCE_CI_UNTRUSTED_PREFLIGHT_RECEIPT');
+     return receipt;
+    }).catch(()=>({
+     status:'SIGNED_MAINTENANCE_CI_PREFLIGHT_PROOF_UNAVAILABLE',
+     read_only:true,executable_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_MAINTENANCE_CI_PREFLIGHT',
+     read_only:true,executable_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // The existing signed worker independently reads the currently observed
+  // GitHub source twice and durably binds the exact maintenance incident
+  // and review/baseline to that source epoch. An epoch change is recorded,
+  // not silently treated as executable frozen CI RED or a completed repair.
+  workerStage='SIGNED_MAINTENANCE_CI_CURRENT_PROVIDER_SOURCE_ATTESTATION';
+  const maintenanceCiSourceEpoch=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await attestOneSignedMaintenanceCiSourceEpoch({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,
+     preflight:signedMaintenanceCiPreflight,fetchImpl:fetch
+    }).catch(error=>({
+     status:String(error?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_MAINTENANCE_CI_SOURCE_DATABASE_UNAVAILABLE':
+      'SIGNED_MAINTENANCE_CI_SOURCE_PROOF_UNVERIFIED',
+     source_current_epoch_verified:false,
+     independent_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_CI_SOURCE_SCOPE',
+     source_current_epoch_verified:false,
+     independent_frozen_ci_red_verified:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+  // Independent Quinn review of staged historical GitHub evidence under the
+  // same signed maintenance warrant. Historical regression != case-specific RED.
+  workerStage='SIGNED_INDEPENDENT_MAINTENANCE_EXTERNAL_EVIDENCE_REVIEW';
+  const signedExternalMaintenanceReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReviewOneStagedMaintenanceRegression({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_EXTERNAL_MAINTENANCE_REVIEW_PROOF_UNAVAILABLE',
+     independent_maintenance_ci_red_attested:false,
+     repair_executed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false
+    })):
+    {status:'NO_SIGNED_EXTERNAL_REVIEW_WAKE',
+     independent_maintenance_ci_red_attested:false,
+     repair_executed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
+
+  // Link the existing original work ID to its actual authorization and
+  // independently observed final receipt. Read-only: no fresh work, no reset.
+  workerStage='SAME_ORIGINAL_CONTINUATION_AND_FINAL_RECEIPT_READBACK';
+  const sameOriginalPostmaintenanceGate=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_read_same_original_postmaintenance_gate_v1',{
+     p_shift_id:wakeReceipt.shift_id
+    }).then(result=>{
+     if(![
+      'EXISTING_ORIGINAL_HAS_INDEPENDENT_FINAL_RECEIPT',
+      'EXISTING_ORIGINAL_NOT_AUTHORIZED_BY_MAINTENANCE_SHIFT',
+      'EXISTING_ORIGINAL_BLOCKED_REQUALIFICATION_REQUIRED',
+      'EXISTING_ORIGINAL_GOVERNED_EXECUTION_REQUIRES_FRESH_ACCEPTANCE',
+      'NO_EXISTING_SAME_ORIGINAL_FOR_SHIFT'
+     ].includes(result?.status)||
+      result.original_job_completed===true&&
+        result.independent_final_receipt_verified!==true||
+      result.installation_authorized!==false||
+      result.new_job_created!==false||
+      result.production_changed===true)
+      throw Error('SAME_ORIGINAL_CONTINUATION_UNTRUSTED');
+     return result;
+    }).catch(()=>({
+     status:'SAME_ORIGINAL_CONTINUATION_READBACK_UNAVAILABLE',
+     original_job_completed:false,
+     independent_final_receipt_verified:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SAME_ORIGINAL_CONTINUATION_WAKE',
+     original_job_completed:false,
+     independent_final_receipt_verified:false,
+     installation_authorized:false,production_changed:false};
+  // The same evidence job is allowed ONE bounded requalification when
+  // its original Github source changed between two signed worker runs.
+  // This is not a code repair. The first failure receipt remains immutable.
+  workerStage='SAME_QUALIFIED_EVIDENCE_SOURCE_REQUALIFICATION';
+  const changedSourceRequalification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await requalifyOneChangedEmployeeSource({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'CHANGED_SOURCE_REQUALIFICATION_PROOF_UNAVAILABLE',
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_SOURCE_REQUALIFICATION_SCOPE',
+     installation_authorized:false,production_changed:false};
+  // A real prior employee inquiry and today's owner-scoped calendar can now
+  // become an executable, READ-ONLY evidence pack on the SAME signed shift.
+  // No new shift or customer original; an independent later wake reviews it.
+  // This is the missing schedule -> qualification -> executor connection.
+  workerStage='SIGNED_SCHEDULE_EVIDENCE_QUALIFICATION';
+  const signedScheduleAdmission=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await admitOneSignedScheduledEvidenceJob({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_SCHEDULE_EVIDENCE_ADMISSION_UNVERIFIED',
+     evidence_job_created:false,customer_original_job_created:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_SHIFT_FOR_SCHEDULED_EVIDENCE',
+     evidence_job_created:false,customer_original_job_created:false,
+     installation_authorized:false,production_changed:false};
+  // Execute exactly one dynamically qualified, read-only job on this
+  // existing owner-authorized signed shift. Review and execution run in
+  // DIFFERENT signed worker processes; neither installs code.
+  workerStage='QUALIFIED_EMPLOYEE_WORK_EXECUTION_OR_INDEPENDENT_VERIFICATION';
+  const qualifiedEmployeeWork=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await advanceOneQualifiedEmployeeEvidenceJob({
+    db,env:process.env,shiftId:wakeReceipt.shift_id,
+    workerRunId:actualWorkerRunId,fetchImpl:fetch
+   }).catch(()=>({
+    status:'QUALIFIED_EMPLOYEE_WORK_EXECUTION_UNVERIFIED',
+    actual_evidence_report_submitted:false,
+    installation_authorized:false,production_changed:false
+   })):
+   {status:'NO_CURRENT_SIGNED_QUALIFIED_EMPLOYEE_WORK',
+    actual_evidence_report_submitted:false,
+    installation_authorized:false,production_changed:false};
+  // Standing incident investigation uses the owner's existing time-limited
+  // evidence-only delegation. It can run DURING an active signed shift, but
+  // cannot extend that shift's executable scope, install, or start a new shift.
+  // No owner, source, or grant can arrive from the HTTP request.
+  workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
+  // The SAME signed worker handles already warranted incident-linked
+  // originals before ordinary discovery. It reuses the existing original
+  // recovery commitment; no new shift, new executor or owner approval.
+  // An unavailable optional lane cannot disable other authorized work.
+  workerStage='INCIDENT_EXISTING_ORIGINAL_GOVERNED_HANDOFF';
+  const incidentOriginalHandoff=await advanceExistingOwnerIncidentOriginal({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'INCIDENT_ORIGINAL_HANDOFF_EVIDENCE_UNAVAILABLE',
+   original_job_created:false,repair_executed:false,
+   installation_authorized:false,production_changed:false
+  }));
+  workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
+  // Reality's own watchdog captures signed-worker failures before they reach
+  // this handler. Give incident investigation first claim on an already
+  // delegated evidence-only wake; never auto-approve the actual repair.
+  // A detected failure DURING an authorized shift is real recovery work.
+  // It must enter the existing service-only, owner-delegated evidence-only
+  // investigation claim now rather than wait until the active shift closes.
+  // Claim dedupe, daily budget, role/reviewer validation, and the separate
+  // repair installation gate remain unchanged. No additional shift is started.
+  const operationalRecoveryResult=
+   await scheduleOneStandingOperationalRecovery({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'SIGNED_WORKER_INCIDENT_INVESTIGATION_UNVERIFIED',
+    new_original_jobs_created:0,execution_authorized:false,
+    installation_authorized:false,production_changed:false
+   }));
+  // Complete previously scheduled employee investigations before generating
+  // more schedules. A scheduled job is not done until a separate durable
+  // inquiry receipt exists; the independent current-gap gate still follows.
+  workerStage='SCHEDULED_CAPABILITY_EMPLOYEE_INQUIRY';
+  const scheduledCapabilityInquiryResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'?
+    await advanceOneScheduledCapabilityInquiry({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SCHEDULED_CAPABILITY_INQUIRY_PROOF_UNAVAILABLE',
+     original_job_created:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'ACTIVE_SIGNED_SHIFT_OR_RECOVERY_CONTROLS_INQUIRY',
+     original_job_created:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  workerStage='STANDING_OWNER_DELEGATION_INQUIRY';
+  const capabilityScheduleResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'&&
+   scheduledCapabilityInquiryResult.status===
+     'NO_STANDING_SCHEDULED_CAPABILITY_INQUIRY_DUE'?
+    await scheduleOneStandingCapability({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'CAPABILITY_EMPLOYEE_SCHEDULE_PROOF_UNAVAILABLE',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'ACTIVE_SIGNED_SHIFT_CONTROLS_CAPABILITY_EXECUTION',
+     new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  // One model-directed standing-work stage per wake. When capability role
+  // scheduling consumes its grant quota, do not spend a second lease on
+  // ordinary source investigation. Existing signed shift work is unaffected.
+  const standingDiscoveryResult=
+   wakeReceipt.status==='NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'&&
+   operationalRecoveryResult.status==='NO_STANDING_WORKER_INCIDENT'&&
+   scheduledCapabilityInquiryResult.status===
+    'NO_STANDING_SCHEDULED_CAPABILITY_INQUIRY_DUE'&&
+   capabilityScheduleResult.status===
+    'NO_NEW_STANDING_CAPABILITY_REQUIRING_ROLE_TRIAGE'?
+    await runOneStandingEmployeeDiscovery({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'STANDING_DISCOVERY_PROOF_OR_PROVIDER_UNAVAILABLE',
+     new_original_jobs_created:0,external_actions_authorized:false,
+     shift_execution_authorized:false,installation_authorized:false,
+     production_changed:false
+    })):
+    {status:'CAPABILITY_SCHEDULING_OR_SIGNED_SHIFT_HANDLED_WAKE',
+     new_original_jobs_created:0,external_actions_authorized:false,
+     shift_execution_authorized:false,installation_authorized:false,
+     production_changed:false};
   // NEW Chat development uses its own signed original-message identity,
   // not an old shift's frozen issue scope. Reuse this same signed service
   // wake and broker; no second shift, scheduler or installation grant.
@@ -173,35 +615,17 @@ export default async function handler(req,res){
   }
   const newDevelopmentAdvanced=publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
+  // This lane already owns its signed ledger. A successful or blocked feature
+  // must not preempt the other employees in the same authorized shift.
+  let chatNewDevelopmentCheckpoint=null;
   if(newDevelopmentAdvanced){
-   // The old shift's pulse is only a worker-availability receipt. The newly
-   // generated development has its OWN source and independent proof ledger.
-   let pulse=null;
-   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
-    workerStage='CHAT_NEW_DEVELOPMENT_WAKE_DISPOSITION';
-    pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
-     p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
-     p_safe_result:'NEW_CHAT_DEVELOPMENT_SEPARATE_SIGNED_SOURCE'
-    });
-    if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-       pulse.shift_id!==wakeReceipt.shift_id||
-       pulse.installation_authorized!==false||
-       pulse.original_job_completed!==false||
-       pulse.production_changed!==false)
-     throw Error('CHAT_NEW_DEV_SIGNED_WAKE_DISPOSITION_UNVERIFIED');
-    if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-     durableWorkerCompletion=pulse;
-   }
-   workerStage='CHAT_NEW_DEVELOPMENT_BOUNDED_RESPONSE';
-   return res.status(200).json({
-    status:'SIGNED_CHAT_NEW_DEVELOPMENT_BOUNDED_TICK',
-    development_result:newDevelopmentAdvanced&&
-      publisherProgress.has(chatNewPublished.status)?chatNewPublished:chatNewBuild,
-    original_job_completed:false,new_shift_started:false,
-    installation_authorized:false,production_changed:false,
-    worker_wake_receipt:wakeReceipt,
-    ...(pulse?{worker_completion_receipt:pulse}:{})
-   });
+   chatNewDevelopmentCheckpoint={
+    status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
+    development_result:publisherProgress.has(chatNewPublished.status)?
+     chatNewPublished:chatNewBuild,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   };
   }
   // Existing original-job shift work continues on normal wakes, including
   // while a new feature awaits independent GitHub CI or reconciliation.
@@ -216,6 +640,7 @@ export default async function handler(req,res){
    .catch(()=>null);
   // A completed bounded check is not a completed customer job; every lane
   // still records its own durable worker outcome before responding.
+  let boundedCorrectiveCheckpoint=null;
   if(isBoundedCorrectiveProofWake(wakeReceipt,boundedCorrectiveScope)){
    workerStage='CORRECTIVE_CI_BOUNDED';
    const corrective=await continueRileyCorrectiveModelIntoIndependentCI({
@@ -226,36 +651,20 @@ export default async function handler(req,res){
     production_changed:false,new_shift_started:false
    }));
    const classification=classifyCorrectiveProofTick(corrective);
-   workerStage='CORRECTIVE_CI_RECEIPT';
-   const pulse=await shiftRpc(db,
-    'reality_record_employee_shift_worker_pulse_v1',{
-     p_shift_id:wakeReceipt.shift_id,
-     p_status:classification.worker_status,
-     p_safe_result:classification.worker_result,
-    });
-   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-      pulse.shift_id!==wakeReceipt.shift_id||
-      pulse.installation_authorized!==false||
-      pulse.production_changed!==false)
-    throw Error('BOUNDED_CORRECTIVE_WORKER_PULSE_READBACK_UNVERIFIED');
-   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-    durableWorkerCompletion=pulse;
-   workerStage='BOUNDED_WORKER_RESPONSE_PUBLICATION';
-   return res.status(classification.http_status).json({
+   boundedCorrectiveCheckpoint={
     status:'BOUNDED_OWNER_SHIFT_CORRECTIVE_CI_RECONCILED',
-    original_job_completed:false,
-    independent_ci_proof_verified:classification.proof_verified,
-    bounded_worker_wake_receipt:wakeReceipt,
-    bounded_worker_completion_receipt:pulse,
     corrective_ci_result:corrective,
-    new_shift_started:false,installation_authorized:false,
-    production_changed:false
-   });
+    independent_ci_proof_verified:classification.proof_verified,
+    independent_ci_verified:classification.proof_verified,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   };
   }
   // Existing Governed Auto-Trigger: separately qualified independent
   // failure can lease ONE new repair attempt on the SAME authorized original.
   // The bounded model stage records only a proposed edit; subsequent frozen
   // independent CI, exact install approval and final settlement remain gated.
+  let sameOriginalRecoveryCheckpoint=null;
   let sameOriginalRecovery={
    status:'NO_SAME_ORIGINAL_RECOVERY_ON_THIS_WORKER_WAKE',
    original_job_completed:false,installation_authorized:false,
@@ -274,37 +683,17 @@ export default async function handler(req,res){
    if(['SAME_ORIGINAL_RECOVERY_PATCH_RECORDED',
        'RECOVERY_PROVIDER_OR_EVIDENCE_UNVERIFIED_NO_REPLAY']
        .includes(sameOriginalRecovery.status)){
-    workerStage='SAME_ORIGINAL_RECOVERY_DURABLE_RECEIPT';
-    const recoveryCompleted=
-     sameOriginalRecovery.status==='SAME_ORIGINAL_RECOVERY_PATCH_RECORDED';
-    const pulse=await shiftRpc(db,
-     'reality_record_employee_shift_worker_pulse_v1',{
-      p_shift_id:wakeReceipt.shift_id,
-      p_status:recoveryCompleted?'WAKE_COMPLETED':'WAKE_FAILED',
-      p_safe_result:recoveryCompleted?
-       'SAME_ORIGINAL_RECOVERY_PATCH_AWAITING_INDEPENDENT_CI':
-       'SAME_ORIGINAL_RECOVERY_PROOF_UNVERIFIED'
-     });
-    if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-       pulse.shift_id!==wakeReceipt.shift_id||
-       pulse.installation_authorized!==false||
-       pulse.production_changed!==false)
-     throw Error('SAME_ORIGINAL_RECOVERY_WORKER_PULSE_UNVERIFIED');
-    if(recoveryCompleted&&
-       isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-     durableWorkerCompletion=pulse;
-    workerStage='SAME_ORIGINAL_RECOVERY_RESPONSE_PUBLICATION';
-    return res.status(recoveryCompleted?200:503).json({
-     status:recoveryCompleted?
-      'GOVERNED_SAME_ORIGINAL_RECOVERY_PATCH_RECORDED':
-      'GOVERNED_SAME_ORIGINAL_RECOVERY_UNVERIFIED',
-     same_original_recovery_attempt:sameOriginalRecovery,
-     actual_worker_wake_receipt:wakeReceipt,
-     actual_worker_completion_receipt:pulse,
+    // Failure belongs to this original, not the whole shift. Retain its
+    // durable repair ledger, without declaring a worker or job completed.
+    sameOriginalRecoveryCheckpoint={
+     status:sameOriginalRecovery.status,
+     next_action:sameOriginalRecovery.status==='SAME_ORIGINAL_RECOVERY_PATCH_RECORDED'?
+      'SAME_ORIGINAL_RECOVERY_PATCH_AWAITING_INDEPENDENT_CI':
+      'SAME_ORIGINAL_RECOVERY_PROOF_UNVERIFIED',
      independent_tests_passed:false,original_job_completed:false,
      new_shift_started:false,installation_authorized:false,
      production_changed:false
-    });
+    };
    }
   }
   // The EXISTING corrective broker now accepts v2 evidence-bound repair
@@ -316,7 +705,9 @@ export default async function handler(req,res){
   const recoveryCiScope=await shiftRpc(db,
    'reality_read_next_same_original_recovery_candidate_v2',{})
    .catch(()=>null);
-  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+  let sameOriginalRecoveryCiCheckpoint=null;
+  if(!boundedCorrectiveCheckpoint&&
+     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      recoveryCiScope?.status==='SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI'&&
      recoveryCiScope.shift_id===wakeReceipt.shift_id&&
      /^[a-f0-9-]{36}$/i.test(recoveryCiScope.attempt_id||'')&&
@@ -348,33 +739,17 @@ export default async function handler(req,res){
      {worker_status:'WAKE_FAILED',
       worker_result:'CORRECTIVE_PROOF_BOUNDARY_UNVERIFIED',
       http_status:503,proof_verified:false};
-   workerStage='SAME_ORIGINAL_RECOVERY_CI_PULSE';
-   const pulse=await shiftRpc(db,
-    'reality_record_employee_shift_worker_pulse_v1',{
-     p_shift_id:wakeReceipt.shift_id,
-     p_status:classification.worker_status,
-     p_safe_result:classification.worker_result
-    });
-   if(pulse?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
-      pulse.shift_id!==wakeReceipt.shift_id||
-      pulse.installation_authorized!==false||
-      pulse.production_changed!==false)
-    throw Error('SAME_ORIGINAL_RECOVERY_CI_PULSE_UNVERIFIED');
-   if(isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
-    durableWorkerCompletion=pulse;
-   workerStage='SAME_ORIGINAL_RECOVERY_CI_RESPONSE_PUBLICATION';
-   return res.status(classification.http_status).json({
+   sameOriginalRecoveryCiCheckpoint={
     status:'GOVERNED_SAME_ORIGINAL_RECOVERY_CI_RECONCILED',
     original_work_id:recoveryCiScope.original_work_id,
     attempt_id:recoveryCiScope.attempt_id,
     attempt_number:recoveryCiScope.attempt_number,
-    same_original_recovery_ci:retryCi,
+    corrective_ci_result:retryCi,
+    independent_ci_proof_verified:classification.proof_verified,
     independent_ci_verified:classification.proof_verified,
-    actual_worker_wake_receipt:wakeReceipt,
-    actual_worker_completion_receipt:pulse,
     original_job_completed:false,new_shift_started:false,
     installation_authorized:false,production_changed:false
-   });
+   };
   }
   // Evidence-backed transition from verified corrective CI into the same
   // original's eventual owner install decision. This READS provider evidence
@@ -439,6 +814,28 @@ export default async function handler(req,res){
     source_installed:false,original_job_completed:false,
     production_changed:false
    }));
+  // The original one-use installation is consumed. A separate signed,
+  // independently tested exact recovery decision may publish once; all
+  // subsequent wakes are read-only reconciliations, not retry permissions.
+  workerStage='GENERAL_ORIGINAL_ONE_USE_RECOVERY_PUBLICATION';
+  const generalOriginalRecoveryPublication=
+   await continueGeneralOriginalOwnerApprovedRecovery({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'RECOVERY_SIGNED_PROVIDER_UNVERIFIED_NO_REPLAY',
+    source_installed:false,original_job_completed:false,
+    production_changed:false
+   }));
+  // A fenced original is a one-time source-backed engineering diagnosis.
+  // The model cannot authorize another write, installation or settlement.
+  const fencedOriginalInvestigationPromise=
+   investigateGeneralOriginalFencedRecovery({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'FENCED_RECOVERY_INVESTIGATION_PROVIDER_UNVERIFIED',
+    independently_tested:false,external_retry_authorized:false,
+    original_job_completed:false,production_changed:false
+   }));
   workerStage='GENERAL_ORIGINAL_INDEPENDENT_FINAL_SETTLEMENT';
   const generalOriginalSettlement=
    await settleGeneralOwnerApprovedOriginal({
@@ -481,13 +878,17 @@ export default async function handler(req,res){
   // a protected isolated candidate branch and a real GitHub frozen CI run.
   // This work is service-only, can be reconciled after uncertainty, and runs
   // concurrently with already-authorized work, without a second Start.
-  const correctiveCiPromise=continueRileyCorrectiveModelIntoIndependentCI({
-   db,env:process.env,fetchImpl:fetch
-  }).catch(()=>({
-   status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
-   original_job_completed:false,installation_authorized:false,
-   production_changed:false,new_shift_started:false
-  }));
+  const correctiveCiPromise=boundedCorrectiveCheckpoint?
+   Promise.resolve(boundedCorrectiveCheckpoint.corrective_ci_result):
+   sameOriginalRecoveryCiCheckpoint?
+   Promise.resolve(sameOriginalRecoveryCiCheckpoint.corrective_ci_result):
+   continueRileyCorrectiveModelIntoIndependentCI({
+    db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false,new_shift_started:false
+   }));
   
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
@@ -582,6 +983,17 @@ export default async function handler(req,res){
   workerStage='GOVERNED_EXECUTION_TICK';
   const result=await processGovernedEmployeeShiftTick(db,{
    coordinateRoleWork,executeQualifiedOriginals
+  }).catch(error=>{
+   // Current shift graph has already passed owner/identity validation.
+   // Preserve the uncertain original, never replay its side effect here.
+   // An unavailable database remains a whole-worker infrastructure failure.
+   if(!isIsolatedOriginalProviderOutage(error))throw error;
+   console.warn('REALITY_SHIFT_ONE_ORIGINAL_PROVIDER_UNAVAILABLE');
+   return {ok:false,
+    status:'EXACT_SHIFT_ORIGINAL_TICK_BLOCKED_OTHER_WORK_CONTINUES',
+    shift_id:initialGraph.shift_id,original_job_completed:false,
+    original_job_retried:false,new_shift_started:false,
+    installation_authorized:false,production_changed:false};
   });
   // A source-checked commit-triage observation only becomes a durable original
   // after independent provider GET and service-only warrant/proof readback.
@@ -659,6 +1071,81 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
+  // existing employee discovery inventory. One bounded model inquiry at most
+  // per wake; the database singleflight prevents replay of unchanged sources.
+  // It only records source-backed investigation, never admits another job.
+  // The unified execution graph intentionally requires a completion-bound
+  // original-job warrant. It must NOT silently suppress employee SOURCE
+  // investigations inside an otherwise valid, time-bounded signed shift.
+  // The existing signed wake is independently rebound to an exact owner
+  // and existing discovery inventory by a service-only read-only RPC.
+  workerStage='SIGNED_EMPLOYEE_INQUIRY_SCOPE';
+  let signedEmployeeInquiryScope={
+   status:'NO_CURRENT_SIGNED_EMPLOYEE_INQUIRY_SCOPE',
+   investigation_authorized:false,owner_verified:false,
+   original_job_created:false,execution_authorized:false,
+   installation_authorized:false,production_changed:false
+  };
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+   signedEmployeeInquiryScope=await shiftRpc(db,
+    'reality_read_current_signed_employee_inquiry_scope_v1',{
+     p_shift_id:wakeReceipt.shift_id
+    }).catch(()=>({
+     status:'SIGNED_EMPLOYEE_INQUIRY_SCOPE_READBACK_UNAVAILABLE',
+     investigation_authorized:false,owner_verified:false,
+     original_job_created:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    }));
+  }
+  const signedInquiryValid=(
+   signedEmployeeInquiryScope.status===
+    'OWNER_SIGNED_EMPLOYEE_INQUIRY_SCOPE_ACTIVE'&&
+   signedEmployeeInquiryScope.owner_verified===true&&
+   /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+    signedEmployeeInquiryScope.owner_id||'')&&
+   signedEmployeeInquiryScope.shift_id===wakeReceipt.shift_id&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedEmployeeInquiryScope.plan_fingerprint||'')&&
+   Number.isSafeInteger(signedEmployeeInquiryScope.due_source_count)&&
+   signedEmployeeInquiryScope.due_source_count>0&&
+   signedEmployeeInquiryScope.due_source_count<=1200&&
+   signedEmployeeInquiryScope.investigation_authorized===true&&
+   signedEmployeeInquiryScope.source_only===true&&
+   signedEmployeeInquiryScope.original_job_created===false&&
+   signedEmployeeInquiryScope.execution_authorized===false&&
+   signedEmployeeInquiryScope.installation_authorized===false&&
+   signedEmployeeInquiryScope.production_changed===false
+  );
+  // The old completion-bound graph continues to authorize ORIGINAL work.
+  // Both paths must agree if present; the source-only readback never
+  // broadens original-job or installation authority.
+  if(signedInquiryValid&&
+   unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+   (unifiedGraph.owner_id!==signedEmployeeInquiryScope.owner_id||
+    unifiedGraph.shift_id!==signedEmployeeInquiryScope.shift_id))
+   throw Error('EMPLOYEE_INQUIRY_OWNER_SHIFT_CONFLICT');
+  const inquiryOwnerId=signedInquiryValid?
+   signedEmployeeInquiryScope.owner_id:
+   unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+   /^[a-f0-9-]{36}$/i.test(unifiedGraph.owner_id||'')?
+    unifiedGraph.owner_id:null;
+  const employeeTemporalInquiryPromise=inquiryOwnerId?
+   generateOneEmployeeTemporalInquiry({
+    ownerId:inquiryOwnerId,db,env:process.env,fetchImpl:fetch
+   }).catch(()=>({
+    status:'EMPLOYEE_TIME_INQUIRY_UNVERIFIED',
+    new_original_jobs_created:0,execution_authorized:false,
+    installation_authorized:false,production_changed:false
+   })):
+   Promise.resolve({
+    status:signedEmployeeInquiryScope.status===
+      'SIGNED_EMPLOYEE_INQUIRY_SCOPE_READBACK_UNAVAILABLE'?
+      'EMPLOYEE_INQUIRY_WORK_SCOPE_PROOF_UNAVAILABLE':
+      'NO_CURRENT_SIGNED_SHIFT_FOR_EMPLOYEE_INQUIRY',
+    new_original_jobs_created:0,execution_authorized:false,
+    installation_authorized:false,production_changed:false
+   });
   // The worker automatically reconciles native-repair and PR-review receipts
   // against the frozen owner warrant on every pulse. The status is merely
   // a truthful next-work diagnostic: never a new job or installation grant.
@@ -1206,6 +1693,21 @@ export default async function handler(req,res){
   // A block-local declaration caused response publication to throw after an
   // otherwise successful WAKE_COMPLETED database receipt.
   const chatWorkHandoff=await chatWorkPromise;
+  workerStage='GENERAL_ORIGINAL_FENCED_MODEL_INVESTIGATION';
+  const fencedOriginalInvestigation=await fencedOriginalInvestigationPromise;
+  // A model result belongs to the same original across all later wakes,
+  // even after its one-time model lease has been consumed.
+  const fencedOriginalInvestigationState=await shiftRpc(db,
+   'reality_read_general_original_fenced_investigation_state_v1',{})
+   .catch(()=>({status:'FENCED_ORIGINAL_READBACK_UNVERIFIED',
+     independently_tested:false,external_retry_authorized:false,
+     original_job_completed:false,production_changed:false}));
+  workerStage='SIGNED_MAINTENANCE_FINAL_RECEIPT_RECONCILIATION';
+  const signedMaintenanceClose=await shiftRpc(db,
+   'reality_close_employee_maintenance_continuation_v1',{}).catch(()=>({
+    status:'SIGNED_MAINTENANCE_CLOSURE_READBACK_UNAVAILABLE',
+    customer_originals_settled:0,production_changed:false
+   }));
   let completedPulse=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    // A successful worker wake is NOT a completed repair. Surface the
@@ -1222,7 +1724,49 @@ export default async function handler(req,res){
    const settledCommitTriage=unifiedGraph.jobs.some(x=>
     x.original_kind==='REAL_COMMIT_REFERENCE_TRIAGE_ORIGINAL'&&
     x.phase==='SETTLED');
-   const outcomeCode=correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
+   // Report a genuinely blocked approved original before unrelated
+   // successful source-check receipts. A completed wake is NOT job settlement.
+   // This is evidence-only; no retry, permission or new work is created.
+   const originalInstallNeedsRecovery=
+    generalOriginalSettlement?.original_job_completed!==true&&
+    generalOriginalInstall?.status===
+     'GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED';
+   const autonomousRecoveryDiagnosisReady=
+    fencedOriginalInvestigation?.status===
+     'FENCED_ORIGINAL_RILEY_MODEL_HYPOTHESIS_RECORDED'||
+    (fencedOriginalInvestigationState?.status===
+     'FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED'&&
+     fencedOriginalInvestigationState.original_job_completed===false&&
+     fencedOriginalInvestigationState.independently_tested===false&&
+     fencedOriginalInvestigationState.external_retry_authorized===false);
+   // A signed independent evidence review does not complete a repair.
+   // Propagate the SAME original's remaining authority and test blocker into
+   // the existing owner shift pulse; do not lose it behind generic "not due".
+   const signedReviewStillNeedsOriginalAuthorization=
+    sameOriginalPostmaintenanceGate?.status===
+      'EXISTING_ORIGINAL_NOT_AUTHORIZED_BY_MAINTENANCE_SHIFT'&&
+    /^sha256:[a-f0-9]{64}$/.test(
+      sameOriginalPostmaintenanceGate.signed_external_review_receipt_sha256||'')&&
+    sameOriginalPostmaintenanceGate.original_job_completed===false&&
+    sameOriginalPostmaintenanceGate.independent_final_receipt_verified===false&&
+    sameOriginalPostmaintenanceGate.case_specific_maintenance_ci_red_attested===false;
+   const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
+    'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    signedReviewStillNeedsOriginalAuthorization?
+    'SIGNED_EVIDENCE_REVIEWED_ORIGINAL_WORK_BLOCKED_BY_WARRANT':
+    generalOriginalRecoveryPublication?.source_installed===true?
+    'GENERAL_ORIGINAL_SOURCE_INSTALLED_POSTINSTALL_RECEIPT_PENDING':
+    generalOriginalRecoveryPublication?.status===
+     'RECOVERY_EXACT_OWNER_APPROVAL_PENDING'?
+    'GENERAL_ORIGINAL_RECOVERY_READY_FOR_EXACT_OWNER_DECISION':
+    generalOriginalRecoveryPublication?.status===
+     'RECOVERY_WRITE_FENCED_ORIGINAL_HEAD_UNCHANGED_NO_RETRY'?
+    'GENERAL_ORIGINAL_RECOVERY_FENCED_NO_GITHUB_EFFECT':
+    autonomousRecoveryDiagnosisReady?
+    'FENCED_RILEY_DIAGNOSIS_RECORDED_INDEPENDENT_REPAIR_TEST_REQUIRED':
+    originalInstallNeedsRecovery?
+    'GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT':
+    correctiveCiResult?.status==='CORRECTIVE_CI_PASSED_EXACT_INSTALL_REVIEW_REQUIRED'?
     'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_PASSED_INSTALL_APPROVAL_REQUIRED':
     correctiveCiResult?.status==='CORRECTIVE_CI_REJECTED_ORIGINAL_REMAINS_OPEN'?
     'CORRECTIVE_CANDIDATE_INDEPENDENT_CI_FAILED_RECOVERY_REQUIRED':
@@ -1281,6 +1825,7 @@ export default async function handler(req,res){
     throw Error('WORKER_COMPLETION_PULSE_UNVERIFIED');
    durableWorkerCompletion=completedPulse;
   }
+  const employeeTemporalInquiry=await employeeTemporalInquiryPromise;
   workerStage='WORKER_RESPONSE_PUBLICATION';
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
@@ -1290,14 +1835,41 @@ export default async function handler(req,res){
     integrated_work_intake:integratedWorkIntake,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
+    employee_time_inquiry_receipt:employeeTemporalInquiry,
+    qualified_employee_executable_work:qualifiedEmployeeWork,
+    changed_source_same_job_requalification:changedSourceRequalification,
+    shift_continuity_incident_investigation:shiftContinuityInvestigation,
+    shift_continuity_independent_review:continuityIndependentReview,
+    independent_business_qualification_review:businessQualificationReview,
+    signed_internal_maintenance_work:internalMaintenanceWork,
+    signed_maintenance_failure_baseline:maintenanceFailureBaseline,
+    signed_maintenance_ci_preflight:signedMaintenanceCiPreflight,
+    signed_maintenance_ci_source_epoch:maintenanceCiSourceEpoch,
+    signed_external_maintenance_review:signedExternalMaintenanceReview,
+    same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
+    signed_schedule_evidence_admission:signedScheduleAdmission,
+    signed_maintenance_completion_report:signedMaintenanceClose,
+    signed_employee_inquiry_scope:signedEmployeeInquiryScope,
+    standing_employee_discovery:standingDiscoveryResult,
+    employee_capability_schedule:capabilityScheduleResult,
+    scheduled_employee_capability_inquiry:scheduledCapabilityInquiryResult,
+    operational_self_recovery_investigation:operationalRecoveryResult,
+    incident_existing_original_handoff:incidentOriginalHandoff,
     authenticated_chat_work_handoff:chatWorkHandoff,
     same_original_recovery_attempt:sameOriginalRecovery,
+    same_original_recovery_checkpoint:sameOriginalRecoveryCheckpoint,
+    same_original_recovery_ci_checkpoint:sameOriginalRecoveryCiCheckpoint,
+    chat_new_development_checkpoint:chatNewDevelopmentCheckpoint,
+    corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
     generalized_original_acceptance_push_preflight:generalOriginalAcceptancePush,
     generalized_original_preview_auto_deploy:generalizedPreviewDeployment,
     generalized_original_approved_install:generalOriginalInstall,
+    generalized_original_recovery_publication:generalOriginalRecoveryPublication,
     generalized_original_final_settlement:generalOriginalSettlement,
+    generalized_original_fenced_investigation:fencedOriginalInvestigation,
+    generalized_original_fenced_investigation_state:fencedOriginalInvestigationState,
     riley_auto_corrective_independent_ci:correctiveCiResult,
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
@@ -1350,11 +1922,17 @@ export default async function handler(req,res){
   }
   // Persist stage only; never provider error text or credentials.
   console.warn('REALITY_SHIFT_WORKER_FAILED_STAGE',workerStage);
+  // Classify transport failure without exposing RPC credentials or sending
+  // another database write while the boundary is demonstrably unavailable.
+  shiftDbTransportUnreachable=isShiftDatabaseTransportUnreachable(error);
+  if(shiftDbTransportUnreachable)
+   console.warn('REALITY_SHIFT_WORKER_DATABASE_TRANSPORT_UNAVAILABLE');
   const safeStage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
    workerStage:'UNCLASSIFIED_STAGE';
   // Best-effort independent failure timestamp; never claim a model/tool
   // succeeded, never take another job claim and never leak provider secrets.
-  if(activePulseDb&&/^[a-f0-9-]{36}$/i.test(activePulseShiftId||'')){
+  if(!shiftDbTransportUnreachable&&activePulseDb&&
+     /^[a-f0-9-]{36}$/i.test(activePulseShiftId||'')){
    try{
     await shiftRpc(activePulseDb,
      'reality_record_employee_shift_worker_pulse_v1',{
@@ -1367,5 +1945,33 @@ export default async function handler(req,res){
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
    work_completed:false,installation_authorized:false,
    production_changed:false});
+ }finally{
+  // Independently attest actual completion or failure even when a worker
+  // response has already been sent. No false 'successful job' claim.
+  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
+   const result=res.statusCode>=500?'FAILED':'COMPLETED';
+   const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
+    workerStage:'UNCLASSIFIED_STAGE';
+   try{
+    await shiftRpc(activePulseDb,'reality_record_signed_worker_actual_run_v1',{
+     p_run_id:actualWorkerRunId,p_status:result,p_stage:stage
+    });
+   }catch{
+    console.warn('REALITY_SIGNED_WORKER_FINAL_ATTESTATION_UNAVAILABLE');
+   }
+  }
+  // A failed release leaves a bounded lease, not another concurrent worker.
+  // This does not settle customer work or change any authorization.
+  if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
+   try{
+    const released=await shiftRpc(activePulseDb,
+     'reality_release_governed_shift_worker_run_v1',
+     {p_claim_id:governedWakeClaimId});
+    if(released?.status!=='WAKE_RELEASED')
+     console.warn('REALITY_SHIFT_WORKER_WAKE_LEASE_NOT_RELEASED');
+   }catch{
+    console.warn('REALITY_SHIFT_WORKER_WAKE_LEASE_RELEASE_UNVERIFIED');
+   }
+  }
  }
 }

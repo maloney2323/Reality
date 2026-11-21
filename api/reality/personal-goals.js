@@ -21,13 +21,16 @@ import {projectAuthoritativeUserGoals,appendAuthenticatedUserGoalCommand,USER_GO
  from '../../src/reality-authoritative-user-goal-ledger-v0.1.js';
 export const maxDuration=60;
 function fail(code,status=400){const e=new Error(code);e.status=status;throw e}
-function scopeFor(session,conversationId){
- const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
- return {
-  root:'personal:chat:'+scope,
-  worldline:'personal:chat:'+scope,
-  world:'personal:chat:'+scope,
- };
+function scopeFor(session,conversationId,mode='conversation'){
+ // The primary business mission belongs to the signed-in OWNER, not a
+ // particular Chat. Individual conversation objectives still use their
+ // previous isolated roots, including all prior receipts.
+ const account=mode==='account';
+ const hash=createHash('sha256').update(account?
+  'reality:owner-primary-business-mission:v1:'+session.user_id:
+  session.user_id+'|'+conversationId).digest('hex');
+ const scope=(account?'personal:owner-business-mission:':'personal:chat:')+hash;
+ return {root:scope,worldline:scope,world:scope};
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
@@ -45,13 +48,23 @@ export default async function handler(req,res){
   const conversationId=String((req.method==='GET'?
    req.query?.conversation_id:req.body?.conversation_id)||'');
   if(!validUuid(conversationId))fail('CHAT_CONVERSATION_ID_INVALID');
+  const mode=String((req.method==='GET'?
+   req.query?.scope:req.body?.scope)||'conversation');
+  if(!['conversation','account'].includes(mode))
+   fail('GOAL_SCOPE_INVALID',400);
+  // An account mission is a durable long-term owner objective. A chat turn
+  // cannot silently detour, pause, complete or overwrite it; updates always
+  // require another explicit authenticated SET_ACTIVE owner command.
+  if(mode==='account'&&req.method==='POST'&&
+     req.body?.operation!=='SET_ACTIVE')
+   fail('ACCOUNT_MISSION_EXPLICIT_SET_ACTIVE_ONLY',400);
   if(process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')
    fail('GOAL_CONTINUITY_DURABILITY_REQUIRED',503);
   const isolated=resolveReliabilityBenchmarkDb();
   if(!isolated||isolated.url!==session.config.url||
       isolated.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
    fail('GOAL_CONTINUITY_PRIVATE_LEDGER_SCOPE_MISMATCH',503);
-  const scoped=scopeFor(session,conversationId);
+  const scoped=scopeFor(session,conversationId,mode);
   const spine=createContinuitySpine({
    continuityRootId:scoped.root,worldlineId:scoped.worldline,
    subjectId:session.user_id,
@@ -67,7 +80,9 @@ export default async function handler(req,res){
     continuityHistory:history,continuityRootId:spine.continuity_root_id,
     worldId:scoped.world,principalId:session.user_id,
    });
-   return res.status(200).json({ok:true,conversation_id:conversationId,goal_state:state});
+   return res.status(200).json({ok:true,conversation_id:conversationId,
+    goal_scope:mode==='account'?'OWNER_ACCOUNT_PRIMARY_MISSION':'CONVERSATION_OBJECTIVE',
+    goal_state:state,external_execution_authorized:false});
   }
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    fail('GOAL_COMMAND_JSON_REQUIRED',415);
@@ -111,6 +126,7 @@ export default async function handler(req,res){
    targetGoalId:target||null,observedAt,
   });
   return res.status(200).json({ok:true,conversation_id:conversationId,
+   goal_scope:mode==='account'?'OWNER_ACCOUNT_PRIMARY_MISSION':'CONVERSATION_OBJECTIVE',
    source_user_message_ref:row.source_ref,
    transition_receipt_id:outcome.event_id,
    goal_state:outcome.state,

@@ -1,0 +1,32 @@
+name: Reality original preinstall contract attestation proof
+on:
+  push:
+    branches:
+      - reality/chat-direct-work-handoff-20261115
+    paths:
+      - supabase/migrations/20261116164000_general_original_preinstall_contract_attestation_v1.sql
+      - supabase/functions/reality-governed-original-acceptance-push-probe-v1/index.ts
+      - test/reality-general-original-preinstall-contract-v1.test.js
+      - .github/workflows/reality-general-original-preinstall-contract-proof-v1.yml
+  pull_request:
+    paths:
+      - supabase/migrations/20261116164000_general_original_preinstall_contract_attestation_v1.sql
+      - supabase/functions/reality-governed-original-acceptance-push-probe-v1/index.ts
+      - test/reality-general-original-preinstall-contract-v1.test.js
+      - .github/workflows/reality-general-original-preinstall-contract-proof-v1.yml
+permissions:
+  contents: read
+jobs:
+  exact-evidence-preinstall-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact owner work identity and final preinstall proof without an install
+        run: |
+          node --test test/reality-general-original-preinstall-contract-v1.test.js

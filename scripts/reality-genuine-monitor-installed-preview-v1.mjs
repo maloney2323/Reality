@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Independent post-install preview activation monitor. Reads installed bytes
 // from GitHub, executes only in an offline, read-only, credential-free sandbox.
 import {readFileSync,mkdirSync,writeFileSync,existsSync} from 'node:fs';
@@ -11,7 +13,7 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 const source='artifact/install/reality-owner-approved-preview-install.json';
 if(env.GITHUB_ACTIONS!=='true'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101'||
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||
  env.OPENAI_API_KEY||env.SUPABASE_SECRET_KEY)
  fail('INDEPENDENT_PREVIEW_RUNNER_REQUIRED');
 const evidence=JSON.parse(readFileSync(source,'utf8'));

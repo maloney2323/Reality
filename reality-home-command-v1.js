@@ -40,6 +40,7 @@
  for(const [title,path,sym,target] of [
   ['Home','/','⌂'],['Chat','/chat','▤'],
   ['Employees','/employees','♧'],
+  ['Capabilities','/#realityCapabilities','◇'],
   ['Work',null,'▣','realityHomeWorkday'],
   ['Shifts',null,'▦','realityEmployeeShiftPlanner'],
   ['ROI & Drift','/value','▥'],['Receipts','/value','✓']
@@ -53,11 +54,30 @@
  for(const text of ['Source-backed discovery','Governed review','Independent receipts'])
   assurances.append(el('span','',text));
  copy.append(assurances);
- // Home is for discovery and understanding. Execution remains in the
- // existing governed Shifts workflow; there is deliberately no Start CTA.
- const heroFoot=el('p','rc-hero-foot',
-  'Proposed work is separate from qualified jobs, active execution and verified outcomes.');
- copy.append(heroFoot);
+ // The owner can manually refresh source discovery without navigating
+ // the older Work Center controls. The action uses the existing GET-only
+ // reader, NOT new job authorization, shift creation or installation.
+ const heroActions=el('div','rc-home-work-actions');
+ const findWorkNow=el('button','rc-outline rc-home-find-work','Refresh source discoveries');
+ findWorkNow.type='button';
+ const findWorkNote=el('p','rc-hero-foot',
+  'This refreshes evidence only. The existing authorized employee investigation runs automatically; see Capabilities → What Reality is doing for progress and next steps.');
+ findWorkNow.addEventListener('click',()=>{
+  const existing=$('findWork');
+  if(!existing){
+   findWorkNote.textContent='Work discovery is unavailable here. No job was dispatched.';
+   return;
+  }
+  reveal('findWork');
+  if(existing.disabled){
+   findWorkNote.textContent='Discovery is already running. No duplicate request sent.';
+   return;
+  }
+  findWorkNote.textContent='Refreshing source observations in the existing Work Center. No shift is authorized or started.';
+  existing.click();
+ });
+ heroActions.append(findWorkNow,findWorkNote);
+ copy.append(heroActions);
  hero.append(copy);stage.append(hero);
  const stats=el('div','rc-stats'),metrics={};
  stats.setAttribute('aria-label','Operational evidence states');
@@ -77,6 +97,9 @@
  const main=el('div','rc-main-grid');
  const people=el('section','rc-workforce');
  people.append(head('AI WORKFORCE · OWNER-SCOPED ROLES','Your AI workforce'));
+ const discoverySummary=el('p','rc-discovery-summary',
+  'Checking source-backed discovery across all eight roles…');
+ people.append(discoverySummary);
  const capacity=el('p','rc-capacity',
   'Workload is evaluated against a hypothetical 40-hour-per-role reference, not actual scheduled employee hours.');
  const weekly=el('section','rc-weekly');
@@ -143,6 +166,7 @@
  mobile.setAttribute('aria-label','Reality mobile navigation');
  for(const [label,path,sym,target] of [
   ['Home','/','⌂'],['Employees','/employees','♧'],
+  ['Capabilities','/#realityCapabilities','◇'],
   ['Work',null,'▣','realityHomeWorkday'],['ROI','/value','▥'],['Chat','/chat','▤']
  ])mobile.append(item(label,path,sym,target));
  document.body.append(mobile);
@@ -308,6 +332,33 @@
   }
   if(ordered.length>featured.length)weeklyRows.append(additional);
  }
+ if(typeof window.addEventListener==='function')
+  window.addEventListener('reality:employee-discovery-readback',event=>{
+   const d=event.detail;
+   if(!signed()||d?.status!=='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'||
+      d.read_only!==true||d.qualified_jobs!==0||
+      d.shift_authorized!==false||d.production_changed!==false||
+      !Array.isArray(d.roles)||d.roles.length!==8||
+      !Array.isArray(d.items)||d.items.length>150){
+    discoverySummary.textContent='Automatic employee discovery readback unavailable. No work or hours inferred.';
+    return;
+   }
+   const current=d.roles.reduce((n,r)=>n+r.candidate_source_count,0);
+   const historical=d.roles.reduce((n,r)=>n+r.historical_source_count,0);
+   const settled=d.roles.reduce((n,r)=>n+r.settled_source_count,0);
+   const noSource=d.roles.filter(r=>
+    r.coverage_state==='NO_CONNECTED_ROLE_SOURCE_EVIDENCE').length;
+   if(![current,historical,settled,noSource].every(Number.isSafeInteger)||
+      current+historical+settled!==d.items.length){
+    discoverySummary.textContent='Employee discovery counts unverified.';
+    return;
+   }
+   discoverySummary.textContent='Automatic discovery · '+
+    current+' current sources to investigate · '+
+    historical+' historical sources need refresh · '+
+    settled+' completed sources withheld · '+
+    noSource+' roles need connected evidence. No jobs authorized by discovery.';
+  });
  if(typeof window.addEventListener==='function')
   window.addEventListener('reality:weekly-workload-readback',event=>{
    const value=event.detail;

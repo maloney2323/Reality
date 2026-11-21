@@ -528,3 +528,127 @@ test('seven failures permit a single verified-draft correction then stop at exac
  assert.equal(nextGovernedSelfImprovementAction(s).installation_authorized,false);
 
 });
+
+test('signed self-repair continuation automatically uses EXACT previously approved capability, then resumes SAME original',async()=>{
+ const h=harness();
+ let current=await gap(createGovernedSelfImprovement({scope}),h);
+ current=await verified(proposeGovernedCandidate(current,candidate()),h);
+ assert.equal(current.phase,'AWAITING_OWNER_APPROVAL');
+ let approvalReads=0,registrations=0,resumes=0,settlements=0;
+ const adapters={
+  readExistingPromotionAuthorization:async req=>{
+   approvalReads++;
+   assert.deepEqual({
+    owner_id:req.owner_id,original_work_id:req.original_work_id,
+    candidate_artifact_hash:req.candidate_artifact_hash,
+    checkpoint_hash:req.checkpoint_hash,read_only:req.read_only,
+    mint_new_approval:req.mint_new_approval,
+    authorize_production:req.authorize_production,
+   },{
+    owner_id:scope.owner_id,original_work_id:scope.original_work_id,
+    candidate_artifact_hash:current.candidate.artifact_hash,
+    checkpoint_hash:current.head_hash,read_only:true,
+    mint_new_approval:false,authorize_production:false,
+   });
+   return h.issue(current,'PROMOTION_AUTHORIZED',{
+    owner_id:scope.owner_id,artifact_hash:current.candidate.artifact_hash,
+    approval_origin:'AUTHENTICATED_OWNER_EXPLICIT_ACTION',consumed_once:true,
+    reservation_ref:'database:existing-single-use-owner-warrant',
+   });
+  },
+  registerAndReobserve:async req=>{
+   registrations++;
+   assert.equal(req.scope.original_work_id,scope.original_work_id);
+   assert.equal(req.promotion_authorization.kind,'PROMOTION_AUTHORIZED');
+   return h.issue(current,'CAPABILITY_REGISTERED',{
+    artifact_hash:current.candidate.artifact_hash,
+    authorization_ref:current.promotion_authorization.evidence_ref,
+    registry_receipt_ref:'provider:registered-exact-capability',
+    status:'ACTIVE',target_worldline_id:scope.worldline_id,
+   });
+  },
+  resumeOriginalWork:async req=>{
+   resumes++;
+   assert.equal(req.scope.original_work_id,scope.original_work_id);
+   return h.issue(current,'ORIGINAL_JOB_RESUMED',{
+    registration_ref:current.registration.registry_receipt_ref,
+    original_work_id:scope.original_work_id,
+    real_execution_observed:true,
+    executor_run_ref:'provider:same-original-actual-worker-run',
+   });
+  },
+  settleAndReobserve:async req=>{
+   settlements++;
+   assert.equal(req.scope.original_work_id,scope.original_work_id);
+   return h.issue(current,'ORIGINAL_JOB_SETTLED',{
+    resumption_ref:current.resumption.executor_run_ref,
+    original_work_id:scope.original_work_id,
+    durable_settlement_readback:true,independent_outcome_verified:true,
+    settlement_receipt_ref:'provider:same-original-independent-final',
+   });
+  },
+  verifyIndependentReceipt:h.verifyProvider,
+  persistCheckpoint:async next=>{
+   current=next;
+   return {persisted:true,independent_readback_verified:true,
+    checkpoint_hash:next.head_hash,
+    original_work_id:next.scope.original_work_id};
+  },
+ };
+ const out=await continueGovernedSelfImprovement({
+  state:current,adapters,maxTransitions:8
+ });
+ assert.equal(out.status,'ORIGINAL_JOB_INDEPENDENTLY_SETTLED');
+ assert.equal(out.original_job_completed,true);
+ assert.equal(out.state.scope.original_work_id,scope.original_work_id);
+ assert.deepEqual([approvalReads,registrations,resumes,settlements],[1,1,1,1]);
+ assert.equal(verifySelfImprovementJournal(out.state),true);
+});
+test('self-repair does not auto-authorize an upgrade when no prior exact owner warrant exists',async()=>{
+ const h=harness();
+ let state=await gap(createGovernedSelfImprovement({scope}),h);
+ state=await verified(proposeGovernedCandidate(state,candidate()),h);
+ let read=0;
+ const adapters={
+  readExistingPromotionAuthorization:async req=>{
+   read++;
+   assert.equal(req.mint_new_approval,false);
+   return null;
+  },
+ };
+ const outcome=await continueGovernedSelfImprovement({state,adapters});
+ assert.equal(outcome.status,'OWNER_APPROVAL_REQUIRED');
+ assert.equal(outcome.original_job_completed,false);
+ assert.equal(outcome.owner_action_required,true);
+ assert.equal(outcome.state.phase,'AWAITING_OWNER_APPROVAL');
+ assert.equal(read,1);
+});
+test('model-written or unsigned approval cannot become a self-installed capability',async()=>{
+ const h=harness();
+ let state=await gap(createGovernedSelfImprovement({scope}),h);
+ state=await verified(proposeGovernedCandidate(state,candidate()),h);
+ let installs=0;
+ await assert.rejects(continueGovernedSelfImprovement({
+  state,adapters:{
+   readExistingPromotionAuthorization:async()=>({
+    kind:'PROMOTION_AUTHORIZED',owner_id:scope.owner_id,
+    artifact_hash:state.candidate.artifact_hash,
+    approval_origin:'AUTHENTICATED_OWNER_EXPLICIT_ACTION',
+    consumed_once:true,reservation_ref:'fake:reservation',
+    evidence_ref:'model:fictional-warrant',
+    evidence_hash:'model:fictional-hash',
+    goal_id:scope.goal_id,original_work_id:scope.original_work_id,
+    continuity_root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,
+   }),
+   verifyIndependentReceipt:h.verifyProvider,
+   persistCheckpoint:async()=>{throw Error('SHOULD_NOT_PERSIST_FORGED_APPROVAL')},
+   registerAndReobserve:async()=>{installs++;throw Error('FORGED_INSTALL')},
+  }
+ }),/SELF_IMPROVEMENT_INDEPENDENT_PROVIDER_READBACK_FAILED/);
+ assert.equal(installs,0);
+ await assert.rejects(continueGovernedSelfImprovement({
+  state,adapters:{readExistingPromotionAuthorization:async()=>({
+   kind:'UNVERIFIED_MODEL_INSTALL_CLAIM'
+  })}
+ }),/SELF_IMPROVEMENT_EXISTING_PROMOTION_RECEIPT_INVALID/);
+});

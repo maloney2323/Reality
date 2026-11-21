@@ -169,6 +169,20 @@ test('Work uses the original Work Center instead of creating a second queue',()=
  assert.equal(f.main.children.filter(x=>x===f.nodes.workCenter).length,1);
  assert.equal(f.find('realityUnifiedRail').children.filter(x=>x.href==='/work').length,1);
 });
+test('full Past Present Future belongs to Home, never repeated on other pages',()=>{
+ const home=build('/');
+ assert.ok(home.find('realityTimeHorizon'),'Home keeps the original timeline host');
+ for(const path of ['/employees','/work','/shifts','/chat','/value','/connections']){
+  const page=build(path);
+  assert.equal(page.find('realityTimeHorizon'),null,path+' must not mount a timeline');
+ }
+ const timeCss=read('reality-past-present-future-v1.css');
+ assert.match(timeCss,/body\.reality-unified-ui:not\(\[data-reality-route="home"\]\)/);
+ assert.match(timeCss,/:is\(#realityTimeHorizon,\.reality-matrix\)/);
+ assert.match(timeCss,/display:none!important/);
+ assert.match(js,/if\(route==='home'&&top&&main\)\{/);
+});
+
 test('the mobile session check is bounded but does not fake authenticated access',()=>{
  assert.match(html,/sessionRequestInFlight/);
  assert.match(html,/AbortSignal\.timeout\(16500\)/);

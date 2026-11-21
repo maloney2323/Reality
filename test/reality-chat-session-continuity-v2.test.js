@@ -65,6 +65,21 @@ test('temporary provider 503 does not erase a previously authenticated session c
    {fetchImpl:healthy.fetch,env});
  assert.equal(user.user_id,signed.owner.user_id);
 });
+test('auth provider readback timeout keeps original owner credentials fenced',async()=>{
+ const signed=await login(),r=response(),fallback=provider();
+ await assert.rejects(
+  authenticatedChatSession(request(signed.cookie),r,{
+   fetchImpl:async (url,options)=>{
+    if(new URL(url).pathname==='/auth/v1/user')
+     throw new Error('simulated provider connection timeout');
+    return fallback.fetch(url,options);
+   },env
+  }),
+  /CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE/
+ );
+ // A provider error does not mean the owner logged out or authorized work.
+ assert.doesNotMatch(String(r.headers['Set-Cookie']||''),/Max-Age=0/);
+});
 test('rejected refresh clears cookie; explicit logout always ends account session',async()=>{
  const signed=await login(),r=response(),p=provider({refreshStatus:401});
  const user=await authenticatedChatSession(request(signed.cookie),r,{fetchImpl:p.fetch,env});

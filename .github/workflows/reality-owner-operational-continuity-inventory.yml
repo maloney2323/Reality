@@ -1,0 +1,19 @@
+name: Reality owner continuity inventory
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261119150000_owner_operational_continuity_inventory_v1.sql'
+      - 'test/reality-owner-operational-continuity-inventory.test.js'
+      - '.github/workflows/reality-owner-operational-continuity-inventory.yml'
+permissions:
+  contents: read
+jobs:
+  read-only-continuity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify owner visibility and governance contract
+        run: node --test test/reality-owner-operational-continuity-inventory.test.js

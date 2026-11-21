@@ -18,6 +18,10 @@ import {readOwnerApprovedChatEmployeeAssignments}
  from '../../src/reality-owner-approved-chat-assignments-v1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {readOwnerTimeHorizonEvidence}
+ from './personal-time-horizon.js';
+import {projectRealityEmployeeTimeInquiryContext}
+ from '../../src/reality-employee-time-inquiry-context-v1.js';
 export const maxDuration=45;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 export default async function handler(req,res){
@@ -39,6 +43,137 @@ export default async function handler(req,res){
   const savedChatPromise=readRealitySavedChatEmployeeProposals(session).catch(()=>null);
   const approvedAssignmentsPromise=
    readOwnerApprovedChatEmployeeAssignments(session).catch(()=>null);
+  // Private owner-scoped readback of the durable 15-minute role calendar.
+  // Fresh evidence, prior verified research, pending self-repair and
+  // signed-shift requirements remain separate; no "40 hour" fiction.
+  const operatingSchedulePromise=(async()=>{
+   const db=shiftDatabase(process.env);
+   if(db.url!==session.config?.url)return null;
+   const schedule=await shiftRpc(db,
+    'reality_read_owner_employee_operating_schedule_v1',{
+     p_owner_id:session.user_id
+    });
+   const names=new Set(['Avery','Riley','Quinn','Taylor','Casey',
+    'Morgan','Jordan','Sage']);
+   const states=new Set([
+    'CURRENT_SOURCE_REVIEW_REQUIRED','HISTORICAL_REVALIDATION_REQUIRED',
+    'SOURCE_EPOCH_REVIEW_REQUIRED','SOURCE_NO_LONGER_CURRENT',
+    'SOURCE_SETTLED_NO_REPLAY','EVIDENCE_REVIEW_VERIFIED',
+    'MAINTENANCE_AWAITING_SIGNED_SHIFT','MAINTENANCE_IN_SIGNED_SHIFT',
+    'MAINTENANCE_VERIFIED'
+   ]);
+   const uuid=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+   const hash=/^sha256:[a-f0-9]{64}$/;
+   if(!schedule||!['OWNER_EIGHT_ROLE_WORK_CALENDAR_CURRENT',
+      'OWNER_EIGHT_ROLE_WORK_CALENDAR_STALE'].includes(schedule.status)||
+      schedule.owner_id!==session.user_id||
+      schedule.owner_scope_verified!==true||
+      schedule.role_count!==8||
+      !Array.isArray(schedule.roles)||schedule.roles.length!==8||
+      new Set(schedule.roles.map(r=>r.employee)).size!==8||
+      !schedule.roles.every(r=>names.has(r.employee)&&
+       Number.isSafeInteger(r.work_records)&&r.work_records>=0&&
+       Number.isSafeInteger(r.planned_source_reviews)&&
+       r.planned_source_reviews>=0&&
+       Number.isSafeInteger(r.current_evidence_verified)&&
+       r.current_evidence_verified>=0&&
+       Number.isSafeInteger(r.unfinished_internal_repairs)&&
+       r.unfinished_internal_repairs>=0)||
+      !Array.isArray(schedule.items)||schedule.items.length>160||
+      schedule.work_records!==schedule.items.length||
+      !Number.isSafeInteger(schedule.planned_investigations)||
+      schedule.planned_investigations<0||
+      !Number.isSafeInteger(schedule.unfinished_internal_repairs)||
+      !Number.isSafeInteger(schedule.independently_verified_current_evidence_reviews)||
+      schedule.planned_dates_are_not_exec_authority!==true||
+      schedule.scheduled_executable_original_jobs!==0||
+      schedule.new_original_customer_jobs_created!==0||
+      schedule.shift_authorized_by_read!==false||
+      schedule.installation_authorized!==false||
+      schedule.production_changed!==false||
+      schedule.items.some(j=>!names.has(j.employee)||
+       !/^schedule:[a-f0-9]{64}$/.test(j.work_key||'')||
+       !['SOURCE_INVESTIGATION','INTERNAL_MAINTENANCE'].includes(j.work_kind)||
+       !states.has(j.work_state)||
+       typeof j.title!=='string'||!j.title||j.title.length>240||
+       typeof j.source_ref!=='string'||j.source_ref.length>1024||
+       !hash.test(j.source_evidence_sha256||'')||
+       typeof j.independently_verified_current_evidence!=='boolean'||
+       (j.previous_independent_evidence_receipt_sha256!==null&&
+        !hash.test(j.previous_independent_evidence_receipt_sha256||''))||
+       (j.planned_business_date!==null&&
+        !/^20\d{2}-[01]\d-[0-3]\d$/.test(j.planned_business_date||''))||
+       (j.daily_order===null)!==(j.planned_business_date===null)||
+       (j.daily_order!==null&&
+        (!Number.isSafeInteger(j.daily_order)||j.daily_order<1||j.daily_order>4))||
+       (j.work_kind==='INTERNAL_MAINTENANCE'&&
+        (!uuid.test(j.incident_id||'')||!uuid.test(j.origin_shift_id||'')))||
+       j.independently_verified_current_evidence!==(
+        j.work_state==='EVIDENCE_REVIEW_VERIFIED')))
+    return null;
+   const roleSum=field=>schedule.roles.reduce((n,r)=>n+r[field],0);
+   if(roleSum('work_records')!==schedule.work_records||
+      roleSum('planned_source_reviews')!==schedule.planned_investigations||
+      roleSum('unfinished_internal_repairs')!==schedule.unfinished_internal_repairs||
+      roleSum('current_evidence_verified')!==
+        schedule.independently_verified_current_evidence_reviews||
+      new Set(schedule.items.map(x=>x.work_key)).size!==schedule.items.length||
+      schedule.items.filter(x=>x.planned_business_date!==null).length!==
+        schedule.planned_investigations)
+    return null;
+   return {...schedule,read_only:true,no_customer_originals_authorized:true};
+  })().catch(()=>null);
+  const discoveryPromise=(async()=>{
+   const db=shiftDatabase(process.env);
+   if(db.url!==session.config?.url)return null;
+   const data=await shiftRpc(db,'reality_read_owner_employee_discovery_v1',{
+    p_owner_id:session.user_id});
+   const names=new Set(['Avery','Riley','Quinn','Taylor','Casey',
+     'Morgan','Jordan','Sage']);
+   if(data?.status!=='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'||
+    data.owner_id!==session.user_id||
+    data.shift_authorized!==false||
+    data.installation_authorized!==false||
+    data.production_changed!==false||
+    data.qualified_jobs!==0||
+    !Number.isFinite(Date.parse(data.checked_at||''))||
+    !Array.isArray(data.roles)||data.roles.length!==8||
+    new Set(data.roles.map(x=>x.employee)).size!==8||
+    !data.roles.every(x=>
+     names.has(x.employee)&&
+     ['CURRENT_PROOF_REQUIRED','HISTORICAL_SOURCES_REQUIRE_REFRESH',
+      'NO_CONNECTED_ROLE_SOURCE_EVIDENCE'].includes(x.coverage_state)&&
+     Number.isSafeInteger(x.candidate_source_count)&&
+     x.candidate_source_count>=0&&x.candidate_source_count<=150&&
+     Number.isSafeInteger(x.historical_source_count)&&
+     x.historical_source_count>=0&&x.historical_source_count<=150&&
+     Number.isSafeInteger(x.settled_source_count)&&
+     x.settled_source_count>=0&&x.settled_source_count<=150&&
+     x.execution_authorized===false&&x.qualified_jobs===0)||
+    !Array.isArray(data.items)||data.items.length>150||
+    data.source_count!==data.items.length||
+    !data.items.every(x=>
+     names.has(x.employee)&&
+     ['GITHUB_ISSUE','GITHUB_PULL_REQUEST','MARKET_ASSESSMENT',
+      'CAPABILITY_AUDIT','ROI_EVIDENCE_GAP'].includes(x.source_family)&&
+     ['NEEDS_CURRENT_VALIDATION','HISTORICAL_REVALIDATION_REQUIRED',
+      'SETTLED_NO_REPLAY'].includes(x.disposition)&&
+     /^sha256:[a-f0-9]{64}$/.test(x.evidence_sha256||'')&&
+     typeof x.title==='string'&&x.title.length>0&&x.title.length<=240&&
+     typeof x.source_ref==='string'&&x.source_ref.length<=1024&&
+     x.qualified_job===false&&x.execution_authorized===false))
+    return null;
+   return {
+    ...data,read_only:true,qualified_executable_jobs:0,
+    employee_discovery_not_actual_shift:true
+   };
+  })().catch(()=>null);
+  // The existing Home time view is an owner-scoped read, not a new queue.
+  const timePromise=(async()=>{
+   const db=shiftDatabase(process.env);
+   if(db.url!==session.config?.url)return null;
+   return readOwnerTimeHorizonEvidence({ownerId:session.user_id,db});
+  })().catch(()=>null);
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const roster=buildRealityNamedEmployeeRoster(brief);
@@ -207,6 +342,19 @@ export default async function handler(req,res){
   const single_model_role_routing=projectSingleModelRoleQueue(next_week_plan);
   const saved_chat_employee_proposals=await savedChatPromise;
   const approved_chat_employee_assignments=await approvedAssignmentsPromise;
+  const [employee_discovery,timeEvidence,employee_operating_schedule]=
+   await Promise.all([discoveryPromise,timePromise,operatingSchedulePromise]);
+  let employee_time_inquiry_context=null;
+  if(employee_discovery&&timeEvidence){
+   try{
+    employee_time_inquiry_context=projectRealityEmployeeTimeInquiryContext({
+     ownerId:session.user_id,roster,time:timeEvidence,
+     discovery:employee_discovery
+    });
+   }catch{
+    // A mismatched owner/source is not transformed into an inquiry or job.
+   }
+  }
   return res.status(200).json({ok:true,...roster,value_preview,
    next_week_plan,weekly_workload_insight,single_model_role_routing,saved_chat_employee_proposals,
    approved_chat_employee_assignments,
@@ -218,6 +366,17 @@ export default async function handler(req,res){
    upstream_source_qualification:qualification,
    weekly_employee_investigation_receipts:weeklyInvestigationReceipts,
    current_shift_engineering_originals:signedOriginals,
+   employee_discovery,
+   employee_operating_schedule,
+   employee_operating_schedule_status:employee_operating_schedule?
+    'OWNER_DURABLE_EIGHT_ROLE_CALENDAR_VERIFIED':
+    'OWNER_DURABLE_EIGHT_ROLE_CALENDAR_UNVERIFIED',
+   employee_time_inquiry_context,
+   employee_time_inquiry_status:employee_time_inquiry_context?.status||
+    'TIME_EVIDENCE_OR_DISCOVERY_NOT_VERIFIED',
+   employee_discovery_status:employee_discovery?
+    'SIGNED_OWNER_EIGHT_ROLE_DISCOVERY_READBACK':
+    'EMPLOYEE_DISCOVERY_READBACK_UNVERIFIED',
    owner_scope_verified:true,
    source_data_partial:brief.status==='SOURCE_BACKED_DISCOVERY_PARTIAL',
    worker_execution_authorized:false});

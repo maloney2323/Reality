@@ -1,0 +1,99 @@
+/* Capabilities belongs next to Employees in Home, never a global panel. */
+#realityHomeCommand #realityCapabilities{
+ border:1px solid #30445c;border-radius:18px;padding:20px;
+ background:linear-gradient(140deg,#111d2b,#0d1725);
+ margin:14px 0 22px;color:#eaf2fc;scroll-margin-top:20px;
+}
+#realityCapabilities .rc-cap-head{
+ display:flex;gap:15px;align-items:flex-start;justify-content:space-between;
+}
+#realityCapabilities .rc-cap-head h2{margin:5px 0 9px;font-size:clamp(19px,3vw,26px);line-height:1.25}
+#realityCapabilities .rc-cap-description{color:#a9bfd4;font-size:13px;line-height:1.6;max-width:700px;margin:0}
+#realityCapabilities button{margin:0;min-height:43px}
+#realityCapabilities .rc-cap-metrics{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:17px 0
+}
+#realityCapabilities .rc-cap-stat{
+ padding:14px;border:1px solid #30445a;border-radius:12px;
+ background:rgba(8,22,37,.63);min-width:0
+}
+#realityCapabilities .rc-cap-stat span{
+ display:block;color:#acc2d5;font-size:11px;line-height:1.45
+}
+#realityCapabilities .rc-cap-stat strong{display:block;margin-top:8px;font-size:26px}
+#realityCapabilities .rc-cap-autonomy{
+ display:flex;align-items:center;justify-content:space-between;gap:15px;
+ background:#142b37;border:1px solid #3c6470;border-radius:14px;
+ padding:15px;margin-bottom:15px
+}
+#realityCapabilities .rc-cap-autonomy strong{font-size:15px}
+#realityCapabilities .rc-cap-autonomy p{margin:6px 0 0;color:#b8cbd7;font-size:12px;line-height:1.55}
+#realityCapabilities .rc-cap-grant-state{color:#dbead5!important}
+#realityCapabilities .rc-cap-toggle{min-width:185px}
+#realityCapabilities .rc-cap-notice{color:#b6c9dc;font-size:12px;line-height:1.5}
+#realityCapabilities .rc-cap-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#realityCapabilities .rc-cap-item{
+ background:#0c1b2b;border:1px solid #30445c;border-radius:13px;padding:15px;
+ min-width:0;overflow-wrap:anywhere
+}
+#realityCapabilities .rc-cap-item-top{display:flex;gap:9px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+#realityCapabilities .rc-cap-item-top strong{font-size:14px;line-height:1.4}
+#realityCapabilities .rc-cap-phase{font-size:10px;color:#c6dbe9;border:1px solid #446079;border-radius:999px;padding:5px 7px}
+#realityCapabilities .rc-cap-item>p{font-size:12px;color:#bdcfe0;line-height:1.55;margin:11px 0}
+#realityCapabilities .rc-cap-meta{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+#realityCapabilities .rc-cap-meta span{background:#1a2a3d;color:#b2c8da;padding:6px 8px;border-radius:8px;font-size:11px}
+#realityCapabilities .rc-cap-proof{border-top:1px solid #30445c;padding-top:10px;color:#bbcee0;font-size:12px}
+#realityCapabilities .rc-cap-proof summary{color:#d9ecfa;font-weight:650}
+#realityCapabilities .rc-cap-proof p{line-height:1.6}
+#realityCapabilities .rc-cap-proof a{color:#b4dafa;text-decoration:underline}
+@media(max-width:780px){
+ #realityCapabilities .rc-cap-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #realityCapabilities .rc-cap-list{grid-template-columns:1fr}
+ #realityCapabilities .rc-cap-autonomy{align-items:stretch;flex-direction:column}
+ #realityCapabilities .rc-cap-toggle{width:100%}
+}
+@media(max-width:470px){
+ #realityHomeCommand #realityCapabilities{padding:14px}
+ #realityCapabilities .rc-cap-head{flex-direction:column}
+ #realityCapabilities .rc-cap-refresh{width:100%}
+}
+
+/* Evidence-based continuity feedback: never leave an owner at a silent switch. */
+#realityCapabilities .rc-cap-progress{
+ border:1px solid #3c5c73;border-radius:14px;background:#101f2f;
+ padding:15px;margin:0 0 16px;overflow-wrap:anywhere
+}
+#realityCapabilities .rc-cap-progress>strong{font-size:15px}
+#realityCapabilities .rc-cap-progress-state{
+ font-size:13px;color:#e1edf7;line-height:1.55;margin:9px 0
+}
+#realityCapabilities .rc-cap-progress-next{
+ font-size:13px;color:#b7d6e8;line-height:1.6;margin:8px 0 2px
+}
+#realityCapabilities .rc-cap-incident{
+ margin-top:12px;padding:12px;border-radius:11px;
+ background:#172b3a;border:1px solid #557188
+}
+#realityCapabilities .rc-cap-incident strong{font-size:12px}
+#realityCapabilities .rc-cap-incident p{
+ font-size:12px;color:#c0d7e7;line-height:1.55;margin:7px 0 0
+}
+
+/* Safe owner-initiated isolated proof of the existing governed engine. */
+#realityCapabilities .rc-cap-demo{
+ background:#121e30;border:1px solid #536b85;
+ border-radius:14px;padding:15px;margin:0 0 16px
+}
+#realityCapabilities .rc-cap-demo strong{font-size:15px}
+#realityCapabilities .rc-cap-demo p{
+ margin:9px 0;font-size:12px;line-height:1.65;color:#bcd1e1;
+ overflow-wrap:anywhere
+}
+#realityCapabilities .rc-cap-demo-run{
+ margin:8px 0 7px;width:auto
+}
+#realityCapabilities .rc-cap-demo-state{color:#e0f0fc!important}
+#realityCapabilities .rc-cap-demo-receipt{color:#b7d8df!important}
+@media(max-width:600px){
+ #realityCapabilities .rc-cap-demo-run{width:100%}
+}

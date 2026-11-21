@@ -1,0 +1,57 @@
+name: Reality unified Chat — exact maintenance approval
+on:
+  push:
+    branches: ['reality/**']
+    paths:
+      - 'index.html'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'reality-chat-maintenance-continuation-v1.css'
+      - 'test/reality-unified-chat-maintenance-continuation-v1.test.js'
+      - 'test/reality-maintenance-owner-chat-dialogue-v1.test.js'
+      - 'test/reality-owner-internal-maintenance-continuity-v1.test.js'
+      - 'supabase/migrations/20261118_owner_chat_maintenance_worker_progress_v22.sql'
+      - 'src/reality-employee-shift-chat-context-v1.js'
+      - '.github/workflows/reality-unified-chat-maintenance-continuation-v1.yml'
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: ['reality/**']
+    paths:
+      - 'index.html'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'reality-chat-maintenance-continuation-v1.css'
+      - 'test/reality-unified-chat-maintenance-continuation-v1.test.js'
+      - 'test/reality-maintenance-owner-chat-dialogue-v1.test.js'
+      - 'test/reality-owner-internal-maintenance-continuity-v1.test.js'
+      - 'supabase/migrations/20261118_owner_chat_maintenance_worker_progress_v22.sql'
+      - 'src/reality-employee-shift-chat-context-v1.js'
+      - '.github/workflows/reality-unified-chat-maintenance-continuation-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify-existing-owner-authorization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Check out exact source without retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Independently test exact signed-owner maintenance continuation from unified Chat
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check reality-chat-maintenance-continuation-v1.js
+          node --check reality-chat-workspace-v1.js
+          node --test \
+            test/reality-unified-chat-maintenance-continuation-v1.test.js \
+            test/reality-maintenance-owner-chat-dialogue-v1.test.js \
+            test/reality-owner-internal-maintenance-continuity-v1.test.js \
+            test/reality-owner-maintenance-exact-continuation-v1.test.js \
+            test/reality-chat-mobile-usable-v3.test.js \
+            test/reality-chat-workspace-v1.test.js \
+            test/reality-chat-fullscreen-v2.test.js \
+            test/reality-chat-scroll-and-saved-turn-recovery-v1.test.js

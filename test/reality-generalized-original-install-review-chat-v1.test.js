@@ -15,15 +15,43 @@ test('owner review API is strictly GET, same signed-in owner and isolated servic
  assert.match(api,/r\.same_original_execution_and_settlement_contract_verified===true/);
  assert.match(api,/r\.approval_receipt_id===null/);
  assert.match(api,/no_installation_effect_by_get:true/);
+ assert.match(api,/recovery_diagnosis:recovery/);
+ assert.match(api,/recovery_publication:pub/);
+ assert.match(api,/reality_read_general_original_recovery_review_v1/);
+ assert.match(api,/recovery_approval_action_available:recoveryApprovalAvailable===true/);
+ assert.match(api,/reality_read_general_original_fenced_investigation_state_v1/);
+ assert.match(api,/diagnosis.original_work_id===r.original_work_id/);
+ assert.match(api,/diagnosis.external_retry_authorized===false/);
  assert.doesNotMatch(api,/create.*[Ii]nstall|owner_approve_native263|OWNER_APPROVED_EXACT/);
  assert.match(api,/private, no-store/);
 });
 test('owner proof UI exposes evidence and the separately authenticated one-click action only after all gates',()=>{
  assert.match(html,/reality-generalized-install-review-ui-v1\.js/);
- assert.match(ui,/realityChatPanelProof/);
+ // The real scrollable transcript owns the exact decision, not a
+ // flex sibling that the mobile overflow:hidden shell would clip.
+ assert.match(ui,/const host=get\('privateTranscript'\)\|\|get\('privateReady'\)/);
+ assert.match(ui,/if\(p.parentNode!==host\)host.append\(p\)/);
+ assert.match(ui,/p\.className='team-proof bubble reality-chat-live-work'/);
+ assert.doesNotMatch(ui,/host\.insertBefore\(p,thread\)/);
+ assert.doesNotMatch(ui,/const host=get\('realityChatPanelProof'\)/);
+ assert.match(ui,/privateAccountMissionBanner/);
+ assert.match(ui,/host\.insertBefore\(p,before\|\|null\)/);
+ assert.match(ui,/host\.id==='privateReady'/);
+ assert.match(html,/id="privateReady"/);
+ assert.match(html,/id="privateAccountMissionBanner"/);
  assert.match(ui,/owner_approval_action_available===true/);
  assert.match(ui,/approveExactFromUserClick/);
  assert.match(ui,/generalizedOriginalInstallApproveExactButton/);
+ assert.match(ui,/generalizedOriginalInstallRecoveryUpdate/);
+ assert.match(ui,/generalizedOriginalRecoveryApproveButton/);
+ assert.match(ui,/approveRecoveryFromUserClick/);
+ assert.match(ui,/recovery_approval_action_available===true/);
+ assert.match(ui,/EXACT_RECOVERY_APPROVAL_NOT_RECORDED/);
+ assert.match(ui,/this page will not retry automatically/);
+ assert.match(ui,/RECOVERY_INTENT/);
+ assert.match(ui,/independent_recovery_test_run_id/);
+ assert.match(ui,/FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED/);
+ assert.match(ui,/Independent repair testing is required/);
  assert.match(ui,/GENERAL_ORIGINAL_FINAL_RELEASE_CONTINUATION_NOT_READY|same_original_execution_and_settlement_contract_verified===true/);
  assert.match(ui,/independent_frozen_run_id/);
  assert.match(ui,/integrated_test_run_id/);
@@ -36,6 +64,31 @@ test('owner proof UI exposes evidence and the separately authenticated one-click
 });
 
 
+test('signed owner sees durable final receipt as concise mobile Chat event without a new approval',()=>{
+ const receiptReadback=readFileSync(new URL(
+  '../supabase/migrations/20261117_general_original_final_receipt_owner_chat_readback_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(receiptReadback,/current_user<>'service_role'/);
+ assert.match(receiptReadback,/WHERE owner_id=p_owner_id/);
+ assert.match(receiptReadback,/'final_receipt_id'/);
+ assert.match(receiptReadback,/'installed_commit_sha'/);
+ assert.match(receiptReadback,/f\.owner_id=p_owner_id/);
+ assert.match(receiptReadback,/f\.outcome='SUCCEEDED'/);
+ assert.match(receiptReadback,/'roi_status'/);
+ assert.match(receiptReadback,/REVOKE ALL ON FUNCTION public\.reality_read_generalized_original_install_review_v1/);
+ assert.match(ui,/d\.phase==='ORIGINAL_SETTLED'/);
+ assert.match(ui,/UUID\.test\(d\.final_receipt_id\|\|''\)/);
+ assert.match(ui,/d\.roi_status==='NOT_MEASURED'/);
+ assert.match(ui,/Reality · original job completed/);
+ assert.match(ui,/Final receipt:/);
+ assert.match(ui,/No additional approval is needed/);
+ assert.match(ui,/generalizedOriginalInstallTechnicalDetails/);
+ assert.match(ui,/View exact source, independent tests and release evidence/);
+ assert.match(ui,/thread\.scrollTop=Math\.max\(0,top-8\)/);
+ assert.match(html,/overflow-y:auto!important;overscroll-behavior-y:contain/);
+ assert.match(html,/-webkit-overflow-scrolling:touch;touch-action:pan-y/);
+ assert.doesNotMatch(ui,/if\(completed\).*approveRecoveryFromUserClick/);
+});
 test('exact signed owner approval action never writes source, authorizes jobs or permits duplicate prompts',()=>{
  const approval=readFileSync(new URL(
   '../api/reality/generalized-owner-install-approval.js',import.meta.url),'utf8');
@@ -47,6 +100,24 @@ test('exact signed owner approval action never writes source, authorizes jobs or
  assert.match(approval,/retry_owner_approval:false/);
  assert.match(approval,/no_third_confirmation/);
  assert.doesNotMatch(approval,/\/contents\/|git\/refs\/|force:true/);
+});
+test('second recovery owner decision is signed, exact, one-use and never writes GitHub',()=>{
+ const api=readFileSync(new URL(
+  '../api/reality/general-original-recovery-approval.js',
+  import.meta.url),'utf8');
+ assert.match(api,/authenticatedChatSession\(req,res\)/);
+ assert.match(api,/assertSameOrigin\(req\)/);
+ assert.match(api,/ONE_EXACT_RECOVERY_PUBLICATION_OWNER_APPROVED/);
+ assert.match(api,/reality_owner_approve_general_original_recovery_v1/);
+ assert.match(api,/owner_approval_ready!==true/);
+ assert.match(api,/retry_owner_approval:false/);
+ assert.match(api,/EXACT_RECOVERY_APPROVAL_NOT_RECORDED/);
+ assert.match(api,/fresh.owner_approval_id===null/);
+ assert.match(api,/fresh.recovery_publication_id===current.recovery_publication_id/);
+ assert.match(api,/fresh.phase==='READY_FOR_EXACT_RECOVERY_APPROVAL'/);
+ assert.match(api,/ONE_EXACT_FENCED_ORIGINAL_RECOVERY_PUBLICATION/);
+ assert.match(api,/session\.access_token/);
+ assert.doesNotMatch(api,/\/contents\/|\/git\/refs\/|force:true/);
 });
 test('one-use install and independent settlement remain separate workers and fenced service RPCs',()=>{
  const worker=readFileSync(new URL(
@@ -63,9 +134,33 @@ test('one-use install and independent settlement remain separate workers and fen
  const finalSQL=readFileSync(new URL(
   '../supabase/migrations/20261115_general_original_independent_postinstall_settlement_v1.sql',
   import.meta.url),'utf8');
+ const recoverySQL=readFileSync(new URL(
+  '../supabase/migrations/20261116_general_original_fenced_recovery_observation_v1.sql',
+  import.meta.url),'utf8');
  assert.match(worker,/continueGeneralOwnerApprovedOriginalInstall/);
+ assert.match(worker,/continueGeneralOriginalOwnerApprovedRecovery/);
+ assert.match(worker,/generalized_original_recovery_publication:generalOriginalRecoveryPublication/);
+ assert.match(worker,/GENERAL_ORIGINAL_INSTALL_FENCED_NO_PROVIDER_EFFECT/);
+ assert.match(worker,/fencedOriginalInvestigationState/);
+ assert.match(worker,/FENCED_ORIGINAL_RILEY_DIAGNOSIS_PERSISTED_TEST_REQUIRED/);
+ assert.match(worker,/FENCED_RILEY_DIAGNOSIS_RECORDED_INDEPENDENT_REPAIR_TEST_REQUIRED/);
+ assert.match(worker,/originalInstallNeedsRecovery\?/);
  assert.match(worker,/settleGeneralOwnerApprovedOriginal/);
  assert.match(installer,/reality_claim_general_original_install_v1/);
+ assert.match(installer,/REALITY_GOVERNED_INSTALL_DISPOSITION/);
+ assert.match(installer,/REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY/);
+ assert.match(installer,/REALITY_INSTALLER_READ_ONLY_RECOVERY_EVIDENCE/);
+ assert.match(installer,/reality_record_general_original_fenced_recovery_v1/);
+ assert.match(installer,/FENCED_RECOVERY_DURABLE_EVIDENCE_NOT_VERIFIED/);
+ assert.match(installer,/FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE/);
+ assert.match(installer,/FENCED_GIT_OBJECTS_OR_EXACT_SOURCE_NOT_VERIFIED/);
+ assert.match(installer,/gh\(token,'\/git\/blobs\/'\+scope\.expected_installed_blob_sha\)/);
+ assert.match(installer,/const repository=await gh\(token,''\)/);
+ assert.match(installer,/console\.info\('REALITY_GOVERNED_INSTALL_DISPOSITION',status\)/);
+ assert.match(installer,/GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED/);
+ // Diagnostics must not change the one-use install fence or retry unknown writes.
+ assert.match(installer,/NO_SECOND_WRITE/);
+ assert.doesNotMatch(installer,/force:true/);
  assert.match(installer,/force:false/);
  assert.match(installer,/GENERAL_INSTALL_FENCED_EFFECT_UNCERTAIN_NO_SECOND_WRITE/);
  assert.match(settlement,/reality_record_general_original_independent_settlement_v1/);
@@ -77,4 +172,10 @@ test('one-use install and independent settlement remain separate workers and fen
  assert.match(finalSQL,/net_verified_labor_savings_usd/);
  assert.match(finalSQL,/roi_verification_status/);
  assert.match(finalSQL,/NOT_MEASURED/);
+ assert.match(recoverySQL,/REALITY_GOVERNED_FENCED_RECOVERY_NO_REPLAY|CHECK\(NOT installation_retried\)/);
+ assert.match(recoverySQL,/GENERAL_ORIGINAL_FENCED_RECOVERY_OBSERVATION_DURABLE/);
+ assert.match(recoverySQL,/reality_read_general_original_install_scope_v1/);
+ assert.match(recoverySQL,/ON CONFLICT\(attempt_id\) DO NOTHING/);
+ assert.match(recoverySQL,/current_user<>'service_role'/);
+ assert.match(recoverySQL,/REVOKE ALL ON reality_internal\.governed_original_install_fenced_recoveries_v1/);
 });

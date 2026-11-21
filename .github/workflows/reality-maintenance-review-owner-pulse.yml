@@ -1,0 +1,19 @@
+name: Reality signed maintenance review continuity pulse
+on:
+  pull_request:
+    paths:
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'test/reality-maintenance-review-owner-pulse.test.js'
+      - '.github/workflows/reality-maintenance-review-owner-pulse.yml'
+permissions:
+  contents: read
+jobs:
+  original-review-continuity-pulse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Test existing owner shift pulse preserves verified review and blocker
+        run: node --test test/reality-maintenance-review-owner-pulse.test.js

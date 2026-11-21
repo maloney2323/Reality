@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Separate GitHub Actions job, with NO OpenAI/service/GitHub credential,
 // executes Reality's model-generated candidate only inside offline Docker.
 import {readFileSync,existsSync,writeFileSync,mkdirSync} from 'node:fs';
@@ -10,7 +12,7 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 const fail=x=>{throw Error('GENUINE_SANDBOX_'+x)};
 if(process.env.GITHUB_ACTIONS!=='true'||
  process.env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- process.env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101'||
+ process.!isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||
  process.env.OPENAI_API_KEY||process.env.SUPABASE_SECRET_KEY)
  fail('SECRET_FREE_VERIFIER_REQUIRED');
 const input=JSON.parse(readFileSync(

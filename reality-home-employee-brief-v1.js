@@ -9,6 +9,11 @@
  const status=document.getElementById('realityHomeEmployeesStatus');
  const refresh=document.getElementById('realityHomeEmployeesRefresh');
  const names=['Avery','Riley','Quinn','Taylor','Casey','Morgan','Jordan','Sage'];
+ const emitDiscovery=inventory=>{
+  window.dispatchEvent(new CustomEvent('reality:employee-discovery-readback',{
+   detail:inventory||null
+  }));
+ };
  const emitWeekly=insight=>{
   // The existing roster fetch owns the source. Home receives a read-only
   // projection, not a duplicate employee planner or private API call.
@@ -63,11 +68,71 @@
     insight.source_work_roles_unallocated_reference_hours;
  };
  const auth=document.getElementById('privateReady');
- let loading=false,pendingReload=false;
+ let loading=false,pendingReload=false,reviewEpoch=0;
+ function removeMarketReview(){
+  root.querySelector('[data-market-research-review]')?.remove();
+ }
+ async function showMarketReview(){
+  const tick=++reviewEpoch;
+  removeMarketReview();
+  if(auth?.style.display!=='block')return;
+  const card=root.querySelector('[data-home-employee="Morgan"]');
+  const caption=card?.querySelector('[data-home-work]');
+  if(!caption)return;
+  try{
+   const r=await fetch('/api/reality/personal-market-research',{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(14000)});
+   const d=await r.json().catch(()=>null);
+   if(tick!==reviewEpoch||auth.style.display!=='block')return;
+   if(!r.ok||d?.ok!==true||d.verified_readback!==true||
+    d.status!=='GOVERNED_MARKET_RESEARCH_RECORDED'||
+    d.review_only!==true||d.job_started!==false||
+    d.installation_authorized!==false||d.production_changed!==false||
+    !/^[a-f0-9-]{36}$/.test(d.receipt_id||'')||
+    !Array.isArray(d.findings)||d.findings.length>4)return;
+   const findings=d.findings.filter(f=>
+    f.status==='RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST'&&
+    /^[a-f0-9]{64}$/.test(f.fingerprint||'')&&
+    f.employee_investigation?.employee==='Morgan'&&
+    f.employee_investigation.status==='SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING'&&
+    f.employee_investigation.assignment_id==='research-review:'+d.receipt_id+':'+f.fingerprint&&
+    /^[a-f0-9]{64}$/.test(f.employee_investigation.assessment_receipt_sha256||'')&&
+    f.employee_investigation.research_only===true&&
+    f.employee_investigation.qualified_original_job===false&&
+    f.employee_investigation.execution_authorized===false&&
+    f.employee_investigation.job_started===false&&
+    f.employee_investigation.installation_authorized===false&&
+    f.employee_investigation.production_changed===false);
+   if(!findings.length||new Set(findings.map(f=>f.fingerprint)).size!==findings.length)return;
+   caption.textContent+=' · '+findings.length+
+    ' assigned market-source reviews (not authorized execution)';
+   const details=document.createElement('details');
+   details.dataset.marketResearchReview='verified';
+   const heading=document.createElement('summary');
+   heading.textContent='Morgan · '+findings.length+' research investigations needing verification';
+   details.append(heading);
+   for(const f of findings){
+    const item=document.createElement('div');
+    const title=document.createElement('strong');
+    title.textContent=String(f.title||'Research finding').slice(0,160);
+    const proof=document.createElement('p');
+    proof.textContent='Review assigned · Test needed: '+
+     String(f.employee_investigation.next_proof||'Independent source evidence needed').slice(0,680);
+    const ref=document.createElement('small');
+    ref.textContent=f.employee_investigation.assignment_id;
+    item.append(title,proof,ref);details.append(item);
+   }
+   const link=document.createElement('a');
+   link.href='/work';link.textContent='Review market sources in the Work Center';
+   details.append(link);card.append(details);
+  }catch{ /* No readback means unknown, not zero assignments. */ }
+ }
  async function load(){
   if(loading){pendingReload=true;return;}
   loading=true;refresh.disabled=true;
-  emitWeekly(null); // Remove stale owner data before each authenticated readback.
+  emitWeekly(null);emitDiscovery(null);
+  // Remove stale owner data before each authenticated readback.
   status.textContent='Checking saved employee work and current source observations…';
   try{
    const response=await fetch('/api/reality/personal-employee-roster',{
@@ -220,6 +285,79 @@
        'saved Chat readback unavailable');
     card.dataset.evidence='read-only';
    }
+   // The scheduled planner now reconciles engineering, market research and
+   // capability evidence into one owner-scoped per-employee discovery queue.
+   // These are observations, never job approvals or measured employee hours.
+   const discovery=data.employee_discovery;
+   let verifiedDiscovery=false;
+   if(data.employee_discovery_status==='SIGNED_OWNER_EIGHT_ROLE_DISCOVERY_READBACK'&&
+      discovery?.status==='OWNER_EMPLOYEE_DISCOVERY_SOURCE_INVENTORY'&&
+      discovery.read_only===true&&
+      discovery.employee_discovery_not_actual_shift===true&&
+      discovery.qualified_executable_jobs===0&&
+      discovery.qualified_jobs===0&&
+      discovery.shift_authorized===false&&
+      discovery.installation_authorized===false&&
+      discovery.production_changed===false&&
+      Array.isArray(discovery.roles)&&discovery.roles.length===8&&
+      Array.isArray(discovery.items)&&discovery.items.length<=150&&
+      discovery.source_count===discovery.items.length&&
+      new Set(discovery.roles.map(r=>r.employee)).size===8&&
+      discovery.roles.every(r=>names.includes(r.employee)&&
+       Number.isSafeInteger(r.candidate_source_count)&&
+       Number.isSafeInteger(r.historical_source_count)&&
+       Number.isSafeInteger(r.settled_source_count)&&
+       r.execution_authorized===false)&&
+      discovery.items.every(x=>names.includes(x.employee)&&
+       x.qualified_job===false&&x.execution_authorized===false&&
+       ['NEEDS_CURRENT_VALIDATION','HISTORICAL_REVALIDATION_REQUIRED',
+        'SETTLED_NO_REPLAY'].includes(x.disposition)&&
+       /^sha256:[a-f0-9]{64}$/.test(x.evidence_sha256||''))){
+    verifiedDiscovery=true;
+    for(const item of discovery.roles){
+     const card=root.querySelector('[data-home-employee="'+item.employee+'"]');
+     const caption=card?.querySelector('[data-home-work]');
+     if(!card||!caption)continue;
+     card.querySelector('[data-role-discovery]')?.remove();
+     caption.textContent+=' · Discovery: '+
+       item.candidate_source_count+' to investigate, '+
+       item.historical_source_count+' historical, '+
+       item.settled_source_count+' already settled';
+     const detail=document.createElement('details');
+     detail.dataset.roleDiscovery='verified';
+     const head=document.createElement('summary');
+     head.textContent=item.employee+' · source-backed discovery';
+     detail.append(head);
+     const relevant=discovery.items.filter(x=>
+      x.employee===item.employee&&x.disposition!=='SETTLED_NO_REPLAY').slice(0,20);
+     if(!relevant.length){
+      const empty=document.createElement('p');
+      empty.textContent='No current unfinished source-backed discovery in this role. Additional connected evidence is needed; no work hours inferred.';
+      detail.append(empty);
+     }
+     for(const row of relevant){
+      const line=document.createElement('p');
+      line.textContent=row.title+' · '+
+       (row.disposition==='HISTORICAL_REVALIDATION_REQUIRED'?
+        'Historical evidence · independently refresh before any work':
+        row.source_family==='GITHUB_PULL_REQUEST'?
+         'Open PR · independently verify relevance and current review status':
+        row.source_family==='ROI_EVIDENCE_GAP'?
+         'Internal verified receipt · measure actual labor and automation costs':
+         'Current source · independently verify issue and impact')+
+       ' · NOT an authorized job';
+      detail.append(line);
+      if(/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9][0-9]*$/
+        .test(row.source_ref||'')){
+       const link=document.createElement('a');link.href=row.source_ref;
+       link.textContent='Open source evidence';link.target='_blank';link.rel='noopener noreferrer';
+       detail.append(link);
+      }
+     }
+     card.append(detail);
+    }
+   }
+   emitDiscovery(verifiedDiscovery?discovery:null);
    const total=data.existing_work_center_candidates;
    if(!Number.isSafeInteger(total)||total<0)
     throw Error('EMPLOYEE_SOURCE_TOTAL_UNVERIFIED');
@@ -238,13 +376,17 @@
     (savedStatus==='VERIFIED_SAVED_CHAT'?
      saved.size+' roles with saved Chat proposals. ':
      'Saved Chat proposals temporarily unverified. ')+
+    (verifiedDiscovery?
+     'Eight-role automatic discovery ledger independently saved. ':
+     'Eight-role discovery ledger readback unavailable. ')+
     'This read-only board does not start any new shift or authorize installation.';
+   void showMarketReview(); // exact persisted research, no extra job writes
    // Publish only the exact same owner-scoped projection Home received.
    // A failure is UNKNOWN, never zero hours, and cannot survive logout.
    emitWeekly(validWeekly(data.weekly_workload_insight,data)?
     data.weekly_workload_insight:null);
   }catch{
-   emitWeekly(null);
+   emitWeekly(null);emitDiscovery(null);
    status.textContent='Employee evidence could not be verified. Existing receipts and the live work status below remain separate; no active work or savings inferred.';
   }finally{
    loading=false;refresh.disabled=false;
@@ -259,7 +401,7 @@
  if(auth&&typeof MutationObserver==='function')
   new MutationObserver(()=>{
    if(auth.style.display==='block')void load();
-   else emitWeekly(null);
+   else {emitWeekly(null);emitDiscovery(null);reviewEpoch++;removeMarketReview();}
   }).observe(auth,{attributes:true,attributeFilter:['style']});
  refresh.addEventListener('click',()=>{void load();});
  void load();

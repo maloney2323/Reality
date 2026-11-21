@@ -100,15 +100,13 @@ test('the conversation loads first and workcards are moved into the optional ins
  assert.match(workspace,/panels\.approvals\.append\(get\('realityChatApprovalInbox'\)\)/);
  assert.doesNotMatch(workspace,/\bfetch\s*\(|\bXMLHttpRequest|\bstartJob\s*\(/);
 });
-test('mobile Chat has visible, reversible, keyboard-safe expand and minimize controls',()=>{
+test('mobile Chat stays full-screen; the desktop-only focus control never minimizes it',()=>{
  assert.match(workspace,/focusToggle\.id = 'realityChatFocusToggle'/);
- assert.match(workspace,/document\.body\.classList\.toggle\('reality-chat-compact'\)/);
+ assert.match(workspace,/if\(smallScreen\(\)\)return;/);
+ assert.doesNotMatch(workspace,/document\.body\.classList\.toggle\('reality-chat-compact'\)/);
+ assert.match(workspace,/document\.body\.classList\.toggle\('reality-chat-focus'\)/);
  assert.match(workspace,/updateFocusLabel\(\)/);
- assert.match(workspace,/Expand chat/);
- assert.match(workspace,/Minimize/);
  assert.match(css,/body\[data-reality-route="chat"\] #realityChatFocusToggle/);
- assert.match(css,/\.reality-chat-compact #privateTranscript/);
- assert.match(css,/\.reality-chat-compact #realityChatWorkspace/);
  assert.match(css,/#privateTranscript\{/);
  assert.match(css,/#realityChatComposer\{/);
  assert.doesNotThrow(()=>new Script(workspace));

@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Reality existing foundational model adapter, never a hardcoded repair.
 // Source and owner scope are independently attested by GitHub OIDC + broker.
 import {readFileSync,writeFileSync,existsSync,mkdirSync} from 'node:fs';
@@ -9,7 +11,7 @@ const die=x=>{throw Error('GENUINE_MODEL_HANDOFF_'+x)};
 const sha=x=>createHash('sha256').update(x).digest('hex');
 if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_EVENT_NAME!=='push'||
   env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
-  env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+  !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  die('EXACT_SIGNED_WORKFLOW_REQUIRED');
 const admitted=JSON.parse(readFileSync(
  'artifact/genuine-capability-admitted-queue.json','utf8'));

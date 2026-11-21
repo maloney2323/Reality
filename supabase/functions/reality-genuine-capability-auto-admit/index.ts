@@ -5,10 +5,17 @@
 // It verifies the GitHub-issued OIDC signature and immutable workflow identity.
 const PROJECT='hvkfreoagbrphwghjajw';
 const REPO='maloney2323/Reality';
-const BRANCH='refs/heads/feature/reality-general-capability-engine-20261101';
+const SIGNED_PREVIEW_REF=/^refs\/heads\/reality\/[a-z0-9][a-z0-9_/-]{8,109}$/;
+const APPROVED_PREVIEW_BRANCH=Deno.env.get('REALITY_CAPABILITY_PREVIEW_BRANCH')||
+ 'reality/chat-direct-work-handoff-20261115';
+const HISTORICAL_BRANCH='refs/heads/feature/reality-general-capability-engine-20261101';
+const signedPreviewRef=(v:unknown)=>typeof v==='string'&&
+ SIGNED_PREVIEW_REF.test(v)&&v==='refs/heads/'+APPROVED_PREVIEW_BRANCH&&
+ !v.includes('//')&&!v.endsWith('/')&&
+ !v.split('/').includes('main')&&!v.split('/').includes('production');
+const validHistoricalRef=(v:unknown)=>signedPreviewRef(v)||v===HISTORICAL_BRANCH;
 const WORKFLOW='.github/workflows/reality-genuine-capability-auto-trigger-v1.yml';
 const AUDIENCE='reality-genuine-capability-auto-admit-v1';
-const REF=REPO+'/'+WORKFLOW+'@'+BRANCH;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -69,7 +76,8 @@ async function verify(jwt,commit,githubToken?:string|null){
   c.aud!==AUDIENCE||c.repository!==REPO||
   c.repository_owner!=='maloney2323'||
   String(c.repository_id)!=='1388852445'||
-  c.workflow_ref!==REF||c.ref!==BRANCH||c.ref_type!=='branch'||
+  c.workflow_ref!==REPO+'/'+WORKFLOW+'@'+c.ref||
+  !signedPreviewRef(c.ref)||c.ref_type!=='branch'||
   !['push','workflow_dispatch'].includes(c.event_name)||c.sha!==commit||!SHA40.test(commit)||
   !/^[1-9][0-9]{0,17}$/.test(String(c.run_id||''))||
   typeof c.exp!=='number'||typeof c.iat!=='number'||
@@ -92,7 +100,7 @@ async function verify(jwt,commit,githubToken?:string|null){
  const run=await api('/actions/runs/'+c.run_id,githubToken);
  if(run?.id!==Number(c.run_id)||run.head_sha!==commit||
   run.event!==c.event_name||run.path!==WORKFLOW||
-  run.head_branch!==BRANCH.slice('refs/heads/'.length)||
+  run.head_branch!==c.ref.slice('refs/heads/'.length)||
   run.head_repository?.full_name!==REPO)
   deny('GITHUB_WORKFLOW_PROVIDER_READBACK_MISMATCH');
  return run;
@@ -1067,7 +1075,7 @@ async function continueOriginalPrepare(sha:string,run:number,token:string){
   if(provider?.id!==Number(target.target_provider_run_id)||
      provider?.status!=='completed'||
      provider?.head_repository?.full_name!==REPO||
-     provider?.head_branch!==BRANCH.slice('refs/heads/'.length)||
+     !validHistoricalRef('refs/heads/'+provider?.head_branch)||
      !Array.isArray(jobs?.jobs)||
      !jobs.jobs.some((x:Record<string,unknown>)=>x.name==='resume_original_job'&&x.conclusion==='success')||
      !jobs.jobs.some((x:Record<string,unknown>)=>x.name==='record_independent_original_settlement'&&x.conclusion==='success')||
@@ -1241,7 +1249,7 @@ async function recoverClaimedOriginalSettlement(sha:string,runnerRun:number,toke
  const historical=Number(claim.original_claim_run_id);
  const run=await api('/actions/runs/'+historical,token);
  if(run?.id!==historical||run.head_sha!==claim.original_claim_runner_sha||
-    run.head_branch!==BRANCH.slice('refs/heads/'.length)||
+    !validHistoricalRef('refs/heads/'+run.head_branch)||
     run.head_repository?.full_name!==REPO||
     run.path!==WORKFLOW||run.event!=='push'||run.status!=='completed')
   deny('ORIGINAL_RECOVERY_HISTORICAL_PROVIDER_RUN_INVALID');
@@ -1484,7 +1492,7 @@ Deno.serve(async request=>{
    if(provider?.id!==scope.failed_run_id||
       provider.status!=='completed'||provider.conclusion!=='failure'||
       provider.path!==WORKFLOW||
-      provider.head_branch!==BRANCH.slice('refs/heads/'.length)||
+      !validHistoricalRef('refs/heads/'+provider.head_branch)||
       provider.head_repository?.full_name!==REPO||
       !SHA40.test(provider.head_sha)||
       !Array.isArray(jobs?.jobs)||jobs.jobs.length<1||
@@ -1676,7 +1684,7 @@ Deno.serve(async request=>{
       deny('INFLIGHT_SIGNED_SCOPE_INVALID');
     const signed=await verify(bearer,input.scope.repository_sha,ghProviderToken);
     if(input.action==='inflight_start'){
-      const branchHead=await api('/git/ref/heads/'+BRANCH.slice('refs/heads/'.length),ghProviderToken);
+      const branchHead=await api('/git/ref/heads/'+signed.head_branch,ghProviderToken);
       if(branchHead?.object?.sha!==input.scope.repository_sha)
         deny('INFLIGHT_STALE_BRANCH_RUN_CANNOT_BEGIN');
     }
@@ -1955,7 +1963,7 @@ Deno.serve(async request=>{
        historicalRun.status!=='completed'||
        historicalRun.event!=='push'||
        historicalRun.path!==WORKFLOW||
-       historicalRun.head_branch!==BRANCH.slice('refs/heads/'.length)||
+       !validHistoricalRef('refs/heads/'+historicalRun.head_branch)||
        historicalRun.head_repository?.full_name!==REPO||
        !SHA40.test(historicalRun.head_sha))
       deny('FINAL_RECEIPT_HISTORICAL_SIGNED_SOURCE_UNVERIFIED');

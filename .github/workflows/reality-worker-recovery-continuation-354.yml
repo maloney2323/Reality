@@ -1,0 +1,20 @@
+name: Reality recovery continuation #354
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261119134500_reconcile_signed_worker_recovery_5min_v1.sql'
+      - 'test/reality-worker-recovery-continuation-354.test.js'
+      - '.github/workflows/reality-worker-recovery-continuation-354.yml'
+      - 'api/reality/governed-employee-shift-worker.js'
+permissions:
+  contents: read
+jobs:
+  recovery-handoff-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify governed signed-worker handoff contracts
+        run: node --test test/reality-worker-recovery-continuation-354.test.js

@@ -3,6 +3,8 @@
 // it never creates a shift, asks an LLM for authority, writes executable
 // source to GitHub, installs anything or settles the original job.
 // Model source drafts are persisted under the original message identity.
+// Atomic release-scoped leasing prevents an older preview worker from claiming
+// a new Chat job that it cannot safely read or process.
 import {createHash} from 'node:crypto';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {outputText} from './reality-riley-native-model-draft-v1.js';
@@ -121,7 +123,8 @@ function excerpt(src,instruction){
  return segments.join('\n/* SOURCE EXCERPT BOUNDARY - DO NOT COPY */\n').slice(0,36000);
 }
 export async function generateNextSignedChatDevelopmentDraft({
- db,env=process.env,fetchImpl=fetch,callRpc=shiftRpc
+ db,env=process.env,fetchImpl=fetch,callRpc=shiftRpc,
+ ownerScope=null
 }={}){
  if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||
     db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
@@ -133,8 +136,27 @@ export async function generateNextSignedChatDevelopmentDraft({
  const model=String(env.REALITY_OPENAI_MODEL||'gpt-5.4');
  if(apiKey.length<20||!/^[a-z0-9][a-z0-9._-]{3,64}$/i.test(model))
   return hold('CHAT_NEW_DEVELOPMENT_MODEL_CREDENTIAL_UNAVAILABLE');
- const claim=await callRpc(db,'reality_claim_chat_new_development_v1',{},
+ // Owner-triggered Chat work must never lease a different customer's
+ // queued build. Scheduled service wakes continue using the global
+ // release-bound lease; signed Chat advances only its exact saved source.
+ if(ownerScope!==null&&(!UUID.test(ownerScope.owner_id||'')||
+    !UUID.test(ownerScope.conversation_id||'')||
+    !UUID.test(ownerScope.request_id||'')))
+  return hold('CHAT_NEW_DEVELOPMENT_OWNER_SOURCE_SCOPE_REQUIRED');
+ const scoped=ownerScope!==null;
+ const claim=await callRpc(db,scoped?
+   'reality_claim_chat_new_development_signed_v3':
+   'reality_claim_chat_new_development_release_v2',
+   {p_release_sha:env.VERCEL_GIT_COMMIT_SHA,
+    ...(scoped?{p_owner_id:ownerScope.owner_id,
+     p_conversation_id:ownerScope.conversation_id,
+     p_request_id:ownerScope.request_id}:{})},
   {fetchImpl});
+ if(scoped&&claim?.status==='SIGNED_NEW_DEVELOPMENT_SOURCE_LEASED'&&
+    (claim.owner_id!==ownerScope.owner_id||
+     claim.conversation_id!==ownerScope.conversation_id||
+     claim.request_id!==ownerScope.request_id))
+  return hold('CHAT_NEW_DEVELOPMENT_CLAIM_IDENTITY_UNVERIFIED');
  if(!checkClaim(claim,db,env))
   return hold('NO_PENDING_SIGNED_NEW_DEVELOPMENT');
  const note=async(code,phase='PROVIDER_UNVERIFIED')=>{

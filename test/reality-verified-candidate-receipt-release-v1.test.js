@@ -32,3 +32,18 @@ test('UI automatically shows durable receipt but no receipt-creation button',()=
  assert.match(home,/durable_release_readback_verified/);
  assert.doesNotMatch(home,/Save work receipt · Start automatic repair preparation/);
 });
+
+test('provider-backed capability release accepts only actual active signed preview, not old development branch',()=>{
+ const latest=readFileSync(
+  'supabase/migrations/20261117_verified_capability_receipt_live_preview_source_v14.sql','utf8');
+ assert.match(latest,/current_user<>'service_role'/);
+ assert.match(latest,/p_proof->>'provider_branch'<>'reality\/chat-direct-work-handoff-20261115'/);
+ assert.doesNotMatch(latest,/p_proof->>'provider_branch'<>'feature\/reality-general-capability-engine-20261101'/);
+ assert.match(latest,/p_proof->>'provider_repository_sha'<>p_report->>'repository_sha'/);
+ assert.match(latest,/p_proof->>'provider_run_id'<>p_report->>'signed_run_id'/);
+ assert.match(latest,/VERIFIED_RECEIPT_INDEPENDENT_PROOF_INVALID/);
+ assert.match(latest,/VERIFIED_RECEIPT_CONFLICT_NO_REWRITE/);
+ assert.match(latest,/installation_authorized',false/);
+ assert.match(latest,/original_job_settled',false/);
+ assert.doesNotMatch(latest,/cron\.alter_job|cron\.schedule\(/);
+});

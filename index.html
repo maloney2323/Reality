@@ -63,6 +63,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .advanced-option{border:1px solid #303e52;border-radius:12px;padding:12px;margin:12px 0}
 .advanced-option>summary{font-size:13px;font-weight:700;cursor:pointer;color:#d5e2f0}
 #privateChat{scroll-margin-top:18px}#privateLogin,#privateReady{scroll-margin-top:16px}
+.private-password-field{position:relative;margin-top:6px}
+.private-password-field #privatePassword{margin-top:0!important;padding-right:58px!important}
+.private-password-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:grid;place-items:center;margin:0!important;padding:9px!important;border:1px solid transparent;background:transparent;color:#c5d8ec;border-radius:10px;cursor:pointer}
+.private-password-toggle:hover,.private-password-toggle:focus-visible{background:#243247;border-color:#6380a0;outline-offset:2px}
+.private-password-toggle svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
 #privateGoalText,#attentionQueue{scroll-margin-top:18px}
 @media(max-width:600px){.start-flow{padding:12px}.start-step{padding:14px}.start-flow-head h2{font-size:22px}}
 
@@ -324,7 +330,7 @@ body[data-reality-route="home"] #realityPublishedRepairEvidence,
 body[data-reality-route="home"] .reality-home-proof{display:none!important}
 
 #realityValueVerification{display:none}
-body[data-reality-route="value"] main > :not(.top):not(#realityValueVerification){display:none!important}
+body[data-reality-route="value"] main > :not(.top):not(#realityValueVerification):not(#realityTimeHorizon){display:none!important}
 body[data-reality-route="value"] main > #realityValueVerification{display:block!important}
 body[data-reality-route="value"] main{max-width:1480px}
 body[data-reality-route="value"] .top{margin-bottom:13px}
@@ -540,7 +546,7 @@ body[data-reality-route="value"] .top{margin-bottom:13px}
 @media(max-width:850px){#realityValueVerification .rv-proof-highlights{grid-template-columns:1fr 1fr}#realityValueVerification .rv-proof-highlights article:last-child:nth-child(odd){grid-column:1/-1}}
 @media(max-width:600px){#realityValueVerification .rv-proof-highlights{grid-template-columns:1fr;gap:8px}#realityValueVerification .rv-proof-highlights article:last-child:nth-child(odd){grid-column:auto}#realityValueVerification .rv-proof-highlights article{padding:13px 14px}#realityValueVerification .rv-proof-highlights strong{font-size:25px;margin:7px 0}#realityValueVerification .rv-proof-highlights small{font-size:11px}}
 
-body[data-reality-route="chat"] main > :not(.top):not(#privateChat){display:none!important}
+body[data-reality-route="chat"] main > :not(.top):not(#privateChat):not(#realityTimeHorizon){display:none!important}
 body[data-reality-route="chat"] #privateChat{
  display:block!important;position:relative!important;z-index:auto!important;
  top:auto!important;bottom:auto!important;left:auto!important;right:auto!important;
@@ -554,14 +560,36 @@ body[data-reality-route="chat"] .reality-chat-close{
  position:static;float:none;width:auto;height:auto;border-radius:10px;
  padding:9px 14px;margin:0 0 15px;font-size:13px;
 }
-body[data-reality-route="chat"] #privateTranscript{max-height:min(60vh,720px)!important}
+/* The live receipt is a conversation event: on mobile this must be an
+   actual touch-scrollable pane, not a 35-42vh clipping window. */
+body[data-reality-route="chat"] #privateTranscript{
+ max-height:min(66dvh,760px)!important;min-height:280px;
+ overflow-y:auto!important;overscroll-behavior-y:contain;
+ -webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-gutter:stable
+}
+#generalizedOriginalInstallReviewPanel{
+ scroll-margin-top:10px;min-width:0;max-width:100%
+}
+#generalizedOriginalInstallReviewPanel #generalizedOriginalInstallRecoveryUpdate{
+ font-size:15px;line-height:1.65;white-space:normal
+}
+#generalizedOriginalInstallReviewPanel details summary{
+ padding:10px 0;cursor:pointer;color:#b9deef;line-height:1.45
+}
+#generalizedOriginalInstallReviewPanel button:not([hidden]){
+ min-height:49px;max-width:100%;white-space:normal
+}
 body[data-reality-route="chat"] .reality-chat-composer{position:relative}
 body[data-reality-route="chat"] main{max-width:1200px}
 @media(max-width:700px){
  .reality-page-tabs{gap:5px;margin:0}
  .reality-page-tabs a{padding:9px 12px;font-size:13px}
  body[data-reality-route="chat"] #privateChat{min-height:calc(100dvh - 120px);padding:12px!important;border-radius:12px!important}
- body[data-reality-route="chat"] #privateTranscript{max-height:42vh!important}
+ body[data-reality-route="chat"] #privateTranscript{
+  max-height:min(66dvh,700px)!important;min-height:300px;
+  overflow-y:auto!important;overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y
+ }
 }
 
 @media(max-width:850px){.business-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-home-header{flex-direction:column;gap:3px}}
@@ -589,7 +617,7 @@ body[data-reality-route="chat"] main{max-width:1200px}
 .wc-capability-status{margin:11px 0 0;font-size:.92rem}
 
 /* Customer-first Reality: the customer sees decisions and findings before diagnostics. */
-body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) main > :not(.top):not(#realitySimpleHome):not(#privateChat){display:none!important}
+body.reality-simple-home[data-reality-route="home"]:not(.reality-details-open) main > :not(.top):not(#realitySimpleHome):not(#privateChat):not(#realityTimeHorizon){display:none!important}
 #realitySimpleHome{margin:18px 0 36px;padding:clamp(19px,4vw,32px);border:1px solid #365f82;border-radius:22px;background:linear-gradient(145deg,#112235,#10182c 65%,#19243c);color:#eaf2fa}
 #realitySimpleHome .simple-kicker{font-size:12px;font-weight:750;letter-spacing:.09em;color:#92c7e2}
 #realitySimpleHome h1{font-size:clamp(28px,5vw,38px);line-height:1.18;margin:9px 0 8px}
@@ -874,7 +902,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 <link rel="stylesheet" href="/reality-chat-workspace-v1.css">
 <link rel="stylesheet" href="/reality-chat-fullscreen-v2.css">
 <link rel="stylesheet" href="/reality-home-command-v1.css">
+<link rel="stylesheet" href="/reality-capability-workspace-v1.css">
+<link rel="stylesheet" href="/reality-chat-operational-incident-briefing-v1.css">
 <link rel="stylesheet" href="/reality-unified-shell-v1.css">
+ <link rel="stylesheet" href="/reality-past-present-future-v1.css">
+ <link rel="stylesheet" href="/reality-connections-workspace-v1.css">
+ <link rel="stylesheet" href="/reality-chat-mobile-usable-v3.css">
+ <link rel="stylesheet" href="/reality-chat-maintenance-continuation-v1.css">
 </head>
 <body class="reality-simple-home">
 <main>
@@ -1537,10 +1571,24 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
   <label for="privateEmail">Account email</label>
   <input id="privateEmail" type="email" required autocomplete="username" placeholder="Email" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
   <label for="privatePassword">Password</label>
-  <input id="privatePassword" type="password" required autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px;margin-top:6px">
+  <div class="private-password-field">
+   <input id="privatePassword" type="password" required name="password" autocomplete="current-password" placeholder="Password" style="width:100%;background:#0b0e14;color:#eef1f7;padding:12px;border:1px solid #303847;border-radius:10px">
+   <button id="privatePasswordToggle" class="private-password-toggle" type="button" aria-label="Show password" aria-pressed="false" aria-controls="privatePassword" title="Show password">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+     <path d="M2 12s3.7-6.5 10-6.5S22 12 22 12s-3.7 6.5-10 6.5S2 12 2 12Z"></path>
+     <circle cx="12" cy="12" r="3"></circle>
+     <path id="privatePasswordEyeSlash" d="M3 3 21 21" style="display:none"></path>
+    </svg>
+   </button>
+  </div>
   <button id="privateSignIn" type="button">Sign in to continuous chat</button>
  </div>
  <div id="privateReady" style="display:none">
+  <div id="privateAccountMissionBanner" role="status" aria-live="polite" style="padding:12px;margin:8px 0;border:1px solid #42637b;border-radius:12px;background:#11283c;font-size:13px;line-height:1.6">
+   <strong>Permanent business mission</strong>
+   <p id="privateMissionBannerText" style="margin:6px 0">Checking your account-wide mission…</p>
+   <button id="privateMissionEditShortcut" type="button" class="simple-secondary">Review or confirm permanent mission</button>
+  </div>
   <section id="realityChatShiftBrief" class="reality-chat-shift-brief" aria-label="Realtime verified eight-hour workday briefing">
     <div class="label">REALITY · EMPLOYEE WORKDAY · LIVE EVIDENCE</div>
     <h4 id="realityChatShiftHeadline" role="status" aria-live="polite">Checking your latest shift…</h4>
@@ -1640,7 +1688,16 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p class="muted" style="font-size:11px">No new queue or dispatch. This opens Reality's existing authenticated original-job review. Reality checks fresh GitHub and Continuity evidence before showing the separate owner approval. No change to production.</p>
   </section>
   <div style="border:1px solid #45516a;border-radius:9px;padding:12px;margin:12px 0">
-   <strong>Confirmed user objective</strong>
+   <strong>Permanent Reality business mission (account-wide)</strong>
+   <p class="muted">Saved across every conversation and sign-in. Separate from temporary Chat goals and from execution approval.</p>
+   <p id="privateMissionStatus" class="muted" role="status" aria-live="polite">Checking the account mission ledger…</p>
+   <label for="privateMissionText">Confirm your permanent mission</label>
+   <textarea id="privateMissionText" minlength="12" maxlength="700" style="width:100%;min-height:150px" placeholder="Describe the long-term mission for your business."></textarea>
+   <button id="privateMissionConfirm" type="button">Save permanent business mission to my account</button>
+   <button id="privateMissionAdoptHere" type="button" class="simple-secondary">Use saved mission for work in this conversation</button>
+   <p class="muted" style="font-size:12px">The mission remains saved across conversations. Using it for an individual conversation requires an explicit owner-confirmed goal binding; this alone never starts or approves work.</p>
+   <hr style="margin:18px 0;border-color:#30465d">
+   <strong>Conversation-specific objective</strong>
    <p id="privateGoalStatus" class="muted">Not checked. The model cannot change this objective.</p>
    <label for="privateGoalText">Required for business work: your confirmed active goal</label>
    <p class="muted" style="font-size:12px">Enter your objective in your own words, or resume an existing confirmed goal. Reality will not choose or change your goal for you.</p>
@@ -1683,7 +1740,7 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
  <p id="startNext" class="start-next" role="status" aria-live="polite">Checking which step you need…</p>
  <p class="start-limit">This preview supports governed discovery, explicit approval, and a separate one-time GitHub issue operation. No issue is created without fresh execution consent.</p>
 </section>
-<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">0</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">0</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">0</div><p>Discovered or ready work.</p></div></div></section>
+<section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">—</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">—</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">—</div><p>Discovered or ready work.</p></div></div></section>
 <section class="work-center" id="workCenter" aria-label="Reality Work Center">
  <section id="wcRepairQuickStart" class="repair-current" aria-label="Reality guided self-repair" style="padding:18px;margin:0 0 18px;border:1px solid #6ba5ba;border-radius:16px;background:#142437">
   <div class="repair-kicker">REALITY · EASY SELF-REPAIR</div>
@@ -2021,11 +2078,11 @@ const $=id=>document.getElementById(id);
 let realityChatPreviousFocus=null;
 const realityIsChatPage=()=>/^\/chat\/?$/.test(window.location.pathname);
 const realityIsValuePage=()=>/^\/value\/?$/.test(window.location.pathname);
-const realityOtherPage=()=>['employees','work','shifts'].find(x=>
+const realityOtherPage=()=>['employees','work','shifts','connections'].find(x=>
    window.location.pathname==='/'+x)||null;
 document.body.dataset.realityRoute=realityIsChatPage()?'chat':
  realityIsValuePage()?'value':realityOtherPage()||'home';
-$('realityHomeTab').setAttribute('aria-current',(!realityIsChatPage()&&!realityIsValuePage())?'page':'false');
+$('realityHomeTab').setAttribute('aria-current',(!realityIsChatPage()&&!realityIsValuePage()&&!realityOtherPage())?'page':'false');
 $('realityChatTab').setAttribute('aria-current',realityIsChatPage()?'page':'false');
 $('realityValueTab').setAttribute('aria-current',realityIsValuePage()?'page':'false');
 function realityOpenChatDock(focusPrompt=false){
@@ -5946,6 +6003,15 @@ function realitySimpleRender(data){
   step.textContent='FINDING '+(i+1)+' · '+(assessed?'INSPECTED · MISSING GAP NOT YET PROVEN':'ASSESSMENT PENDING');
   const heading=document.createElement('h3');heading.textContent=String(finding.title||'Research opportunity');
   card.append(step,heading);
+  const review=finding.employee_investigation;
+  if(review?.employee==='Morgan'&&
+    review.status==='SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING'&&
+    review.execution_authorized===false&&review.qualified_original_job===false&&
+    review.installation_authorized===false){
+   const caption=document.createElement('p');
+   caption.textContent='Investigation owner: Morgan · Source revalidation assigned · Engineering work not yet qualified.';
+   card.append(caption);
+  }
   const wrap=document.createElement('div');wrap.className='simple-assess';
   function paragraph(label,value){
    const item=document.createElement('div');item.className='simple-aspect';
@@ -6101,6 +6167,27 @@ async function wcInvestigateMarket({restore=false}={}){
    const title=document.createElement('h4');
    title.textContent=String(finding.title||'Market opportunity');
    card.append(level,title);
+   const route=finding.employee_investigation;
+   if(route?.status==='SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING'&&
+      route.employee==='Morgan'&&
+      /^research-review:[a-f0-9-]{36}:[a-f0-9]{64}$/.test(route.assignment_id||'')&&
+      /^[a-f0-9]{64}$/.test(route.assessment_receipt_sha256||'')&&
+      route.research_only===true&&route.qualified_original_job===false&&
+      route.execution_authorized===false&&route.job_started===false&&
+      route.installation_authorized===false&&route.production_changed===false){
+    const responsibility=document.createElement('p');
+    responsibility.textContent='Morgan · Saved research-source investigation assigned · Freshness and independent Reality capability proof pending. Assignment '+route.assignment_id+
+     '. No engineering job or upgrade is approved.';
+    card.append(responsibility);
+    const next=document.createElement('p');
+    next.textContent='Morgan’s next evidence requirement: '+
+     String(route.next_proof||'Recheck dated sources and current Reality source.').slice(0,750);
+    card.append(next);
+    const employeeLink=document.createElement('a');
+    employeeLink.href='/employees';
+    employeeLink.textContent='See Morgan’s assigned source investigations';
+    card.append(employeeLink);
+   }
    for(const [label,value] of [
     ['Market evidence',finding.market_claim],
     ['Reality comparison',finding.reality_comparison],
@@ -6129,7 +6216,10 @@ async function wcInvestigateMarket({restore=false}={}){
    ' web source(s), '+cards.length+' review hypothesis(es). '+
    'Pinned Reality commit '+data.pinned_commit_sha.slice(0,12)+
    ' · Receipt '+data.receipt_id+
-   ' · Independent DB readback confirmed. These are NOT verified gaps or approved upgrades.';
+   ' · Independent DB readback confirmed. '+
+   cards.length+' source-review candidate(s) remain unqualified; '+
+   'saved Morgan investigation ownership appears on independently matched findings. '+
+   'These are NOT verified gaps or approved upgrades.';
  }catch{
   if(restore)realitySimpleSetStatus('Could not restore saved research. Check your account connection; no new search was started.');
   status.textContent=restore?'Saved research readback unavailable. Earlier research remains recorded; no actions started.':
@@ -6163,9 +6253,14 @@ function renderWork(source){
     present:items.filter(w=>present.has(state(w))).length,
     future:items.filter(w=>future.has(state(w))).length
   };
-  $('matrixPastCount').textContent=String(counts.past);
-  $('matrixPresentCount').textContent=String(counts.present);
-  $('matrixFutureCount').textContent=String(counts.future);
+  // The original Matrix is now owner-scoped and independently evidenced
+  // by reality-past-present-future-v1.js. The broad source catalog cannot
+  // overwrite final receipt counts, active shift state, or future discovery.
+  if(!document.body.classList.contains('reality-unified-ui')){
+   $('matrixPastCount').textContent=String(counts.past);
+   $('matrixPresentCount').textContent=String(counts.present);
+   $('matrixFutureCount').textContent=String(counts.future);
+  }
   $('workCount').textContent=String(items.length);
    void wcDiscoverCatalog();
   $('workQueue').innerHTML=items.length?items.map((w,i)=>{
@@ -6618,6 +6713,9 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    el('privateSelfImprovementStatus').textContent=
     'Sign in to inspect original verified work. No model action is authorized.';
   }
+  // Preserve / as a public landing page. AFTER a verified owner login,
+  // always enter the conversation instead of the dashboard.
+  if(yes&&window.location.pathname==='/')window.location.assign('/chat');
  }
  function bubble(role,text){
   const node=document.createElement('div');
@@ -6652,7 +6750,91 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   try{await loadSaved();await loadConversations();void wcLoadCompletionReports()}catch(e){status(e.message)}
  };
  let confirmedActiveGoal=null;
+ const realityProposedPermanentMission="Build Reality into a trustworthy, profitable Personal Operational Intelligence business. Prove value by operating Reality as Customer Zero, then serving owner-operated residential remodeling and construction companies. Continuously assess launch readiness, customers, finances, risks, and unfinished work. Each AI employee investigates its own authorized sources, qualifies useful jobs, and coordinates through one continuity ledger. Advance authorized work, recover safely, independently verify outcomes, and produce durable receipts measuring cost, time, and ROI where proven. Keep improving launch, customer value, retention, and growth, with owner control and clear Past, Present, and Future.";
+ let confirmedPermanentMission=null;
+ async function loadPermanentMission(){
+  const banner=el('privateMissionBannerText'),state=el('privateMissionStatus');
+  try{
+   const r=await fetch('/api/reality/personal-goals?scope=account&conversation_id='+
+    encodeURIComponent(conversationId()),{credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(15000)});
+   const out=await r.json().catch(()=>null);
+   if(!r.ok||out?.ok!==true||out.goal_scope!=='OWNER_ACCOUNT_PRIMARY_MISSION'||
+      out.goal_state?.assistant_can_mutate_goals!==false||
+      out.goal_state?.external_execution_authorized!==false)
+    throw Error('ACCOUNT_MISSION_VERIFIED_READBACK_UNAVAILABLE');
+   const g=out.goal_state.active_goal;
+   if(g?.goal_id&&out.goal_state.active_goal_id===g.goal_id&&
+     g.status==='ACTIVE'&&g.user_confirmed===true&&
+     g.title?.length<=700&&g.source_user_message_ref){
+    confirmedPermanentMission={goal_id:g.goal_id,text:g.title,
+     receipt:g.last_transition_receipt_id};
+    banner.textContent='SAVED ACROSS YOUR ACCOUNT · '+g.title;
+    state.textContent='Confirmed account-wide mission · Continuity receipt: '+
+      String(g.last_transition_receipt_id||'not returned');
+    el('privateMissionText').value=g.title;
+    el('privateMissionAdoptHere').disabled=false;
+   }else{
+    confirmedPermanentMission=null;
+    el('privateMissionAdoptHere').disabled=true;
+    banner.textContent='No account-wide primary mission confirmed yet. Review the proposal in Chat settings and save it once.';
+    state.textContent='No owner-confirmed permanent mission recorded. This proposal is NOT yet your active account mission.';
+    if(!el('privateMissionText').value.trim())
+     el('privateMissionText').value=realityProposedPermanentMission;
+   }
+  }catch(e){
+   confirmedPermanentMission=null;
+   el('privateMissionAdoptHere').disabled=true;
+   banner.textContent='Account mission verification unavailable; Reality cannot claim it was saved.';
+   state.textContent='Unable to read the account mission: '+String(e.message||'UNKNOWN')+
+     '. Your previous goals were not deleted.';
+  }
+ }
+ el('privateMissionEditShortcut').onclick=()=>{
+  if(el('realityChatSettings'))el('realityChatSettings').open=true;
+  el('privateMissionText').scrollIntoView({behavior:'smooth',block:'center'});
+  el('privateMissionText').focus({preventScroll:true});
+ };
+ el('privateMissionAdoptHere').disabled=true;
+ el('privateMissionAdoptHere').onclick=async()=>{
+  const mission=confirmedPermanentMission?.text;
+  if(typeof mission!=='string'||mission.length<12)
+   return status('Save your permanent mission before using it for this conversation.');
+  if(!confirm('Use your already-confirmed permanent business mission as this conversation’s active objective? This does not authorize any execution or installation.'))return;
+  const button=el('privateMissionAdoptHere');button.disabled=true;
+  try{
+   const saved=await saveGoalCommand('SET_ACTIVE',mission);
+   if(saved.goal_state?.active_goal?.title!==mission||
+      saved.goal_state?.active_goal?.user_confirmed!==true)
+    throw Error('CONVERSATION_MISSION_BINDING_READBACK_UNVERIFIED');
+   await loadGoals();
+   status('This conversation is now linked to your saved business mission. No work was started or authorized.');
+  }catch(e){status('Mission was not linked to this conversation: '+String(e.message||'UNVERIFIED'))}
+  finally{button.disabled=false}
+ };
+ el('privateMissionConfirm').onclick=async()=>{
+  const field=el('privateMissionText'),message=field.value.trim();
+  if(message.length<12||message.length>700||message.includes(String.fromCharCode(0)))
+   return status('Permanent mission must contain 12–700 characters.');
+  if(!confirm('Confirm this exact mission as your permanent Reality business objective across all conversations? This does not authorize any work, payments, releases, or external actions.'))
+   return;
+  const button=el('privateMissionConfirm');button.disabled=true;
+  try{
+   const saved=await saveGoalCommand('SET_ACTIVE',message,null,'account');
+   if(saved.goal_scope!=='OWNER_ACCOUNT_PRIMARY_MISSION'||
+      saved.goal_state?.active_goal?.title!==message||
+      saved.goal_state?.active_goal?.user_confirmed!==true||
+      !saved.transition_receipt_id)
+    throw Error('ACCOUNT_MISSION_WRITE_READBACK_UNVERIFIED');
+   await loadPermanentMission();
+   if(confirmedPermanentMission?.text!==message)
+    throw Error('ACCOUNT_MISSION_PERSISTED_SOURCE_MISMATCH');
+   status('Permanent business mission independently saved to your account. It will remain visible across conversations. No new shift or installation was authorized.');
+  }catch(e){status('Permanent mission not confirmed: '+String(e.message||'UNAVAILABLE'))}
+  finally{button.disabled=false}
+ };
  async function loadGoals(){
+  void loadPermanentMission();
   const label=el('privateGoalStatus');
   try{
    const r=await fetch('/api/reality/personal-goals?conversation_id='+encodeURIComponent(conversationId()),{cache:'no-store',signal:AbortSignal.timeout(12000)});
@@ -6670,7 +6852,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    label.textContent=state.active_goal?
      ('USER-CONFIRMED active objective: '+String(state.active_goal.title||'').slice(0,250)+
       ' · Ledger receipt: '+state.active_goal.last_transition_receipt_id):
-     ('No explicitly confirmed active objective in this conversation. Prior suggestions are not authorization.');
+     ('No conversation-specific work objective confirmed. Your permanent account mission is displayed above; select “Use saved mission for work in this conversation” to bind it explicitly.');
    const select=el('privateSavedGoals');select.replaceChildren();
    for(const item of state.goals||[]){
     if(item.goal_id===state.active_goal_id||item.status==='ABANDONED'||
@@ -6691,11 +6873,12 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    el('privateResumeGoal').disabled=true;
   }
  }
- async function saveGoalCommand(operation,message,target_goal_id=null){
+ async function saveGoalCommand(operation,message,target_goal_id=null,scope='conversation'){
   const r=await fetch('/api/reality/personal-goals',{method:'POST',
-   headers:{'content-type':'application/json'},
+   credentials:'same-origin',headers:{'content-type':'application/json'},
    body:JSON.stringify({conversation_id:conversationId(),
-    request_id:crypto.randomUUID(),operation,message,target_goal_id})});
+    request_id:crypto.randomUUID(),operation,message,target_goal_id,
+    ...(scope==='account'?{scope:'account'}:{})})});
   const data=await r.json();if(!r.ok)throw Error(data.error||'Goal change not recorded');
   if(!data.transition_receipt_id||data.goal_state?.external_execution_authorized!==false)
    throw Error('GOAL_TRANSITION_READBACK_NOT_VERIFIED');
@@ -7128,7 +7311,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      controls.append(inspect,report);card.append(controls);
      const justSaved=window.realityJustSavedWorkRequest;
      if(justSaved?.conversation_id===conversationId()&&
-        justSaved.request_id===message.request_id){
+        justSaved.request_id===message.request_id&&
+        window.realityChatDirectWorkEnabled!==true){
       window.realityJustSavedWorkRequest=null;
       void inspect.onclick();
      }
@@ -7200,7 +7384,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   window.dispatchEvent(new CustomEvent('reality:saved-chat-readback',{
    detail:{conversation_id:data.conversation_id,
     messages:(data.messages||[]).map(x=>({role:x.role,
-     request_id:x.request_id,source_ref:x.source_ref,created_at:x.created_at})),
+     request_id:x.request_id,source_ref:x.source_ref,created_at:x.created_at,
+     text:x.role==='user'&&typeof x.text==='string'?x.text.slice(0,6000):null})),
     unanswered_requests:replyReadback?.unanswered_requests||[]}
   }));
   await loadGoals();
@@ -7284,17 +7469,44 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    resetSessionRetry();void init();
   }
  });
+ function setPrivatePasswordVisibility(visible){
+  const password=el('privatePassword'),toggle=el('privatePasswordToggle');
+  password.type=visible?'text':'password';
+  toggle.setAttribute('aria-pressed',String(visible));
+  toggle.setAttribute('aria-label',visible?'Hide password':'Show password');
+  toggle.title=visible?'Hide password':'Show password';
+  el('privatePasswordEyeSlash').style.display=visible?'':'none';
+ }
+ el('privatePasswordToggle').onclick=()=>{
+  const input=el('privatePassword'),start=input.selectionStart,end=input.selectionEnd;
+  setPrivatePasswordVisibility(input.type==='password');
+  input.focus({preventScroll:true});
+  try{input.setSelectionRange(start,end)}catch{}
+ };
+ // Keyboard Enter and mobile Done submit through the same bounded sign-in POST.
+ for(const id of ['privateEmail','privatePassword']){
+  el(id).addEventListener('keydown',event=>{
+   if(event.key==='Enter'){
+    event.preventDefault();
+    if(!el('privateSignIn').disabled)el('privateSignIn').click();
+   }
+  });
+ }
  el('privateSignIn').onclick=async()=>{
+  if(el('privateSignIn').disabled)return;
   for(const id of ['privateEmail','privatePassword']){
     if(!el(id).checkValidity()){el(id).reportValidity();return status('Email and password are required to sign in.');}
   }
-  el('privateSignIn').disabled=true;status('Checking account…');
+  el('privateSignIn').disabled=true;status('Checking secure account…');
   try{
-   const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},
-    signal:AbortSignal.timeout(18000),
+   const r=await fetch(endpoint,{method:'POST',credentials:'same-origin',
+    headers:{'content-type':'application/json'},
+    signal:AbortSignal.timeout(30000),
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
-   const data=await r.json();if(!r.ok)throw Error(data.error||'Sign-in failed');
-   el('privatePassword').value='';resetSessionRetry();showSignedIn(true);
+   const data=await r.json();
+   if(!r.ok)throw Error(data?.error||'CHAT_SIGN_IN_REQUEST_FAILED');
+   el('privatePassword').value='';setPrivatePasswordVisibility(false);
+   resetSessionRetry();showSignedIn(true);
    // Credentials were verified by the server; don't block the login control
    // behind unrelated endpoints and don't fetch a hidden page's Chat archive.
    if(realityCurrentRoute()==='chat'){
@@ -7306,8 +7518,22 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     if(typeof wcReadGovernedBuild==='function')void wcReadGovernedBuild();
     void wcLoadCompletionReports();
    }
-   if(realityCurrentRoute()==='chat'&&!confirmedActiveGoal)jumpToWorkSetup('goal');
-  }catch(e){status(e.message)}finally{el('privateSignIn').disabled=false}
+   // Chat-first onboarding now asks for the owner's real goal in conversation.
+   // Do not pop Settings over the transcript just because a first goal is missing.
+  }catch(e){
+   const code=String(e?.message||'');
+   if(code==='CHAT_LOGIN_FAILED')
+    status('Reality could not verify the email and password. Use the eye icon to check what you entered, and confirm the account email.');
+   else if(['CHAT_AUTH_PROVIDER_TEMPORARILY_UNAVAILABLE',
+     'CHAT_AUTH_PROVIDER_RESPONSE_UNVERIFIED',
+     'CHAT_LOGIN_IDENTITY_UNVERIFIED','CHAT_SESSION_UNAVAILABLE'].includes(code))
+    status('Reality’s sign-in service is temporarily unavailable. This does not mean your password is wrong. Your account was not changed; please retry the connection.');
+   else if(code==='CHAT_AUTH_RATE_LIMITED')
+    status('Sign-in attempts are temporarily limited. Try again after the service allows another attempt.');
+   else if(e?.name==='TimeoutError'||e?.name==='AbortError')
+    status('Reality’s account connection timed out. Your password may be correct; try again when the service recovers.');
+   else status('Reality could not complete sign-in: '+(code||'ACCOUNT_CONNECTION_UNAVAILABLE'));
+  }finally{el('privateSignIn').disabled=false}
  };
  el('privateSignOut').onclick=async()=>{
   el('privateSignOut').disabled=true;
@@ -7358,7 +7584,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
        /\b(?:issue|job|repair)\s*#?[1-9]\d*\b/i.test(value)||
        /work:[a-f0-9]{32}/i.test(value)),
     // Presentation hint only: don't poll a worker inbox on normal Chat.
-    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install)\b/i.test(value)}
+    work_status_requested:/\b(?:build|implement|code|repair|fix|develop|upgrade|start|run|execute|automate|install|create|generate|investigate|assign|prepare|research|deploy)\b/i.test(value)}
   }));
   el('privateSend').disabled=true;
   let intakeVerified=false,responseFailureStage=null;
@@ -7721,6 +7947,11 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
 
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
+ <script defer src="/reality-chat-maintenance-continuation-v1.js"></script>
+ <script defer src="/reality-chat-first-contact-v1.js"></script>
+ <script defer src="/reality-chat-proactive-operational-v1.js"></script>
+<script defer src="/reality-chat-operational-incident-briefing-v1.js"></script>
+<script defer src="/reality-chat-direct-work-handoff-v1.js"></script>
 <script defer src="/reality-chat-employee-shift-card-v1.js"></script>
 <script defer src="/reality-chat-approved-assignments-v1.js"></script>
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
@@ -7737,7 +7968,10 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
 <script defer src="/reality-economic-evidence-dashboard-v1.js"></script>
 <script defer src="/reality-home-employee-brief-v1.js"></script>
 <script defer src="/reality-home-command-v1.js"></script>
+<script defer src="/reality-capability-workspace-v1.js"></script>
 <script defer src="/reality-unified-shell-v1.js"></script>
+ <script defer src="/reality-past-present-future-v1.js"></script>
+ <script defer src="/reality-connections-workspace-v1.js"></script>
 <script defer src="/reality-employee-work-audit-ui-v1.js"></script>
 <script defer src="/reality-pre-automation-business-case-v1.js"></script>
 <script defer src="/reality-engine-delta-v1.js"></script>

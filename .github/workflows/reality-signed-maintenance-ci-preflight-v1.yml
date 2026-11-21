@@ -1,0 +1,23 @@
+name: Reality signed maintenance CI admission contract
+on:
+  pull_request:
+    paths:
+      - 'test/reality-signed-maintenance-ci-preflight-v1.test.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'supabase/migrations/20261119161500_signed_maintenance_ci_preflight_v1.sql'
+      - 'supabase/migrations/20261119170000_signed_maintenance_ci_service_acl_v1.sql'
+      - 'test/reality-signed-maintenance-ci-acl.test.js'
+      - '.github/workflows/reality-signed-maintenance-ci-preflight-v1.yml'
+permissions:
+  contents: read
+jobs:
+  signed-frozen-maintenance-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run exact frozen maintenance admission tests
+        run: node --test test/reality-signed-maintenance-ci-preflight-v1.test.js test/reality-signed-maintenance-ci-acl.test.js

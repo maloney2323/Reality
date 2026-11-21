@@ -98,3 +98,48 @@ test('owner-only GET uses exact owner ID, strict isolated DB, and no action auth
  assert.match(migration,/security invoker/);
  assert.match(migration,/revoke all on function public\.reality_read_latest_owner_market_research_v1/);
 });
+
+
+
+test('saved source research shows Morgan review ownership only with independently matched receipt, not executable work',async()=>{
+ const reportId='11111111-1111-4111-8111-111111111111';
+ const fingerprint='a'.repeat(64);
+ const item={status:'RESEARCH_HYPOTHESIS_NEEDS_INDEPENDENT_TEST',
+  fingerprint,title:'Research exact connector approval controls',
+  evidence_urls:['https://docs.example.org/approvals'],
+  market_claim:'Vendor documentation',reality_comparison:'Existing controls not conclusively assessed',
+  proposed_improvement:'Compare current source with independent tests',
+  falsification_test:'Revoke access and verify that unapproved effects are prevented.',
+  employee_investigation:{
+   employee:'Morgan',status:'SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING',
+   assignment_id:'research-review:'+reportId+':'+fingerprint,
+   assessment_receipt_sha256:'b'.repeat(64),
+   next_proof:'Revoke access and verify that unapproved effects are prevented.',
+   research_only:true,qualified_original_job:false,execution_authorized:false,
+   job_started:false,installation_authorized:false,production_changed:false}};
+ const x=preview({findings:[item]});
+ await vm.runInContext('wcInvestigateMarket({restore:true})',x.context);
+ const card=x.nodes.wcMarketResearchFindings.children[0];
+ assert.ok(card.children.some(child=>child.textContent.includes('Morgan · Saved research-source investigation assigned')));
+ assert.ok(card.children.some(child=>child.textContent.includes('Morgan’s next evidence requirement')));
+ assert.ok(card.children.some(child=>child.href==='/employees'));
+ assert.match(x.nodes.wcMarketResearchStatus.textContent,/source-review candidate/);
+ assert.equal(x.requests.length,1,'review rendering never starts or approves work');
+ const without=preview({findings:[{...item,
+  employee_investigation:{...item.employee_investigation,installation_authorized:true}}]});
+ await vm.runInContext('wcInvestigateMarket({restore:true})',without.context);
+ assert.ok(!without.nodes.wcMarketResearchFindings.children[0].children.some(
+  child=>child.textContent.includes('Morgan · Saved research-source investigation assigned')));
+});
+test('source assignment changes the existing assessment receipt metadata, not research proof hash or shift authority',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261116162000_market_research_to_employee_source_review_v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/ALTER TABLE reality_internal\.market_finding_assessments_v1/);
+ assert.match(sql,/research_review_employee text NOT NULL DEFAULT 'Morgan'/);
+ assert.match(sql,/SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING/);
+ assert.match(sql,/a\.assessment_sha256=pg_catalog\.encode/);
+ assert.match(sql,/source_commit_sha=v\.source_commit_sha/);
+ assert.match(sql,/'qualified_original_job',false/);
+ assert.match(sql,/'execution_authorized',false/);
+ assert.match(sql,/'production_changed',false/);
+ assert.doesNotMatch(sql,/CREATE TABLE|START_SHIFT|INSTALL_APPROVED/);
+});

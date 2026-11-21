@@ -120,15 +120,50 @@ export async function continueGovernedSelfImprovement({
    case 'ORIGINAL_JOB_RESUMED':
     current=await observe(current,'ORIGINAL_JOB_SETTLED','settleAndReobserve',adapters);
     break;
-   case 'AWAITING_OWNER_APPROVAL':
+   case 'AWAITING_OWNER_APPROVAL':{
+    // An approved exact candidate may already have a ONE-TIME owner warrant
+    // in the authoritative ledger (possibly granted in an earlier Reality
+    // session). Re-read it on each signed continuation instead of halting
+    // for ChatGPT or asking the owner to approve the same artifact again.
+    // Missing approval returns an in-app action, NOT a guessed permission.
+    // The reader is an injected TRUSTED provider adapter: neither the LLM
+    // nor a browser can provide, mutate or sign a promotion receipt.
+    const read=adapters?.readExistingPromotionAuthorization;
+    if(read!==undefined&&typeof read!=='function')
+     throw Error('SELF_IMPROVEMENT_PROMOTION_READER_UNTRUSTED');
+    if(typeof read==='function'){
+     const already=await read(Object.freeze({
+      owner_id:current.scope.owner_id,
+      goal_id:current.scope.goal_id,
+      original_work_id:current.scope.original_work_id,
+      worldline_id:current.scope.worldline_id,
+      goal_transition_receipt_ref:current.scope.goal_transition_receipt_ref,
+      candidate_artifact_hash:current.candidate?.artifact_hash,
+      sandbox_evidence_ref:current.sandbox_receipt?.evidence_ref,
+      checkpoint_hash:current.head_hash,
+      read_only:true,require_existing_authenticated_owner_approval:true,
+      mint_new_approval:false,authorize_production:false,
+     }));
+     if(already!==null&&already!==undefined){
+      if(already.kind!=='PROMOTION_AUTHORIZED')
+       throw Error('SELF_IMPROVEMENT_EXISTING_PROMOTION_RECEIPT_INVALID');
+      current=await committed(await acceptGovernedObservation(
+       current,already,{
+        verifyProvider:requireAdapter(adapters,'verifyIndependentReceipt'),
+       }),adapters);
+      break;
+     }
+    }
     return Object.freeze({
      driver_version:GOVERNED_SELF_IMPROVEMENT_DRIVER_VERSION,
      status:'OWNER_APPROVAL_REQUIRED',
      state:current,trace,
-     // A model cannot auto-click or fabricate user authorization.
+     // No provider-backed existing warrant: return to Reality's owner UI,
+     // never ask the model to grant approval or fabricate an installation.
      owner_action_required:true,production_mutation_authorized:false,
      original_job_completed:false,
     });
+   }
    case 'ESCALATED':
     return Object.freeze({
      driver_version:GOVERNED_SELF_IMPROVEMENT_DRIVER_VERSION,

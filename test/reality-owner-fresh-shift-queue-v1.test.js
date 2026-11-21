@@ -67,27 +67,36 @@ const settledNative={
    'supabase:riley_native_independent_final_receipts_v1:681ce4ab-4dd0-47cf-963b-dc65087468fc'
  }]
 };
+const additionalSettled={
+ status:'OWNER_ADDITIONAL_SETTLED_SOURCES_INDEPENDENTLY_RECONCILED',
+ owner_id:owner,source_refs:[prefix+'issues/185',prefix+'issues/62'],
+ settled_source_count:2,work_creation_authorized:false,
+ shift_authorized:false,installation_authorized:false,
+ production_changed:false
+};
 test('independently settled owner originals excluded from exact new source work',async()=>{
  const rpc=async(db,name,args)=>{
   assert.equal(args.p_owner_id,owner);
   return name==='reality_read_owner_riley_pr_review_v1'?
    settledPR:name==='reality_read_owner_riley_repair_original_v1'?
-    settledNative:settledTriage;
+    settledNative:name==='reality_read_owner_additional_settled_shift_sources_v1'?
+     additionalSettled:settledTriage;
  };
  const excluded=await ownerSettledOriginalSourceRefs({
   ownerId:owner,db:{},call:rpc});
- assert.deepEqual(excluded,[prefix+'issues/143',prefix+'issues/263',prefix+'pull/58']);
+ assert.deepEqual(excluded,[prefix+'issues/143',prefix+'issues/185',
+  prefix+'issues/263',prefix+'issues/62',prefix+'pull/58']);
  const brief=buildRealityWorkdayOpportunityBrief(catalog());
  const plan=buildRealityEightHourShiftDraft(brief,{
   excludedSettledSourceRefs:excluded});
  const urls=plan.slots.slice(1,5).map(s=>s.candidate?.source_url)
   .filter(Boolean);
- assert.deepEqual(urls,[prefix+'issues/185']);
+ assert.deepEqual(urls,[]);
  assert.equal(urls.includes(prefix+'issues/143'),false);
  assert.equal(urls.includes(prefix+'issues/263'),false);
  assert.equal(urls.includes(prefix+'pull/58'),false);
- assert.equal(plan.counts.already_settled_source_records_excluded,3);
- assert.equal(plan.counts.selected_distinct_source_records,1);
+ assert.equal(plan.counts.already_settled_source_records_excluded,4);
+ assert.equal(plan.counts.selected_distinct_source_records,0);
 });
 test('receipt verification cannot be bypassed with invented success',async()=>{
  for(const [kind,fixture] of [
@@ -105,6 +114,8 @@ test('receipt verification cannot be bypassed with invented success',async()=>{
     return kind==='triage'?fixture:settledTriage;
    if(name==='reality_read_owner_riley_repair_original_v1')
     return kind==='native'?fixture:settledNative;
+   if(name==='reality_read_owner_additional_settled_shift_sources_v1')
+    return additionalSettled;
    throw Error('UNEXPECTED_OWNER_READBACK');
   };
   await assert.rejects(
@@ -115,6 +126,27 @@ test('receipt verification cannot be bypassed with invented success',async()=>{
  assert.throws(()=>buildRealityEightHourShiftDraft(brief,{
   excludedSettledSourceRefs:[prefix+'pull/58',prefix+'pull/58']
  }),/SETTLED_SOURCE_EXCLUSIONS_UNVERIFIED/);
+});
+test('additional settled inventory must be owner matched and independently bounded',async()=>{
+ for(const changed of [
+  {...additionalSettled,owner_id:'99999999-9999-4999-8999-999999999999'},
+  {...additionalSettled,shift_authorized:true},
+  {...additionalSettled,source_refs:['https://evil.example/issues/185']},
+  {...additionalSettled,settled_source_count:999}
+ ]){
+  const rpc=async(_db,name)=>{
+   if(name==='reality_read_owner_riley_pr_review_v1')return settledPR;
+   if(name==='reality_read_owner_shift_failure_triage_143_v1')
+    return settledTriage;
+   if(name==='reality_read_owner_riley_repair_original_v1')
+    return settledNative;
+   if(name==='reality_read_owner_additional_settled_shift_sources_v1')
+    return changed;
+   throw Error('UNEXPECTED_OWNER_READBACK');
+  };
+  await assert.rejects(ownerSettledOriginalSourceRefs({
+   ownerId:owner,db:{},call:rpc}),/SHIFT_OWNER_SETTLED/);
+ }
 });
 test('both owner draft and start use the SAME independently checked exclusion set',()=>{
  const api=readFileSync(new URL(

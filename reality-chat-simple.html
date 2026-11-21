@@ -203,6 +203,12 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <p id="rileyNextActionText">Reading the current owner shift and excluding previously settled source work from a new draft.</p>
  <button id="rileyHistoryToggle" type="button" aria-expanded="false" aria-controls="rileyLiveProgressPanel">Show previous shift's receipts and investigation</button>
 </details>
+<details id="realityUnfinishedMaintenance" class="team-value section-fold" aria-label="Unfinished Reality internal maintenance work" aria-live="polite" hidden>
+ <summary id="realityUnfinishedMaintenanceTitle">Unfinished maintenance from earlier shifts</summary>
+ <div id="realityUnfinishedMaintenanceRows"></div>
+ <button id="resumeMaintenance" type="button" disabled>Verify outstanding maintenance before continuation</button>
+ <p id="resumeMaintenanceScope" style="font-size:12px">Requires authenticated owner approval of the exact outstanding work, not installation.</p>
+</details>
 <details class="section-fold shift-scope-fold"><summary>Shift authorization and operating rules</summary><p class="riley-start-guide" id="fullShiftScope">One authorization starts a verified fresh work batch until its independently accepted final receipts. Completed historical jobs are not re-queued; an exact new capability installation still requires your separate approval in Chat.</p></details>
 <details id="rileyStartConfirmation" class="team-value section-fold" role="status" aria-live="polite" aria-label="Reality job batch start confirmation" hidden>
  <summary>Reality · Job test confirmation</summary>
@@ -225,6 +231,12 @@ header strong{font-size:19px}header a{font-size:13px;text-decoration:none}
  <summary>AI employees · Roles and assignments</summary>
  <div class="team-head"><strong>Meet Reality's AI team</strong><span id="teamBoardSummary" class="team-role" role="status">Loading verified categories…</span></div>
  <p class="team-intro">Eight proposed virtual employees with distinct jobs. Names help identify responsibilities; no worker is active merely because a card appears.</p>
+ <details id="employeeOperatingSchedule" class="team-value section-fold" aria-label="Durable owner employee discovery and maintenance schedules" open>
+  <summary><strong>Automatic employee work schedules · Current assignments and evidence</strong></summary>
+  <p id="operatingScheduleSummary" aria-live="polite">Reading independently reconciled discovery and repair assignments…</p>
+  <div id="operatingScheduleRoles"></div>
+  <p>Source investigation dates are evidence-only work plans, not measured labor hours or approvals to execute customer jobs. Repairs and external actions require their existing exact governance.</p>
+ </details>
  <details class="team-value section-fold" aria-label="Reality source-backed business value">
   <summary>Potential business value · before the shift</summary>
   <p>What Reality discovers, what comparable human work might cost, and what Reality has actually verified. Scheduled AI role-hours are not automatically human hours saved.</p>
@@ -1194,6 +1206,106 @@ function clearSavedEmployeeChatProposals(){
  $('savedEmployeeChatSummary').textContent='Saved Chat proposals unavailable. No recommendations or work authorization inferred.';
  $('savedEmployeeChatRoles').replaceChildren();
 }
+function renderEmployeeOperatingSchedule(roster){
+ const note=$('operatingScheduleSummary'),root=$('operatingScheduleRoles');
+ root.replaceChildren();
+ const s=roster?.employee_operating_schedule;
+ if(roster?.employee_operating_schedule_status!==
+    'OWNER_DURABLE_EIGHT_ROLE_CALENDAR_VERIFIED'||!s){
+  note.textContent='Live employee schedule readback unavailable. Prior discovery and maintenance receipts remain unchanged; no work is declared absent.';
+  return;
+ }
+ if(!['OWNER_EIGHT_ROLE_WORK_CALENDAR_CURRENT',
+      'OWNER_EIGHT_ROLE_WORK_CALENDAR_STALE'].includes(s.status)||
+    s.owner_scope_verified!==true||s.read_only!==true||
+    s.planned_dates_are_not_exec_authority!==true||
+    s.scheduled_executable_original_jobs!==0||
+    s.new_original_customer_jobs_created!==0||
+    s.production_changed!==false||
+    s.installation_authorized!==false||
+    !Array.isArray(s.roles)||s.roles.length!==8||
+    !Array.isArray(s.items)||s.items.length>160||
+    s.work_records!==s.items.length)
+  throw Error('OWNER_EMPLOYEE_CALENDAR_SCOPE_UNVERIFIED');
+ const seen=new Set(),known=new Set(['Avery','Riley','Quinn','Taylor',
+  'Casey','Morgan','Jordan','Sage']);
+ const current=s.status==='OWNER_EIGHT_ROLE_WORK_CALENDAR_CURRENT';
+ note.textContent=s.planned_investigations+
+  ' evidence-only reviews proposed across eight employee roles · '+
+  s.unfinished_internal_repairs+' unfinished internal repair(s) · '+
+  s.independently_verified_current_evidence_reviews+
+  ' independently verified current-evidence review(s). '+
+  (current?
+   'Calendar reconciled '+(verifiedLocalTimestamp(s.reconciled_at)||'recently')+
+    '; source discovery refreshes separately.':
+   'Calendar is stale; do not assume these are current assignments.')+
+  ' No new customer shift, installation or cash savings authorized.';
+ const byRole=new Map();
+ for(const j of s.items){
+  if(!known.has(j.employee)||seen.has(j.work_key)||
+   !/^schedule:[a-f0-9]{64}$/.test(j.work_key||'')||
+   !/^sha256:[a-f0-9]{64}$/.test(j.source_evidence_sha256||'')||
+   !['SOURCE_INVESTIGATION','INTERNAL_MAINTENANCE'].includes(j.work_kind)||
+   !['CURRENT_SOURCE_REVIEW_REQUIRED','HISTORICAL_REVALIDATION_REQUIRED',
+     'SOURCE_EPOCH_REVIEW_REQUIRED','SOURCE_NO_LONGER_CURRENT',
+     'SOURCE_SETTLED_NO_REPLAY','EVIDENCE_REVIEW_VERIFIED',
+     'MAINTENANCE_AWAITING_SIGNED_SHIFT','MAINTENANCE_IN_SIGNED_SHIFT',
+     'MAINTENANCE_VERIFIED'].includes(j.work_state))
+   throw Error('OWNER_EMPLOYEE_CALENDAR_WORK_SCOPE_INVALID');
+  seen.add(j.work_key);
+  if(!byRole.has(j.employee))byRole.set(j.employee,[]);
+  byRole.get(j.employee).push(j);
+ }
+ const states={
+  CURRENT_SOURCE_REVIEW_REQUIRED:'Validate the latest source evidence',
+  HISTORICAL_REVALIDATION_REQUIRED:'Refresh historical evidence first',
+  SOURCE_EPOCH_REVIEW_REQUIRED:'Source changed since prior evidence review',
+  SOURCE_NO_LONGER_CURRENT:'Check whether this older source is still relevant',
+  SOURCE_SETTLED_NO_REPLAY:'Previously settled; no duplicate work',
+  EVIDENCE_REVIEW_VERIFIED:'Current evidence review independently receipted',
+  MAINTENANCE_AWAITING_SIGNED_SHIFT:'Unfinished internal repair · signed shift required',
+  MAINTENANCE_IN_SIGNED_SHIFT:'Internal repair in authorized shift · final proof pending',
+  MAINTENANCE_VERIFIED:'Internal repair independently settled'
+ };
+ for(const role of s.roles){
+  if(!known.has(role.employee))throw Error('OWNER_EMPLOYEE_CALENDAR_ROLE_UNVERIFIED');
+  const list=byRole.get(role.employee)||[];
+  if(list.length!==role.work_records)
+   throw Error('OWNER_EMPLOYEE_CALENDAR_ROLE_COUNT_MISMATCH');
+  const wrap=document.createElement('details');wrap.className='week-role';
+  if(role.unfinished_internal_repairs>0)wrap.open=true;
+  const title=document.createElement('summary');
+  title.textContent=role.employee+' · '+role.planned_source_reviews+
+   ' review(s) planned · '+role.current_evidence_verified+
+   ' verified evidence · '+role.unfinished_internal_repairs+
+   ' unfinished repair(s)';
+  wrap.append(title);
+  if(!list.length){
+   wrap.append(textNode('p','No verified connected-source assignments. Discovery coverage must be expanded; the clock is not a job.'));
+  }
+  for(const item of list){
+   const row=document.createElement('div');row.className='workforce-output-row';
+   row.append(textNode('strong',item.title));
+   const moment=item.planned_business_date?
+    'Planned '+item.planned_business_date+' · '+item.daily_order+'/4':'History / no re-execution';
+   row.append(textNode('div',moment+' · '+states[item.work_state]));
+   if(item.work_kind==='INTERNAL_MAINTENANCE'){
+    row.append(textNode('div','Original maintenance incident: '+item.incident_id+
+     ' · Original shift: '+item.origin_shift_id));
+   }else if(item.previous_independent_evidence_receipt_sha256){
+    row.append(textNode('div','Earlier independent evidence receipt exists. '+
+     (item.independently_verified_current_evidence?
+      'The exact current evidence epoch is verified.':
+      'It does not verify the newly observed source epoch.')));
+   }
+   if(/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull)\/[1-9]\d*$/.test(item.source_ref))
+    row.append(combinedQueueLink(item.source_ref,'Open source evidence'));
+   wrap.append(row);
+  }
+  root.append(wrap);
+ }
+}
+
 function clearNextWeekWorkPlan(){
  $('nextWeekSourceStatus').textContent='Preparation unverified';
  $('nextWeekSummary').textContent='Next-week source or owner evidence could not be verified. No shift, worker execution or business savings is claimed.';
@@ -1227,6 +1339,7 @@ async function refreshEmployeeBoard(){
     configureWorkforceSavingsRoles(roster);
     loadWorkforceRoleInputs();
     renderNextWeekWorkPlan(roster);
+    renderEmployeeOperatingSchedule(roster);
     renderSavedEmployeeChatProposals(roster);
     void refreshRileyProof();
     void refreshRileyLoopReadiness();
@@ -1240,6 +1353,9 @@ async function refreshEmployeeBoard(){
     $('teamCards').replaceChildren();
     clearShiftValueEvidence();
     clearNextWeekWorkPlan();
+    $('operatingScheduleSummary').textContent=
+     'Schedule source unverified. Existing evidence and approved work must not be erased.';
+    $('operatingScheduleRoles').replaceChildren();
     clearSavedEmployeeChatProposals();
     summary.textContent='Employee evidence unavailable';
     $('teamEvidenceNote').textContent='Unable to verify current employee assignments: '+
@@ -1968,6 +2084,15 @@ async function refreshRileyTaylorCombinedWorkQueue(){
      Date.parse(s.planned_end_at)>Date.now())));
   if(current){renderActiveRileyTaylorQueue(read);return;}
   renderRileyTaylorDraftQueue(read.requested_shift_draft);
+  if(read?.requested_maintenance_draft_status===
+    'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY'&&
+    !verifiedFreshBatchReady){
+   showRileyNextAction('UNFINISHED REPAIRS FOUND · Continue existing maintenance',
+    'Reality still has independently verified internal maintenance assigned to Riley and Taylor. '+
+    'Open the expanded Unfinished maintenance panel and press Continue once. '+
+    'This starts a new signed execution epoch for the same old incidents, '+
+    'not a duplicate customer-job batch or a new approval to install code.');
+  }
  }catch{
   verifiedFreshBatchReady=false;
   $('runFullShift').disabled=true;
@@ -2039,12 +2164,82 @@ function renderCombinedShiftRoleEvidence(readback){
  panel.hidden=shown===0;
 }
 
+function renderUnfinishedMaintenanceContinuity(data){
+ const panel=$('realityUnfinishedMaintenance');
+ const rows=$('realityUnfinishedMaintenanceRows');
+ if(!panel||!rows)return;
+ rows.replaceChildren();
+ const c=data?.internal_maintenance_continuity;
+ const resume=$('resumeMaintenance');
+ resume.disabled=true;
+ resume.textContent='Maintenance scope verification required';
+ if(data?.internal_maintenance_continuity_status!==
+     'OWNER_MAINTENANCE_SOURCE_AND_ROLE_VERIFIED'||!c){
+  panel.hidden=false;
+  $('realityUnfinishedMaintenanceTitle').textContent=
+   'Maintenance continuity · Verification unavailable';
+  rows.append(textNode('p',
+   'The owner maintenance queue could not be independently verified. This is not evidence that unfinished work disappeared.'));
+  return;
+ }
+ if(!Array.isArray(c.items)||!Number.isSafeInteger(c.open_count)||
+    c.open_count!==c.items.length){
+  panel.hidden=false;
+  $('realityUnfinishedMaintenanceTitle').textContent='Maintenance evidence needs reconciliation';
+  return;
+ }
+ panel.hidden=c.open_count===0;
+ const ready=data?.requested_maintenance_draft_status===
+  'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY'&&
+  data.requested_maintenance_draft?.status===
+   'EXACT_OWNER_INTERNAL_MAINTENANCE_CONTINUATION_DRAFT'&&
+  data.requested_maintenance_draft?.open_maintenance_jobs===c.open_count&&
+  data.requested_maintenance_draft?.owner_authorization_required===true&&
+  data.requested_maintenance_draft?.installation_authorized===false&&
+  data.requested_maintenance_draft?.production_changed===false;
+ if(ready&&!c.current_shift_id&&!panel.dataset.maintenanceExpandedOnce){
+  panel.open=true;
+  panel.dataset.maintenanceExpandedOnce='true';
+ }
+ resume.disabled=pending||!!c.current_shift_id||!ready;
+ resume.textContent=c.current_shift_id?'Existing signed shift is active':
+  ready?'Continue '+c.open_count+' unfinished maintenance repairs':
+  'Maintenance continuation is not yet verified';
+ $('resumeMaintenanceScope').textContent=c.current_shift_id?
+  'The existing signed shift controls execution. A second authorization would duplicate the work.':
+  ready?'Authorizes only the '+c.open_count+
+   ' exact prior-shift maintenance jobs until independent final repair receipts. Each code installation still requires separate exact approval.':
+  'No new shift or approval is created by this read; verify owner scope first.';
+ if(!c.open_count)return;
+ $('realityUnfinishedMaintenanceTitle').textContent=
+  c.open_count+' unfinished internal repair'+(c.open_count===1?'':'s')+
+  ' carried over from previous shift';
+ rows.append(textNode('p',c.current_shift_id?
+  'An active owner-authorized shift exists. Reality can recheck the signed maintenance sources; a frozen reproduction, tested repair and independent final receipt are still required.':
+  'The prior shift is closed, but these exact internal jobs remain queued. An authenticated completion-bound shift is required to let the signed workers claim them. Do not reopen the archived shift or claim a completed repair.'));
+ for(const j of c.items){
+  const card=document.createElement('article');
+  card.className='automation-card';
+  const kind=j.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'?
+   'Business-job qualification handoff':'Source-evidence continuity';
+  card.append(textNode('strong',j.assignee+' · '+kind));
+  card.append(textNode('p','Independent reviewer: '+j.independent_reviewer+
+   ' · Phase: '+String(j.phase).replaceAll('_',' ')));
+  card.append(textNode('p','Original shift: '+j.origin_shift_id+
+   ' · Source: '+j.source_ref));
+  card.append(textNode('p',j.repair_verified?
+   'A repair receipt is recorded, but customer work is not settled.':
+   'No verified repair receipt yet. Frozen failure testing and governed execution remain required.'));
+  rows.append(card);
+ }
+}
 async function refreshShiftStatus(){
   if(shiftLoading)return;
   shiftLoading=true;
   try{
     const data=await json(SHIFT,{signal:AbortSignal.timeout(12000)});
     const activeState=safeShiftReadbackState(data);
+    renderUnfinishedMaintenanceContinuity(data);
     renderCombinedShiftRoleEvidence(data);
     renderRileyLiveProgress(data);
     renderShiftStartProof(data);
@@ -2435,6 +2630,67 @@ $('rileyHistoryToggle').onclick=()=>{
  $('rileyHistoryToggle').textContent=showHistoricalEvidence?
   'Hide previous shift evidence':'Show previous shift receipts and investigation';
  void refreshShiftStatus();
+};
+$('resumeMaintenance').onclick=async()=>{
+ // The owner explicitly clicks in an authenticated Reality session. The
+ // server rebuilds the exact maintenance IDs and scope from its own ledger.
+ if(pending||$('resumeMaintenance').disabled)return;
+ pending=true;$('resumeMaintenance').disabled=true;$('send').disabled=true;
+ const message=bubble('assistant',
+  'Checking and authorizing the exact unfinished maintenance scope…','pending');
+ try{
+  const data=await json(SHIFT,{signal:AbortSignal.timeout(16000)});
+  const draft=data?.requested_maintenance_draft;
+  if(data?.requested_maintenance_draft_status!==
+    'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY'||
+    draft?.status!=='EXACT_OWNER_INTERNAL_MAINTENANCE_CONTINUATION_DRAFT'||
+    !/^sha256:[a-f0-9]{64}$/.test(draft.expected_fingerprint||'')||
+    !Number.isSafeInteger(draft.open_maintenance_jobs)||
+    draft.open_maintenance_jobs<1||draft.open_maintenance_jobs>4||
+    draft.installation_authorized!==false||
+    draft.owner_authorization_required!==true||
+    draft.production_changed!==false)
+   throw Error('Exact owner maintenance scope cannot be verified');
+  const authorization=await json(SHIFT,{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({
+    action:'AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION',
+    expected_fingerprint:draft.expected_fingerprint,
+    planned_start_at:new Date(Date.now()+12000).toISOString(),
+    requested_hours:8,completion_bound:true
+   }),
+   signal:AbortSignal.timeout(35000)
+  });
+  if(authorization?.ok!==true||
+     !uuid(authorization.shift_id)||
+     authorization.owner_scope_verified!==true||
+     authorization.completion_bound!==true||
+     authorization.completion_condition!==
+      'ALL_EXACT_INTERNAL_MAINTENANCE_REPAIR_RECEIPTS_VERIFIED'||
+     authorization.start_confirmation?.exact_internal_work_count!==
+      draft.open_maintenance_jobs||
+     authorization.installation_authorized!==false||
+     authorization.production_changed!==false)
+   throw Error('No verified owner signed maintenance warrant returned');
+  message.classList.remove('pending');
+  message.lastChild.textContent=
+   'SIGNED MAINTENANCE CONTINUATION AUTHORIZED · '+authorization.shift_id+
+   ' · '+draft.open_maintenance_jobs+' existing internal repair assignments. '+
+   'Archived shifts remain closed. Repair execution and independent final receipts '+
+   'are still required. No installation or customer job settlement is claimed.';
+  status('Signed maintenance continuation read back; check live worker events.');
+  void refreshShiftStatus();void refreshRileyTaylorCombinedWorkQueue();
+ }catch(error){
+  message.className='message assistant error';
+  message.lastChild.textContent=
+   'No maintenance authorization confirmed. Refresh existing shift status before retrying. ('+
+   String(error?.message||'Unknown').slice(0,170)+')';
+  status('Maintenance authorization unverified; do not create duplicate work.');
+  void refreshShiftStatus();
+ }finally{
+  pending=false;$('send').disabled=false;
+  void refreshShiftStatus();
+ }
 };
 $('runFullShift').onclick=async()=>{
  // Direct owner click is the sole trigger. The model and passive page load

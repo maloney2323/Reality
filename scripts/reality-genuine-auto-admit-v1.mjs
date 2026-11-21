@@ -1,13 +1,14 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Autonomous bridge: GitHub-signed discovery receipt -> service-verified
 // owner Continuity -> existing atomic queue. No GitHub token or DB secret.
 import {readFileSync,writeFileSync} from 'node:fs';
 const err=x=>{throw Error('GENUINE_AUTO_ADMISSION_'+x)};
 const report=JSON.parse(readFileSync('artifact/genuine-capability-auto-trigger.json','utf8'));
-const REF='refs/heads/feature/reality-general-capability-engine-20261101';
 if(process.env.GITHUB_ACTIONS!=='true'||
    process.env.GITHUB_EVENT_NAME!=='push'||
    process.env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
-   process.env.GITHUB_REF!==REF||
+   !isSignedRealityCapabilityPreviewRef(process.env.GITHUB_REF||'')||
    process.env.GITHUB_SHA!==report.repository_sha)
  err('PINNED_WORKFLOW_OR_SOURCE_CHANGED');
 if(!Array.isArray(report.findings)||report.findings.length>30||

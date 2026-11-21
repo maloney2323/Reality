@@ -51,3 +51,19 @@ test('Home can deep-link to authenticated Employee board in Chat without executi
  assert.match(chat,/panel\.hidden=false;panel\.open=true/);
  assert.match(chat,/void refreshEmployeeBoard\(\)/);
 });
+
+
+test('employee board shows exact market-research investigation source without treating it as an active engineer job',()=>{
+ assert.match(brief,/\/api\/reality\/personal-market-research/);
+ assert.match(brief,/showMarketReview/);
+ assert.match(brief,/data-home-employee="Morgan"/);
+ assert.match(brief,/research-review:/);
+ assert.match(brief,/SOURCE_FRESHNESS_AND_GAP_REVALIDATION_PENDING/);
+ assert.match(brief,/qualified_original_job===false/);
+ assert.match(brief,/execution_authorized===false/);
+ assert.match(brief,/installation_authorized===false/);
+ assert.match(brief,/job_started===false/);
+ assert.match(brief,/marketResearchReview='verified'/);
+ assert.match(brief,/removeMarketReview/);
+ assert.doesNotMatch(brief,/REPLAY_ORIGINAL|START_NEW_SHIFT|APPROVE_INSTALLATION/);
+});

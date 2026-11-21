@@ -21,13 +21,18 @@
  action.type='button';
  action.setAttribute('aria-label','Audit the weekly responsibilities of all eight employees');
  heading.append(action);
+ const inquiryAction=add('button','simple-secondary reality-employee-inquiry-trigger',
+  'Discover next question');
+ inquiryAction.type='button';
+ inquiryAction.setAttribute('aria-label','Let Reality form and investigate one source-backed question');
+ heading.append(inquiryAction);
  const panel=add('section','reality-employee-audit-panel');
  panel.id='realityEmployeeResponsibilityAuditResults';
  panel.setAttribute('aria-live','polite');
  panel.setAttribute('aria-label','Independently checked employee weekly responsibilities');
  panel.hidden=true;
  grid.insertAdjacentElement('afterend',panel);
- const buttons=[action];
+ const buttons=[action,inquiryAction];
  let running=false;
  async function audit(name){
   if(running)return;
@@ -68,6 +73,13 @@
     ' · '+data.weekly_source_inspected+' weekly issues previously inspected'+
     ' · No job or capability installation authorized.';
    panel.replaceChildren(status);
+   if(data.business_launch_readiness==='NOT_VERIFIED_FROM_CONNECTED_EVIDENCE'&&
+      data.launch_decision_authorized===false&&
+      data.standing_discovery_roles_defined===data.role_audits.length&&
+      data.standing_discovery_is_execution===false){
+    panel.append(add('p','reality-audit-warning',
+     'BUSINESS LAUNCH POSTURE · Not independently certified launch-ready. Each employee below owns a source-specific discovery scope; current findings still need qualification and the recurring role-level auto-wake has not been proven.'));
+   }
    if(data.status==='EMPLOYEE_RESPONSIBILITIES_PARTIAL_SOURCE_AUDIT')
     panel.append(add('p','reality-audit-warning',
      'Weekly qualification readback was unavailable; the live catalog was checked, but its entries still require verification.'));
@@ -94,6 +106,35 @@
     for(const check of role.responsibility_checks.slice(0,3))
      checks.append(add('li',null,check));
     card.append(checks);
+    const discovery=role.standing_discovery;
+    if(discovery?.employee===role.employee_name&&
+       discovery.cadence==='WEEKLY_DISCOVERY_SCOPE_PROPOSED_NOT_AUTONOMOUS_SHIFT'&&
+       discovery.original_job_created===false&&
+       discovery.execution_authorized===false&&
+       discovery.installation_authorized===false&&
+       Array.isArray(discovery.categories)&&discovery.categories.length===3){
+     const scope=add('details','reality-audit-findings');
+     scope.append(add('summary',null,'Standing job-discovery responsibilities'));
+     const mandate=add('ul','reality-audit-responsibilities');
+     for(const requirement of discovery.categories)
+      mandate.append(add('li',null,requirement));
+     scope.append(mandate,add('p','reality-audit-warning',
+      'Discovery scope defined. Recurring autonomous employee investigation is NOT yet verified; this audit itself runs only when requested. Unconnected source coverage must be reported rather than inventing work.'));
+     card.append(scope);
+    }
+    const launch=role.business_launch_requirement;
+    if(launch?.readiness==='NOT_VERIFIED_FOR_CUSTOMER_LAUNCH'&&
+       launch.launch_authorized===false){
+     const gate=add('div','reality-audit-role-description');
+     gate.append(add('strong',null,'Launch-readiness investigation'));
+     gate.append(add('p',null,'Business outcome: '+
+       String(launch.business_outcome||'Not yet verified')+
+       ' · Required gate: '+String(launch.required_gate||'Evidence not yet connected')));
+     gate.append(add('small',null,'Existing source coverage: '+
+       String(launch.evidence_status||'UNVERIFIED')+
+       '. This role must investigate its gate; no launch or deployment approval is implied.'));
+     card.append(gate);
+    }
     const details=add('details','reality-audit-findings');
     const summary=add('summary',null,'Review '+role.suggested_checks.length+
      ' source-backed checks and next evidence requirements');
@@ -116,6 +157,128 @@
      work.append(row);
     }
     details.append(work);card.append(details);
+    // The SAME owner-scoped Past/Present/Future evidence used by Home can
+    // inform role investigations. Source signals are not model questions,
+    // approved jobs, execution or claimed outcomes.
+    const time=data.employee_time_inquiry_context;
+    if(time?.owner_scope_verified===true&&time.read_only===true&&
+       time.execution_authorized===false&&
+       time.new_original_jobs_created===0&&
+       Array.isArray(time.roles)){
+     const perspective=time.roles.find(x=>x.employee_name===role.employee_name);
+     if(perspective&&Array.isArray(perspective.inquiry_sources)&&
+        perspective.execution_authorized===false&&
+        perspective.questions_generated===0){
+      const block=add('details','reality-audit-findings');
+      block.append(add('summary',null,
+       'Past · Present · Future · '+perspective.inquiry_sources.length+
+       ' source signals for investigation'));
+      const phase=add('p','reality-audit-role-description',
+       'Past verified final receipts: '+
+        (perspective.past_verified_receipt_count??'Not verified')+
+       ' · Present active shifts: '+
+        (perspective.present_active_shift_count??'Not verified')+
+       '. These totals do not establish work for this role.');
+      block.append(phase);
+      if(!perspective.future_source_snapshot_verified)
+       block.append(add('p','reality-audit-warning',
+        'Future discovery is stale or unverified. No inquiry signals were admitted.'));
+      else if(!perspective.inquiry_sources.length)
+       block.append(add('p','reality-audit-role-description',
+        'No unresolved, currently verified source observations for this role.'));
+      const lines=add('ul','reality-audit-responsibilities');
+      for(const signal of perspective.inquiry_sources.slice(0,30)){
+       if(signal.employee_name!==role.employee_name||
+          signal.qualified_job!==false||
+          signal.execution_authorized!==false||
+          signal.question_generated!==false)continue;
+       const entry=add('li',null,signal.source_title);
+       entry.append(add('small',null,
+        ' · '+signal.evidence_disposition+
+        ' · Independent source revalidation required'));
+       lines.append(entry);
+      }
+      block.append(lines);
+      block.append(add('p','reality-audit-warning',
+       'These are grounded inputs for Reality to develop new questions. No question has been generated or dispatched as a job by this read-only view.'));
+      card.append(block);
+     }
+    }
+    // Only signed durable model/investigation receipts are surfaced here.
+    const inquiry=data.employee_inquiry_receipts;
+    if(inquiry?.status==='OWNER_EMPLOYEE_INQUIRIES_READ_ONLY'&&
+       inquiry.owner_scope_verified===true&&inquiry.read_only===true&&
+       inquiry.execution_authorized===false&&
+       inquiry.qualified_executable_jobs===0&&
+       Array.isArray(inquiry.items)){
+     const received=inquiry.items.filter(x=>x.employee===role.employee_name);
+     if(received.length){
+      const saved=add('details','reality-audit-findings');
+      saved.append(add('summary',null,
+       'Reality investigated '+received.length+' source question(s)'));
+      for(const record of received){
+       if(record.qualified_executable_job!==false||
+          record.execution_authorized!==false||
+          !/^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/[1-9][0-9]*$/.test(
+           record.source_ref||''))continue;
+       const item=add('div','reality-audit-work-item');
+       item.append(add('strong',null,record.question));
+       const source=add('a',null,'View original source');
+       source.href=record.source_ref;source.target='_blank';
+       source.rel='noopener noreferrer';item.append(source);
+       item.append(add('p',null,'Investigation: '+record.investigation));
+       item.append(add('p',null,'Next independent proof: '+record.next_proof));
+       item.append(add('small',null,
+        'Source checked and model response recorded · '+record.recommendation+
+        ' · Not a verified repair, approved job or completed customer outcome'));
+       saved.append(item);
+      }
+      card.append(saved);
+     }
+    }
+    const capability=data.employee_capability_investigations;
+    if(capability?.status===
+       'VERIFIED_EXISTING_EMPLOYEE_CAPABILITY_INQUIRY_SCHEDULE'&&
+       capability.read_only===true&&
+       capability.execution_authorized===false&&
+       capability.original_jobs_created===0&&
+       capability.installation_authorized===false&&
+       Array.isArray(capability.items)){
+     const assigned=capability.items.filter(x=>
+      x.employee===role.employee_name&&
+      x.source_feed_fingerprint_unchanged===true&&
+      x.phase==='INQUIRY_SCHEDULED_REQUIRES_INDEPENDENT_GAP_PROOF'&&
+      x.execution_authorized_by_schedule===false&&
+      x.original_job_created_by_schedule===false&&
+      x.installation_authorized===false);
+     if(assigned.length){
+      const scheduled=add('details','reality-audit-findings');
+      scheduled.append(add('summary',null,
+       assigned.length+' assigned capability investigation(s)'));
+      for(const assignment of assigned){
+       const line=add('div','reality-audit-work-item');
+       line.append(add('strong',null,
+        assignment.capability_key+' · Independent reviewer: '+assignment.reviewer));
+       line.append(add('p',null,
+        'Scheduled: '+String(assignment.planned_inquiry_at||'Unknown')+
+        ' · Provisional effort: '+
+        (assignment.estimate_minutes_low/60).toFixed(1)+'–'+
+        (assignment.estimate_minutes_high/60).toFixed(1)+
+        ' hours (not measured)'));
+       line.append(add('p',null,
+        'Investigation: '+String(assignment.scope||'Independent scope required')));
+       line.append(add('p',null,
+        'Independent next proof: '+
+        String(assignment.independent_test_requirement||'Not yet verified')));
+       line.append(add('small',null,
+        assignment.independent_current_gap_proven&&assignment.existing_original_work_id?
+         'Existing independently qualified original · Execution remains governed':
+         'Investigation scheduled only · No verified current gap or authorized repair'));
+       scheduled.append(line);
+      }
+      card.append(scheduled);
+     }
+    }
     if(role.additional_business_connections_needed)
      card.append(add('p','reality-audit-warning',
       'Connected GitHub sources do not yet cover this role\'s full business responsibilities.'));
@@ -142,5 +305,41 @@
   button.addEventListener('click',()=>{void audit(name);});
   card.append(button);buttons.push(button);
  }
+ async function inquire(){
+  if(running)return;
+  running=true;buttons.forEach(b=>b.disabled=true);
+  panel.hidden=false;
+  panel.replaceChildren(add('p','reality-audit-progress',
+   'Reality is rechecking one source and generating its own evidence-grounded question…'));
+  let refresh=false;
+  try{
+   const response=await fetch('/api/reality/personal-employee-inquiry',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({intent:'INVESTIGATE_NEXT_SOURCE'}),
+    signal:AbortSignal.timeout(55000)
+   });
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true||
+      data.execution_authorized!==false||
+      data.installation_authorized!==false||
+      data.production_changed!==false)
+    throw Error('INQUIRY_VERIFIED_RESPONSE_REQUIRED');
+   refresh=data.status==='EMPLOYEE_SOURCE_QUESTION_AND_INVESTIGATION_RECORDED';
+   panel.replaceChildren(add('p','reality-audit-summary',
+    refresh?'Reality recorded a new source-backed question for '+
+       data.employee+'. Reloading verified employee investigation receipts…':
+    data.status==='NO_FRESH_UNSETTLED_EMPLOYEE_INQUIRY_SOURCE'?
+       'No new verified unsettled source is eligible. Refresh connected business sources; no job created.':
+    'Inquiry is blocked or already claimed. No job or approval was created.'));
+  }catch{
+   panel.replaceChildren(add('p','reality-audit-warning',
+    'Reality could not verify a new investigation. No work or capability was authorized.'));
+  }finally{
+   running=false;buttons.forEach(b=>b.disabled=false);
+  }
+  if(refresh)void audit('ALL');
+ }
+ inquiryAction.addEventListener('click',()=>{void inquire()});
  action.addEventListener('click',()=>{void audit('ALL');});
 })();

@@ -1,9 +1,53 @@
 name: Reality employee responsibility audit isolated proof
 on:
   push:
-    branches: [reality/native263-temporal-chat-proof-20261113]
+    branches: [reality/native263-temporal-chat-proof-20261113, reality/chat-direct-work-handoff-20261115]
     paths:
       - src/reality-employee-responsibility-audit-v1.js
+      - src/reality-employee-time-inquiry-context-v1.js
+      - src/reality-dynamic-employee-inquiry-worker-v1.js
+      - src/reality-standing-employee-discovery-v1.js
+      - src/reality-capability-role-schedule-worker-v1.js
+      - src/reality-governed-operational-self-repair-v1.js
+      - api/reality/personal-self-repair-demo.js
+      - supabase/migrations/20261117_governed_self_repair_isolated_demo_v1.sql
+      - supabase/migrations/20261117_restore_signed_worker_cron_scope_v1.sql
+      - supabase/migrations/20261117_owner_worker_self_observation_and_recovery_v1.sql
+      - supabase/migrations/20261117_worker_failure_summary_reconciliation_v2.sql
+      - supabase/migrations/20261117_owner_worker_cron_readback_access_v1.sql
+      - supabase/migrations/20261117_worker_operational_continuity_verification_v1.sql
+      - supabase/migrations/20261117_preview_watchdog_actual_self_repair_v1.sql
+      - supabase/migrations/20261117_preview_watchdog_actual_self_repair_v2.sql
+      - supabase/migrations/20261117_watchdog_autorepair_trigger_and_owner_readback_v1.sql
+      - supabase/migrations/20261117_preview_watchdog_owner_status_v2.sql
+      - supabase/migrations/20261117_owner_worker_recovery_status_readback_v2.sql
+      - supabase/migrations/20261117_owner_capability_employee_schedule_v1.sql
+      - supabase/migrations/20261117_existing_worker_capability_schedule_wake_v1.sql
+      - supabase/migrations/20261117_capability_schedule_proof_readback_v2.sql
+      - api/reality/personal-capabilities.js
+      - api/reality/personal-chat.js
+      - src/reality-owner-operational-incident-chat-v1.js
+      - src/reality-incident-existing-original-handoff-v1.js
+      - src/reality-standing-scheduled-capability-inquiry-v1.js
+      - supabase/migrations/20261117_capability_scheduled_inquiry_execution_v1.sql
+      - supabase/migrations/20261117_existing_worker_scheduled_capability_inquiry_wake_v1.sql
+      - supabase/migrations/20261117_capability_inquiry_readback_v3.sql
+      - supabase/migrations/20261117_signed_worker_dispatch_semantics_v2.sql
+      - supabase/migrations/20261117_incident_original_handoff_failure_epoch_v1.sql
+      - supabase/migrations/20261117_signed_worker_actual_run_receipts_v1.sql
+      - supabase/migrations/20261117_incident_existing_original_governed_handoff_v1.sql
+      - reality-chat-operational-incident-briefing-v1.js
+      - reality-chat-operational-incident-briefing-v1.css
+      - index.html
+      - reality-capability-workspace-v1.js
+      - reality-capability-workspace-v1.css
+      - reality-home-command-v1.js
+      - supabase/migrations/20261117_standing_routine_discovery_delegation_v1.sql
+      - supabase/migrations/20261117_standing_discovery_existing_worker_cron_v1.sql
+      - api/reality/personal-employee-inquiry.js
+      - supabase/migrations/20261117_dynamic_employee_temporal_inquiries_v1.sql
+      - api/reality/governed-employee-shift-worker.js
+      - api/reality/personal-time-horizon.js
       - src/reality-governed-shift-boundary-v1.js
       - api/reality/personal-employee-work-audit.js
       - api/reality/personal-employee-roster.js
@@ -11,6 +55,41 @@ on:
       - reality-employee-work-audit-ui-v1.js
       - index.html
       - test/reality-employee-responsibility-audit-v1.test.js
+      - test/reality-employee-time-inquiry-context-v1.test.js
+      - test/reality-dynamic-employee-inquiry-worker-v1.test.js
+      - test/reality-signed-shift-employee-inquiry-continuity-v1.test.js
+      - test/reality-shift-continuity-autonomous-v1.test.js
+      - test/reality-automatic-qualified-evidence-work-v1.test.js
+      - test/reality-qualified-source-change-requalification-v1.test.js
+      - src/reality-qualified-source-requalification-v1.js
+      - supabase/migrations/20261117_qualified_source_change_requalification_v1.sql
+      - supabase/migrations/20261117_qualified_source_change_owner_readback_v2.sql
+      - src/reality-automatic-qualified-evidence-worker-v1.js
+      - supabase/migrations/20261117_automatic_qualified_employee_evidence_work_v1.sql
+      - supabase/migrations/20261117_automatic_qualified_employee_evidence_work_pulse_v2.sql
+      - src/reality-shift-continuity-auto-investigation-v1.js
+      - src/reality-owner-operational-incident-chat-v1.js
+      - reality-chat-operational-incident-briefing-v1.js
+      - src/reality-governed-shift-boundary-v1.js
+      - supabase/migrations/20261117_owner_shift_continuity_stall_incidents_v1.sql
+      - supabase/migrations/20261117_shift_continuity_independent_resumption_v1.sql
+      - supabase/migrations/20261117_shift_continuity_resumption_source_epochs_v2.sql
+      - supabase/migrations/20261117_shift_incident_exact_repair_install_readiness_v1.sql
+      - supabase/migrations/20261117_signed_shift_to_all_employee_inquiry_handoff_v1.sql
+      - supabase/migrations/20261117_signed_shift_employee_inquiry_continuation_wake_v1.sql
+      - supabase/migrations/20261117_signed_shift_employee_inquiry_continuation_wake_v2.sql
+      - test/reality-standing-capability-autonomy-v1.test.js
+      - test/reality-capability-role-schedule-v1.test.js
+      - test/reality-worker-self-recovery-v1.test.js
+      - test/reality-worker-operational-continuity-v1.test.js
+      - test/reality-governed-operational-self-repair-v1.test.js
+      - test/reality-owner-isolated-self-repair-demo-v1.test.js
+      - test/reality-owner-operational-incident-chat-v1.test.js
+      - test/reality-preview-watchdog-actual-self-repair-v1.test.js
+      - test/reality-incident-existing-original-handoff-v1.test.js
+      - test/reality-signed-worker-actual-receipts-v1.test.js
+      - test/reality-standing-scheduled-capability-inquiry-v1.test.js
+      - test/reality-past-present-future-time-map-v1.test.js
       - test/reality-home-live-employees-v1.test.js
       - src/reality-active-weekly-source-investigator-v1.js
       - api/reality/governed-employee-shift-worker.js
@@ -32,6 +111,24 @@ jobs:
       - name: Syntax check the new owner audit boundary and Home buttons
         run: |
           node --check src/reality-employee-responsibility-audit-v1.js
+          node --check src/reality-employee-time-inquiry-context-v1.js
+          node --check src/reality-dynamic-employee-inquiry-worker-v1.js
+          node --check src/reality-shift-continuity-auto-investigation-v1.js
+          node --check src/reality-automatic-qualified-evidence-worker-v1.js
+          node --check src/reality-qualified-source-requalification-v1.js
+          node --check src/reality-standing-employee-discovery-v1.js
+          node --check src/reality-capability-role-schedule-worker-v1.js
+          node --check src/reality-governed-operational-self-repair-v1.js
+          node --check api/reality/personal-self-repair-demo.js
+          node --check api/reality/personal-capabilities.js
+          node --check api/reality/personal-chat.js
+          node --check src/reality-owner-operational-incident-chat-v1.js
+          node --check src/reality-incident-existing-original-handoff-v1.js
+          node --check src/reality-standing-scheduled-capability-inquiry-v1.js
+          node --check reality-chat-operational-incident-briefing-v1.js
+          node --check reality-capability-workspace-v1.js
+          node --check api/reality/personal-employee-inquiry.js
+          node --check api/reality/personal-time-horizon.js
           node --check api/reality/personal-employee-work-audit.js
           node --check reality-employee-work-audit-ui-v1.js
           node --check src/reality-active-weekly-source-investigator-v1.js
@@ -40,7 +137,7 @@ jobs:
           node --check reality-home-employee-brief-v1.js
       - name: Run the actual isolated employee-audit acceptance tests
         run: |
-          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js
+          node --test test/reality-employee-responsibility-audit-v1.test.js test/reality-home-live-employees-v1.test.js test/reality-active-weekly-source-investigator-v1.test.js test/reality-employee-time-inquiry-context-v1.test.js test/reality-past-present-future-time-map-v1.test.js test/reality-dynamic-employee-inquiry-worker-v1.test.js test/reality-signed-shift-employee-inquiry-continuity-v1.test.js test/reality-shift-continuity-autonomous-v1.test.js test/reality-automatic-qualified-evidence-work-v1.test.js test/reality-qualified-source-change-requalification-v1.test.js test/reality-standing-capability-autonomy-v1.test.js test/reality-capability-role-schedule-v1.test.js test/reality-worker-self-recovery-v1.test.js test/reality-worker-operational-continuity-v1.test.js test/reality-governed-operational-self-repair-v1.test.js test/reality-owner-isolated-self-repair-demo-v1.test.js test/reality-owner-operational-incident-chat-v1.test.js test/reality-preview-watchdog-actual-self-repair-v1.test.js test/reality-incident-existing-original-handoff-v1.test.js test/reality-signed-worker-actual-receipts-v1.test.js test/reality-standing-scheduled-capability-inquiry-v1.test.js
       - name: No new shift, installation or production effect
         run: |
           echo 'Read-only responsibility audit proof; no secrets or provider mutations'

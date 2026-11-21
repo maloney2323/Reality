@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Automatic reconciliation of Reality's already-consumed original claim.
 // A new red-only Docker run does not re-claim, install, or touch production.
 // All privileged DB state is re-read inside the signed Supabase service broker.
@@ -11,7 +13,7 @@ if(!env.GH_TOKEN||env.GH_TOKEN.length<20)die('SIGNED_READ_ONLY_GITHUB_TOKEN_REQU
 if(env.GITHUB_ACTIONS!=='true'||
  env.GITHUB_EVENT_NAME!=='push'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101')
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||''))
  die('EXACT_GITHUB_ACTIONS_REQUIRED');
 const admitted=JSON.parse(readFileSync(
  'artifact/genuine-capability-admitted-queue.json','utf8'));

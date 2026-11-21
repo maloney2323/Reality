@@ -72,6 +72,32 @@ jobs:
       - run: node --test test/reality-general-original-work-settlement-v1.0.test.js
       - run: node --test test/reality-general-approved-repair-continuation-v1.0.test.js
       - run: node --test test/reality-work-center-owner-approval-ui-v1.test.js
+      - name: Governed automatic fenced original diagnosis — one model lease and no installation retry
+        run: |
+          node --check src/reality-general-original-fenced-investigator-v1.js
+          node --test test/reality-general-original-fenced-investigator-v1.test.js
+          node --test test/reality-general-original-fenced-reconcile-v1.test.js
+          node --test test/reality-fenced-original-recovery-publication-v1.test.js
+          node --test test/reality-shift-close-four-sources-v1.test.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --test test/reality-owner-fresh-shift-queue-v1.test.js
+          node --test test/reality-owner-settled-source-inventory-v1.test.js
+          node --test test/reality-eight-role-source-discovery-v1.test.js
+          node --test test/reality-employee-pr-role-discovery-v1.test.js
+          node --test test/reality-owner-connections-workspace-v1.test.js
+          node --test test/reality-past-present-future-time-map-v1.test.js
+          node --check api/reality/personal-time-horizon.js
+          node --check reality-past-present-future-v1.js
+          node --check reality-unified-shell-v1.js
+          node --test test/reality-owner-connection-auto-discovery-catalog-v1.test.js
+          node --check api/reality/personal-connections.js
+          node --check reality-connections-workspace-v1.js
+          node --check reality-unified-shell-v1.js
+          node --test test/reality-home-command-v1.test.js
+          node --check api/reality/personal-employee-roster.js
+          node --check reality-home-employee-brief-v1.js
+          node --check reality-home-command-v1.js
+          node --test test/reality-generalized-original-install-review-chat-v1.test.js
       - run: node --test test/reality-owner-repair-candidate-admission-v1.0.test.js
       - run: node --test test/reality-general-constitutional-checkpoint-v1.0.test.js
       - run: echo 'Contract tests, no real owner approval or installation.'

@@ -9,18 +9,33 @@ const REPO='maloney2323/Reality';
 const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(issues|pull|actions\/runs)\/([1-9][0-9]{0,15})$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const noProduction=x=>x?.production_changed===false;
-async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}){
+export function isIsolatedOriginalProviderOutage(error){
+ // Temporary GitHub source readback failure is one-job scoped.
+ // Owner/tenant identity, authority, proof, and receipt failures are NOT.
+ return String(error?.message||'')==='SHIFT_GITHUB_PROVIDER_READBACK_UNAVAILABLE';
+}
+
+export async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}){
  const parsed=URL.exec(String(source||''));
  if(!parsed)throw Error('SHIFT_SOURCE_REF_NOT_ALLOWED');
  const category=parsed[1],id=parsed[2],endpoint=
   category==='issues'?'issues':category==='pull'?'pulls':'actions/runs';
  const target='https://api.github.com/repos/'+REPO+'/'+endpoint+'/'+id;
- const r=await fetchImpl(target,{
-  method:'GET',redirect:'error',cache:'no-store',
-  headers:{accept:'application/vnd.github+json','user-agent':'Reality-Employee-Shift-ReadOnly/1.0',
-   'x-github-api-version':'2022-11-28'},
-  signal:AbortSignal.timeout(10000)
- });
+ // A connection refusal, timeout or fetch transport exception is a
+ // source-job provider outage. Keep the error code stable so the existing
+ // shift worker can fence THIS job while continuing its other work.
+ // Do NOT catch source validation, owner scope, identity, or receipt failures.
+ let r;
+ try{
+  r=await fetchImpl(target,{
+   method:'GET',redirect:'error',cache:'no-store',
+   headers:{accept:'application/vnd.github+json','user-agent':'Reality-Employee-Shift-ReadOnly/1.0',
+    'x-github-api-version':'2022-11-28'},
+   signal:AbortSignal.timeout(10000)
+  });
+ }catch{
+  throw Error('SHIFT_GITHUB_PROVIDER_READBACK_UNAVAILABLE');
+ }
  if(r.status===404)return {
   kind:'GITHUB_SOURCE_READBACK',source_url:source,provider_status:'NOT_FOUND',
   provider_checked:true,read_only:true,production_changed:false,
@@ -57,6 +72,9 @@ async function readProviderSource(source,{fetchImpl=fetch,includePatch=false}={}
   const evidence={
    kind:'PULL_REQUEST_CHANGESET_OBSERVED',
    head_sha:headSha,base_sha:baseSha,changed_file_count:total,
+   // Source evidence records whether GitHub itself considers this PR draft.
+   // An absent or invalid draft state is UNKNOWN, never 'ready to review'.
+   draft:typeof data.draft==='boolean'?data.draft:null,
    files:[],review_coverage:'PATCH_UNAVAILABLE'
   };
   if(includePatch&&state==='OPEN_PULL_REQUEST'&&headSha){

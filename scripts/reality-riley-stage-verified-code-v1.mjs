@@ -1,3 +1,5 @@
+import {isSignedRealityCapabilityPreviewRef}
+ from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Real Riley code-writer stage for the EXISTING independently verified
 // capability pipeline. Not a model executor; no keys reach generated files.
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
@@ -9,7 +11,7 @@ const deny=x=>{throw Error('RILEY_VERIFIED_CODE_STAGE_'+x)};
 if(env.GITHUB_ACTIONS!=='true'||
  env.GITHUB_REPOSITORY!=='maloney2323/Reality'||
  env.GITHUB_EVENT_NAME!=='push'||
- env.GITHUB_REF!=='refs/heads/feature/reality-general-capability-engine-20261101'||
+ !isSignedRealityCapabilityPreviewRef(env.GITHUB_REF||'')||
  !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA||'')||
  !/^[1-9][0-9]*$/.test(env.GITHUB_RUN_ID||''))
  deny('EXACT_ISOLATED_SIGNED_WORKFLOW_REQUIRED');

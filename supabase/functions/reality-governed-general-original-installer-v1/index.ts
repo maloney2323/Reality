@@ -10,15 +10,24 @@ const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const BRANCH=/^reality\/[a-zA-Z0-9/_-]{10,135}$/;
 const SOURCE=/^src\/[a-zA-Z0-9/_-]+\.js$/;
 const fail=s=>{throw Error('GENERAL_ORIGINAL_INSTALL_'+s)};
-const safe=(status,more={},http=200)=>new Response(JSON.stringify({
- status,source_installed:false,original_job_completed:false,
- production_changed:false,...more
-}),{status:http,headers:{'content-type':'application/json',
- 'cache-control':'no-store','x-content-type-options':'nosniff'}});
+// Diagnosable worker outcomes must never expose source bodies, credentials,
+// owner identity or arbitrary provider responses. All dispositions are finite
+// installer-generated codes; log only a bounded code, not exception content.
+const safe=(status,more={},http=200)=>{
+ if(typeof status==='string'&&
+   /^GENERAL_(?:ORIGINAL_)?INSTALL_[A-Z0-9_]{4,120}$/.test(status))
+  console.info('REALITY_GOVERNED_INSTALL_DISPOSITION',status);
+ return new Response(JSON.stringify({
+  status,source_installed:false,original_job_completed:false,
+  production_changed:false,...more
+ }),{status:http,headers:{'content-type':'application/json',
+  'cache-control':'no-store','x-content-type-options':'nosniff'}});
+};
 async function rpc(base,key,name,args={}){
  if(!['reality_read_general_original_install_scope_v1',
        'reality_claim_general_original_install_v1',
-       'reality_record_general_original_installed_source_v1'].includes(name))
+       'reality_record_general_original_installed_source_v1',
+       'reality_record_general_original_fenced_recovery_v1'].includes(name))
   fail('RPC_NOT_ALLOWED');
  const r=await fetch(base+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -98,6 +107,10 @@ function validScope(x){
   SHA.test(x.expected_installed_blob_sha||'')&&
   HASH.test(x.candidate_artifact_sha256||'')&&
   x.expected_preinstall_blob_sha!==x.expected_installed_blob_sha&&
+  // A missing pinned parent cannot be reported as a verified no-effect
+  // recovery after the one-use GitHub write has been durably claimed.
+  (x.phase==='OWNER_APPROVED'||
+   SHA.test(x.expected_parent_commit_sha||''))&&
   x.installation_authorized===true&&
   x.original_job_completed===false&&x.production_changed===false&&
   ['OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED','DEPLOYMENT_VERIFIED']
@@ -105,10 +118,80 @@ function validScope(x){
 }
 async function reconcile(token,base,key,scope,head){
  const expected=scope.expected_parent_commit_sha;
- if(!SHA.test(expected||'')||head===expected)
+ if(!SHA.test(expected||''))
+  fail('FENCED_EXPECTED_PARENT_COMMIT_SHA_NOT_VERIFIED');
+ if(head===expected){
+  // Read-only diagnostic against the SAME runtime GitHub credential.
+  // A passing inert Contents canary does not prove the Git Data API
+  // commit/ref path is writable. NEVER probe with a POST or PATCH here.
+  try{
+   const repository=await gh(token,'');
+   const permission=repository.ok&&repository.data?.permissions?.push===true?
+    'RUNTIME_REPO_PUSH_PERMISSION_CONFIRMED':
+    repository.ok?'RUNTIME_REPO_PUSH_PERMISSION_NOT_CONFIRMED':
+    'RUNTIME_REPO_METADATA_READ_UNAVAILABLE';
+   console.info('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY',permission,
+    Number.isInteger(repository.status)?repository.status:0);
+   // Verify whether the exact immutable installation ingredients still
+   // exist. GET-only: no new GitHub objects or refs, even if the old write
+   // was interrupted after creating unreachable objects.
+   const [parent,candidateBlob,baseline,candidate]=await Promise.all([
+    gh(token,'/git/commits/'+expected),
+    gh(token,'/git/blobs/'+scope.expected_installed_blob_sha),
+    checkedSource(token,scope.target_path,expected).catch(()=>null),
+    checkedSource(token,scope.target_path,scope.candidate_commit_sha)
+     .catch(()=>null)
+   ]);
+   const finding=parent.ok&&SHA.test(parent.data?.tree?.sha||'')&&
+    candidateBlob.ok&&candidateBlob.data?.sha===
+     scope.expected_installed_blob_sha&&
+    baseline?.blob===scope.expected_preinstall_blob_sha&&
+    candidate?.blob===scope.expected_installed_blob_sha&&
+    candidate?.digest===scope.candidate_artifact_sha256?
+    'FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE':
+    'FENCED_GIT_OBJECTS_OR_EXACT_SOURCE_NOT_VERIFIED';
+   console.info('REALITY_INSTALLER_READ_ONLY_RECOVERY_EVIDENCE',finding,
+    Number.isInteger(parent.status)?parent.status:0,
+    Number.isInteger(candidateBlob.status)?candidateBlob.status:0);
+   if(finding==='FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE'&&
+      permission==='RUNTIME_REPO_PUSH_PERMISSION_CONFIRMED'){
+    // An immutable, exact-original diagnosis is a write to the evidence
+    // ledger only; the original GitHub ref update remains fully fenced.
+    const attested=JSON.stringify([
+     scope.attempt_id,scope.original_work_id,scope.shift_id,
+     scope.approval_receipt_id,scope.target_branch,scope.target_path,
+     expected,head,scope.expected_preinstall_blob_sha,
+     scope.expected_installed_blob_sha,scope.candidate_commit_sha,
+     scope.candidate_artifact_sha256,parent.status,candidateBlob.status,
+     baseline.blob,candidate.blob,candidate.digest
+    ]);
+    const evidenceSHA=await digest('SHA-256',
+     new TextEncoder().encode(attested));
+    const stored=await rpc(base,key,
+     'reality_record_general_original_fenced_recovery_v1',{
+      p_attempt_id:scope.attempt_id,p_observed_branch_head:head,
+      p_evidence_sha256:evidenceSHA,p_finding:finding
+     });
+    if(stored.status!=='GENERAL_ORIGINAL_FENCED_RECOVERY_OBSERVATION_DURABLE'||
+       stored.original_work_id!==scope.original_work_id||
+       stored.shift_id!==scope.shift_id||
+       stored.phase!=='READ_ONLY_DIAGNOSIS_RECORDED'||
+       stored.installation_retried!==false||
+       stored.original_job_completed!==false||
+       stored.production_changed!==false)
+     fail('FENCED_RECOVERY_DURABLE_EVIDENCE_NOT_VERIFIED');
+    console.info('REALITY_INSTALLER_FENCED_RECOVERY_RECEIPTED',
+     'SAME_ORIGINAL_DIAGNOSIS_DURABLE_NO_RETRY');
+   }
+   // Passing these GET checks is NOT proof that an earlier ref update
+   // never happened and cannot reopen the consumed write authority.
+  }catch{
+   console.warn('REALITY_INSTALLER_READ_ONLY_PROVIDER_CAPABILITY','PROBE_UNAVAILABLE');
+  }
   return safe('GENERAL_INSTALL_ALREADY_FENCED_NO_PROVIDER_EFFECT_CONFIRMED',{
    original_work_id:scope.original_work_id,installation_authorized:true,
    next_gate:'WAIT_FOR_EXACT_PROVIDER_READBACK_OR_CONTROLLED_RECOVERY'});
+ }
  const commit=await gh(token,'/commits/'+head);
  const source=await checkedSource(token,scope.target_path,head);
  if(!commit.ok||!Array.isArray(commit.data?.parents)||

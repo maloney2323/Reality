@@ -28,6 +28,10 @@ import {assessRealityNativeBatchReadiness}
  from '../../src/reality-riley-native-batch-readiness-v1.js';
 import {diagnoseRealityEmployeeRecovery}
  from '../../src/reality-employee-recovery-route-v1.js';
+import {projectOwnerInternalMaintenanceContinuity}
+ from '../../src/reality-owner-internal-maintenance-continuity-v1.js';
+import {buildOwnerMaintenanceContinuationDraft}
+ from '../../src/reality-owner-maintenance-continuation-plan-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
 export const maxDuration=60;
@@ -83,10 +87,12 @@ export async function ownerExistingRileySourcePriority({catalog,brief,ownerId,db
 // old UI strings, model advice or an inference from an issue being open.
 export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}={}){
  if(!UUID.test(ownerId||''))throw Error('SHIFT_OWNER_SETTLED_SCOPE_UNVERIFIED');
- const [reviews,triage,native]=await Promise.all([
+ const [reviews,triage,native,additional]=await Promise.all([
   call(db,'reality_read_owner_riley_pr_review_v1',{p_owner_id:ownerId}),
   call(db,'reality_read_owner_shift_failure_triage_143_v1',{p_owner_id:ownerId}),
-  call(db,'reality_read_owner_riley_repair_original_v1',{p_owner_id:ownerId})
+  call(db,'reality_read_owner_riley_repair_original_v1',{p_owner_id:ownerId}),
+  call(db,'reality_read_owner_additional_settled_shift_sources_v1',{
+   p_owner_id:ownerId})
  ]);
  if(reviews?.status!=='OWNER_PR_REVIEW_ORIGINAL_READBACK'||
     reviews.production_changed!==false||
@@ -97,7 +103,19 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
     native?.status!=='OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK'||
     native.production_changed!==false||
     native.does_not_authorize_new_work!==true||
-    !Array.isArray(native.jobs)||native.jobs.length>6)
+    !Array.isArray(native.jobs)||native.jobs.length>6||
+    additional?.status!==
+     'OWNER_ADDITIONAL_SETTLED_SOURCES_INDEPENDENTLY_RECONCILED'||
+    additional.owner_id!==ownerId||
+    additional.work_creation_authorized!==false||
+    additional.shift_authorized!==false||
+    additional.installation_authorized!==false||
+    additional.production_changed!==false||
+    !Array.isArray(additional.source_refs)||
+    additional.source_refs.length>30||
+    additional.settled_source_count!==additional.source_refs.length||
+    additional.source_refs.some(ref=>
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(ref)))
   throw Error('SHIFT_OWNER_SETTLED_ORIGINAL_RECEIPT_READBACK_UNVERIFIED');
  const refs=new Set();
  for(const [kind,data] of [['PR_REVIEW',reviews.jobs],['FAILURE_TRIAGE',triage.jobs]]){
@@ -133,6 +151,10 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
    throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
   refs.add(j.source_ref);
  }
+ // A repository source can remain marked OPEN after Reality completed its
+ // original work. The owner-matched, independently settled ledger wins;
+ // never silently recycle those jobs into a new shift.
+ for(const ref of additional.source_refs)refs.add(ref);
  return Object.freeze([...refs].sort());
 }
 
@@ -463,6 +485,34 @@ export default async function handler(req,res){
       'WEEKLY_AND_HOMEPAGE_INTAKE_NOT_YET_VERIFIED';
     }
    }
+   // Preserve unfinished maintenance as a separate, signed owner work queue.
+   // The original closed shift is never reopened by a GET or new admission.
+   let internal_maintenance_continuity=null;
+   let internal_maintenance_continuity_status='OWNER_MAINTENANCE_READBACK_UNAVAILABLE';
+   try{
+    const maintenance=await shiftRpc(db,'reality_read_owner_internal_maintenance_v1',{
+     p_owner_id:session.user_id
+    });
+    internal_maintenance_continuity=projectOwnerInternalMaintenanceContinuity(
+     maintenance,{ownerId:session.user_id,shifts:read.shifts});
+    internal_maintenance_continuity_status='OWNER_MAINTENANCE_SOURCE_AND_ROLE_VERIFIED';
+   }catch{
+    // No work, approval, or settled receipt may be inferred from failed readback.
+   }
+   let requested_maintenance_draft=null;
+   let requested_maintenance_draft_status='NO_VERIFIED_MAINTENANCE_CONTINUATION_READY';
+   if(!active&&internal_maintenance_continuity?.status===
+      'OWNER_UNFINISHED_INTERNAL_MAINTENANCE_PRESERVED'){
+    try{
+     requested_maintenance_draft=buildOwnerMaintenanceContinuationDraft(
+      internal_maintenance_continuity,{ownerId:session.user_id});
+     requested_maintenance_draft_status=
+      'VERIFIED_EXISTING_INTERNAL_MAINTENANCE_CONTINUATION_READY';
+    }catch{
+     requested_maintenance_draft_status=
+      'MAINTENANCE_CONTINUATION_EXACT_SCOPE_UNAVAILABLE';
+    }
+   }
    const shift_briefing=buildRealityShiftConversationBrief(
     read.shifts,handoffs,new Date(),shift_source_native_receipts);
    const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:read.shifts,handoffs});
@@ -497,6 +547,8 @@ export default async function handler(req,res){
     riley_native_reviewed_patch,riley_native_reviewed_patch_status,
     riley_native_batch_readiness,riley_native_model_tool_proof,
     requested_shift_draft:draft,
+    internal_maintenance_continuity,internal_maintenance_continuity_status,
+    requested_maintenance_draft,requested_maintenance_draft_status,
     recovery_diagnosis,
     riley_pr_review_jobs,riley_failure_triage_jobs,riley_code_repair_jobs,
     capability_approval_handoffs:handoffs,handoff_status,
@@ -523,13 +575,75 @@ export default async function handler(req,res){
       (keys.length===3&&Object.hasOwn(b,'requested_hours'))))||
    (!Number.isSafeInteger(b.requested_hours??8)||
    (b.requested_hours??8)<1||(b.requested_hours??8)>12)||
-   b.action!=='AUTHORIZE_EXACT_EMPLOYEE_SHIFT'||!SHA.test(b.expected_fingerprint||''))
+   !['AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
+     'AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'].includes(b.action)||
+   (b.action==='AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'&&
+    (b.completion_bound!==true||b.requested_hours!==8))||
+   !SHA.test(b.expected_fingerprint||''))
    return res.status(400).json({ok:false,error:'SHIFT_EXACT_APPROVAL_REQUIRED'});
   const start=new Date(b.planned_start_at);
   if(typeof b.planned_start_at!=='string'||!/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ/.test(b.planned_start_at)||
    !Number.isFinite(start.valueOf())||
    start.getTime()<Date.now()-120000||start.getTime()>Date.now()+7*86400000)
    return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});
+  if(b.action==='AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'){
+   // Never trust browser-supplied owner or incident IDs. Bind all selected
+   // obligations to the authenticated owner and newly fingerprinted work.
+   const before=assertShiftReadback(await shiftRpc(db,
+    'reality_read_owner_employee_shifts_v1',{p_owner_id:session.user_id}));
+   if(before.shifts.some(s=>
+      ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&
+      (s.planned_end_at==='infinity'||Date.parse(s.planned_end_at)>Date.now())))
+    return res.status(409).json({ok:false,
+     error:'OWNER_ALREADY_HAS_ACTIVE_SIGNED_SHIFT_NO_DUPLICATE'});
+   const ledger=await shiftRpc(db,'reality_read_owner_internal_maintenance_v1',{
+    p_owner_id:session.user_id
+   });
+   const continuity=projectOwnerInternalMaintenanceContinuity(ledger,{
+    ownerId:session.user_id,shifts:before.shifts
+   });
+   const drafted=buildOwnerMaintenanceContinuationDraft(continuity,{
+    ownerId:session.user_id
+   });
+   if(drafted.expected_fingerprint!==b.expected_fingerprint)
+    return res.status(409).json({ok:false,
+     error:'OWNER_MAINTENANCE_SCOPE_CHANGED_REFRESH_BEFORE_START'});
+   const plan=drafted.plan;
+   const receipt=assertShiftReceipt(await shiftRpc(db,
+    'reality_authorize_employee_maintenance_continuation_v1',{
+     p_owner_id:session.user_id,p_fingerprint:drafted.expected_fingerprint,
+     p_source_observed_at:plan.observed_at,p_start_at:start.toISOString(),
+     p_steps:plan.slots
+    }));
+   if(receipt.completion_bound!==true||
+      receipt.carried_internal_maintenance_count!==drafted.open_maintenance_jobs||
+      receipt.completion_condition!==
+       'ALL_EXACT_INTERNAL_MAINTENANCE_REPAIR_RECEIPTS_VERIFIED')
+    throw Error('SHIFT_MAINTENANCE_CONTINUATION_WARRANT_UNVERIFIED');
+   const verified=assertShiftReadback(await shiftRpc(db,
+    'reality_read_owner_employee_shifts_v1',{p_owner_id:session.user_id}));
+   const exact=verified.shifts.find(s=>s.shift_id===receipt.shift_id&&
+    s.plan_fingerprint===drafted.expected_fingerprint&&
+    s.planned_end_at==='infinity'&&s.steps.length===8);
+   if(!exact)throw Error('SHIFT_MAINTENANCE_CONTINUATION_READBACK_UNVERIFIED');
+   return res.status(202).json({
+    ok:true,...receipt,shift:exact,status:'SHIFT_DURABLY_AUTHORIZED',
+    original_shift_ids:drafted.originating_shift_ids,
+    work_items:drafted.work_items,
+    start_confirmation:{
+     status:'EXACT_OWNER_INTERNAL_MAINTENANCE_CONTINUATION_AUTHORIZED',
+     shift_id:exact.shift_id,
+     old_shifts_unchanged:true,
+     exact_internal_work_count:drafted.open_maintenance_jobs,
+     worker_execution_verified:false,
+     customer_job_completed:false,production_changed:false
+    },
+    initial_authorization_recorded:true,
+    completion_bound:true,completion_condition:receipt.completion_condition,
+    job_started:false,shift_started:false,worker_dispatch_verified:false,
+    installation_authorized:false,production_changed:false
+   });
+  }
   const catalog=await buildRealityWorkCatalog();
   const brief=buildRealityWorkdayOpportunityBrief(catalog);
   const priority=await ownerExistingRileySourcePriority({

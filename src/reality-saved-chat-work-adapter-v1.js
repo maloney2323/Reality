@@ -11,6 +11,10 @@ import {continueRileyCorrectiveModelIntoIndependentCI}
  from './reality-riley-auto-corrective-ci-bridge-v1.js';
 import {admitOwnerNewDevelopment,readOwnerNewDevelopment}
  from './reality-chat-new-development-adapter-v1.js';
+import {generateNextSignedChatDevelopmentDraft}
+ from './reality-chat-new-development-worker-v1.js';
+import {continueChatNewDevelopmentCandidate}
+ from './reality-chat-new-development-publisher-v1.js';
 
 const workId=x=>/^work:[a-f0-9]{32}$/.test(String(x||''));
 const SOURCE=/^supabase:reality_chat_messages:[a-f0-9-]{36}$/i;
@@ -80,16 +84,32 @@ export async function inspectSavedChatWork({
    action_eligible:false,execution_started:false,
    installation_authorized:false,production_changed:false});
  }
- // A literal, signed request to code an exact GitHub issue or original work
- // identity wins over a vague "discover existing work" classification. This
- // narrows the destination; it cannot add an original or mint an authority.
- if(intent.kind==='WORK_REQUEST'&&intent.explicit_request===true&&
-    typeof intent.source_quote==='string'&&
-    verified.text.includes(intent.source_quote)&&
-    /\b(?:build|code|implement|repair|fix|develop|upgrade)\b/i.test(verified.text)&&
-    (/(?:https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*|\b(?:issue|job|repair)\s*#?[1-9]\d*\b|work:[a-f0-9]{32})/i)
-      .test(verified.text)){
+ // Do not allow model-selected "original engineering" to attach a
+ // general owner instruction to an unrelated existing repair. A specific
+ // original must be named in the CURRENT signed human message; Universe
+ // source discovery alone is not the owner's exact-work authorization.
+ const exactOriginalReference=/(?:https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*|(?:^|[^\w])work:[a-f0-9]{32}(?![\w])|\b(?:issue|job|repair)\s*#?[1-9]\d*\b)/i
+  .test(verified.text);
+ const explicitBuildInstruction=intent.kind==='WORK_REQUEST'&&
+  intent.explicit_request===true&&intent.action_eligible===true&&
+  typeof intent.source_quote==='string'&&
+  verified.text.includes(intent.source_quote)&&
+  /\b(?:build|implement|develop|create|generate)\b/i.test(verified.text);
+ if(explicitBuildInstruction&&exactOriginalReference){
+  // A named original is NEVER silently re-admitted as brand-new development.
   intent={...intent,capability_id:'governed-original-engineering',
+   action_eligible:true};
+ }else if(explicitBuildInstruction&&
+    intent.capability_id==='governed-original-engineering'&&
+    !exactOriginalReference&&
+    !/\b(?:continue|resume)\s+(?:(?:my|the|our|this|an|already|existing)\s+){0,3}(?:existing|previous|original|prior|job|issue|repair)\b/i
+      .test(verified.text)){
+  // The installed new-development adapter can admit an isolated task from
+  // this exact signed build request; the original-engineering adapter cannot.
+  // This is destination normalization only, not permission to install or
+  // to reuse an old shift: the new-development database must still validate
+  // the immutable source and require idempotent owner-scoped admission.
+  intent={...intent,capability_id:'governed-chat-new-development',
    action_eligible:true};
  }
  const common={
@@ -344,4 +364,263 @@ export async function authorizeSavedChatNewDevelopment({
     result.production_changed!==false||result.new_shift_started!==false)
   fail('CHAT_WORK_NEW_DEVELOPMENT_ADMISSION_RECEIPT_UNVERIFIED',503);
  return result;
+}
+
+
+// One signed Chat instruction -> exactly one installed governed work adapter.
+// The model chooses only among registered capabilities; it cannot mint a
+// warrant. Reuse the SAME inspection in the chosen adapter, instead of
+// classifying a source twice and drifting between inspection and admission.
+// This action never grants installation or starts another employee shift.
+export async function processSignedSavedChatWork({
+ session,conversationId,requestId,messages,
+ inspect=inspectSavedChatWork,
+ admitNew=authorizeSavedChatNewDevelopment,
+ readNew=readOwnerNewDevelopment,
+ queueOriginal=authorizeSavedChatExistingOriginal,
+ continueEngineering=continueVerifiedChatEngineering
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ const args={session,conversationId,requestId,messages};
+ const eligible=await inspect(args);
+ if(!eligible||typeof eligible.status!=='string')
+  fail('CHAT_WORK_PROCESS_INSPECTION_UNVERIFIED',503);
+ if(eligible.source_ref!==signed.source_ref||
+    eligible.request_id!==requestId||
+    eligible.installation_authorized!==false||
+    eligible.production_changed!==false)
+  fail('CHAT_WORK_PROCESS_SOURCE_OR_AUTHORITY_MISMATCH',503);
+ const inspection=async()=>eligible;
+ if(eligible.status==='CHAT_WORK_NEW_DEVELOPMENT_ELIGIBLE'&&
+    eligible.capability_id==='governed-chat-new-development'&&
+    eligible.action_eligible===true){
+  const admitted=await admitNew({...args,inspect:inspection});
+  if(admitted?.status!=='CHAT_WORK_NEW_DEVELOPMENT_DURABLY_ADMITTED'||
+     !workId(admitted.original_work_id)||
+     admitted.request_id!==requestId||
+     admitted.source_ref!==signed.source_ref||
+     admitted.installation_authorized!==false||
+     admitted.production_changed!==false||
+     admitted.new_shift_started!==false)
+   fail('CHAT_WORK_PROCESS_ADMISSION_RECEIPT_UNVERIFIED',503);
+  // Independent owner-scoped service readback. A failed read MUST NOT
+  // cause a second admission attempt or erase the committed source identity.
+  let read=null;
+  try{read=await readNew({session,conversationId})}catch{}
+  const matches=read?.status==='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'&&
+    read.owner_id===session.user_id&&
+    read.conversation_id===conversationId&&
+    read.installation_authorized===false&&
+    read.production_changed===false&&
+    Array.isArray(read.items)?
+   read.items.filter(x=>x.request_id===requestId&&
+    x.source_ref===signed.source_ref&&
+    x.original_work_id===admitted.original_work_id&&
+    x.installation_authorized===false&&
+    x.production_changed===false):[];
+  return Object.freeze({
+   status:matches.length===1?
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_AND_READ_BACK':
+    'CHAT_WORK_NEW_DEVELOPMENT_ADMITTED_READBACK_PENDING',
+   capability_id:'governed-chat-new-development',
+   request_id:requestId,source_ref:signed.source_ref,
+   original_work_id:admitted.original_work_id,
+   development_phase:matches.length===1?matches[0].phase:
+    admitted.development_phase,
+   admission_receipt_verified:true,independent_readback_verified:matches.length===1,
+   work_execution_verified:false,execution_started:false,
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  });
+ }
+ if(eligible.status==='CHAT_WORK_ENGINEERING_SCOPED_CI_READY'&&
+    eligible.capability_id==='governed-original-engineering'&&
+    eligible.action_eligible===true)
+  return await continueEngineering({...args,inspect:inspection});
+ if(eligible.status==='EXISTING_ORIGINAL_DISCOVERY_ELIGIBLE'&&
+    eligible.capability_id==='governed-original-discovery'&&
+    eligible.action_eligible===true)
+  return await queueOriginal({...args,inspect:inspection});
+ // Existing work, conversational questions and missing capabilities cause
+ // no writes. Never infer authority from a model explanation.
+ return Object.freeze({...eligible,request_id:requestId,
+  source_ref:signed.source_ref,
+  execution_started:false,installation_authorized:false,
+  production_changed:false,new_shift_started:false});
+}
+
+
+// Advance the SAME saved, authenticated new-development job without depending
+// on the unrelated legacy shift worker's cron host or secret. The model cannot
+// claim its own authority: the persisted owner/source/readback and the exact
+// preview release are independently re-verified before any service write.
+// At most one transition per call: queue -> draft -> isolated candidate -> CI.
+export async function advanceSignedChatDevelopment({
+ session,conversationId,requestId,messages,
+ env=process.env,readNew=readOwnerNewDevelopment,
+ dbFactory=shiftDatabase,callRpc=shiftRpc,
+ generate=generateNextSignedChatDevelopmentDraft,
+ publish=continueChatNewDevelopmentCandidate,fetchImpl=fetch
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ if(env.VERCEL_ENV!=='preview')
+  fail('CHAT_WORK_NEW_DEVELOPMENT_PREVIEW_ONLY',403);
+ const existing=await readNew({session,conversationId,env,fetchImpl});
+ if(existing?.status!=='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'||
+    existing.owner_id!==session.user_id||
+    existing.conversation_id!==conversationId||
+    existing.installation_authorized!==false||
+    existing.production_changed!==false||
+    !Array.isArray(existing.items))
+  fail('CHAT_WORK_NEW_DEVELOPMENT_OWNER_READBACK_REQUIRED',503);
+ const matches=existing.items.filter(x=>x.request_id===requestId&&
+  x.source_ref===signed.source_ref&&workId(x.original_work_id)&&
+  x.installation_authorized===false&&x.production_changed===false);
+ if(matches.length!==1)
+  fail('CHAT_WORK_NEW_DEVELOPMENT_EXACT_ADMISSION_REQUIRED',409);
+ const item=matches[0],db=dbFactory(env);
+ if(!db?.strictSecrets||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    db.url!==session.config?.url)
+  fail('CHAT_WORK_NEW_DEVELOPMENT_OWNER_DATABASE_REQUIRED',403);
+ const base=Object.freeze({request_id:requestId,source_ref:signed.source_ref,
+  original_work_id:item.original_work_id,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false});
+ if(item.phase==='QUEUED'){
+  const result=await generate({db,env,fetchImpl,callRpc,
+   ownerScope:{owner_id:session.user_id,conversation_id:conversationId,
+    request_id:requestId}});
+  if(result?.original_work_id!=null&&
+     result.original_work_id!==item.original_work_id)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_DRAFT_IDENTITY_MISMATCH',503);
+  if(result?.installation_authorized!==false||
+     result.production_changed!==false||
+     result.original_job_completed!==false||
+     result.new_shift_started!==false)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_DRAFT_AUTHORITY_MISMATCH',503);
+  return Object.freeze({...base,
+   status:result.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED'?
+    'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_GENERATED':
+    'CHAT_WORK_NEW_DEVELOPMENT_DRAFT_BLOCKED',
+   development_phase:result.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED'?
+    'DRAFT_GENERATED':item.phase,
+   worker_status:result.status,
+   model_generated:result.model_generated===true,
+   ...(result.source_path?{source_path:result.source_path}:{})});
+ }
+ if(['DRAFT_GENERATED','PUBLISH_FENCED','CANDIDATE_STAGED'].includes(item.phase)){
+  // The existing broker is a global service worker. Never invoke it from an
+  // owner click when it has selected another owner's candidate.
+  const selected=await callRpc(db,
+   'reality_read_next_chat_new_development_candidate_v2',{},
+   {fetchImpl});
+  if(selected?.status!=='EXACT_SIGNED_CHAT_NEW_DEVELOPMENT_CANDIDATE'||
+     selected.owner_id!==session.user_id||
+     selected.conversation_id!==conversationId||
+     selected.request_id!==requestId||
+     selected.source_sha256==null||
+     selected.original_work_id!==item.original_work_id||
+     selected.release_sha!==env.VERCEL_GIT_COMMIT_SHA||
+     selected.installation_authorized!==false||
+     selected.production_changed!==false)
+   return Object.freeze({...base,
+    status:'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_NOT_CURRENT',
+    development_phase:item.phase,
+    worker_status:'EXACT_CANDIDATE_NOT_FIRST_IN_GOVERNED_QUEUE',
+    model_generated:item.model_generated===true});
+  const result=await publish({db,env,fetchImpl});
+  if(result?.original_work_id!=null&&
+     result.original_work_id!==item.original_work_id)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_BROKER_IDENTITY_MISMATCH',503);
+  if(result?.installation_authorized!==false||
+     result.production_changed!==false||
+     result.original_job_completed!==false||
+     result.new_shift_started!==false)
+   fail('CHAT_WORK_NEW_DEVELOPMENT_BROKER_AUTHORITY_MISMATCH',503);
+  const ci=result.status==='CHAT_DEVELOPMENT_INDEPENDENT_SOURCE_SYNTAX_CI_VERIFIED';
+  const staged=result.status==='NEW_CHAT_DEVELOPMENT_PROVIDER_CANDIDATE_STAGED';
+  return Object.freeze({...base,
+   status:ci?'CHAT_WORK_NEW_DEVELOPMENT_CI_VERIFIED':
+    staged?'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_STAGED':
+    'CHAT_WORK_NEW_DEVELOPMENT_CANDIDATE_BLOCKED',
+   worker_status:result.status,
+   development_phase:ci?'CI_VERIFIED':
+    staged?'CANDIDATE_STAGED':item.phase,
+   model_generated:item.model_generated===true,
+   independent_ci_verified:ci,
+   ...(result.pr_url?{pr_url:result.pr_url}:{}),
+   ...(result.artifact_commit_sha?{artifact_commit_sha:result.artifact_commit_sha}:{}),
+   ...(result.ci_run_id?{ci_run_id:result.ci_run_id}:{})});
+ }
+ return Object.freeze({...base,
+  status:'CHAT_WORK_NEW_DEVELOPMENT_TERMINAL_OR_BLOCKED',
+  worker_status:item.phase,development_phase:item.phase,
+  model_generated:item.model_generated===true,
+  independent_ci_verified:item.independent_ci_verified===true});
+}
+
+
+// Owner-scoped, READ-ONLY reconstruction of an exact signed Chat
+// development request. This permits persisted status on reload without
+// reclassifying, starting a worker, approving or claiming completion.
+export async function readSignedChatDevelopmentStatus({
+ session,conversationId,requestId,messages,
+ readNew=readOwnerNewDevelopment
+}={}){
+ const signed=sourceTurn({session,conversationId,requestId,messages});
+ const r=await readNew({session,conversationId});
+ if(r?.status!=='OWNER_CHAT_NEW_DEVELOPMENT_READBACK'||
+   r.owner_id!==session.user_id||
+   r.conversation_id!==conversationId||
+   r.installation_authorized!==false||
+   r.original_job_completed!==false||
+   r.production_changed!==false||
+   r.new_shift_started!==false||
+   !Array.isArray(r.items))
+  fail('CHAT_WORK_DEVELOPMENT_STATUS_OWNER_READBACK_UNVERIFIED',503);
+ const matches=r.items.filter(x=>x.request_id===requestId&&
+  x.source_ref===signed.source_ref&&
+  x.installation_authorized===false&&
+  x.original_job_completed===false&&
+  x.production_changed===false&&
+  x.new_shift_started===false);
+ if(matches.length>1)
+  fail('CHAT_WORK_DEVELOPMENT_STATUS_DUPLICATE_SOURCE',503);
+ const item=matches[0];
+ const base={request_id:requestId,source_ref:signed.source_ref,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false};
+ if(!item)return Object.freeze({...base,
+  status:'CHAT_WORK_NEW_DEVELOPMENT_NOT_ADMITTED',
+  development_phase:'NOT_ADMITTED',independent_readback_verified:true,
+  model_generated:false,independent_ci_verified:false});
+ if(!workId(item.original_work_id))
+  fail('CHAT_WORK_DEVELOPMENT_STATUS_WORK_ID_UNVERIFIED',503);
+ const evidence=item.evidence&&typeof item.evidence==='object'?
+  item.evidence:{};
+ const prUrl=typeof evidence.pr_url==='string'&&
+  /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(evidence.pr_url)?
+   evidence.pr_url:null;
+ const commit=typeof evidence.artifact_commit_sha==='string'&&
+  /^[a-f0-9]{40}$/.test(evidence.artifact_commit_sha)?
+   evidence.artifact_commit_sha:null;
+ const run=Number.isSafeInteger(evidence.ci_run_id)&&
+  evidence.ci_run_id>10000?evidence.ci_run_id:null;
+ return Object.freeze({...base,
+  status:'CHAT_WORK_NEW_DEVELOPMENT_STATUS_READBACK',
+  original_work_id:item.original_work_id,
+  development_phase:item.phase,
+  model_generated:item.model_generated===true,
+  independent_ci_verified:item.independent_ci_verified===true,
+  independent_readback_verified:true,
+  ...(typeof item.objective==='string'&&item.objective.length<=450?
+    {objective:item.objective}:{}),
+  ...(typeof evidence.target_path==='string'&&
+     /^src\/[a-z0-9][a-z0-9._/-]{3,160}\.[cm]?js$/i.test(evidence.target_path)&&
+     !evidence.target_path.includes('..')?
+    {target_path:evidence.target_path}:{}),
+  ...(prUrl?{pr_url:prUrl}:{}),
+  ...(commit?{artifact_commit_sha:commit}:{}),
+  ...(run?{ci_run_id:run}:{})
+ });
 }

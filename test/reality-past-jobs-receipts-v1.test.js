@@ -17,7 +17,7 @@ function node(tag='div'){
   addEventListener(name,fn){this.listeners[name]=fn},
   click(){this.listeners.click?.()}};
 }
-function mount({signed=true,job=null,final=null,history=[]}={}){
+function mount({signed=true,job=null,final=null,history=[],roiJobs=[]}={}){
  const ids=['realitySimpleHome','simpleArchivePanel','archiveJobs','archivePriorUpgrades',
   'archivePriorActions','archiveReadback','archiveRefresh','simpleAdvancedToggle',
   'wcCompletionCenter','wcShiftReceipt','wcRefreshCompletion','privateReady'];
@@ -30,13 +30,17 @@ function mount({signed=true,job=null,final=null,history=[]}={}){
  const old={ok:true,status:'OWNER_GAP_INTAKE_RECONCILED',
   read_only:true,work_started:false,installation_authorized:false,
   production_changed:false,settled_history:history};
+ const roi={ok:true,version:'reality-owner-original-job-roi-projection-v1',
+  status:roiJobs.length?'VERIFIED_ISOLATED_SETTLEMENT_EVIDENCE':'NO_SETTLED_JOB_EVIDENCE',
+  production_changed:false,financial_roi_verified:false,jobs:roiJobs};
  vm.runInNewContext(archive,{
   document:{getElementById:id=>els[id],createElement:node,
    addEventListener:(name,fn)=>{events[name]=fn},
    body:{classList:{add(){},remove(){}}}},
   MutationObserver:class{observe(){}},
   fetch:async(url,opt)=>{calls.push({url,opt});return {
-   ok:true,json:async()=>url.includes('loop-status')?owner:old}},
+   ok:true,json:async()=>url.includes('loop-status')?owner:
+    url.includes('job-roi-evidence')?roi:old}},
   encodeURIComponent
  },{filename:'reality-past-jobs-receipts-v1.js'});
  const open=()=>events.click({target:{closest:selector=>
@@ -65,7 +69,7 @@ test('verified original work exposes the exact authenticated PDF link, no writes
   historical_settlement_verified:true,source_commit:'c'.repeat(40),
   source_url:'https://github.com/maloney2323/Reality/commit/'+'c'.repeat(40)}]});
  f.open();await settle();
- assert.equal(f.calls.length,2);
+ assert.equal(f.calls.length,3);
  assert.ok(f.calls.every(c=>c.opt.method==='GET'&&c.opt.credentials==='same-origin'));
  assert.match(f.els.archiveReadback.textContent,/1 independently settled/);
  const card=f.els.archiveJobs.children[0];
@@ -143,4 +147,28 @@ test('signed-out archive makes no server requests and displays no saved results'
  f.open();await settle();
  assert.equal(f.calls.length,0);
  assert.match(f.els.archiveReadback.textContent,/Sign in/);
+});
+
+
+
+test('most recent fully settled job shows real technical measurements, unknown financial ROI and its PDF',async()=>{
+ const job={original_work_id:WORK,capability_id:'reality-general-execution-receipt',
+  independently_settled:true,universe_settlement_verified:true,
+  full_loop_independently_verified:true};
+ const final={original_work_id:WORK,status:'FULL_LOOP_INDEPENDENTLY_VERIFIED',
+  verified_at:'2026-11-16T14:25:00Z'};
+ const roiJobs=[{original_work_id:WORK,production_changed:false,
+  technical_settlement_status:'INDEPENDENTLY_SETTLED_ISOLATED_PREVIEW',
+  measured:{claim_to_settlement_ms:12500,verified_check_pass_count:9},
+  economic_value:{verified_cash_savings_usd:{value:null}}}];
+ const f=mount({job,final,roiJobs});
+ f.open();await settle();
+ assert.match(f.els.archiveReadback.textContent,/Most recent verified job: work:/);
+ const card=f.els.archiveJobs.children[0];
+ assert.match(card.children[0].textContent,/MOST RECENT COMPLETED JOB/);
+ assert.ok(card.children.some(x=>/12\.5 seconds/.test(x.textContent)));
+ assert.ok(card.children.some(x=>/9/.test(x.textContent)));
+ assert.ok(card.children.some(x=>/Realized cash ROI: not measured/.test(x.textContent)));
+ assert.ok(card.children.some(x=>/Drift reduction: not measured/.test(x.textContent)));
+ assert.ok(card.children.some(x=>x.href?.includes('final-receipt-pdf')));
 });
