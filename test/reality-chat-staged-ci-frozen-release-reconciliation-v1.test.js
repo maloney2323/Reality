@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const edge=readFileSync(new URL('../supabase/functions/reality-chat-new-development-broker-v1/index.ts',import.meta.url),'utf8');
 const worker=readFileSync(new URL('../src/reality-chat-new-development-publisher-v1.js',import.meta.url),'utf8');
 test('recorded staged original may reconcile old frozen release CI, no new source writes',()=>{
- assert.match(edge,/if\(s\.phase!=='CANDIDATE_STAGED'&&s\.release_sha!==body\.base_sha\)/);
+ assert.match(edge,/if\(s\.phase!=='CANDIDATE_STAGED'&&\s*\(!SOURCE_STAGING_BRANCH\.test\(body\.base_branch\)\|\|\s*s\.release_sha!==body\.base_sha\)\)/);
  assert.match(edge,/if\(s\.phase==='CANDIDATE_STAGED'\)\s*return await verifyCI\(s,project\.origin,secret,token\)/);
  assert.match(edge,/return await stage\(s,project\.origin,secret,token,body\.base_branch\)/);
  assert.match(edge,/if\(!cleanScope\(s\)\)/);
