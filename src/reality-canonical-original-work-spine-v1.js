@@ -63,7 +63,7 @@ export function projectOriginalAgainstCanonicalSpine(preflight,item){
  const stages=[
   itemStatus('RAW_SIGNAL',item.source_ref?'SOURCE_OBSERVED':'SOURCE_PROVENANCE_REQUIRED',item.source_ref||null),
   itemStatus('TRANSFORMATION','CONTINUITY_ROUTE_RECORDED',identity),
-  itemStatus('OBSERVATION',current?'SOURCE_EPOCH_RECHECK_REQUIRED_FOR_EXECUTION':
+  itemStatus('OBSERVATION',current?'SOURCE_OBSERVATION_RECORDED_NOT_EXECUTION_PROOF':
    'SOURCE_REOBSERVATION_REQUIRED',identity),
   itemStatus('SITUATION',situation?'EVIDENCE_VERIFIED':'GOAL_ACCEPTANCE_WORLDLINE_REQUIRED',
    situation?original:null),
