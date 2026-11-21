@@ -49,6 +49,15 @@
  const multiRefresh=node('button','Verify multi-job readiness');
  multiRefresh.type='button';
  multiOriginal.append(multiHeading,multiSummary,multiSources,internalProviderProof,businessContract,multiRefresh);
+ const completionReview=node('section');
+ completionReview.setAttribute('aria-label','Existing original development completion gates');
+ const completionHeading=node('h4','Existing original · full-goal completion');
+ const completionStatus=node('p','Checking independent feature acceptance and same-original installation scope…');
+ completionStatus.setAttribute('role','status');
+ const completionItems=node('div');
+ const completionRefresh=node('button','Recheck original completion gates');
+ completionRefresh.type='button';
+ completionReview.append(completionHeading,completionStatus,completionItems,completionRefresh);
  const exactReview=node('section');
  exactReview.setAttribute('aria-label','Saved signed Chat originals awaiting exact qualification');
  const exactHeading=node('h4','Signed Chat originals · exact approval');
@@ -61,7 +70,7 @@
  const review=node('button','Discuss next qualification in Chat');
  review.type='button';review.disabled=true;
  const footer=node('p','Evidence intake is not executable work. A specific, current, independently qualified job must be presented through the existing governed owner approval flow.');
- root.append(heading,summary,multiOriginal,entries,exactReview,refresh,review,footer);
+ root.append(heading,summary,multiOriginal,entries,completionReview,exactReview,refresh,review,footer);
  panel.prepend(root);
  let active=null,loading=false,verified=null;
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -75,6 +84,48 @@
  const EFFECT_OWNER_APPROVAL='/api/reality/personal-exact-business-effect-approval';
  let verifiedBusinessClasses=[];
  const INTERNAL_PROOF_API='/api/reality/personal-internal-business-provider-proof';
+ const COMPLETION_PREFLIGHT='/api/reality/personal-chat-development-completion-preflight';
+ let completionLoading=false;
+ async function loadChatOriginalCompletion(){
+  if(completionLoading||!isReady())return;
+  completionLoading=true;completionRefresh.disabled=true;
+  try{
+   const res=await fetch(COMPLETION_PREFLIGHT,{method:'GET',credentials:'same-origin',
+    cache:'no-store',signal:AbortSignal.timeout(15000)});
+   const r=await res.json().catch(()=>null);
+   if(!res.ok||r?.ok!==true||
+    r.status!=='OWNER_CHAT_DEVELOPMENT_FULL_GOAL_COMPLETION_PREFLIGHT_READ_ONLY'||
+    r.read_only!==true||r.execution_authorized!==false||
+    r.installation_authorized!==false||r.original_job_completed_by_read!==false||
+    r.production_changed!==false||!Array.isArray(r.items)||r.items.length>10||
+    r.items.some(x=>x.feature_acceptance_independently_verified!==false||
+     x.owner_install_approval_ready!==false||
+     x.installation_authorized!==false||x.original_job_completed_by_read!==false))
+    throw Error('CHAT_ORIGINAL_COMPLETION_READ_UNVERIFIED');
+   completionStatus.textContent=r.total+' existing Chat-development original(s) checked against their signed source and independent completion obligations. Syntax-only CI does not prove feature acceptance.';
+   completionItems.replaceChildren();
+   for(const x of r.items){
+    const card=node('article');card.className='reality-qualification-source';
+    card.append(node('strong','Original '+String(x.original_work_id||'UNVERIFIED')));
+    card.append(node('p',String(x.original_goal||'').slice(0,350)));
+    card.append(node('small','Actual stage: '+String(x.phase||'UNKNOWN')+
+     ' · '+(x.syntax_ci_independently_recorded?'Source/syntax CI verified':'Source/syntax CI not independently verified')));
+    const missing=node('p','Next required gate: '+String(x.next_gate||'UNVERIFIED').replaceAll('_',' '));
+    card.append(missing);
+    if(x.existing_general_install_lineage_compatible===false){
+     card.append(node('p','Existing generalized installer belongs to a different original-work lineage. It must be connected through a compatible same-original authority contract; unrelated approvals cannot be reused.'));
+    }
+    card.append(node('small','No feature-level acceptance, installation approval, final completion or production change is established by this readback.'));
+    completionItems.append(card);
+   }
+   if(!r.items.length)completionItems.append(node('p','No signed Chat-development originals found in this owner scope.'));
+  }catch{
+   completionStatus.textContent='Original completion evidence unavailable. No acceptance, installation, or completion inferred.';
+   completionItems.replaceChildren();
+  }finally{completionLoading=false;completionRefresh.disabled=false;}
+ }
+ completionRefresh.addEventListener('click',()=>void loadChatOriginalCompletion());
+
  async function loadInternalCompanySourceProviderProof(){
   if(internalProviderLoading||!isReady())return;
   internalProviderLoading=true;internalProviderRefresh.disabled=true;
@@ -659,6 +710,7 @@
       !Array.isArray(data.items)||data.items.length>30)
     throw Error('OWNER_QUALIFICATION_RECEIPT_NOT_AVAILABLE');
    verified=data;paint(data);
+   void loadChatOriginalCompletion();
    void loadMultiOriginal();
    void loadBusinessSourceExecutorContract();
    void loadInternalCompanySourceProviderProof();
