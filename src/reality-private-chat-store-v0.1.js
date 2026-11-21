@@ -3,7 +3,11 @@ const table='reality_chat_messages';
 export function validUuid(s){return typeof s==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(s)}
 function asRows(value){if(!Array.isArray(value))throw Error('CHAT_HISTORY_NOT_ARRAY');return value}
 async function storageRequest(session,query,{method='GET',body,fetchImpl=fetch}={}){
- const response=await fetchImpl(session.config.url+'/rest/v1/'+table+query,{
+ // Bound each RLS storage request. A slow provider must never hold a signed-in
+ // Chat turn for a minute, but cannot be treated as an unsaved or invalid turn.
+ let response;
+ try{
+  response=await fetchImpl(session.config.url+'/rest/v1/'+table+query,{
   method,
   headers:{
    apikey:session.config.key,authorization:'Bearer '+session.access_token,
@@ -11,7 +15,11 @@ async function storageRequest(session,query,{method='GET',body,fetchImpl=fetch}=
    ...(body?{'content-type':'application/json',Prefer:'return=representation'}:{}),
   },
   ...(body?{body:JSON.stringify(body)}:{}),
- });
+  signal:AbortSignal.timeout(8000),
+  });
+ }catch{
+  throw Object.assign(Error('CHAT_STORAGE_UNAVAILABLE'),{status:503});
+ }
  const result=await response.json().catch(()=>null);
  if(!response.ok){
   const err=new Error(response.status===401||response.status===403?'CHAT_STORAGE_ACCESS_DENIED':'CHAT_STORAGE_UNAVAILABLE');
@@ -20,7 +28,9 @@ async function storageRequest(session,query,{method='GET',body,fetchImpl=fetch}=
  }
  return asRows(result);
 }
-export async function readPrivateChat(session,conversationId,{fetchImpl=fetch,limit=240}={}){
+// Ordinary Chat context is a RECENT window, not Reality's continuity ledger.
+// Explicit bounded historical reads remain available for the conversation UI.
+export async function readPrivateChat(session,conversationId,{fetchImpl=fetch,limit=32}={}){
  if(!validUuid(conversationId)||!Number.isInteger(limit)||limit<1||limit>240)
   throw Object.assign(new Error('CHAT_CONVERSATION_ID_INVALID'),{status:400});
  const q='?select=id,role,content,created_at,request_id'+
