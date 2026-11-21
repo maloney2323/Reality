@@ -89,6 +89,23 @@ function safeWorkOrder(p,{shiftId,withinScope,action,currentBlob,repairBlob}){
   external_effect_performed:false,read_only:true
  });
 }
+// A bounded read-only wake must not depend on optional weekly/Home intake.
+// This is a preflight for source review, not original-job or install authority.
+export function canAutomaticallyQualifyResearchRepairOnSignedWake({
+ wakeReceipt,graph,originalGate
+}={}){
+ return wakeReceipt?.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+  graph?.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+  UUID.test(graph.owner_id||'')&&UUID.test(graph.shift_id||'')&&
+  wakeReceipt.shift_id===graph.shift_id&&
+  originalGate?.status==='EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+  originalGate.owner_id===graph.owner_id&&
+  originalGate.shift_id===graph.shift_id&&
+  originalGate.read_only===true&&
+  originalGate.original_job_completed===false&&
+  originalGate.installation_authorized===false&&
+  originalGate.production_changed===false;
+}
 export async function automaticallyQualifyVerifiedRepairOpportunity({
  db,env=process.env,graph,originalGate,shiftId,workerRunId,
  call=shiftRpc,fetchImpl=fetch
