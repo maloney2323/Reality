@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+// Include exact owner readback regression in the existing signed CI gate.
+import './reality-signed-maintenance-owner-approval-readback-v1.test.js';
 import {readFileSync} from 'node:fs';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../src/reality-signed-maintenance-approved-install-bridge-v1.js';
