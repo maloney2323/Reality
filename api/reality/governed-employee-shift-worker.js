@@ -56,6 +56,8 @@ import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
+import {automaticallyQualifyVerifiedRepairOpportunity}
+ from '../../src/reality-governed-automatic-repair-qualification-v1.js';
 import {runCurrentShiftWeeklyInvestigations}
  from '../../src/reality-active-weekly-source-investigator-v1.js';
 import {admitCurrentShiftInvestigatedSourceWithFrozenProof}
@@ -1684,6 +1686,34 @@ export default async function handler(req,res){
       code:'WEEKLY_AND_HOMEPAGE_INTAKE_PROVIDER_READ_UNAVAILABLE';
    }
   }
+  // Every signed wake independently qualifies REAL saved RED->GREEN repair
+  // opportunities against GitHub and original shift scope. Read-only: a
+  // decision packet, never a new job, approval or installation.
+  let automaticRepairOpportunityQualification={
+   status:'NO_AUTHORIZED_OWNER_SOURCE_FOR_REPAIR_QUALIFICATION',
+   reviewed_candidate_count:0,work_orders:[],
+   installation_authorized:false,production_changed:false,
+   original_job_completed:false,new_shift_started:false,read_only:true
+  };
+  if(integratedWorkIntake?.status===
+     'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+   try{
+    workerStage='AUTOMATIC_OWNER_REPAIR_SOURCE_AND_SCOPE_QUALIFICATION';
+    automaticRepairOpportunityQualification=
+     await automaticallyQualifyVerifiedRepairOpportunity({
+      db,env:process.env,graph:unifiedGraph,
+      shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+      fetchImpl:fetch
+     });
+   }catch{
+    automaticRepairOpportunityQualification={
+     status:'AUTOMATIC_REPAIR_SOURCE_SCOPE_OR_PROVIDER_UNVERIFIED',
+     reviewed_candidate_count:0,work_orders:[],
+     installation_authorized:false,production_changed:false,
+     original_job_completed:false,new_shift_started:false,read_only:true
+    };
+   }
+  }
   // Actual employee source investigations now RUN on the existing signed
   // worker, rather than merely appearing as proposed jobs on the Homepage.
   // Provider GETs + idempotent service-only receipts; no extra authorization.
@@ -2395,6 +2425,7 @@ export default async function handler(req,res){
     automatic_work_supervisor:automaticWorkSupervisor,
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,
+    automatic_repair_work_order_qualification:automaticRepairOpportunityQualification,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
