@@ -20,6 +20,8 @@ const GATES=new Set([
  'EXACT_BUSINESS_ORIGINAL_SHIFT_WARRANT_REQUIRED',
  'OWNER_CONSENTED_PROVIDER_CONNECTION_PROOF_REQUIRED',
  'REGISTER_AND_INDEPENDENTLY_VERIFY_EXECUTOR_ADAPTER',
+ 'REGISTER_AND_INDEPENDENTLY_VERIFY_EFFECT_SPECIFIC_EXECUTOR',
+ 'RESOLVE_AMBIGUOUS_ORIGINAL_SOURCE_ROUTES',
  'OWNER_MUST_REVIEW_EXACT_EFFECT_TARGET_PAYLOAD_AND_ONE_USE_AUTHORIZATION'
 ]);
 export const maxDuration=20;
@@ -34,6 +36,7 @@ export function checkExactEffectReadback(receipt,owner,original,jobClass,effect)
    receipt.production_changed!==false||
    receipt.installation_authorized!==false||
    receipt.original_job_completed_by_read!==false||
+   receipt.execution_claim_created!==false||
    !GATES.has(receipt.next_gate)||
    typeof receipt.ready_for_exact_effect_review!=='boolean'||
    !['OWNER_EXACT_BUSINESS_EFFECT_AUTHORITY_PREFLIGHT',
@@ -41,11 +44,16 @@ export function checkExactEffectReadback(receipt,owner,original,jobClass,effect)
   throw Error('EXACT_EFFECT_INDEPENDENT_OWNER_RECEIPT_UNVERIFIED');
  if(receipt.status==='EXACT_BUSINESS_EFFECT_ORIGINAL_NOT_ADMITTED'){
   if(receipt.ready_for_exact_effect_review!==false||
-    receipt.next_gate!=='ADMIT_REAL_SOURCE_BACKED_ORIGINAL_WITH_OWNER_GOAL')
+    !['ADMIT_REAL_SOURCE_BACKED_ORIGINAL_WITH_OWNER_GOAL',
+      'RESOLVE_AMBIGUOUS_ORIGINAL_SOURCE_ROUTES'].includes(receipt.next_gate))
    throw Error('EXACT_EFFECT_INDEPENDENT_ORIGINAL_MISSING');
  }else{
   if(!UUID.test(receipt.shift_id||'')||
     typeof receipt.source_ref!=='string'||
+    receipt.owner_review_before_execution_claim!==true||
+    typeof receipt.canonical_original_admission_verified!=='boolean'||
+    (receipt.ready_for_exact_effect_review===true&&
+     receipt.canonical_original_admission_verified!==true)||
     receipt.ready_for_exact_effect_review===true&&(
      receipt.canonical_source_current!==true||
      receipt.exact_business_shift_warrant_verified!==true||

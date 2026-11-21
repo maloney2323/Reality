@@ -13,6 +13,8 @@ const base={
  owner_id:owner,shift_id:shift,original_work_id:original,
  source_ref:'connector:provider-id:source',job_class:jobClass,effect_type:effect,
  canonical_source_current:false,exact_business_shift_warrant_verified:false,
+ canonical_original_admission_verified:false,
+ owner_review_before_execution_claim:true,execution_claim_created:false,
  independent_goal_acceptance_worldline_verified:false,
  consented_business_provider_verified:false,
  registered_executor_independently_verified:false,
@@ -41,6 +43,7 @@ test('existing maintenance warrant never grants general business effects',()=>{
 test('all positive proofs only permit exact effect REVIEW, not execution',()=>{
  const r=check({...base,
   canonical_source_current:true,exact_business_shift_warrant_verified:true,
+  canonical_original_admission_verified:true,
   independent_goal_acceptance_worldline_verified:true,
   consented_business_provider_verified:true,
   registered_executor_independently_verified:true,
@@ -80,4 +83,28 @@ test('Reality Chat offers only a scoped read-only effect check for admitted orig
  assert.match(ui,/method:'GET',credentials:'same-origin'/);
  assert.match(ui,/itemized_approval_granted!==false/);
  assert.match(ui,/No execution, publication or purchase authorized/);
+});
+
+test('original admission and exact owner review precede execution claim',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261122001000_owner_business_preclaim_approval_handoff_v2.sql',import.meta.url),'utf8');
+ assert.match(sql,/owner_continuity_qualification_routes_v1 r/);
+ assert.match(sql,/public\.universe_events u/);
+ assert.match(sql,/canonical_original_admission_verified/);
+ assert.match(sql,/owner_review_before_execution_claim/);
+ assert.match(sql,/execution_claim_created',false/);
+ assert.doesNotMatch(sql,/\bgoverned_employee_original_claims_v1\b/);
+ assert.match(sql,/supported_effect_types \? p_effect_type/);
+ assert.match(sql,/EXACT_BUSINESS_ORIGINAL_SHIFT_WARRANT_REQUIRED/);
+ assert.match(sql,/current_user<>'service_role'/);
+ const r=check({...base,canonical_original_admission_verified:true});
+ assert.equal(r.ready_for_exact_effect_review,false);
+ assert.equal(r.execution_claim_created,false);
+});
+test('reject ready effect approval when canonical original not admitted',()=>{
+ assert.throws(()=>check({...base,ready_for_exact_effect_review:true,
+  canonical_source_current:true,exact_business_shift_warrant_verified:true,
+  consented_business_provider_verified:true,
+  registered_executor_independently_verified:true,
+  independent_goal_acceptance_worldline_verified:true
+ }),/READY_WITHOUT/);
 });
