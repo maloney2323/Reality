@@ -70,6 +70,9 @@
  const hintLabel=make('p','reality-chat-maintenance-nudge-text',
   'Reality is checking your unfinished work…');
  const dialogueJobs=make('div','reality-chat-maintenance-dialogue-jobs');
+ const detailDisclosure=make('section','reality-chat-maintenance-detail-disclosure');
+ detailDisclosure.id='realityChatMaintenanceDetails';detailDisclosure.hidden=true;
+ detailDisclosure.setAttribute('aria-label','Technical repair evidence and worker detail');
  const dialogueActions=make('div','reality-chat-maintenance-dialogue-actions');
  const inlineContinue=make('button','reality-chat-maintenance-inline-authorize',
   'Continue exact unfinished repairs');
@@ -99,15 +102,18 @@
  timeline.id='realityChatMaintenanceLive';timeline.hidden=true;
  timeline.setAttribute('aria-label','Independent live repair evidence and completion receipts');
  timeline.setAttribute('aria-live','polite');
- const review=make('button','reality-chat-maintenance-nudge-open','Review evidence');
+ const review=make('button','reality-chat-maintenance-nudge-open','View details');
  review.id='realityChatMaintenanceOpen';review.type='button';
  const reply=make('button','reality-chat-maintenance-reply','Reply to Reality');
  reply.id='realityChatMaintenanceReply';reply.type='button';
  const dialogueProof=make('p','reality-chat-maintenance-dialogue-proof',
   'Source: owner-scoped signed shift and independent maintenance ledger. No installation authority is implied.');
- dialogueActions.append(inlineContinue,installApprove,checkStatusInChat,watch,review,reply);
+ // A single decision and its readback in Chat; all verbose evidence stays
+ // available in the same message after choosing View details.
+ dialogueActions.append(inlineContinue,installApprove,checkStatusInChat,review);
+ detailDisclosure.append(chatEvidence,dialogueJobs,watch,timeline,dialogueProof,reply);
  hint.append(verifiedLabel,hintLabel,decisionHeadline,installDetails,
-  dialogueActions,chatStatus,chatEvidence,dialogueJobs,timeline,dialogueProof);
+  dialogueActions,chatStatus,detailDisclosure);
  thread.append(hint);
  // The saved Chat history uses replaceChildren(). Re-attach this owner-ledger
  // projection once after each transcript reload. No new AI message or shift.
@@ -376,8 +382,8 @@
   approvedScope=scope;
   decisionHeadline.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   decisionHeadline.textContent=scope.exactInstallCard?
-   'Your decision · Independently verified preview repair':
-   scope.exactInstallDecision?'Approval recorded · Independent installation pending':'';
+   'Approval needed · Repair ready':
+   scope.exactInstallDecision?'Approval recorded · Reality continuing work':'';
   checkStatusInChat.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   if(!installUncertain)chatStatus.textContent=scope.exactInstallCard?
    'Ready for your one-time decision. This approves only the exact reviewed file in the isolated preview, not production.':
@@ -407,7 +413,8 @@
     chatEvidence.append(link);
    }
   }
-  review.textContent=chatEvidence.hidden?'View evidence here':'Hide evidence';
+  review.textContent=detailDisclosure.hidden?'View details':'Hide details';
+  review.setAttribute('aria-expanded',String(!detailDisclosure.hidden));
   installApprove.hidden=!scope.exactInstallCard;
   // Readback renders while loading=true; a verified approval must be
   // enabled AFTER render, while the click handler itself guards loading.
@@ -418,11 +425,9 @@
   installDetails.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   installDetails.textContent=scope.exactInstallCard?
    'PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
-   ' · '+scope.exactInstallCard.target_path+
-   ' · tested candidate '+scope.exactInstallCard.candidate_commit_sha.slice(0,12)+
-   ' · isolated preview installation only. One click, one decision.':
+   ' passed independent review. This approves installation in the isolated preview only, not production.':
    scope.exactInstallDecision?
-   'One exact owner approval recorded. Reality must now install, verify and resume the same shift. No completion claimed.':'';
+   'Approval recorded. Independent installation and the original job are still pending verification.':'';
   list.replaceChildren();
   root.hidden=scope.count===0;
   hint.hidden=scope.count===0&&!scope.finalReceipt;
@@ -453,32 +458,16 @@
   };
   const signedIds=new Set(scope.signedIds);
   hintLabel.textContent=scope.activeId&&scope.warrantVerified?
-   'You authorized '+scope.signedCount+' exact earlier repairs under shift '+
-   scope.activeId+'. '+(scope.outsideCount?
-    'I discovered '+scope.outsideCount+' more repair incident'+
-     (scope.outsideCount===1?'':'s')+' afterward. That work is NOT covered '+
-     'by your original authorization. ':'')+
-   'The signed repairs have not reached independent final verification. '+
-   'You can reply right here to ask what happened. No code installation was authorized.':
+   scope.exactInstallCard?
+    'Reality found a verified repair for your existing shift. One exact approval is needed before installation.':
+   scope.exactInstallDecision?
+    'Your approval is recorded. Reality must independently verify installation and return to the same job.':
+    'Your existing shift is still active. Reality is investigating the remaining repairs.':
    scope.activeId?
-   'I see an active shift, but its exact repair authorization is not verified. '+
-   'I cannot treat any maintenance as approved until the signed source scope is confirmed.':
+    'Reality preserved the existing shift, but must verify its authority before proceeding.':
    scope.valid?
-   'I found '+scope.count+' unfinished employee repairs from your earlier shift. '+
-   'Riley and Taylor have independently reviewed maintenance to finish. '+
-   'May I continue exactly those repairs under a signed shift? '+
-   'I will ask separately before installing any code. You can reply to ask questions.':
-   'I found unfinished employee repairs, but I cannot verify an exact signed authorization scope yet. '+
-   'Ask me about the blockers or review the source evidence.';
-  if(scope.exactInstallCard)hintLabel.textContent+=' An independently tested repair is ready for exact one-time installation approval below.';
-  if(scope.exactInstallDecision)hintLabel.textContent+=' Exact installation permission is already recorded; no additional approval is needed.';
-  if(scope.verifiedArtifacts?.length)
-   hintLabel.textContent+=' Reality independently recorded '+
-    scope.verifiedArtifacts.length+' exact tested repair artifact'+
-    (scope.verifiedArtifacts.length===1?'':'s')+
-    '. '+scope.verifiedArtifacts.filter(a=>a.install_target_verified===true).length+
-    ' have a separate independent installation-target receipt. '+
-    (scope.exactInstallDecision?'Exact owner permission is recorded; independent installation and original-job proof are still required.':'Exact owner approval and original-resumption proof are still required. No installation was authorized.');
+    'Reality found '+scope.count+' unfinished employee repairs. One exact decision can continue the existing work.':
+    'Reality found unfinished work, but its authorization is not yet verified.';
   dialogueJobs.replaceChildren();
   for(const item of scope.jobs){
    dialogueJobs.append(make('p','',
@@ -496,12 +485,10 @@
   inlineContinue.textContent='Continue '+scope.count+' unfinished repair'+
    (scope.count===1?'':'s');
   dialogueProof.textContent=scope.activeId&&scope.warrantVerified?
-   'Verified exact maintenance warrant for '+scope.signedCount+
-    ' incident(s) in shift '+scope.activeId+
-    ' · remaining proof: frozen CI, independently tested repair, exact installation approval and final receipts. '+scope.outsideCount+
-    ' later incident(s) are not authorized by that warrant.':
-   'Verified source scope from the existing owner maintenance ledger. '+
-   'Continuing a shift never grants installation approval.';
+   'Signed shift '+scope.activeId+' · '+scope.signedCount+
+   ' repairs in scope; '+scope.outsideCount+
+   ' additional incidents outside scope. Exact installation still requires owner approval and independent receipts.':
+   'This source readback never grants installation authority.';
   if(hint.parentElement!==thread)thread.append(hint);
   for(const item of scope.jobs){
    const card=make('article','reality-chat-maintenance-job');
@@ -689,17 +676,19 @@
   }finally{loading=false;reload.disabled=false}
  }
  function showApprovals(){
-  // All owner decisions and evidence remain in the current chat transcript.
-  // Never open the separate Work/Approvals inspector to finish this flow.
   if(!signedIn())return;
-  if(chatEvidence.hidden)chatEvidence.hidden=false;
-  review.textContent='Hide evidence';
+  detailDisclosure.hidden=false;
+  chatEvidence.hidden=false;
+  review.textContent='Hide details';
+  review.setAttribute('aria-expanded','true');
   hint.scrollIntoView({behavior:'smooth',block:'nearest'});
  }
  review.addEventListener('click',()=>{
   if(!signedIn())return;
-  chatEvidence.hidden=!chatEvidence.hidden;
-  review.textContent=chatEvidence.hidden?'View evidence here':'Hide evidence';
+  detailDisclosure.hidden=!detailDisclosure.hidden;
+  chatEvidence.hidden=detailDisclosure.hidden;
+  review.textContent=detailDisclosure.hidden?'View details':'Hide details';
+  review.setAttribute('aria-expanded',String(!detailDisclosure.hidden));
  });
  checkStatusInChat.addEventListener('click',()=>{
   if(!signedIn()||loading||installAuthorizing)return;
