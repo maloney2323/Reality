@@ -1,0 +1,14 @@
+{
+  "version": "reality-chat-original-frozen-candidate-functional-fixture-v1",
+  "original_work_id": "work:d135a3649035a7360b44f9ef3903533a",
+  "source_message_id": "db1d42a9-759f-4d4c-8a62-b819c16393f1",
+  "base_commit_sha": "66284c453b8604f1a9e819bdd78b3cfc6eb2c09e",
+  "candidate_commit_sha": "9baa419274758b08f52ef9fdb361431ce5f5e369",
+  "candidate_pr_number": 309,
+  "target_path": "src/reality-chat-new-development-worker-v1.js",
+  "independent_syntax_ci_run_id": 43879567344,
+  "feature_acceptance_scope": "FROZEN_CANDIDATE_UTF8_SOURCE_GUARD_ONLY",
+  "full_original_goal_acceptance": false,
+  "installation_authorized": false,
+  "original_job_completed": false
+}
