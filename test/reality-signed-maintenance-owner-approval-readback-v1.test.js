@@ -146,3 +146,14 @@ test('owner decision verified response is accepted as one RPC; no automatic seco
  assert.equal(r.status,'APPROVAL_FIXTURE_ONLY');
  assert.equal(calls,1);
 });
+
+test('persisted approval migration fixes operator precedence without widening authorization',()=>{
+ const ddl=read('supabase/migrations/20261121010403_fix_exact_owner_maintenance_approval_hash_operator_precedence_v1.sql');
+ assert.match(ddl,/\(card->>'target_head_sha'\)\|\|'\|'\|\|\(card->>'artifact_receipt_sha256'\)/);
+ assert.doesNotMatch(ddl,/[^()]card->>'target_head_sha'\|\|'\|'\|\|card->>'artifact_receipt_sha256'/);
+ assert.match(ddl,/current_user<>'service_role'/);
+ assert.match(ddl,/EXACT_OWNER_MAINTENANCE_INSTALL_ALREADY_DECIDED_NO_REPLAY/);
+ assert.match(ddl,/OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR/);
+ assert.match(ddl,/UPDATE reality_internal\.owner_internal_maintenance_jobs_v1/);
+ assert.doesNotMatch(ddl,/SECURITY DEFINER|GRANT ALL TO PUBLIC|DROP TABLE|TRUNCATE/);
+});
