@@ -198,3 +198,17 @@ test('owner Chat uses the generic plan to show missing and registered capability
  assert.match(ui,/candidate_count/);
  assert.doesNotMatch(ui,/#211|#307|#308/);
 });
+
+test('worker binds registered CI dispatch to independently re-read signed graph before later graph declaration',()=>{
+ const source=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const begin=source.indexOf("workerStage='SIGNED_MAINTENANCE_CASE_CI_EXECUTOR'");
+ const end=source.indexOf("workerStage='SIGNED_MAINTENANCE_CASE_CI_INDEPENDENT_DIAGNOSTIC_REVIEW'",begin);
+ assert.ok(begin>0&&end>begin,'expected registered CI dispatch stage');
+ const ci=source.slice(begin,end);
+ assert.match(ci,/graph:assertRealityUnifiedShiftGraph\(await shiftRpc\(db,/);
+ assert.match(ci,/reality_read_current_shift_execution_graph_v1/);
+ assert.match(ci,/expectedShiftId:wakeReceipt\.shift_id/);
+ assert.doesNotMatch(ci,/graph:\s*unifiedGraph\b/);
+ assert.ok(source.indexOf('const unifiedGraph=')>end,
+  'later broad employee execution graph must not be used during CI dispatch');
+});
