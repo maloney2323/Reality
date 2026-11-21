@@ -12,6 +12,8 @@ on:
       - '.github/workflows/reality-signed-maintenance-target-continuation-v1.yml'
       - 'src/reality-signed-maintenance-continuity-enforcement-v1.js'
       - 'src/reality-governed-auto-trigger-v1.0.js'
+      - 'src/reality-signed-maintenance-original-return-handoff-v1.js'
+      - 'test/reality-signed-maintenance-original-return-handoff-v1.test.js'
       - 'test/reality-signed-maintenance-governed-auto-trigger-v1.test.js'
       - 'test/reality-signed-maintenance-continuity-enforcement-v1.test.js'
       - 'supabase/migrations/20261120222500_signed_maintenance_postinstall_universe_readback_v1.sql'
@@ -59,5 +61,7 @@ jobs:
           node --test test/reality-signed-maintenance-exact-full-loop-v1.test.js
           node --test test/reality-signed-maintenance-continuity-enforcement-v1.test.js
           node --test test/reality-signed-maintenance-governed-auto-trigger-v1.test.js
+          node --check src/reality-signed-maintenance-original-return-handoff-v1.js
+          node --test test/reality-signed-maintenance-original-return-handoff-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
