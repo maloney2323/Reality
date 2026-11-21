@@ -4,7 +4,7 @@
 // before preparing an owner decision. This module does not mutate any state.
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
 const HASH=/^research:[a-f0-9]{64}$/i;
