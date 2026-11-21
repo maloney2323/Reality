@@ -819,3 +819,68 @@ test('owner business qualification readback matches owner, shift and signed rece
  assert.doesNotMatch(sql,/cron\.alter_job|cron\.schedule\(/);
  assert.doesNotMatch(sql,/grant execute[^;]+to (anon|authenticated)/is);
 });
+
+test('owner Chat retains repeated no-progress incident and independently reviewed governed action without false success',()=>{
+ const continued={
+  ...readback,items:[{...readback.items[0],
+   kind:'SIGNED_SHIFT_REPEATED_NO_PROGRESS',
+   phase:'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'}]
+ };
+ const recoveredAction={
+  status:'OWNER_SIGNED_SHIFT_RECOVERY_ACTIONS_READ_ONLY',
+  owner_id:owner,owner_scope_verified:true,
+  count:1,read_only:true,
+  source_requalification_not_original_completion:true,
+  execution_authorized:false,owner_approval_granted:false,
+  installation_authorized:false,production_changed:false,
+  items:[{
+   incident_id:incident,shift_id:shift,
+   kind:'SIGNED_SHIFT_REPEATED_NO_PROGRESS',
+   governed_action:'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
+   blocker_class:'MISSING_SOURCE_EVIDENCE',
+   action_worker_run_id:'66666666-7777-4888-8999-aaaaaaaaaaaa',
+   action_recorded_at:'2026-11-21T20:35:06Z',
+   action_receipt_sha256:hash('c'),
+   source_requalification_receipt_sha256:hash('d'),
+   exact_admission_gate:'EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED_NO_SCOPE_EXPANSION',
+   independent_review_phase:'INDEPENDENT_REVIEW_RECORDED',
+   independent_review_status:'SOURCE_REQUALIFICATION_VERIFIED_BUSINESS_WARRANT_STILL_MISSING',
+   independent_review_worker_run_id:'77777777-8888-4999-8aaa-bbbbbbbbbbbb',
+   independent_review_receipt_sha256:hash('e'),
+   independent_review_at:'2026-11-21T20:40:05Z',
+   action_independently_rechecked:true,
+   owner_next_action:'EXACT_OWNER_SOURCE_SCOPE_AND_ITEMIZED_BUSINESS_WARRANT_REQUIRED_IN_CHAT',
+   original_job_completed:false,original_resumed_by_recovery_action:false,
+   owner_approval_granted_by_read:false,installation_authorized:false,
+   production_changed:false,read_only:true
+  }]
+ };
+ const b=projectOwnerIncidentChatBriefing({
+  ownerId:owner,source,continuity:continued,
+  recoveryActions:recoveredAction
+ });
+ assert.equal(b.shift_continuity_count,1);
+ const item=b.shift_continuity_incidents[0];
+ assert.equal(item.kind,'SIGNED_SHIFT_REPEATED_NO_PROGRESS');
+ assert.equal(item.signed_governed_recovery.action,
+  'REQUALIFY_EXISTING_CONTINUITY_SOURCE');
+ assert.equal(item.signed_governed_recovery.action_independently_rechecked,true);
+ assert.equal(item.work_resumption_verified,false);
+ assert.equal(item.self_repair_proven,false);
+ assert.equal(item.next_action,
+  'EXACT_OWNER_SOURCE_SCOPE_AND_ITEMIZED_BUSINESS_WARRANT_REQUIRED_IN_CHAT');
+ const universe=incidentChatUniverseObservations(b);
+ assert.match(universe[0].summary,/SOURCE_REQUALIFICATION_VERIFIED_BUSINESS_WARRANT_STILL_MISSING/);
+ assert.equal(universe[0].original_job_completed,false);
+ for(const forged of [
+  {...recoveredAction,owner_id:shift},
+  {...recoveredAction,items:[{...recoveredAction.items[0],
+   independent_review_worker_run_id:recoveredAction.items[0].action_worker_run_id}]},
+  {...recoveredAction,items:[{...recoveredAction.items[0],
+   original_job_completed:true}]}
+ ]){
+  assert.throws(()=>projectOwnerIncidentChatBriefing({
+   ownerId:owner,source,continuity:continued,recoveryActions:forged
+  }),/OPERATIONAL_CHAT_OWNER_INCIDENT_PROOF_REQUIRED/);
+ }
+});

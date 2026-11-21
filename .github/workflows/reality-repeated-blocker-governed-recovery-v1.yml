@@ -4,6 +4,9 @@ on:
     paths:
       - 'supabase/migrations/*signed_shift_repeated_blocker_recovery_v1.sql'
       - 'src/reality-shift-continuity-auto-investigation-v1.js'
+      - 'src/reality-owner-operational-incident-chat-v1.js'
+      - 'test/reality-shift-continuity-autonomous-v1.test.js'
+      - 'supabase/migrations/*owner_chat_signed_recovery_action_readback_v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - 'api/reality/governed-employee-shift-worker.js'
       - 'test/reality-signed-repeated-blocker-recovery-v1.test.js'
@@ -22,6 +25,6 @@ jobs:
         with:
           node-version: '20'
       - name: Syntax check signed worker and recovery investigator
-        run: node --check api/reality/governed-employee-shift-worker.js && node --check src/reality-shift-continuity-auto-investigation-v1.js && node --check src/reality-governed-shift-boundary-v1.js
+        run: node --check api/reality/governed-employee-shift-worker.js && node --check src/reality-shift-continuity-auto-investigation-v1.js && node --check src/reality-governed-shift-boundary-v1.js && node --check src/reality-owner-operational-incident-chat-v1.js
       - name: Test governed no-progress, LLM action classification and existing incident compatibility
         run: node --test test/reality-signed-repeated-blocker-recovery-v1.test.js test/reality-signed-continuity-recovery-action-v1.test.js test/reality-shift-continuity-autonomous-v1.test.js test/reality-shift-continuity-rpc-wiring-v1.test.js

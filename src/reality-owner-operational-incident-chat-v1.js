@@ -21,7 +21,7 @@ const stage=phase=>({
  OPERATIONAL_CONTINUITY_VERIFIED_EXTERNAL_FIX:
   'OPERATIONAL RECOVERY VERIFIED · External correction, not autonomous repair'
 })[phase];
-export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null,repairGates=null,qualifiedWork=null}={}){
+export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,delivery=null,autoRepair=null,continuity=null,repairGates=null,qualifiedWork=null,recoveryActions=null}={}){
  if(!UUID.test(ownerId||'')||
    source?.status!=='OWNER_SIGNED_WORKER_RECOVERY_EVIDENCE_READ_ONLY'||
    source.owner_id!==ownerId||source.owner_scope_verified!==true||
@@ -322,6 +322,52 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
   }
   installGateReadStatus='OWNER_EXACT_REPAIR_INSTALL_GATE_VERIFIED_READ_ONLY';
  }
+ const recoveryByIncident=new Map();
+ if(recoveryActions!==null){
+  if(recoveryActions?.status!=='OWNER_SIGNED_SHIFT_RECOVERY_ACTIONS_READ_ONLY'||
+   recoveryActions.owner_id!==ownerId||
+   recoveryActions.owner_scope_verified!==true||
+   recoveryActions.read_only!==true||
+   recoveryActions.source_requalification_not_original_completion!==true||
+   recoveryActions.execution_authorized!==false||
+   recoveryActions.owner_approval_granted!==false||
+   recoveryActions.installation_authorized!==false||
+   recoveryActions.production_changed!==false||
+   !Array.isArray(recoveryActions.items)||
+   recoveryActions.items.length>8||
+   recoveryActions.count!==recoveryActions.items.length)fail();
+  for(const a of recoveryActions.items){
+   if(!UUID.test(a.incident_id||'')||!UUID.test(a.shift_id||'')||
+    a.kind!=='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||
+    a.governed_action!=='REQUALIFY_EXISTING_CONTINUITY_SOURCE'||
+    !HASH.test(a.action_receipt_sha256||'')||
+    !HASH.test(a.source_requalification_receipt_sha256||'')||
+    !UUID.test(a.action_worker_run_id||'')||
+    !validDate(a.action_recorded_at)||
+    !['ACTION_RECORDED_AWAITING_DISTINCT_WORKER',
+      'INDEPENDENT_REVIEW_RECORDED'].includes(a.independent_review_phase)||
+    !['EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED_NO_SCOPE_EXPANSION',
+      'INDEPENDENT_SOURCE_GOAL_AND_CANONICAL_ORIGINAL_REQUIRED',
+      'EXACT_ITEMIZED_EXECUTOR_POLICY_AND_OWNER_APPROVAL_REQUIRED']
+      .includes(a.exact_admission_gate)||
+    typeof a.owner_next_action!=='string'||
+    a.owner_next_action.length>150||
+    a.original_job_completed!==false||
+    a.original_resumed_by_recovery_action!==false||
+    a.owner_approval_granted_by_read!==false||
+    a.installation_authorized!==false||
+    a.production_changed!==false||a.read_only!==true||
+    a.action_independently_rechecked!==(
+     a.independent_review_phase==='INDEPENDENT_REVIEW_RECORDED')||
+    (a.action_independently_rechecked&&(
+      !UUID.test(a.independent_review_worker_run_id||'')||
+      a.independent_review_worker_run_id===a.action_worker_run_id||
+      !HASH.test(a.independent_review_receipt_sha256||'')||
+      !validDate(a.independent_review_at)))||
+    recoveryByIncident.has(a.incident_id))fail();
+   recoveryByIncident.set(a.incident_id,a);
+  }
+ }
  const continuityItems=[];
  let continuityReadStatus='OWNER_SHIFT_CONTINUITY_EVIDENCE_UNAVAILABLE';
  if(continuity!==null){
@@ -335,7 +381,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
    !Array.isArray(continuity.items)||continuity.items.length>8||
    continuity.count!==continuity.items.length)fail();
   const types=new Set(['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
-   'QUALIFIED_EVIDENCE_JOB_BLOCKED','EMPLOYEE_QUALIFICATION_HANDOFF_STALLED']);
+   'QUALIFIED_EVIDENCE_JOB_BLOCKED','EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
+   'SIGNED_SHIFT_REPEATED_NO_PROGRESS']);
   const phases=new Set(['DETECTED','INVESTIGATION_CLAIMED',
    'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
    'BLOCKED_NEEDS_EVIDENCE','RECOVERED_AFTER_OBSERVATION']);
@@ -414,6 +461,8 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
      (businessReview.original_job_claims!==0||
       businessReview.source_backed_inquiries>=2))
    ))fail();
+   const recovery=recoveryByIncident.get(x.incident_id)||null;
+   if(recovery&&recovery.shift_id!==x.shift_id)fail();
    const exactGate=gateByIncident.get(x.incident_id)||null;
    if(exactGate&&(exactGate.shift_id!==x.shift_id||
     exactGate.incident_evidence_sha256!==x.evidence_sha256))fail();
@@ -422,6 +471,18 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     shift_id:x.shift_id,kind:x.kind,phase:x.phase,
     source_ref:'reality:shift-continuity-incident:'+x.incident_id,
     exact_code_repair_install_gate:exactGate,
+    signed_governed_recovery:recovery?Object.freeze({
+     action:recovery.governed_action,
+     blocker_class:recovery.blocker_class,
+     action_receipt_sha256:recovery.action_receipt_sha256,
+     independent_review_status:recovery.independent_review_status,
+     independent_review_receipt_sha256:
+      recovery.independent_review_receipt_sha256,
+     action_independently_rechecked:recovery.action_independently_rechecked,
+     exact_admission_gate:recovery.exact_admission_gate,
+     original_job_completed:false,original_resumed:false,
+     installation_authorized:false,production_changed:false
+    }):null,
     evidence_sha256:x.evidence_sha256,
     observed_at:x.last_observed_at,
     error_summary:trim(x.error_summary,280),
@@ -473,7 +534,7 @@ export function projectOwnerIncidentChatBriefing({ownerId,source,handoff=null,de
     verified_original_inquiry_claim_id:
      x.phase==='RECOVERED_AFTER_OBSERVATION'?
        x.resolved_inquiry_claim_id:null,
-    next_action:trim(x.next_action,700),
+    next_action:trim(recovery?.owner_next_action||x.next_action,700),
     repair_executed:false,installation_authorized:false,
     production_changed:false,
     self_repair_proven:false,
@@ -640,7 +701,7 @@ export async function readOwnerOperationalIncidentChatBriefing({
   db.url!==session.config.url||
   db.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
   fail();
- const [source,handoff,delivery,autoRepair,continuity,repairGates,qualifiedWork]=await Promise.all([
+ const [source,handoff,delivery,autoRepair,continuity,repairGates,qualifiedWork,recoveryActions]=await Promise.all([
   call(db,'reality_read_owner_worker_recovery_status_v1',{
    p_owner_id:owner
   },{fetchImpl}),
@@ -663,11 +724,14 @@ export async function readOwnerOperationalIncidentChatBriefing({
   },{fetchImpl}).catch(()=>null),
   call(db,'reality_read_owner_qualified_employee_evidence_jobs_v1',{
    p_owner_id:owner
+  },{fetchImpl}).catch(()=>null),
+  call(db,'reality_read_owner_signed_shift_recovery_actions_v1',{
+   p_owner_id:owner
   },{fetchImpl}).catch(()=>null)
  ]);
  return projectOwnerIncidentChatBriefing({
   ownerId:owner,source,handoff,delivery,autoRepair,continuity,repairGates,
-  qualifiedWork
+  qualifiedWork,recoveryActions
  });
 }
 export function incidentChatUniverseObservations(briefing){
@@ -734,6 +798,14 @@ export function incidentChatUniverseObservations(briefing){
    '; exact gate next action '+(
     x.exact_code_repair_install_gate?.next_action||
     'Get current original authorization and independent CI proof before modifying code')+
+   '; signed governed recovery action '+(x.signed_governed_recovery?.action||'not yet executed')+
+   '; action receipt '+(x.signed_governed_recovery?.action_receipt_sha256||'not available')+
+   '; separate signed worker independent recheck '+
+    (x.signed_governed_recovery?.independent_review_status||'not yet independently reviewed')+
+   '; independent action review receipt '+
+    (x.signed_governed_recovery?.independent_review_receipt_sha256||'not available')+
+   '; exact admission gate '+
+    (x.signed_governed_recovery?.exact_admission_gate||'not yet established')+
    '; next action '+x.next_action,
   independent_investigation_receipt:x.investigation_receipt_sha256,
   original_job_completed:false,self_repair_proven:false,
