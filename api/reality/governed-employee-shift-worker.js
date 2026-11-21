@@ -201,9 +201,14 @@ export default async function handler(req,res){
   // Fail closed if the claim cannot be independently read back.
   workerStage='SHIFT_WORKER_DURABLE_SINGLEFLIGHT';
   const proposedWakeClaimId=crypto.randomUUID();
+  // The database can briefly queue PostgREST requests while healthy
+  // client SQL still works. Allow one bounded 18s claim attempt, but never
+  // retry the write: a timed-out first call might have committed its lease.
+  // A missing claim receipt still fails closed; no shift or work is started.
   const governedWakeGate=await shiftRpc(
    db,'reality_claim_governed_shift_worker_run_v1',
-   {p_claim_id:proposedWakeClaimId}
+   {p_claim_id:proposedWakeClaimId},
+   {timeoutMs:18000}
   );
   if(governedWakeGate?.status==='WAKE_COALESCED_ACTIVE_OR_COOLDOWN' &&
      governedWakeGate.original_job_completed===false &&
