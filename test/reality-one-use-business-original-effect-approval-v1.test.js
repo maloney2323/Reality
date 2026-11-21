@@ -75,3 +75,22 @@ test('Reality Chat requires two explicit owner clicks and cannot claim or execut
  assert.match(endpoint,/effect_executed:false/);
  assert.doesNotMatch(endpoint,/reality_claim_approved_business_original_effect_v1/);
 });
+
+test('signed worker recognizes next owner-approved original but cannot claim when no registered handler is connected',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261122004000_signed_worker_next_approved_business_effect_v1.sql',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const boundary=readFileSync(new URL('../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ assert.match(sql,/governed_preview_shift_worker_leases_v1/);
+ assert.match(sql,/APPROVED_ONE_USE_NOT_EXECUTED/);
+ assert.match(sql,/reality_read_owner_exact_business_effect_preflight_v1/);
+ assert.match(sql,/registered_execution_adapter/);
+ assert.match(sql,/effect_reserved',false/);
+ assert.match(sql,/handler_installed_and_verified_by_read',false/);
+ assert.doesNotMatch(sql,/\\b(update|insert into|delete from)\\s+reality_internal\\./i);
+ assert.match(worker,/reality_read_next_signed_business_effect_handoff_v1/);
+ assert.match(worker,/p_worker_run_id:actualWorkerRunId/);
+ assert.match(worker,/EXACT_APPROVED_BUSINESS_EFFECT_REGISTERED_HANDLER_REQUIRED/);
+ assert.match(worker,/exact_approved_business_effect_handoff:exactApprovedBusinessEffectHandoff/);
+ assert.doesNotMatch(worker,/reality_claim_approved_business_original_effect_v1/);
+ assert.match(boundary,/read_next_signed_business_effect_handoff_v1/);
+});
