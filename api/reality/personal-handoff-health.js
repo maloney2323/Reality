@@ -7,6 +7,8 @@ import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
 import {planGovernedCapabilitiesFromOwnerReceipts}
  from '../../src/reality-evidence-driven-capability-router-v1.js';
+import {verifyOwnerOriginalLineagePacket}
+ from '../../src/reality-signed-original-lineage-packet-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/;
@@ -108,7 +110,23 @@ export default async function handler(req,res){
      plan.production_changed!==false)
    return res.status(503).json({
     ok:false,status:'GOVERNED_HANDOFF_CAPABILITY_PLAN_UNVERIFIED'});
-  return res.status(200).json({ok:true,...v,governed_capability_plan:plan});
+  // Source-bound original provenance remains independent from the employee
+  // evidence count, PR-review claim, install and customer settlement.
+  // A DB outage must not turn an unverified packet into proven lineage.
+  let lineage={status:'SIGNED_ORIGINAL_LINEAGE_READ_UNAVAILABLE',
+   packet_verified:false,original_job_completed:false,
+   installation_authorized:false,production_changed:false};
+  try{
+   const fromLedger=await shiftRpc(db,
+    'reality_read_owner_original_lineage_packet_v1',{
+     p_owner_id:session.user_id
+    },{timeoutMs:5000});
+   const checked=verifyOwnerOriginalLineagePacket(fromLedger,
+    session.user_id,v.shift_id);
+   if(checked)lineage=checked;
+  }catch{/* Continue reporting the verified health independently. */}
+  return res.status(200).json({ok:true,...v,
+   governed_capability_plan:plan,original_lineage_packet:lineage});
  }catch{
   return res.status(503).json({ok:false,status:'HANDOFF_HEALTH_SOURCE_OR_PROVIDER_UNAVAILABLE'});
  }
