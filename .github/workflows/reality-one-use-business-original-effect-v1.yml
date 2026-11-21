@@ -9,6 +9,8 @@ on:
       - 'reality-chat-continuous-qualification-v1.js'
       - 'supabase/migrations/20261122002000_one_use_business_effect_approval_reservation_v1.sql'
       - 'supabase/migrations/20261122003000_business_effect_exact_payload_persistence_v1.sql'
+      - 'supabase/migrations/20261122004000_signed_worker_next_approved_business_effect_v1.sql'
+      - 'api/reality/governed-employee-shift-worker.js'
       - 'test/reality-one-use-business-original-effect-approval-v1.test.js'
       - '.github/workflows/reality-one-use-business-original-effect-v1.yml'
 permissions:
@@ -34,3 +36,4 @@ jobs:
           node --check api/reality/personal-exact-business-effect-approval.js
           node --check reality-chat-continuous-qualification-v1.js
           node --check src/reality-governed-shift-boundary-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
