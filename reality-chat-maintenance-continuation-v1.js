@@ -618,7 +618,9 @@
    const scope=await read();
    // A previous uncertain POST is never silently retried. This button is
    // only unlocked after an explicit source-backed Check status.
-   uncertain=false;installUncertain=false;
+   // A background refresh MUST NOT unlock a failed/unknown owner POST.
+   // Only a separate explicit Check status read can establish its outcome.
+   uncertain=false;
    render(scope);
   }catch(e){
    approvedScope=null;authorize.disabled=true;installApprove.disabled=true;
@@ -707,7 +709,59 @@
     safeError(e)+'). Use Check status before any further action. No automatic retry.';
   }finally{installAuthorizing=false;reload.disabled=false}
  });
- reload.addEventListener('click',()=>{if(!authorizing)void refresh()});
+ async function checkExactOwnerApprovalStatus(){
+  if(!signedIn()||loading||authorizing||installAuthorizing)return;
+  reload.disabled=true;
+  try{
+   // Read-only owner-scoped GET. This never retries the earlier POST,
+   // creates another request ID, or invokes an installer.
+   const response=await fetch('/api/reality/signed-maintenance-exact-install-approval',{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(23000)
+   });
+   const r=await response.json().catch(()=>null);
+   if(!response.ok||r?.ok!==true||r.retry_owner_approval!==false)
+    fail('EXACT_OWNER_APPROVAL_STATUS_UNVERIFIED_'+(r?.failed_stage||response.status));
+   if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK'&&
+      r.owner_approval_recorded===true&&r.installation_authorized===true&&
+      SHA.test(r.approval_receipt_sha256||'')){
+    installUncertain=true;
+    installApprove.hidden=true;installApprove.disabled=true;
+    installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
+    hintLabel.textContent='Reality independently read back your original exact approval. No duplicate owner click is needed.';
+    feedback.textContent='Exact owner approval receipt '+r.approval_receipt_sha256+
+     ' verified. Installer and original-job completion remain separately unverified. No repeat approval.';
+    return;
+   }
+   if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK'&&
+      r.owner_approval_recorded===false&&r.installation_authorized===false){
+    installUncertain=false;
+    await refresh();
+    feedback.textContent=approvedScope?.exactInstallCard?
+     'Independent owner readback: the earlier approval was NOT recorded. The exact repair must be reviewed again before one new explicit owner click. No automatic retry.':
+     'Independent owner readback: no approval recorded. The exact repair is not currently verified as ready for approval.';
+    return;
+   }
+   if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_SCOPE_UNAVAILABLE'&&
+      r.owner_approval_recorded===false){
+    installUncertain=true;
+    installApprove.disabled=true;installApproveInInbox.disabled=true;
+    feedback.textContent='No current exact approval scope is available. Installation remains blocked; do not retry.';
+    return;
+   }
+   fail('EXACT_OWNER_APPROVAL_STATUS_CONTRADICTORY');
+  }catch(e){
+   installUncertain=true;
+   installApprove.disabled=true;installApproveInInbox.disabled=true;
+   feedback.textContent='Exact approval readback is still unverified ('+
+    safeError(e)+'). No automatic retry or new shift.';
+  }finally{reload.disabled=false}
+ }
+ reload.addEventListener('click',()=>{
+  if(authorizing)return;
+  if(installUncertain)void checkExactOwnerApprovalStatus();
+  else void refresh();
+ });
  authorize.addEventListener('click',async()=>{
   // The only POST path in this module is this REAL owner button event.
   if(authorizing||loading||uncertain||!signedIn()||
