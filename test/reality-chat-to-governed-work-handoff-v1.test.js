@@ -86,16 +86,81 @@ test('real signed worker automatically qualifies saved Chat turn under current o
  assert.equal(result.new_shift_started,false);
  assert.equal(work,1);assert.equal(model,1);assert.equal(records,1);
 });
-test('no pending or no owner warrant starts no model call and no duplicate shift',async()=>{
+test('no pending under either warrant never calls a model or creates work',async()=>{
  let called=0;
+ const operations=[];
  const result=await investigateAuthenticatedChatUnderExistingShift({
   db,env,callRpc:async(_,name)=>{
-   assert.equal(name,'reality_claim_chat_work_for_shift_v1');
-   return {status:'NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT'};
+   operations.push(name);
+   if(name==='reality_claim_chat_work_for_shift_v1')
+    return {status:'NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT'};
+   if(name==='reality_claim_signed_maintenance_chat_investigation_v1')
+    return {status:'NO_PENDING_SIGNED_MAINTENANCE_CHAT_INVESTIGATION',
+     execution_authorized:false,new_shift_started:false,
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false};
+   throw Error('UNEXPECTED_CLAIM');
   },fetchImpl:async()=>{called++;throw Error('FORBIDDEN')}
  });
  assert.equal(result.status,'NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT');
+ assert.deepEqual(operations,[
+  'reality_claim_chat_work_for_shift_v1',
+  'reality_claim_signed_maintenance_chat_investigation_v1']);
  assert.equal(called,0);
+});
+test('existing exact owner maintenance Chat is admitted for model advice only, never customer work',async()=>{
+ let model=0,diagnoses=0;
+ const got=await investigateAuthenticatedChatUnderExistingShift({
+  db,env,callRpc:async(_,name,args)=>{
+   if(name==='reality_claim_chat_work_for_shift_v1')
+    return {status:'NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT'};
+   if(name==='reality_claim_signed_maintenance_chat_investigation_v1')
+    return {...claim,investigation_only:true};
+   if(name==='reality_read_current_shift_execution_graph_v1')return graph;
+   if(name==='reality_record_chat_work_diagnosis_v1'){
+    diagnoses++;
+    assert.equal(args.p_message_id,messageId);
+    assert.equal(args.p_decision,'NEEDS_NEW_OR_EXACT_SCOPE');
+    assert.deepEqual(args.p_selected_sources,[]);
+    return {status:'SIGNED_CHAT_WORK_DIAGNOSIS_DURABLY_RECORDED',
+     message_id:messageId,owner_id:owner,request_id:request,shift_id:shift,
+     work_status:'NEEDS_AUTHORIZED_SCOPE',selected_source_count:0,
+     model_advisory_recorded:true,execution_authorized:false,
+     installation_authorized:false,new_shift_started:false};
+   }
+   throw Error('UNEXPECTED_RPC_'+name);
+  },
+  fetchImpl:async()=>{model++;return {ok:true,json:async()=>answer({
+   decision:'NEEDS_NEW_OR_EXACT_SCOPE',
+   diagnosis:'The pending work is outside the exact signed original-business scope. The owner must qualify a real source-backed original; the maintenance shift itself cannot grant it.',
+   selected_source_refs:[]
+  })};}
+ });
+ assert.equal(got.status,'AUTHENTICATED_CHAT_INSTRUCTION_INVESTIGATED_IN_EXISTING_SHIFT');
+ assert.equal(got.work_status,'NEEDS_AUTHORIZED_SCOPE');
+ assert.equal(got.execution_authorized,false);
+ assert.equal(got.original_job_completed,false);
+ assert.equal(got.installation_authorized,false);
+ assert.equal(model,1);assert.equal(diagnoses,1);
+});
+test('service-only SQL selects exact maintenance owner continuation, forbids generic backlog admission',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261121043000_signed_maintenance_chat_investigation_scope_v1.sql',import.meta.url),'utf8');
+ const boundary=readFileSync(new URL('../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ assert.match(sql,/current_user <> 'service_role'/);
+ assert.match(sql,/UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS/);
+ assert.match(sql,/i.message_sha256=pg_catalog.encode/);
+ assert.match(sql,/sh.shift_id::text/);
+ assert.match(sql,/FOR UPDATE OF i SKIP LOCKED/);
+ assert.match(sql,/owner_internal_maintenance_jobs_v1/);
+ assert.match(sql,/owner_id=i.owner_id/);
+ assert.match(sql,/incident.production_changed IS FALSE/);
+ assert.match(sql,/m.content ~\* '\^\[\[:space:\]\]\*Reality,/);
+ assert.match(sql,/REVOKE ALL ON FUNCTION/);
+ assert.match(sql,/TO service_role/);
+ assert.doesNotMatch(sql,/\bSECURITY DEFINER\b/i);
+ assert.doesNotMatch(sql,/\bINSERT INTO reality_internal[.]governed_employee_original_claims_v1\b/i);
+ assert.doesNotMatch(sql,/\bUPDATE reality_internal[.]governed_employee_shifts_v1\b/i);
+ assert.match(boundary,/claim_signed_maintenance_chat_investigation_v1/);
 });
 test('model cannot smuggle an unapproved source, new issue or installation',async()=>{
  let accepted=0,failed=0;
