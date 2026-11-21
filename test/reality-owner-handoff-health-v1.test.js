@@ -111,7 +111,7 @@ test('Chat receives owner-only health read and shows actual gaps, never invents 
  assert.match(ui,/personal-handoff-health/);
  assert.match(ui,/Original customer work/);
  assert.match(ui,/Reality CEO and Past \/ Present \/ Future/);
- assert.match(ui,/case-specific independent frozen tests/);
+ assert.match(ui,/case-specific independent tests/);
  assert.match(ui,/independently verified maintenance installation/);
  assert.match(sql,/t\.install_state='VERIFIED' AND t\.independently_verified_at IS NOT NULL/);
  assert.match(sql,/h\.owner_id=p_owner_id AND h\.shift_id=v_shift\.shift_id/);
