@@ -195,7 +195,8 @@
      const p=matching[0];
      if(p.review_state==='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'&&
       /^work:[a-f0-9]{32}$/.test(p.original_work_id||'')&&
-      SHA.test(p.approval_receipt_sha256||'')){
+      SHA.test(p.approval_receipt_sha256||'')&&
+      p.canonical_chat_original_readback_verified===true){
       button.disabled=true;
       feedback.textContent='Already admitted: '+p.original_work_id+
        '. Owner approval receipt '+p.approval_receipt_sha256+
