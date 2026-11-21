@@ -47,7 +47,8 @@
  feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
  const limits=make('p','reality-chat-maintenance-limits',
   'Continuing a shift is NOT approval to install code. Each independently tested installation requires its own exact authorization.');
- // One owner decision, visible in both the Chat message and owner inbox.
+ // One actual exact approval is now visible in Chat. The historical inbox
+ // mirror stays hidden and cannot create an alternate authorization path.
  const installApproveInInbox=make('button','reality-chat-maintenance-approve',
   'Approve exact verified preview repair');
  installApproveInInbox.id='realityChatMaintenanceApprovalInboxInstall';
@@ -411,8 +412,9 @@
   // Readback renders while loading=true; a verified approval must be
   // enabled AFTER render, while the click handler itself guards loading.
   installApprove.disabled=!scope.exactInstallCard||installAuthorizing||installUncertain||authorizing;
-  installApproveInInbox.hidden=installApprove.hidden;
-  installApproveInInbox.disabled=installApprove.disabled;
+  // Never send the owner to a second place to approve a Chat decision.
+  installApproveInInbox.hidden=true;
+  installApproveInInbox.disabled=true;
   installDetails.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   installDetails.textContent=scope.exactInstallCard?
    'PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
@@ -672,12 +674,18 @@
    render(scope);
   }catch(e){
    approvedScope=null;authorize.disabled=true;installApprove.disabled=true;
-   installApproveInInbox.disabled=true;
-   inlineContinue.disabled=true;root.hidden=false;hint.hidden=true;
+   installApprove.hidden=true;
+   installApproveInInbox.disabled=true;installApproveInInbox.hidden=true;
+   inlineContinue.disabled=true;root.hidden=false;hint.hidden=false;
+   checkStatusInChat.hidden=false;decisionHeadline.hidden=true;
    title.textContent='Maintenance verification unavailable';
    list.replaceChildren();
+   hintLabel.textContent='Reality could not independently retrieve the live maintenance ledger. Your earlier shift is not restarted, and no approval is inferred.';
+   chatStatus.textContent='Source readback unavailable ('+safeError(e)+
+    '). You can check the exact approval status right here without retrying an approval.';
    description.textContent='Reality cannot independently read the unfinished maintenance ledger.';
-   feedback.textContent='No approval submitted. '+safeError(e)+'. Try Check status.';
+   feedback.textContent='Approval not confirmed. '+safeError(e)+'. Check status in Chat.';
+   if(!thread.contains(hint))thread.append(hint);
   }finally{loading=false;reload.disabled=false}
  }
  function showApprovals(){
@@ -913,6 +921,8 @@
    hintLabel.textContent='I could not verify whether the continuation request was recorded. '+
     'Please use Check status here in Chat before trying anything again. '+
     'I will not issue a duplicate authorization.';
+   checkStatusInChat.hidden=false;
+   chatStatus.textContent='Continuation authorization status unverified. Tap Check approval status here; never repeat an uncertain owner request.';
    dialogueJobs.replaceChildren();
    feedback.textContent='Authorization could not be independently confirmed ('+
     safeError(e)+'). Use Check status first. Do not press Continue again until Reality proves there is no active shift.';
