@@ -28,6 +28,17 @@
  const multiSummary=node('p','Checking real business originals, independent evidence, and exact authority…');
  multiSummary.setAttribute('role','status');
  const multiSources=node('div');
+ const internalProviderProof=node('section');
+ internalProviderProof.setAttribute('aria-label','Internal company source provider readback');
+ const internalProviderTitle=node('h4','Internal company source · live provider proof');
+ const internalProviderStatus=node('p',
+  'Reality is waiting for the existing signed worker to verify a live internal GitHub source. This is not a customer connection.');
+ internalProviderStatus.setAttribute('role','status');
+ const internalProviderItems=node('div');
+ const internalProviderRefresh=node('button','Verify internal source receipt');
+ internalProviderRefresh.type='button';
+ internalProviderProof.append(internalProviderTitle,internalProviderStatus,
+  internalProviderItems,internalProviderRefresh);
  const businessContract=node('section');
  businessContract.setAttribute('aria-label','Business source and executor proof');
  const contractHeading=node('h4','Five business work lanes · source & executor proof');
@@ -37,7 +48,7 @@
  businessContract.append(contractHeading,contractStatus,contractRows);
  const multiRefresh=node('button','Verify multi-job readiness');
  multiRefresh.type='button';
- multiOriginal.append(multiHeading,multiSummary,multiSources,businessContract,multiRefresh);
+ multiOriginal.append(multiHeading,multiSummary,multiSources,internalProviderProof,businessContract,multiRefresh);
  const exactReview=node('section');
  exactReview.setAttribute('aria-label','Saved signed Chat originals awaiting exact qualification');
  const exactHeading=node('h4','Signed Chat originals · exact approval');
@@ -57,9 +68,49 @@
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const ROUTE=/^reality:qualification:[a-f0-9]{64}$/;
  const APPROVAL_API='/api/reality/personal-qualified-chat-original-approval';
- let checkingExact=false,approvalUncertain=false,multiLoading=false,contractLoading=false;
+ let checkingExact=false,approvalUncertain=false,multiLoading=false,contractLoading=false,internalProviderLoading=false;
  const MULTI_PREFLIGHT='/api/reality/personal-multi-original-shift-preflight?target=5';
  const CONTRACT_PREFLIGHT='/api/reality/personal-business-original-admission-contract';
+ const INTERNAL_PROOF_API='/api/reality/personal-internal-business-provider-proof';
+ async function loadInternalCompanySourceProviderProof(){
+  if(internalProviderLoading||!isReady())return;
+  internalProviderLoading=true;internalProviderRefresh.disabled=true;
+  try{
+   const response=await fetch(INTERNAL_PROOF_API,{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(17000)});
+   const r=await response.json().catch(()=>null);
+   if(!response.ok||r?.ok!==true||
+    r.status!=='OWNER_INTERNAL_BUSINESS_SOURCE_PROVIDER_PROOFS'||
+    r.read_only!==true||r.internal_company_provider_only!==true||
+    r.customer_source_connection_verified!==false||
+    r.original_customer_job_completed!==false||
+    r.owner_approval_granted!==false||
+    r.model_execution_authorized!==false||
+    !Number.isSafeInteger(r.provider_source_proof_count)||
+    !Array.isArray(r.sources)||r.sources.length>8)
+     throw Error('INTERNAL_COMPANY_PROVIDER_SOURCE_RECEIPT_UNVERIFIED');
+   internalProviderStatus.textContent=r.provider_source_proof_count?
+    String(r.provider_source_proof_count)+
+    ' real internal repository source(s) re-read twice from the GitHub provider by Reality’s signed worker. No customer connection or executable original granted.' :
+    'No real live internal provider source receipt yet. The signed worker must obtain and reconcile the provider readback; no customer job is approved.';
+   internalProviderItems.replaceChildren();
+   for(const source of r.sources.slice(0,4)){
+    if(typeof source.source_title!=='string'||
+      typeof source.source_ref!=='string'||source.execution_authorized!==false||
+      source.provider_double_readback_proven!==true)continue;
+    const card=node('p');card.className='reality-qualification-source';
+    card.append(node('strong',source.source_title.slice(0,130)),
+     node('small',' · '+String(source.provider_readback_current?'Current provider proof':'Provider proof stale; recheck source')),
+     node('small',' · '+source.source_ref.slice(0,230)));
+    internalProviderItems.append(card);
+   }
+  }catch{
+   internalProviderStatus.textContent='Current internal company provider receipt unavailable. Do not infer a verified business connector or a new executable job.';
+   internalProviderItems.replaceChildren();
+  }finally{internalProviderLoading=false;internalProviderRefresh.disabled=false;}
+ }
+ internalProviderRefresh.addEventListener('click',()=>void loadInternalCompanySourceProviderProof());
  async function loadBusinessSourceExecutorContract(){
   if(contractLoading||!isReady())return;
   contractLoading=true;
@@ -386,6 +437,7 @@
    verified=data;paint(data);
    void loadMultiOriginal();
    void loadBusinessSourceExecutorContract();
+   void loadInternalCompanySourceProviderProof();
   }catch{
    verified=null;active=null;review.disabled=true;
    summary.textContent='Qualification source readback unavailable. This does not mean work is approved, finished, or safe to replay.';
