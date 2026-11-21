@@ -70,3 +70,14 @@ test('effect contract is source neutral, service-only and never mutates the exis
  assert.match(sql,/public\.universe_events/);
  assert.doesNotMatch(sql,/\b(insert into|update reality_internal|delete from|create table|alter table)\b/i);
 });
+
+test('Reality Chat offers only a scoped read-only effect check for admitted originals',()=>{
+ const ui=readFileSync(new URL('../reality-chat-continuous-qualification-v1.js',import.meta.url),'utf8');
+ assert.match(ui,/EXACT_EFFECT_PREFLIGHT/);
+ assert.match(ui,/Check exact business-effect authority/);
+ assert.match(ui,/original_work_id\|\|''/);
+ assert.match(ui,/verifiedBusinessClasses\.length/);
+ assert.match(ui,/method:'GET',credentials:'same-origin'/);
+ assert.match(ui,/itemized_approval_granted!==false/);
+ assert.match(ui,/No execution, publication or purchase authorized/);
+});
