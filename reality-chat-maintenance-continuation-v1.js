@@ -759,7 +759,10 @@
  }
  reload.addEventListener('click',()=>{
   if(authorizing)return;
-  if(installUncertain)void checkExactOwnerApprovalStatus();
+  // Check status uses the narrow signed owner receipt even after a page
+  // reload has cleared the previous browser-only uncertainty flag.
+  if(installUncertain||approvedScope?.exactInstallCard||
+     approvedScope?.exactInstallDecision)void checkExactOwnerApprovalStatus();
   else void refresh();
  });
  authorize.addEventListener('click',async()=>{
