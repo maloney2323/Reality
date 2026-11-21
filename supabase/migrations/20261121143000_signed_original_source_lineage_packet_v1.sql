@@ -237,7 +237,7 @@ create or replace function public.reality_read_owner_original_lineage_packet_v1(
  p_owner_id uuid
 ) returns jsonb language plpgsql security invoker set search_path=''
 as $$
-declare v record; v_source record; v_warrant record; v_hash text;
+declare v record; v_source record; v_warrant record; v_universe record; v_hash text;
 begin
  if current_user<>'service_role' or p_owner_id is null then
    raise exception 'ORIGINAL_LINEAGE_READ_SERVICE_OWNER_REQUIRED'; end if;
@@ -302,6 +302,31 @@ begin
   'owner_id',p_owner_id,'packet_verified',false,
   'original_job_completed',false,'installation_authorized',false,
   'production_changed',false); end if;
+ -- Rejoin the already recorded owner/shift/original Continuity/Universe
+ -- observation from the real ledger. This event says the original is
+ -- UNFINISHED; it is never accepted as customer business-work authority.
+ select e.event_id,e.continuity_root_id,e.worldline_id into v_universe
+ from public.universe_events e
+ where e.entity_type='work' and e.event_kind='WORK'
+  and e.epistemic_status='VERIFIED'
+  and e.payload->>'owner_id'=v.owner_id::text
+  and e.payload->>'shift_id'=v.shift_id::text
+  and e.payload->>'original_work_id'=v.original_work_id
+  and e.payload->>'original_source_ref'=v.source_ref
+  and e.payload->>'verified_fact'='CURRENT_ORIGINAL_REMAINS_UNFINISHED'
+  and e.payload->>'original_job_completed'='false'
+  and e.payload->>'production_changed'='false'
+  and e.payload->>'signed_maintenance_step'=
+    'NEXT_SIGNED_ORIGINAL_OBLIGATION_RECONCILED'
+  and e.provenance->>'authoritative_source'=
+    'service_role_existing_signed_shift'
+ order by e.created_at desc limit 1;
+ if v_universe.event_id is null or v_universe.continuity_root_id is null
+ then return jsonb_build_object(
+  'status','SIGNED_ORIGINAL_LINEAGE_CONTINUITY_OBSERVATION_UNVERIFIED',
+  'owner_id',p_owner_id,'packet_verified',false,
+  'original_job_completed',false,'installation_authorized',false,
+  'production_changed',false); end if;
  return jsonb_build_object(
   'status','SIGNED_ORIGINAL_LINEAGE_EVIDENCE_INDEPENDENTLY_READ',
   'packet_id',v.packet_id,'owner_id',v.owner_id,
@@ -310,6 +335,11 @@ begin
   'maintenance_id',v.maintenance_id,
   'evidence_sha256',v.evidence_sha256,
   'packet_verified',true,'customer_original_verified',false,
+  'continuity_observation_verified',true,
+  'continuity_event_id',v_universe.event_id,
+  'continuity_root_id',v_universe.continuity_root_id,
+  'continuity_worldline_id',v_universe.worldline_id,
+  'continuity_fact','CURRENT_ORIGINAL_REMAINS_UNFINISHED',
   'canonical_customer_original_present',v_source.original_customer_work_id is not null,
   'next_action','VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
   'independent_review_required',true,'original_claim_admitted',false,
