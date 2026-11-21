@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {runInNewContext} from 'node:vm';
 
 const fixture=JSON.parse(readFileSync(new URL(
- '../fixtures/reality-chat-original-frozen-candidate-functional-v1.json',
+ './fixtures/reality-chat-original-frozen-candidate-functional-v1.json',
  import.meta.url),'utf8'));
 const SHA=/^[a-f0-9]{40}$/;
 const FILE=/^src\/[a-zA-Z0-9/_-]+\.js$/;
