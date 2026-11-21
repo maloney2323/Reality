@@ -56,7 +56,8 @@ import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
-import {automaticallyQualifyVerifiedRepairOpportunity}
+import {automaticallyQualifyVerifiedRepairOpportunity,
+ canAutomaticallyQualifyResearchRepairOnSignedWake}
  from '../../src/reality-governed-automatic-repair-qualification-v1.js';
 import {runCurrentShiftWeeklyInvestigations}
  from '../../src/reality-active-weekly-source-investigator-v1.js';
@@ -1700,16 +1701,9 @@ export default async function handler(req,res){
   // and the independent read-only current owner/shift warrant gate.
   // A broken optional supervisor intake must not silence a real research
   // repair's safe next-action decision.
-  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-     unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
-     sameOriginalPostmaintenanceGate?.status===
-       'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
-     sameOriginalPostmaintenanceGate.owner_id===unifiedGraph.owner_id&&
-     sameOriginalPostmaintenanceGate.shift_id===wakeReceipt.shift_id&&
-     sameOriginalPostmaintenanceGate.read_only===true&&
-     sameOriginalPostmaintenanceGate.original_job_completed===false&&
-     sameOriginalPostmaintenanceGate.installation_authorized===false&&
-     sameOriginalPostmaintenanceGate.production_changed===false){
+  if(canAutomaticallyQualifyResearchRepairOnSignedWake({
+   wakeReceipt,graph:unifiedGraph,originalGate:sameOriginalPostmaintenanceGate
+  })){
    try{
     workerStage='AUTOMATIC_OWNER_REPAIR_SOURCE_AND_SCOPE_QUALIFICATION';
     automaticRepairOpportunityQualification=
