@@ -1,0 +1,19 @@
+.reality-handoff-health{max-width:850px;border:1px solid rgba(129,173,226,.28);border-radius:14px;background:linear-gradient(146deg,rgba(18,32,54,.96),rgba(12,22,40,.95));padding:16px;color:#eef6ff;margin:12px 0}
+.reality-handoff-health[hidden]{display:none!important}
+.reality-handoff-health .label{font-size:.7rem;letter-spacing:.075em;color:#a3caff;font-weight:750;margin-bottom:7px}
+.reality-handoff-health-title{font-size:1rem;line-height:1.35;display:block}
+.reality-handoff-health-summary{font-size:.84rem;line-height:1.5;color:#c7d8ef}
+.reality-handoff-health-next{border-left:3px solid #739ee0;padding:5px 10px;margin:10px 0}
+.reality-handoff-health-next p{margin:7px 0;font-size:.83rem;line-height:1.5}
+.reality-handoff-health-details{border-top:1px solid rgba(160,191,225,.23);margin-top:12px;padding-top:10px}
+.reality-handoff-health-details summary{font-size:.84rem;color:#b5dcff;font-weight:650;cursor:pointer;min-height:32px;display:list-item}
+.reality-handoff-health-lanes{display:grid;gap:11px;margin-top:10px}
+.reality-handoff-health-lane{padding:10px;border:1px solid rgba(154,187,228,.22);border-radius:10px;background:rgba(22,39,66,.45)}
+.reality-handoff-health-lane strong{font-size:.82rem;line-height:1.5;display:block;color:#f5faff}
+.reality-handoff-health-lane p{font-size:.81rem;line-height:1.5;margin:5px 0 0;color:#c9daee;overflow-wrap:anywhere}
+.reality-handoff-health-lane .reality-handoff-health-next-action{color:#d9eeff}
+.reality-handoff-health-actions{display:flex;margin:10px 0}
+.reality-handoff-health-refresh{font-size:.82rem;border:1px solid rgba(140,185,241,.5);border-radius:9px;padding:9px 12px;background:rgba(35,68,112,.65);color:#e9f4ff;cursor:pointer}
+.reality-handoff-health-refresh:disabled{opacity:.5;cursor:default}
+.reality-handoff-health-status{font-size:.76rem;line-height:1.5;color:#b9cde7;overflow-wrap:anywhere}
+@media(max-width:600px){.reality-handoff-health{padding:13px;margin:8px 0}.reality-handoff-health-next{padding-left:8px}.reality-handoff-health-refresh{width:100%;min-height:44px}}

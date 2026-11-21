@@ -2425,6 +2425,49 @@ export default async function handler(req,res){
    durableWorkerCompletion=completedPulse;
   }
   const employeeTemporalInquiry=await employeeTemporalInquiryPromise;
+  // Cross-layer audit on the SAME signed wake. This does not promote an
+  // evidence pack, repair, or Universe entry to original-job completion.
+  // Health read failures cannot stop a governed shift.
+  let signedOwnerHandoffHealth={status:'SIGNED_OWNER_HANDOFF_HEALTH_UNVERIFIED',
+   read_only:true,installation_authorized:false,
+   original_job_completed:false,production_changed:false};
+  if(unifiedGraph?.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+      unifiedGraph.shift_id===wakeReceipt.shift_id){
+   try{
+    const h=await shiftRpc(db,'reality_read_owner_shift_handoff_health_v1',{
+     p_owner_id:unifiedGraph.owner_id
+    });
+    if(h?.status==='SIGNED_OWNER_SHIFT_HANDOFF_HEALTH_READ_ONLY'&&
+       h.owner_id===unifiedGraph.owner_id&&
+       h.shift_id===wakeReceipt.shift_id&&
+       h.read_only===true&&h.installation_authorized===false&&
+       h.original_job_completed===false&&h.production_changed===false&&
+       Number.isSafeInteger(h.original_claim_count)&&
+       Number.isSafeInteger(h.original_independent_final_receipt_count)&&
+       Number.isSafeInteger(h.employee_independently_verified_evidence_jobs)&&
+       Array.isArray(h.maintenance_handoffs)){
+      signedOwnerHandoffHealth={
+       status:h.status,owner_id:h.owner_id,shift_id:h.shift_id,
+       worker_status:h.worker_status,
+       employee_independently_verified_evidence_jobs:
+        h.employee_independently_verified_evidence_jobs,
+       original_claim_count:h.original_claim_count,
+       original_independent_final_receipt_count:
+        h.original_independent_final_receipt_count,
+       original_work_status:h.original_work_status,
+       repair_scope_status:h.repair_scope?.status||null,
+       maintenance_handoffs:h.maintenance_handoffs.map(x=>({
+        source_ref:x.source_ref,status:x.status,
+        next_action:x.next_action
+       })),
+       universe_verified_event_rows:h.universe_verified_event_rows,
+       ceo_operational_decision_handoff:h.ceo_operational_decision_handoff,
+       read_only:true,installation_authorized:false,
+       original_job_completed:false,production_changed:false
+      };
+    }
+   }catch{/* Signed execution continues; no guessed work status. */}
+  }
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -2472,6 +2515,7 @@ export default async function handler(req,res){
     integrated_work_intake:integratedWorkIntake,
     automatic_repair_work_order_qualification:automaticRepairOpportunityQualification,
     signed_repair_owner_scope_handoff:signedRepairOwnerScopeHandoff,
+    signed_owner_handoff_health:signedOwnerHandoffHealth,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
