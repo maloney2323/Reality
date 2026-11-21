@@ -20,6 +20,7 @@ on:
       - 'test/reality-business-original-source-executor-contract-v1.test.js'
       - 'supabase/migrations/*signed_internal_repo_business_source_probe_v1.sql'
       - 'src/reality-signed-internal-business-source-readback-v1.js'
+      - 'supabase/functions/reality-signed-internal-repo-business-source-v1/index.ts'
       - 'api/reality/personal-internal-business-provider-proof.js'
       - 'test/reality-signed-internal-business-source-readback-v1.test.js'
       - 'supabase/migrations/*owner_multi_original_shift_preflight_v1.sql'
