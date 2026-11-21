@@ -63,8 +63,26 @@ export async function investigateAuthenticatedChatUnderExistingShift({
 }={}){
  if(typeof fetchImpl!=='function'||typeof callRpc!=='function')
   fail('TRUSTED_WORKER_TOOLS_REQUIRED');
- const claimed=await callRpc(db,'reality_claim_chat_work_for_shift_v1',{},
+ let claimed=await callRpc(db,'reality_claim_chat_work_for_shift_v1',{},
   {fetchImpl});
+ // The ordinary Chat claim requires a final-receipt warrant. When Reality
+ // holds only an INTERNAL MAINTENANCE warrant, an exact owner-signed
+ // continuation may still be investigated as advisory evidence. This new
+ // service-only claim independently rechecks shift, warrant and source.
+ // It NEVER admits a customer original or changes installation authority.
+ if(claimed?.status==='NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT'){
+  const maintenance=await callRpc(db,
+   'reality_claim_signed_maintenance_chat_investigation_v1',{},
+   {fetchImpl});
+  if(maintenance?.status==='NO_PENDING_SIGNED_MAINTENANCE_CHAT_INVESTIGATION'&&
+     maintenance.execution_authorized===false&&
+     maintenance.new_shift_started===false&&
+     maintenance.installation_authorized===false&&
+     maintenance.original_job_completed===false&&
+     maintenance.production_changed===false)
+   return safe('NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT');
+  claimed=maintenance;
+ }
  const c=validateClaim(claimed,db,env);
  if(!c)return safe('NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT');
  let cause='MODEL_PROVIDER_OR_DIAGNOSIS_UNVERIFIED';

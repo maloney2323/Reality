@@ -172,3 +172,26 @@ test('source requalification remains owner-verifiable after same incident advanc
  assert.equal(completed.customer_job_completed,false);
  assert.equal(completed.owner_authority_granted,false);
 });
+
+
+test('seventh historical shift does not erase the exact current signed shift or create a new one',()=>{
+ const historical=Array.from({length:6},(_,i)=>({
+  shift_id:'11111111-1111-4111-8111-'+String(i+1).padStart(12,'0'),
+  status:'ENDED_WITH_BLOCKED_WORK',closed_at:'2026-11-19T00:00:00Z',
+  planned_end_at:'2026-11-19T00:00:00Z'
+ }));
+ const latest={shift_id:active,status:'AWAITING_EXACT_ORIGINAL_WORK',
+  closed_at:null,planned_end_at:'infinity'};
+ const result=projectOwnerInternalMaintenanceContinuity(readback,{
+  ownerId:owner,shifts:[...historical,latest]
+ });
+ assert.equal(result.current_shift_id,active);
+ assert.equal(result.open_count,2);
+ assert.equal(result.no_new_shift_started,true);
+ assert.equal(result.owner_authority_granted,false);
+ assert.equal(result.production_changed,false);
+ assert.equal(result.next_action,'VERIFY_ACTIVE_SHIFT_EXACT_MAINTENANCE_SCOPE');
+ assert.throws(()=>projectOwnerInternalMaintenanceContinuity(readback,{
+  ownerId:owner,shifts:[...historical,...historical,...historical,
+   ...historical,latest,latest]}),/OWNER_MAINTENANCE_CONTINUITY_OWNER_SERVICE_READBACK_REQUIRED/);
+});

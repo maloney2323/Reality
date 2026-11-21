@@ -4,7 +4,9 @@
  'use strict';
  if(!/^\/chat\/?$/.test(location.pathname))return;
  const composer=document.getElementById('realityChatComposer');
- if(!composer||document.getElementById('realityChatExistingShiftHandoff'))return;
+ const transcript=document.getElementById('privateTranscript');
+ if(!composer||!transcript||
+    document.getElementById('realityChatExistingShiftHandoff'))return;
  const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
  const box=document.createElement('section');
  box.id='realityChatExistingShiftHandoff';
@@ -15,9 +17,22 @@
  box.style.cssText='box-sizing:border-box;max-width:100%;margin:0 0 12px;padding:12px 14px;'+
   'border:1px solid #43849a;border-radius:12px;background:#103044;'+
   'font-size:13px;color:#ebf6fc;line-height:1.5;overflow-wrap:anywhere';
+ // This is a *dismissible historical receipt*, not a fixed overlay or an
+ // approval action. The real source ledger and saved conversation remain.
+ const header=document.createElement('div');
+ header.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
  const heading=document.createElement('strong');
  heading.textContent='REALITY · EXISTING SHIFT HANDOFF VERIFIED';
- heading.style.cssText='display:block;margin:0 0 4px;font-size:13px';
+ heading.style.cssText='display:block;font-size:13px';
+ const dismiss=document.createElement('button');
+ dismiss.type='button';
+ dismiss.textContent='×';
+ dismiss.id='realityChatExistingShiftHandoffDismiss';
+ dismiss.setAttribute('aria-label','Dismiss existing shift handoff card');
+ dismiss.style.cssText='flex:0 0 auto;display:block;min-width:44px;'+
+  'min-height:44px;border:1px solid #729bb5;border-radius:9px;'+
+  'background:#15374e;color:white;font-size:25px;line-height:1;cursor:pointer';
+ header.append(heading,dismiss);
  const summary=document.createElement('p');
  summary.style.cssText='margin:5px 0';
  const next=document.createElement('p');
@@ -28,10 +43,45 @@
  link.style.cssText='background:transparent;border:0;padding:8px 0;min-height:36px;'+
   'text-decoration:underline;font:inherit;color:#a5ddff;text-align:left';
  link.hidden=true;
- box.append(heading,summary,next,link);
- composer.insertBefore(box,composer.firstChild);
+ box.append(header,summary,next,link);
+ // A card inside the scrollable conversation cannot cover the composer.
+ // This replaces the previous always-visible composer-mounted notice.
  let inFlight=false,again=false,latest=null;
+ let dismissedRequest=null;
+ const storageKey='reality.dismissed.latest.shift.handoff.v1';
+ function wasDismissed(requestId){
+  if(!UUID.test(requestId||''))return false;
+  if(dismissedRequest===requestId)return true;
+  try{return window.sessionStorage?.getItem(storageKey)===requestId}
+  catch{return false}
+ }
+ function dismissNotice(){
+  const requestId=latest?.request_id;
+  if(UUID.test(requestId||'')){
+   dismissedRequest=requestId;
+   try{window.sessionStorage?.setItem(storageKey,requestId)}catch{}
+  }
+  box.hidden=true;
+  box.remove();
+ }
+ dismiss.addEventListener('click',dismissNotice);
+ function attach(){
+  if(box.hidden)return;
+  // Do not duplicate the operational maintenance approval message.
+  const decision=document.getElementById('realityChatMaintenanceNudge');
+  if(decision&&!decision.hidden){
+   box.hidden=true;box.remove();return;
+  }
+  if(!transcript.contains(box))transcript.append(box);
+ }
  function paint(data){
+  if(wasDismissed(data.request_id)){
+   box.hidden=true;box.remove();return;
+  }
+  const decision=document.getElementById('realityChatMaintenanceNudge');
+  if(decision&&!decision.hidden){
+   box.hidden=true;box.remove();return;
+  }
   box.hidden=false;
   const short=data.shift_id.slice(0,8);
   summary.textContent='Your signed Chat instruction was delivered to authorized shift '+short+
@@ -45,6 +95,7 @@
    '. Queueing this wake does not prove this request started or completed the job.';
   latest=data;
   link.hidden=!UUID.test(data.conversation_id||'');
+  attach();
  }
  async function refresh(){
   if(inFlight){again=true;return}
@@ -56,11 +107,11 @@
    });
    const data=await response.json().catch(()=>null);
    if(response.status===401){
-    box.hidden=true;latest=null;return;
+    box.hidden=true;box.remove();latest=null;return;
    }
    if(!response.ok||data?.ok!==true)return;
    if(data.status==='NO_OWNER_ACTIVE_SIGNED_SHIFT_CHAT_WAKE'){
-    box.hidden=true;latest=null;return;
+    box.hidden=true;box.remove();latest=null;return;
    }
    if(data.status!=='OWNER_LATEST_SIGNED_SHIFT_CHAT_WAKE_VERIFIED'||
       !UUID.test(data.shift_id||'')||
@@ -96,6 +147,21 @@
   void window.realityChatRefreshTranscript?.();
  };
  window.addEventListener('reality:saved-chat-readback',()=>{void refresh()});
+ // A new chat rendering can replace its child nodes; never reintroduce an
+ // owner-dismissed notice or cover the message field.
+ const observer=new MutationObserver(()=>{
+  if(!box.hidden&&box.parentElement===null)attach();
+ });
+ observer.observe(transcript,{childList:true});
+ // A later shift readback can render the current maintenance approval after
+ // this old saved-handoff notice. Remove the redundant receipt immediately.
+ const decision=document.getElementById('realityChatMaintenanceNudge');
+ if(decision){
+  const decisionObserver=new MutationObserver(()=>{
+   if(!decision.hidden){box.hidden=true;box.remove()}
+  });
+  decisionObserver.observe(decision,{attributes:true,attributeFilter:['hidden']});
+ }
  window.addEventListener('reality:chat-intake-saved',()=>{void refresh()});
  window.addEventListener('pageshow',()=>{void refresh()});
  if(document.readyState==='loading')

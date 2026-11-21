@@ -50,6 +50,21 @@
  if(workPanel)workPanel.append(panel);
  else container.insertBefore(panel,composer);
  const transcript=document.getElementById('privateTranscript');
+ // Dismissal only controls this old, already-saved shift handoff notice.
+ // It cannot delete ledger evidence, stop the employee shift or affect an
+ // exact installation decision. Remember it across a reload of this tab.
+ const dismissedShiftNotices=new Set();
+ const noticeKey=ref=>'reality:hide-signed-shift-note:'+ref.request_id;
+ const isNoticeDismissed=ref=>{
+  if(!UUID.test(ref?.request_id||''))return false;
+  if(dismissedShiftNotices.has(ref.request_id))return true;
+  try{return window.sessionStorage?.getItem(noticeKey(ref))==='1'}
+  catch{return false}
+ };
+ const dismissNotice=ref=>{
+  dismissedShiftNotices.add(ref.request_id);
+  try{window.sessionStorage?.setItem(noticeKey(ref),'1')}catch{}
+ };
  let activeRef=null,activePhase=null,verifiedComplete=false;
  const phaseOrder=['QUEUED','DRAFT_GENERATED','CANDIDATE_STAGED','CI_VERIFIED'];
  const steps=['Saved instruction admitted to original work',
@@ -61,6 +76,10 @@
   if(!transcript||!UUID.test(ref?.request_id||'')||
      window.realityActiveConversationId?.()!==ref.conversation_id)
    return null;
+  // The dismissed status is never recreated by an async saved-history read.
+  if((result?.capability_id==='governed-existing-shift-continuation'||
+      result?.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')&&
+     isNoticeDismissed(ref))return null;
   const nodes=Array.from(transcript.children||[]);
   let card=nodes.find(n=>n.dataset?.realityBuildRequest===ref.request_id);
   if(!card){
@@ -87,7 +106,29 @@
   actions.style.cssText='display:flex;gap:9px;flex-wrap:wrap;margin-top:12px';
   const label=document.createElement('div');
   label.style.cssText='font-size:12px;opacity:.86';
-  const isExistingShift=result?.capability_id==='governed-existing-shift-continuation';
+  const isExistingShift=result?.capability_id==='governed-existing-shift-continuation'||
+   result?.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED';
+  if(isExistingShift){
+   // This is an informational receipt, not an owner authorization surface.
+   // A visible, touch-sized X dismisses the old notice without any POST.
+   head.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px';
+   const close=document.createElement('button');
+   close.type='button';
+   close.textContent='×';
+   close.className='reality-chat-shift-notice-dismiss';
+   close.setAttribute('aria-label','Dismiss existing shift handoff update');
+   close.setAttribute('title','Dismiss this update; the saved shift is unchanged');
+   close.style.cssText='min-width:44px;min-height:44px;border:1px solid #507d9d;'+
+    'border-radius:10px;background:#15364f;color:#ebf8ff;font-size:25px;'+
+    'line-height:1;cursor:pointer;flex:0 0 auto';
+   close.onclick=()=>{
+    dismissNotice(ref);
+    card.hidden=true;
+    card.style.display='none';
+    card.remove?.();
+   };
+   head.append(close);
+  }
   const work=result?.original_work_id;
   label.textContent=isExistingShift?
    'Existing authorized shift · '+String(result.shift_id||'verification pending'):
@@ -417,6 +458,13 @@
   return second;
  }
  function showCheckedResult(result,ref){
+  if((result?.capability_id==='governed-existing-shift-continuation'||
+      result?.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')&&
+     isNoticeDismissed(ref)){
+   // Not a fallback to a second Work popup: user dismissed this notice.
+   panel.hidden=true;panel.style.display='none';
+   return;
+  }
   const inline=inlineWork(ref,explain(result),result);
   if(!inline){
    show(explain(result),true,ref);

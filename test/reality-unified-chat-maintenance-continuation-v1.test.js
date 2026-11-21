@@ -93,18 +93,18 @@ class El{
  focus(){this.focused=true;}
  contains(target){return this===target||this.children.some(x=>x.contains(target));}
 }
-function setup({readback=data,posted=receipt,signedIn=true}={}){
+function setup({readback=data,posted=receipt,signedIn=true,installPosted=undefined,installReadback=undefined}={}){
  const ready=new El();ready.id='privateReady';
  ready.style.display=signedIn?'block':'none';
  const inbox=new El();inbox.id='realityChatApprovalInbox';
  const itemsAnchor=new El();itemsAnchor.id='realityChatApprovalItems';
  inbox.append(itemsAnchor);
- const center=new El();center.id='realityChatConversation';
- const thread=new El();thread.id='privateTranscript';center.append(thread);
+ // Mirror the REAL /chat DOM: the transcript has no legacy conversation-center wrapper.
+ const thread=new El();thread.id='privateTranscript';
  const open=new El();open.id='realityChatOpenInspector';
  const approvals=new El();approvals.id='realityChatTabApprovals';
  const prompt=new El('textarea');prompt.id='privatePrompt';
- const nodes=[ready,inbox,center,open,approvals,prompt];
+ const nodes=[ready,inbox,thread,open,approvals,prompt];
  const locate=(id)=>{
   function scan(n){if(n.id===id)return n;
    for(const c of n.children){const found=scan(c);if(found)return found;}
@@ -115,10 +115,30 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
  };
  const calls=[],now=new Date();
  const fetch=async(url,options)=>{
-  assert.equal(url,'/api/reality/personal-governed-employee-shift');
   assert.equal(options.credentials,'same-origin');
   assert.equal(options.cache,'no-store');
   calls.push({url,options});
+  if(url==='/api/reality/signed-maintenance-exact-install-approval'){
+   if(options.method==='GET'){
+    const x=installReadback||{ok:true,
+     status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
+     owner_approval_recorded:false,installation_authorized:false,
+     retry_owner_approval:false};
+    return {ok:!x.apiError,status:x.apiError?503:200,json:async()=>x};
+   }
+   const x=installPosted===undefined?{
+    ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_AUTO_CONTINUATION',
+    maintenance_id:items[1].origin_incident_id,shift_id:signedShiftId,
+    approval_id:'e1111111-2222-4333-8444-555555555555',
+    approval_receipt_sha256:HASH('7'),
+    installation_authorized:true,installation_completed:false,
+    original_job_completed:false,production_changed:false,new_shift_started:false,
+    no_third_confirmation:true
+   }:installPosted;
+   return x===null?Promise.reject(Error('UNVERIFIED_OWNER_TRANSPORT')):{
+    ok:!x.apiError,status:x.apiError?409:202,json:async()=>x};
+  }
+  assert.equal(url,'/api/reality/personal-governed-employee-shift');
   const response=options.method==='POST'?posted:readback;
   if(options.method==='POST')return response===null?Promise.reject(Error('TIMEOUT')):{
    ok:!response?.apiError,status:response?.apiError?409:202,
@@ -135,13 +155,14 @@ function setup({readback=data,posted=receipt,signedIn=true}={}){
   matchMedia:()=>({matches:true}),addEventListener:()=>{},
   setInterval:()=>0,dispatchEvent:e=>events.push(e)};
  const context={window:win,document:doc,fetch,AbortSignal,
+  crypto:{randomUUID:()=> 'e1111111-2222-4333-8444-555555555555'},
   MutationObserver:class{constructor(cb){observers.push(cb)}
    observe(){}disconnect(){}},CustomEvent:class{constructor(type,init){
     this.type=type;this.detail=init?.detail;
    }},Date,console};
  runInNewContext(ui,context);
  const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
- return {ready,inbox,thread,center,locate,calls,events,flush,observers,
+ return {ready,inbox,thread,locate,calls,events,flush,observers,
   click:id=>locate(id)?.click()};
 }
 test('unified signed-in Chat actually loads existing maintenance controls, not old chat-simple',()=>{
@@ -150,9 +171,14 @@ test('unified signed-in Chat actually loads existing maintenance controls, not o
  assert.ok(html.indexOf('reality-chat-maintenance-continuation-v1.css')>
   html.indexOf('reality-chat-mobile-usable-v3.css'));
  assert.match(ui,/get\('realityChatApprovalInbox'\)/);
- assert.match(ui,/get\('realityChatConversation'\)/);
- assert.match(ui,/get\('realityChatTabApprovals'\)/);
- assert.match(ui,/get\('realityChatOpenInspector'\)/);
+ assert.match(html,/id="privateTranscript"/);
+ assert.doesNotMatch(html,/id="realityChatConversation"/);
+ assert.doesNotMatch(ui,/get\('realityChatConversation'\)/);
+ // Decision, proof and check-status controls are native to the transcript.
+ assert.doesNotMatch(ui,/get\('realityChatTabApprovals'\)/);
+ assert.doesNotMatch(ui,/get\('realityChatOpenInspector'\)/);
+ assert.match(ui,/realityChatMaintenanceCheckStatusInChat/);
+ assert.match(ui,/realityChatMaintenanceEvidenceInChat/);
  assert.doesNotMatch(ui,/reality-chat-simple\.html|\/chat-simple/);
  assert.doesNotThrow(()=>new Script(ui));
 });
@@ -202,7 +228,10 @@ test('no login / no independently readback owner scope means no approval',async(
  await forgery.flush();
  assert.equal(forgery.locate('realityChatMaintenanceAuthorize').disabled,true);
  await forgery.click('realityChatMaintenanceAuthorize');await forgery.flush();
- assert.deepEqual(forgery.calls.map(x=>x.options.method),['GET']);
+ assert.deepEqual(forgery.calls.map(x=>x.options.method),['GET','GET'],
+  'unverified broad shift scope permits only a narrow read-only recovery attempt');
+ assert.equal(forgery.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.equal(forgery.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
 });
 test('an existing signed maintenance shift blocks duplicate authorization',async()=>{
  const current=setup({readback:{...data,requested_maintenance_draft:null,
@@ -268,11 +297,11 @@ test('an explicit approve click from the chat message delegates to the ORIGINAL 
  assert.equal(msg.parentElement,v.thread);
  assert.equal(msg.hidden,false,'signed result must stay in the conversation');
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /You authorized 2 exact earlier repairs/);
+  /Reality found a verified repair|Your existing shift is still active|Reality found 2 unfinished employee repairs/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /under shift/);
+  /existing shift|existing work/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /not reached independent final verification/);
+  /remaining repairs|independently verified repair steps|exact approval|existing work/);
  assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
 });
 test('an already signed shift is reported IN Chat instead of asking for another approval',async()=>{
@@ -289,8 +318,8 @@ test('an already signed shift is reported IN Chat instead of asking for another 
  const msg=active.locate('realityChatMaintenanceNudge');
  assert.equal(msg.hidden,false);
  assert.equal(msg.parentElement,active.thread);
- assert.match(msg.children[1].textContent,/You authorized 2 exact earlier repairs/);
- assert.match(msg.children[1].textContent,new RegExp(signedShiftId));
+ assert.match(msg.children[1].textContent,/Your existing shift is still active/);
+ assert.match(msg.children[1].textContent,/existing shift/);
  assert.equal(active.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
  await active.click('realityChatMaintenanceInlineAuthorize');await active.flush();
  assert.equal(active.calls.length,1,'no new signed shift was created');
@@ -475,4 +504,260 @@ test('owner Chat exposes executed maintenance stages, not a fabricated final rep
  assert.match(screen,/original frozen RED still required/);
  assert.match(screen,/No independently verified repair yet/);
  assert.ok(v.calls.every(c=>c.options.method==='GET'));
+});
+
+
+function exactApprovalReadback(){
+ const c=runningOwnerMaintenance();
+ const target='sha256:'+'9'.repeat(64);
+ const candidate='6'.repeat(40),blob='a'.repeat(40),original='b'.repeat(40);
+ c.signed_verified_maintenance_repair_artifacts={
+  status:'OWNER_VERIFIED_MAINTENANCE_ARTIFACTS_READ_ONLY',
+  owner_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
+  count:1,installation_authorized:false,production_changed:false,
+  items:[{
+   maintenance_id:items[1].origin_incident_id,shift_id:signedShiftId,
+   source_ref:items[1].source_ref,
+   candidate_commit_sha:candidate,candidate_source_blob_sha:blob,
+   historical_source_blob_sha:original,
+   review_receipt_sha256:HASH('a'),case_ci_receipt_sha256:HASH('b'),
+   github_run_id:44800111234,github_artifact_id:99201111,
+   owner_approval_ready:false,
+   install_target_verified:true,target_review_receipt_sha256:target,
+   target_review_branch:'reality/chat-direct-work-handoff-20261115',
+   target_review_head_sha:'c'.repeat(40),
+   target_review_existing_blob_sha:original,
+   installation_authorized:false,repair_installed:false,
+   original_job_completed:false
+  }]
+ };
+ c.exact_signed_maintenance_install_review={
+  status:'EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY',
+  owner_id:c.signed_verified_maintenance_repair_artifacts.owner_id,
+  owner_approval_ready:true,installation_authorized:false,
+  repair_installed:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false,
+  shift_id:signedShiftId,maintenance_id:items[1].origin_incident_id,
+  source_ref:items[1].source_ref,
+  candidate_commit_sha:candidate,candidate_source_blob_sha:blob,
+  target_head_sha:'c'.repeat(40),
+  target_branch:'reality/chat-direct-work-handoff-20261115',
+  target_path:'src/reality-qualified-source-requalification-v1.js',
+  target_review_receipt_sha256:target,
+  artifact_receipt_sha256:HASH('a'),
+  case_ci_receipt_sha256:HASH('b')
+ };
+ return c;
+}
+test('an actual current-owner signed repair target is visible on the real Chat DOM without the removed wrapper',async()=>{
+ const c=exactApprovalReadback();
+ const x=setup({readback:c});await x.flush();
+ assert.equal(x.calls.length,1);
+ assert.equal(x.locate('realityChatMaintenanceNudge').hidden,false,'Chat parse diagnostic: '+JSON.stringify({feedback:x.locate('realityChatMaintenanceFeedback')?.textContent,rootHidden:x.locate('realityChatMaintenanceContinuation')?.hidden}));
+ const approve=x.locate('realityChatMaintenanceExactInstallApprove');
+ assert.ok(approve,'owner approval button must exist in the actual Chat DOM');
+ assert.equal(approve.hidden,false,'Approval visibility diagnostic: '+JSON.stringify({feedback:x.locate('realityChatMaintenanceFeedback')?.textContent,details:x.locate('realityChatMaintenanceExactInstallDetails')?.textContent,ownerCard:c.exact_signed_maintenance_install_review?.status,artifactCount:c.signed_verified_maintenance_repair_artifacts?.count}));
+ assert.equal(approve.disabled,false);
+ const decisionButton=x.locate('realityChatMaintenanceApprovalInboxInstall');
+ assert.ok(decisionButton);
+ assert.equal(decisionButton.hidden,true,'no separate duplicate Work approval');
+ assert.equal(decisionButton.disabled,true);
+ assert.ok(x.locate('realityChatMaintenanceContinuation').contains(decisionButton));
+ assert.equal(approve.parentElement?.id,'','exact approval is in the chat message actions');
+ assert.match(x.locate('realityChatMaintenanceExactInstallDetails').textContent,/PR #308/);
+ assert.equal(x.locate('realityChatMaintenanceCheckStatusInChat').hidden,false);
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/Ready for your one-time decision/);
+ assert.equal(x.locate('realityChatMaintenanceContinuation').parentElement,x.inbox);
+ // Read-only rendering never causes installation, approval, or a new shift.
+ assert.deepEqual(x.calls.map(x=>x.options.method),['GET']);
+});
+test('the exact install approval button remains hidden for unsigned / missing target review',async()=>{
+ const c=runningOwnerMaintenance();
+ const missing=setup({readback:c});await missing.flush();
+ const button=missing.locate('realityChatMaintenanceExactInstallApprove');
+ assert.equal(button.hidden,true);
+ assert.equal(button.disabled,true);
+ assert.equal(missing.locate('realityChatMaintenanceApprovalInboxInstall').hidden,true);
+ assert.equal(missing.locate('realityChatMaintenanceApprovalInboxInstall').disabled,true);
+ assert.deepEqual(missing.calls.map(x=>x.options.method),['GET']);
+});
+
+
+test('clicking exact approval inside Reality Chat performs one POST, never opening a separate panel',async()=>{
+ const c=exactApprovalReadback();
+ const x=setup({readback:c});await x.flush();
+ const button=x.locate('realityChatMaintenanceExactInstallApprove');
+ assert.equal(button.hidden,false);
+ assert.equal(button.disabled,false);
+ assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').hidden,true);
+ await x.click('realityChatMaintenanceExactInstallApprove');
+ await x.flush();
+ assert.deepEqual(x.calls.map(x=>[x.options.method,x.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['POST','/api/reality/signed-maintenance-exact-install-approval']
+ ]);
+ const post=x.calls[1].options;
+ assert.equal(post.headers['content-type'],'application/json');
+ assert.ok(post.signal instanceof AbortSignal);
+ const p=JSON.parse(post.body);
+ assert.deepEqual(Object.keys(p).sort(),[
+  'candidate_commit_sha','intent','maintenance_id','request_id','shift_id',
+  'target_review_receipt_sha256'
+ ]);
+ assert.equal(p.intent,'OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR');
+ assert.equal(p.maintenance_id,c.exact_signed_maintenance_install_review.maintenance_id);
+ assert.equal(p.shift_id,signedShiftId);
+ assert.equal(p.candidate_commit_sha,c.exact_signed_maintenance_install_review.candidate_commit_sha);
+ assert.equal(p.target_review_receipt_sha256,
+  c.exact_signed_maintenance_install_review.target_review_receipt_sha256);
+ assert.equal(button.hidden,true);
+ assert.equal(button.disabled,true);
+ assert.match(x.locate('realityChatMaintenanceFeedback').textContent,/Owner approval receipt/);
+ await x.click('realityChatMaintenanceExactInstallApprove');await x.flush();
+ assert.equal(x.calls.length,2,'one exact owner click must never replay the installation decision');
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/Approval recorded/);
+});
+test('uncertain exact owner POST is not silently retried and preserves the same original shift',async()=>{
+ const c=exactApprovalReadback();
+ const x=setup({readback:c,installPosted:null});await x.flush();
+ await x.click('realityChatMaintenanceExactInstallApprove');await x.flush();
+ assert.deepEqual(x.calls.map(x=>[x.options.method,x.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['POST','/api/reality/signed-maintenance-exact-install-approval']
+ ]);
+ assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
+ assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').disabled,true);
+ assert.match(x.locate('realityChatMaintenanceFeedback').textContent,/could not be independently confirmed/);
+ await x.click('realityChatMaintenanceExactInstallApprove');await x.flush();
+ assert.equal(x.calls.length,2);
+});
+
+test('a verified exact owner approval, its source evidence and status all remain inside Chat',async()=>{
+ const c=exactApprovalReadback();
+ const status={ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
+  owner_approval_recorded:false,installation_authorized:false,
+  retry_owner_approval:false,
+  exact_review:{...c.exact_signed_maintenance_install_review,
+   expected_old_blob_sha:'b'.repeat(40)}
+ };
+ const x=setup({readback:c,installReadback:status});await x.flush();
+ assert.equal(x.locate('realityChatMaintenanceCheckStatusInChat').hidden,false);
+ assert.equal(x.locate('realityChatMaintenanceEvidenceInChat').hidden,true);
+ await x.click('realityChatMaintenanceOpen');await x.flush();
+ assert.equal(x.locate('realityChatMaintenanceEvidenceInChat').hidden,false);
+ assert.match(x.locate('realityChatMaintenanceEvidenceInChat').children.map(p=>p.children?.[0]?.textContent||p.textContent||'').join('|'),
+  /Independent installation-target receipt/);
+ await x.click('realityChatMaintenanceCheckStatusInChat');await x.flush();
+ assert.deepEqual(x.calls.map(y=>[y.options.method,y.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['GET','/api/reality/signed-maintenance-exact-install-approval']
+ ],'owner check must never repeat the slow broad shift read');
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/no previous approval was recorded/);
+ assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').disabled,false);
+ assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').hidden,true);
+ assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').disabled,true);
+});
+test('conversation-native actions are mobile reachable without opening the Work inspector',()=>{
+ assert.match(css,/#realityChatMaintenanceExactInstallApprove/);
+ assert.match(css,/#realityChatMaintenanceCheckStatusInChat/);
+ assert.match(css,/\.reality-chat-maintenance-chat-evidence/);
+ assert.match(css,/@media\(max-width:600px\)/);
+ assert.doesNotMatch(ui,/get\('realityChatTabApprovals'\)/);
+ assert.doesNotMatch(ui,/get\('realityChatOpenInspector'\)/);
+ assert.match(ui,/review\.addEventListener\('click'/);
+ assert.match(ui,/checkStatusInChat\.addEventListener\('click'/);
+ assert.match(ui,/chatStatus\.textContent='Approval outcome unverified/);
+});
+
+test('the approval card is concise and employee diagnostics are collapsed but recoverable within Chat',async()=>{
+ const c=exactApprovalReadback();
+ const v=setup({readback:c});await v.flush();
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').hidden,false);
+ const brief=v.locate('realityChatMaintenanceNudge').children[1].textContent;
+ assert.match(brief,/verified repair/);
+ assert.ok(brief.length<180,'plain-language summary must fit a mobile chat bubble');
+ const details=v.locate('realityChatMaintenanceDetails');
+ assert.equal(details.hidden,true,'technical evidence must not overwhelm owner');
+ assert.equal(v.locate('realityChatMaintenanceEvidenceInChat').hidden,true);
+ assert.equal(v.locate('realityChatMaintenanceOpen').textContent,'View details');
+ assert.match(v.locate('realityChatMaintenanceExactInstallDetails').textContent,
+  /isolated preview only, not production/);
+ await v.click('realityChatMaintenanceOpen');await v.flush();
+ assert.equal(details.hidden,false);
+ assert.equal(v.locate('realityChatMaintenanceEvidenceInChat').hidden,false);
+ assert.match(collectedText(details),/Riley/);
+ assert.match(collectedText(details),/Taylor/);
+ assert.match(collectedText(details),/Independent installation-target receipt/);
+ await v.click('realityChatMaintenanceOpen');await v.flush();
+ assert.equal(details.hidden,true);
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').disabled,false,
+  'opening details never grants or removes owner approval');
+ assert.deepEqual(v.calls.map(x=>x.options.method),['GET'],
+  'disclosing evidence cannot trigger any installation POST');
+});
+
+test('broad shift timeout recovers exact PR #308 within Chat using a narrow read-only GET',async()=>{
+ const c=exactApprovalReadback();
+ const exact={...c.exact_signed_maintenance_install_review,
+  expected_old_blob_sha:'b'.repeat(40)};
+ const narrow={ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
+  owner_approval_recorded:false,installation_authorized:false,
+  retry_owner_approval:false,exact_review:exact};
+ const x=setup({readback:null,installReadback:narrow});await x.flush();
+ assert.deepEqual(x.calls.map(v=>[v.options.method,v.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['GET','/api/reality/signed-maintenance-exact-install-approval']
+ ]);
+ assert.equal(x.locate('realityChatMaintenanceNudge').hidden,false);
+ assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').hidden,false);
+ assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').disabled,false);
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/no previous approval was recorded/);
+ assert.equal(x.locate('realityChatMaintenanceContinuation').hidden,true);
+ assert.equal(x.calls.filter(v=>v.options.method==='POST').length,0);
+ await x.click('realityChatMaintenanceExactInstallApprove');await x.flush();
+ assert.equal(x.calls.filter(v=>v.options.method==='POST').length,1);
+ assert.equal(x.calls[2].url,'/api/reality/signed-maintenance-exact-install-approval');
+ assert.equal(JSON.parse(x.calls[2].options.body).candidate_commit_sha,
+  c.exact_signed_maintenance_install_review.candidate_commit_sha);
+});
+
+test('Chat status reconciles exact installed source without stale pending-installation language',async()=>{
+ const installed={
+  ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
+  owner_approval_recorded:true,installation_authorized:true,
+  approval_receipt_sha256:HASH('7'),retry_owner_approval:false,
+  shift_id:signedShiftId,source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  decision_state:'INSTALLED',repair_installed:true,
+  installed_commit_sha:'8'.repeat(40),postinstall_verified:false,
+  independent_postinstall_receipt_sha256:null,
+  production_changed:false,original_job_completed:false
+ };
+ const v=setup({readback:null,installReadback:installed});await v.flush();
+ assert.deepEqual(v.calls.map(x=>[x.options.method,x.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['GET','/api/reality/signed-maintenance-exact-install-approval']
+ ]);
+ assert.match(v.locate('realityChatMaintenanceChatStatus').textContent,/Repair installed · Independent verification pending/);
+ assert.match(v.locate('realityChatMaintenanceExactInstallDetails').textContent,/Installed commit/);
+ assert.match(v.locate('realityChatMaintenanceExactInstallDetails').textContent,/Independent post-install verification is pending/);
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
+ assert.equal(v.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.doesNotMatch(ui,/Approval recorded\. Independent installation and the original job are still pending verification/);
+});
+test('Chat only reports independent repair acceptance with a verified post-install receipt, never original-job settlement',async()=>{
+ const verified={
+  ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
+  owner_approval_recorded:true,installation_authorized:true,
+  approval_receipt_sha256:HASH('7'),retry_owner_approval:false,
+  shift_id:signedShiftId,source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  decision_state:'VERIFIED',repair_installed:true,
+  installed_commit_sha:'8'.repeat(40),postinstall_verified:true,
+  independent_postinstall_receipt_sha256:HASH('9'),
+  production_changed:false,original_job_completed:false
+ };
+ const v=setup({readback:null,installReadback:verified});await v.flush();
+ assert.match(v.locate('realityChatMaintenanceChatStatus').textContent,/Independent repair verification recorded/);
+ assert.match(v.locate('realityChatMaintenanceFeedback').textContent,/Original job completion still requires independent proof/);
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
+ assert.equal(v.calls.filter(x=>x.options.method==='POST').length,0);
 });

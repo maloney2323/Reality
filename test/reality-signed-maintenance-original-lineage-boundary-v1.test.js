@@ -74,3 +74,20 @@ test('the running signed worker uses this guard and the existing read-only origi
  ])assert.ok(sql.includes(term),term);
  assert.doesNotMatch(sql,/update reality_internal|insert into reality_internal|net\.http_post/i);
 });
+
+test('worker prioritizes missing exact owner-business original over routed maintenance classification',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const start=worker.indexOf('const outcomeCode=');
+ assert.ok(start>=0);
+ const outcome=worker.slice(start,start+2100);
+ const original=outcome.indexOf(
+  "'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED'");
+ const generic=outcome.indexOf(
+  "'SIGNED_MAINTENANCE_REPAIR_AND_ORIGINAL_LINEAGE_SEPARATELY_ROUTED'");
+ assert.ok(original>=0&&generic>original,
+  'the authenticated owner must see the missing exact original before generic routing');
+ assert.match(outcome,/signedMaintenanceCanonicalBusinessLineageMissing/);
+ assert.match(outcome,/signedMaintenanceOriginalReturnDispatch\?\.status/);
+ assert.match(outcome,/GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED/);
+});

@@ -286,3 +286,52 @@ body[data-reality-route="chat"].reality-chat-signed-in #privateChat > #privateSt
 body[data-reality-route="chat"]:not(.reality-chat-signed-in) #privateChat > #privateStatus{
  display:block;margin:10px auto;max-width:520px;font-size:12px;color:#b6d1e3;
 }
+
+
+/* No floating Work/Chats or middle-of-chat "Details" bar on mobile.
+   Preserve original signed controls by mounting each panel as a
+   conversational, scrollable card only when explicitly requested. */
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-status-bar[hidden],
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-inline-panels[hidden] {display:none!important;}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-status-bar{
+ display:block;align-self:flex-start;max-width:min(95%,620px);
+ width:fit-content;min-height:0;margin:8px 0;
+ padding:11px 13px;border-radius:13px;
+ background:#10273c;border:1px solid #487d9c;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-status-bar #realityChatStatusSummary{
+ display:block!important;overflow-wrap:anywhere;
+ max-height:none!important;-webkit-line-clamp:unset;
+ color:#e0f1fa;font-size:12px;line-height:1.55;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-inline-panels{
+ display:block;box-sizing:border-box;
+ align-self:stretch;width:100%;max-width:100%!important;
+ margin:10px 0 15px;padding:10px;
+ border-radius:13px;border:1px solid #3d7799;background:#0b2135;
+}
+@media(max-width:950px){
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-inline-panels .reality-chat-sidebar,
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-inline-panels .reality-chat-inspector{
+  position:static!important;display:flex!important;inset:auto!important;
+  top:auto!important;bottom:auto!important;left:auto!important;right:auto!important;
+  width:100%!important;max-width:100%!important;
+  min-height:0!important;height:auto!important;max-height:none!important;
+  overflow:visible!important;z-index:auto!important;
+  padding:9px!important;border:0!important;border-radius:10px!important;
+  box-shadow:none!important;background:transparent!important;
+ }
+ body[data-reality-route="chat"][data-reality-chat-panel]:not([data-reality-chat-panel=""])
+  .reality-chat-panel-scrim{display:none!important;}
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-inline-panels .reality-chat-panel-close{
+  display:block!important;margin-left:auto;min-height:42px;
+ }
+}

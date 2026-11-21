@@ -9,11 +9,13 @@
  if(!/^\/chat\/?$/.test(window.location.pathname))return;
  const get=id=>document.getElementById(id);
  const ready=get('privateReady'),inbox=get('realityChatApprovalInbox'),
-  thread=get('privateTranscript'),center=get('realityChatConversation');
- if(!ready||!inbox||!thread||!center||get('realityChatMaintenanceContinuation'))return;
+  thread=get('privateTranscript');
+ // Require only actual signed-in Chat anchors; a removed container id must not hide approval.
+ if(!ready||!inbox||!thread||get('realityChatMaintenanceContinuation'))return;
  const URL='/api/reality/personal-governed-employee-shift';
  const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
  const SHA=/^sha256:[0-9a-f]{64}$/;
+ const GIT=/^[0-9a-f]{40}$/;
  const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9][0-9]*$/;
  const KINDS=new Set(['EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
   'QUALIFIED_EVIDENCE_JOB_BLOCKED']);
@@ -45,7 +47,14 @@
  feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
  const limits=make('p','reality-chat-maintenance-limits',
   'Continuing a shift is NOT approval to install code. Each independently tested installation requires its own exact authorization.');
- actions.append(authorize,reload);
+ // One actual exact approval is now visible in Chat. The historical inbox
+ // mirror stays hidden and cannot create an alternate authorization path.
+ const installApproveInInbox=make('button','reality-chat-maintenance-approve',
+  'Approve exact verified preview repair');
+ installApproveInInbox.id='realityChatMaintenanceApprovalInboxInstall';
+ installApproveInInbox.type='button';installApproveInInbox.hidden=true;
+ installApproveInInbox.disabled=true;
+ actions.append(authorize,installApproveInInbox,reload);
  root.append(title,description,list,actions,feedback,limits);
  const anchor=get('realityChatApprovalItems');
  if(anchor)inbox.insertBefore(root,anchor);
@@ -61,35 +70,61 @@
  const hintLabel=make('p','reality-chat-maintenance-nudge-text',
   'Reality is checking your unfinished work…');
  const dialogueJobs=make('div','reality-chat-maintenance-dialogue-jobs');
+ const detailDisclosure=make('section','reality-chat-maintenance-detail-disclosure');
+ detailDisclosure.id='realityChatMaintenanceDetails';detailDisclosure.hidden=true;
+ detailDisclosure.setAttribute('aria-label','Technical repair evidence and worker detail');
  const dialogueActions=make('div','reality-chat-maintenance-dialogue-actions');
  const inlineContinue=make('button','reality-chat-maintenance-inline-authorize',
   'Continue exact unfinished repairs');
  inlineContinue.id='realityChatMaintenanceInlineAuthorize';
  inlineContinue.type='button';inlineContinue.disabled=true;
+ const installApprove=make('button','reality-chat-maintenance-inline-authorize','Approve exact verified preview repair');
+ installApprove.id='realityChatMaintenanceExactInstallApprove';
+ installApprove.type='button';installApprove.hidden=true;installApprove.disabled=true;
+ const decisionHeadline=make('strong','reality-chat-maintenance-decision-headline');
+ decisionHeadline.id='realityChatMaintenanceDecisionHeadline';decisionHeadline.hidden=true;
+ const installDetails=make('p','reality-chat-maintenance-dialogue-proof','');
+ installDetails.id='realityChatMaintenanceExactInstallDetails';installDetails.hidden=true;
+ const chatStatus=make('p','reality-chat-maintenance-chat-status',
+  'Reality is independently checking the existing shift and decision receipts.');
+ chatStatus.id='realityChatMaintenanceChatStatus';
+ chatStatus.setAttribute('role','status');chatStatus.setAttribute('aria-live','polite');
+ const checkStatusInChat=make('button','reality-chat-maintenance-check-status',
+  'Check approval status');
+ checkStatusInChat.id='realityChatMaintenanceCheckStatusInChat';
+ checkStatusInChat.type='button';checkStatusInChat.hidden=true;
+ const chatEvidence=make('section','reality-chat-maintenance-chat-evidence');
+ chatEvidence.id='realityChatMaintenanceEvidenceInChat';chatEvidence.hidden=true;
+ chatEvidence.setAttribute('aria-label','Independently verified repair and authority evidence');
  const watch=make('button','reality-chat-maintenance-watch','Follow live repairs');
  watch.id='realityChatMaintenanceWatch';watch.type='button';watch.hidden=true;
  const timeline=make('section','reality-chat-maintenance-live');
  timeline.id='realityChatMaintenanceLive';timeline.hidden=true;
  timeline.setAttribute('aria-label','Independent live repair evidence and completion receipts');
  timeline.setAttribute('aria-live','polite');
- const review=make('button','reality-chat-maintenance-nudge-open','Review evidence');
+ const review=make('button','reality-chat-maintenance-nudge-open','View details');
  review.id='realityChatMaintenanceOpen';review.type='button';
  const reply=make('button','reality-chat-maintenance-reply','Reply to Reality');
  reply.id='realityChatMaintenanceReply';reply.type='button';
  const dialogueProof=make('p','reality-chat-maintenance-dialogue-proof',
   'Source: owner-scoped signed shift and independent maintenance ledger. No installation authority is implied.');
- dialogueActions.append(inlineContinue,watch,reply,review);
- hint.append(verifiedLabel,hintLabel,dialogueJobs,dialogueActions,timeline,dialogueProof);
+ // A single decision and its readback in Chat; all verbose evidence stays
+ // available in the same message after choosing View details.
+ dialogueActions.append(inlineContinue,installApprove,checkStatusInChat,review);
+ detailDisclosure.append(chatEvidence,dialogueJobs,watch,timeline,dialogueProof,reply);
+ hint.append(verifiedLabel,hintLabel,decisionHeadline,installDetails,
+  dialogueActions,chatStatus,detailDisclosure);
  thread.append(hint);
  // The saved Chat history uses replaceChildren(). Re-attach this owner-ledger
  // projection once after each transcript reload. No new AI message or shift.
  const threadObserver=new MutationObserver(()=>{
-  if(signedIn()&&(approvedScope?.count>0||approvedScope?.finalReceipt)&&
+  if(signedIn()&&(approvedScope?.count>0||approvedScope?.finalReceipt||
+    approvedScope?.exactInstallCard||approvedScope?.exactInstallDecision)&&
      !thread.contains(hint))
    thread.append(hint);
  });
  threadObserver.observe(thread,{childList:true});
- let loading=false,authorizing=false,uncertain=false;
+ let loading=false,authorizing=false,uncertain=false,installAuthorizing=false,installUncertain=false;
  let approvedScope=null,initialized=false,watching=false;
  const signedIn=()=>ready.style.display==='block';
  const safeError=e=>String(e?.message||'SOURCE_NOT_VERIFIED').slice(0,120);
@@ -254,11 +289,48 @@
     SHA.test(a?.case_ci_receipt_sha256||'')&&
     Number.isSafeInteger(a?.github_run_id)&&a.github_run_id>10000&&
     Number.isSafeInteger(a?.github_artifact_id)&&a.github_artifact_id>10000&&
-    a.owner_approval_ready===false&&a.install_target_verified===false&&
+    a.owner_approval_ready===false&&
+    ((a.install_target_verified===false&&a.target_review_receipt_sha256==null)||
+     (a.install_target_verified===true&&
+      SHA.test(a.target_review_receipt_sha256||'')&&
+      a.target_review_branch==='reality/chat-direct-work-handoff-20261115'&&
+      GIT.test(a.target_review_head_sha||'')&&
+      GIT.test(a.historical_source_blob_sha||'')&&
+      a.target_review_existing_blob_sha===a.historical_source_blob_sha))&&
     a.installation_authorized===false&&a.repair_installed===false&&
     a.original_job_completed===false))
     verifiedArtifacts=artifacts.items;
   }
+  let exactInstallCard=null,exactInstallDecision=null;
+  const ci=data.exact_signed_maintenance_install_review;
+  if(ci?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
+   ci.owner_approval_ready===true&&ci.installation_authorized===false&&
+   ci.repair_installed===false&&ci.original_job_completed===false&&
+   ci.production_changed===false&&ci.new_shift_started===false&&
+   ci.shift_id===c.current_shift_id&&
+   c.signed_maintenance_incident_ids.includes(ci.maintenance_id)&&
+   c.items.some(j=>j.origin_incident_id===ci.maintenance_id&&j.source_ref===ci.source_ref)&&
+   verifiedArtifacts.some(a=>a.maintenance_id===ci.maintenance_id&&
+    a.install_target_verified===true&&
+    a.target_review_receipt_sha256===ci.target_review_receipt_sha256&&
+    a.candidate_commit_sha===ci.candidate_commit_sha)&&
+   UUID.test(ci.maintenance_id||'')&&UUID.test(ci.shift_id||'')&&
+   GIT.test(ci.candidate_commit_sha||'')&&
+   GIT.test(ci.candidate_source_blob_sha||'')&&
+   GIT.test(ci.target_head_sha||'')&&
+   ci.target_branch==='reality/chat-direct-work-handoff-20261115'&&
+   /^src\/[a-z0-9_./-]+\.js$/.test(ci.target_path||'')&&
+   SHA.test(ci.target_review_receipt_sha256||'')&&
+   SHA.test(ci.artifact_receipt_sha256||'')&&
+   SHA.test(ci.case_ci_receipt_sha256||''))
+   exactInstallCard=ci;
+  if(ci?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED'&&
+   ci.shift_id===c.current_shift_id&&
+   c.signed_maintenance_incident_ids.includes(ci.maintenance_id)&&
+   UUID.test(ci.approval_id||'')&&SHA.test(ci.approval_receipt_sha256||'')&&
+   ci.installation_authorized===true&&ci.owner_approval_ready===false&&
+   ci.original_job_completed===false&&ci.production_changed===false)
+   exactInstallDecision=ci;
   // Universe projection of Reality's verified classifier only. A lane is
   // evidence + NEXT governed action, never an executor or approval button.
   const route=data.governed_continuity_evidence_classification;
@@ -290,7 +362,7 @@
    classifiedLanes=route.lanes;
   return Object.freeze({
    count:c.open_count,jobs:c.items,activeId:c.current_shift_id,
-   verifiedArtifacts,classifiedLanes,
+   verifiedArtifacts,classifiedLanes,exactInstallCard,exactInstallDecision,
    activity,shiftReadback:shift,finalReceipt:terminal?{
     shift_id:terminal.shift_id,
     count:terminal.close_report.independently_verified_internal_maintenance_jobs,
@@ -309,6 +381,54 @@
  }
  function render(scope){
   approvedScope=scope;
+  decisionHeadline.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
+  decisionHeadline.textContent=scope.exactInstallCard?
+   'Approval needed · Repair ready':
+   scope.exactInstallDecision?'Approval recorded · Installation status in Chat':'';
+  checkStatusInChat.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
+  if(!installUncertain)chatStatus.textContent=scope.exactInstallCard?
+   'Ready for your one-time decision. This approves only the exact reviewed file in the isolated preview, not production.':
+   scope.exactInstallDecision?
+   'Owner approval is recorded. The verified installation-status message in Chat shows source installation and independent verification separately. Original work remains open until proven.':
+   'The original shift is preserved. Reality will only ask for authority when a verified repair is ready.';
+  chatEvidence.replaceChildren();
+  const evidence=scope.exactInstallCard||scope.exactInstallDecision;
+  if(evidence){
+   const label=(name,value)=>{
+    if(value==null||value==='')return;
+    const p=make('p','');
+    p.append(make('strong','',name+': '),make('span','',value));
+    chatEvidence.append(p);
+   };
+   label('Existing authorized shift',evidence.shift_id);
+   label('Repair',evidence.source_ref);
+   label('Target file',evidence.target_path);
+   label('Candidate commit',evidence.candidate_commit_sha);
+   label('Independent artifact receipt',evidence.artifact_receipt_sha256);
+   label('Independent frozen CI receipt',evidence.case_ci_receipt_sha256);
+   label('Independent installation-target receipt',evidence.target_review_receipt_sha256);
+   label('Installation scope','Isolated preview only; production untouched');
+   if(REF.test(evidence.source_ref||'')){
+    const link=make('a','reality-chat-maintenance-source','Open exact GitHub evidence');
+    link.href=evidence.source_ref;link.target='_blank';link.rel='noopener noreferrer';
+    chatEvidence.append(link);
+   }
+  }
+  review.textContent=detailDisclosure.hidden?'View details':'Hide details';
+  review.setAttribute('aria-expanded',String(!detailDisclosure.hidden));
+  installApprove.hidden=!scope.exactInstallCard;
+  // Readback renders while loading=true; a verified approval must be
+  // enabled AFTER render, while the click handler itself guards loading.
+  installApprove.disabled=!scope.exactInstallCard||installAuthorizing||installUncertain||authorizing;
+  // Never send the owner to a second place to approve a Chat decision.
+  installApproveInInbox.hidden=true;
+  installApproveInInbox.disabled=true;
+  installDetails.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
+  installDetails.textContent=scope.exactInstallCard?
+   'PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
+   ' passed independent review. This approves installation in the isolated preview only, not production.':
+   scope.exactInstallDecision?
+   'Approval recorded. See Reality’s verified installation-status message in this conversation for the installed commit and the independent post-installation result.':'';
   list.replaceChildren();
   root.hidden=scope.count===0;
   hint.hidden=scope.count===0&&!scope.finalReceipt;
@@ -339,28 +459,16 @@
   };
   const signedIds=new Set(scope.signedIds);
   hintLabel.textContent=scope.activeId&&scope.warrantVerified?
-   'You authorized '+scope.signedCount+' exact earlier repairs under shift '+
-   scope.activeId+'. '+(scope.outsideCount?
-    'I discovered '+scope.outsideCount+' more repair incident'+
-     (scope.outsideCount===1?'':'s')+' afterward. That work is NOT covered '+
-     'by your original authorization. ':'')+
-   'The signed repairs have not reached independent final verification. '+
-   'You can reply right here to ask what happened. No code installation was authorized.':
+   scope.exactInstallCard?
+    'Reality found a verified repair for your existing shift. One exact approval is needed before installation.':
+   scope.exactInstallDecision?
+    'Your approval is recorded. Reality tracks installed source, independent verification and the original job separately. No repeat approval is needed.':
+    'Your existing shift is still active. Reality is investigating the remaining repairs.':
    scope.activeId?
-   'I see an active shift, but its exact repair authorization is not verified. '+
-   'I cannot treat any maintenance as approved until the signed source scope is confirmed.':
+    'Reality preserved the existing shift, but must verify its authority before proceeding.':
    scope.valid?
-   'I found '+scope.count+' unfinished employee repairs from your earlier shift. '+
-   'Riley and Taylor have independently reviewed maintenance to finish. '+
-   'May I continue exactly those repairs under a signed shift? '+
-   'I will ask separately before installing any code. You can reply to ask questions.':
-   'I found unfinished employee repairs, but I cannot verify an exact signed authorization scope yet. '+
-   'Ask me about the blockers or review the source evidence.';
-  if(scope.verifiedArtifacts?.length)
-   hintLabel.textContent+=' Reality independently recorded '+
-    scope.verifiedArtifacts.length+' exact tested repair artifact'+
-    (scope.verifiedArtifacts.length===1?'':'s')+
-    '. Isolated installation review remains required; no approval was granted.';
+    'Reality found '+scope.count+' unfinished employee repairs. One exact decision can continue the existing work.':
+    'Reality found unfinished work, but its authorization is not yet verified.';
   dialogueJobs.replaceChildren();
   for(const item of scope.jobs){
    dialogueJobs.append(make('p','',
@@ -378,12 +486,13 @@
   inlineContinue.textContent='Continue '+scope.count+' unfinished repair'+
    (scope.count===1?'':'s');
   dialogueProof.textContent=scope.activeId&&scope.warrantVerified?
-   'Verified exact maintenance warrant for '+scope.signedCount+
-    ' incident(s) in shift '+scope.activeId+
-    ' · remaining proof: frozen CI, independently tested repair, exact installation approval and final receipts. '+scope.outsideCount+
-    ' later incident(s) are not authorized by that warrant.':
-   'Verified source scope from the existing owner maintenance ledger. '+
-   'Continuing a shift never grants installation approval.';
+   'Signed shift '+scope.activeId+' · '+scope.signedCount+
+   ' repairs in scope; '+scope.outsideCount+
+   ' additional incidents outside scope. '+
+   (scope.exactInstallDecision?
+    'The exact repair approval is already recorded. Do not approve again. Independent installation and verification are tracked separately.':
+    'Any further installation requires its own exact owner approval and independent receipts.'):
+   'This source readback never grants installation authority.';
   if(hint.parentElement!==thread)thread.append(hint);
   for(const item of scope.jobs){
    const card=make('article','reality-chat-maintenance-job');
@@ -413,7 +522,9 @@
   feedback.textContent=scope.activeId?
    'Existing shift: '+scope.activeId+' · '+scope.signedCount+
     ' exact signed repairs · '+scope.outsideCount+
-    ' outside-scope incidents. No installation or completed repair is implied.':
+    (scope.exactInstallDecision?
+     ' outside-scope incidents. Owner approval recorded; see the live installation message in Chat. No duplicate click.':
+     ' outside-scope incidents. This shift receipt alone does not prove installation or completion.'):
    scope.valid?'No work is started by reading this card. Press Continue to authorize the exact preserved maintenance set.':
     'Could not prepare an exact continuation; review and refresh the signed maintenance readback.';
  }
@@ -466,12 +577,13 @@
   for(const a of scope.verifiedArtifacts||[]){
    const n=a.source_ref.split('/').pop();
    line('Independent repair artifact:', 'PR #'+n+
-    ' · exact source tested; install target review still needed.');
+    (a.install_target_verified===true?' · exact target independently reviewed.':' · exact source tested; install target review still needed.'));
    line('Candidate commit:',a.candidate_commit_sha);
    line('Independent CI run:',String(a.github_run_id));
    digest('Review artifact receipt:',a.review_receipt_sha256);
    digest('Frozen RED/GREEN:',a.case_ci_receipt_sha256);
-   line('Authority:', 'No installation approval; no original-job completion.');
+   if(a.install_target_verified===true)digest('Independent target proof:',a.target_review_receipt_sha256);
+   line('Authority:',scope.exactInstallDecision?'Owner install permission recorded; original not completed.':'No installation approval; no original-job completion.');
   }
   if(scope.classifiedLanes?.length){
    const header=make('strong','reality-chat-maintenance-live-title',
@@ -543,32 +655,59 @@
   return parse(data);
  }
  async function refresh(){
-  if(!signedIn()||loading||authorizing)return;
+  if(!signedIn()||loading||authorizing||installAuthorizing)return;
   loading=true;reload.disabled=true;
   try{
    const scope=await read();
    // A previous uncertain POST is never silently retried. This button is
    // only unlocked after an explicit source-backed Check status.
+   // A background refresh MUST NOT unlock a failed/unknown owner POST.
+   // Only a separate explicit Check status read can establish its outcome.
    uncertain=false;
    render(scope);
   }catch(e){
-   approvedScope=null;authorize.disabled=true;
-   inlineContinue.disabled=true;root.hidden=false;hint.hidden=true;
+   approvedScope=null;authorize.disabled=true;installApprove.disabled=true;
+   installDetails.hidden=true;installDetails.textContent='';
+   installApprove.hidden=true;
+   installApproveInInbox.disabled=true;installApproveInInbox.hidden=true;
+   inlineContinue.disabled=true;root.hidden=false;hint.hidden=false;
+   checkStatusInChat.hidden=false;decisionHeadline.hidden=true;
    title.textContent='Maintenance verification unavailable';
    list.replaceChildren();
+   hintLabel.textContent='Reality could not independently retrieve the live maintenance ledger. Your earlier shift is not restarted, and no approval is inferred.';
+   chatStatus.textContent='Source readback unavailable ('+safeError(e)+
+    '). You can check the exact approval status right here without retrying an approval.';
    description.textContent='Reality cannot independently read the unfinished maintenance ledger.';
-   feedback.textContent='No approval submitted. '+safeError(e)+'. Try Check status.';
-  }finally{loading=false;reload.disabled=false}
+   feedback.textContent='Approval not confirmed. '+safeError(e)+'. Check status in Chat.';
+   if(!thread.contains(hint))thread.append(hint);
+  }finally{
+   loading=false;reload.disabled=false;
+   // The full shift read can time out while the tiny, owner-scoped exact
+   // decision RPC is healthy. GET never approves or installs anything.
+   if(!approvedScope)void checkExactOwnerApprovalStatus();
+  }
  }
  function showApprovals(){
   if(!signedIn())return;
-  const panel=get('realityChatOpenInspector');
-  if(window.matchMedia('(max-width:950px)').matches&&
-     document.body.dataset.realityChatPanel!=='work')panel?.click();
-  get('realityChatTabApprovals')?.click();
-  root.scrollIntoView({behavior:'smooth',block:'nearest'});
+  detailDisclosure.hidden=false;
+  chatEvidence.hidden=false;
+  review.textContent='Hide details';
+  review.setAttribute('aria-expanded','true');
+  hint.scrollIntoView({behavior:'smooth',block:'nearest'});
  }
- review.addEventListener('click',showApprovals);
+ review.addEventListener('click',()=>{
+  if(!signedIn())return;
+  detailDisclosure.hidden=!detailDisclosure.hidden;
+  chatEvidence.hidden=detailDisclosure.hidden;
+  review.textContent=detailDisclosure.hidden?'View details':'Hide details';
+  review.setAttribute('aria-expanded',String(!detailDisclosure.hidden));
+ });
+ checkStatusInChat.addEventListener('click',()=>{
+  if(!signedIn()||loading||installAuthorizing)return;
+  // Always use the small, owner-scoped read. Never route a status check
+  // back through the broad 25-second shift snapshot that just timed out.
+  void checkExactOwnerApprovalStatus();
+ });
  reply.addEventListener('click',()=>{
   if(!signedIn())return;
   // A reply is an ordinary saved owner Chat turn; it never consumes a
@@ -580,7 +719,225 @@
   // which freshly re-reads the scope and refuses an uncertain duplicate.
   if(!inlineContinue.disabled&&!authorize.disabled)authorize.click();
  });
- reload.addEventListener('click',()=>{if(!authorizing)void refresh()});
+ installApproveInInbox.addEventListener('click',()=>{
+  // Delegate to EXACT same owner click transport; no second approval request.
+  if(!installApproveInInbox.disabled&&!installApprove.disabled)installApprove.click();
+ });
+ installApprove.addEventListener('click',async()=>{
+  // No model, assistant message or ordinary Chat reply can press this.
+  // The server independently re-reads and compares the exact current
+  // owner-scoped artifact before accepting a one-use approval. Do not insert
+  // an expensive/unreliable duplicate full-shift GET between an explicit
+  // owner click and its one authorized POST.
+  if(!signedIn()||loading||authorizing||installAuthorizing||
+   installUncertain||installApprove.disabled||!approvedScope?.exactInstallCard)
+   return;
+  const prior=approvedScope.exactInstallCard;
+  installAuthorizing=true;installApprove.disabled=true;installApproveInInbox.disabled=true;reload.disabled=true;
+  try{
+   // This is the exact receipt the owner reviewed; never replace it with
+   // model content. The service-only approval endpoint MUST recheck it
+   // against the live ledger before recording any installation authority.
+   const c=prior;
+   if(typeof crypto?.randomUUID!=='function')
+    fail('SECURE_REQUEST_ID_UNAVAILABLE');
+   feedback.textContent='Recording one exact preview installation approval. The existing shift will continue automatically.';
+   chatStatus.textContent='Recording your one-use preview approval. Installation and the original job are not yet verified.';
+   const response=await fetch('/api/reality/signed-maintenance-exact-install-approval',{
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+     maintenance_id:c.maintenance_id,shift_id:c.shift_id,
+     candidate_commit_sha:c.candidate_commit_sha,
+     target_review_receipt_sha256:c.target_review_receipt_sha256,
+     intent:'OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR',
+     request_id:crypto.randomUUID()
+    }),signal:AbortSignal.timeout(55000)
+   });
+   const r=await response.json().catch(()=>null);
+   if(!response.ok||r?.ok!==true||
+    r.status!=='EXACT_SIGNED_OWNER_APPROVAL_RECORDED_AUTO_CONTINUATION'||
+    r.shift_id!==c.shift_id||r.maintenance_id!==c.maintenance_id||
+    !UUID.test(r.approval_id||'')||!SHA.test(r.approval_receipt_sha256||'')||
+    r.installation_authorized!==true||
+    r.installation_completed!==false||r.original_job_completed!==false||
+    r.production_changed!==false||r.new_shift_started!==false||
+    r.no_third_confirmation!==true)
+    fail('EXACT_INSTALL_APPROVAL_OUTCOME_UNVERIFIED');
+   installUncertain=true;
+   installApprove.hidden=true;installApprove.disabled=true;
+   installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
+   hintLabel.textContent='Reality recorded the exact owner approval. The SAME signed shift must now install, independently verify and resume the unfinished work.';
+   feedback.textContent='Owner approval receipt '+r.approval_receipt_sha256+
+    ' recorded. No repeat approval or shift restart. Installation and final job verification are pending.';
+   chatStatus.textContent='Approval recorded · '+r.approval_receipt_sha256+
+    '. Reality must now install, independently verify, and resume the SAME shift. No second click.';
+   // A successful signed decision is already a verified receipt. A broad
+   // shift refresh must not overwrite it with an unrelated GET timeout.
+  }catch(e){
+   installUncertain=true;installApprove.disabled=true;installApproveInInbox.disabled=true;
+   feedback.textContent='The exact installation decision could not be independently confirmed ('+
+    safeError(e)+'). Use Check status before any further action. No automatic retry.';
+   chatStatus.textContent='Approval outcome unverified ('+safeError(e)+
+    '). Tap Check approval status here in Chat. Do not approve again.';
+  }finally{installAuthorizing=false;reload.disabled=false}
+ });
+ // Narrow, authenticated ledger readback permits an owner to review the
+ // exact independently tested artifact even if the unrelated broad shift
+ // dashboard is overloaded. Every POST separately revalidates all hashes.
+ function renderExactReviewFromNarrowReadback(card){
+  if(!card||!UUID.test(card.maintenance_id||'')||
+     !UUID.test(card.shift_id||'')||
+     !REF.test(card.source_ref||'')||
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/.test(card.source_ref)||
+     card.target_branch!=='reality/chat-direct-work-handoff-20261115'||
+     !/^src\/[a-z0-9_./-]+\.js$/.test(card.target_path||'')||
+     card.target_path.includes('..')||
+     !GIT.test(card.candidate_commit_sha||'')||
+     !GIT.test(card.candidate_source_blob_sha||'')||
+     !GIT.test(card.target_head_sha||'')||
+     !GIT.test(card.expected_old_blob_sha||'')||
+     !SHA.test(card.artifact_receipt_sha256||'')||
+     !SHA.test(card.case_ci_receipt_sha256||'')||
+     !SHA.test(card.target_review_receipt_sha256||''))
+   fail('NARROW_EXACT_ARTIFACT_READBACK_INVALID');
+  approvedScope=Object.freeze({exactInstallCard:Object.freeze(card)});
+  root.hidden=true;
+  hint.hidden=false;
+  hintLabel.textContent='Reality verified PR #'+card.source_ref.split('/').pop()+
+   ' for your existing shift. The larger work report is delayed, but this exact approval was independently read from the ledger.';
+  decisionHeadline.hidden=false;
+  decisionHeadline.textContent='Your decision · Verified preview repair';
+  installDetails.hidden=false;
+  installDetails.textContent='Approve only '+card.target_path+
+   ' in Reality’s isolated preview. Production is unchanged.';
+  checkStatusInChat.hidden=false;
+  installApprove.hidden=false;
+  installApprove.disabled=false;
+  installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
+  inlineContinue.hidden=true;
+  watch.hidden=true;
+  chatEvidence.replaceChildren();
+  for(const [label,value] of [
+   ['Original shift',card.shift_id],
+   ['Exact repair',card.source_ref],
+   ['Candidate commit',card.candidate_commit_sha],
+   ['Independent frozen test',card.case_ci_receipt_sha256],
+   ['Independent artifact receipt',card.artifact_receipt_sha256],
+   ['Independent target proof',card.target_review_receipt_sha256],
+   ['Installation scope','Isolated preview only; not production']
+  ]){
+   const p=make('p','');
+   p.append(make('strong','',label+': '),make('span','',value));
+   chatEvidence.append(p);
+  }
+  detailDisclosure.hidden=true;chatEvidence.hidden=true;
+  review.textContent='View details';
+  review.setAttribute('aria-expanded','false');
+  chatStatus.textContent='Checked: no previous approval was recorded. This exact reviewed repair is ready for one explicit owner decision.';
+  feedback.textContent='Owner decision readback verified. No installation was authorized by checking status.';
+  if(!thread.contains(hint))thread.append(hint);
+ }
+ async function checkExactOwnerApprovalStatus(){
+  if(!signedIn()||loading||authorizing||installAuthorizing)return;
+  reload.disabled=true;
+  try{
+   // Read-only owner-scoped GET. This never retries the earlier POST,
+   // creates another request ID, or invokes an installer.
+   const response=await fetch('/api/reality/signed-maintenance-exact-install-approval',{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(23000)
+   });
+   const r=await response.json().catch(()=>null);
+   if(!response.ok||r?.ok!==true||r.retry_owner_approval!==false)
+    fail('EXACT_OWNER_APPROVAL_STATUS_UNVERIFIED_'+(r?.failed_stage||response.status));
+   if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK'&&
+      r.owner_approval_recorded===true&&r.installation_authorized===true&&
+      SHA.test(r.approval_receipt_sha256||'')){
+    // Approval is immutable, but installed source and independent verification
+    // advance separately. Never imply that a verified installed commit is
+    // uninstalled or that GitHub success alone settled the repair.
+    const installed=['INSTALLED','VERIFIED'].includes(r.decision_state)&&
+     r.repair_installed===true&&GIT.test(r.installed_commit_sha||'');
+    const verified=installed&&r.decision_state==='VERIFIED'&&
+     r.postinstall_verified===true&&
+     SHA.test(r.independent_postinstall_receipt_sha256||'');
+    if((['INSTALLED','VERIFIED'].includes(r.decision_state)&&!installed)||
+       (r.decision_state==='VERIFIED'&&!verified))
+     fail('EXACT_POSTINSTALL_RECEIPT_CONTRADICTORY');
+    installUncertain=true;
+    installApprove.hidden=true;installApprove.disabled=true;
+    installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
+    hint.hidden=false;
+    checkStatusInChat.hidden=false;
+    const number=String(r.source_ref||'').split('/').pop();
+    const title=verified?'Independent repair verification recorded':
+     installed?'Repair installed · Independent verification pending':
+     'Owner approval recorded · Installation not yet verified';
+    decisionHeadline.hidden=false;
+    decisionHeadline.textContent=title;
+    hintLabel.textContent=verified?
+     'Reality independently verified the installed repair for PR #'+number+
+     '. Original business work remains a separate unfinished acceptance gate.':
+     installed?
+     'Reality installed PR #'+number+
+     ' in the isolated preview. Independent verification is not yet recorded. No repeat approval.':
+     'Reality independently read back your exact owner approval. The installation step is still separate. No repeat approval.';
+    if(!thread.contains(hint))thread.append(hint);
+    feedback.textContent=verified?
+     'Repair verification receipt '+r.independent_postinstall_receipt_sha256+
+     ' recorded. Original job completion still requires independent proof.':
+     installed?
+     'Installed commit '+r.installed_commit_sha+
+     ' verified in the owner ledger; waiting for the separate post-installation receipt.':
+     'Exact owner approval receipt '+r.approval_receipt_sha256+
+     ' verified. Installation is separately governed; no repeat approval.';
+    installDetails.hidden=false;
+    installDetails.textContent=verified?
+     'Installed commit '+r.installed_commit_sha+
+     ' was independently accepted. Original work is not yet settled.':
+     installed?
+     'Installed commit '+r.installed_commit_sha+
+     ' is recorded in the isolated preview. Independent post-install verification is pending.':
+     'Approval is recorded. Reality has not yet verified an installed commit.';
+    chatStatus.textContent='PR #'+number+' · '+title+
+     '. The existing shift remains open until its own work is independently reconciled.';
+    return;
+   }
+   if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK'&&
+      r.owner_approval_recorded===false&&r.installation_authorized===false){
+    if(!r.exact_review)fail('NARROW_EXACT_REVIEW_MISSING');
+    // No automatic retry or approval: this renders only the exact evidence.
+    renderExactReviewFromNarrowReadback(r.exact_review);
+    installUncertain=false;
+    return;
+   }
+   if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_SCOPE_UNAVAILABLE'&&
+      r.owner_approval_recorded===false){
+    installUncertain=true;
+    installApprove.disabled=true;installApproveInInbox.disabled=true;
+    feedback.textContent='No current exact approval scope is available. Installation remains blocked; do not retry.';
+    chatStatus.textContent='Checked: no verified exact approval scope is available. Installation is blocked. Do not retry.';
+    return;
+   }
+   fail('EXACT_OWNER_APPROVAL_STATUS_CONTRADICTORY');
+  }catch(e){
+   installUncertain=true;
+   installApprove.disabled=true;installApproveInInbox.disabled=true;
+   feedback.textContent='Exact approval readback is still unverified ('+
+    safeError(e)+'). No automatic retry or new shift.';
+   chatStatus.textContent='Check failed ('+safeError(e)+
+    '). Reality cannot verify the decision yet. No duplicate click, install, or shift restart.';
+  }finally{reload.disabled=false}
+ }
+ reload.addEventListener('click',()=>{
+  if(authorizing)return;
+  // Check status uses the narrow signed owner receipt even after a page
+  // reload has cleared the previous browser-only uncertainty flag.
+  if(installUncertain||approvedScope?.exactInstallCard||
+     approvedScope?.exactInstallDecision)void checkExactOwnerApprovalStatus();
+  else void refresh();
+ });
  authorize.addEventListener('click',async()=>{
   // The only POST path in this module is this REAL owner button event.
   if(authorizing||loading||uncertain||!signedIn()||
@@ -656,8 +1013,10 @@
    authorize.disabled=true;inlineContinue.disabled=true;
    hint.hidden=false;
    hintLabel.textContent='I could not verify whether the continuation request was recorded. '+
-    'Please choose Check status in Work before trying anything again. '+
+    'Please use Check status here in Chat before trying anything again. '+
     'I will not issue a duplicate authorization.';
+   checkStatusInChat.hidden=false;
+   chatStatus.textContent='Continuation authorization status unverified. Tap Check approval status here; never repeat an uncertain owner request.';
    dialogueJobs.replaceChildren();
    feedback.textContent='Authorization could not be independently confirmed ('+
     safeError(e)+'). Use Check status first. Do not press Continue again until Reality proves there is no active shift.';
@@ -669,6 +1028,8 @@
    initialized=false;approvedScope=null;watching=false;
    root.hidden=true;hint.hidden=true;timeline.hidden=true;
    authorize.disabled=true;inlineContinue.disabled=true;watch.disabled=true;
+   installApprove.hidden=true;installApprove.disabled=true;
+   installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
   }
  });
  signObserver.observe(ready,{attributes:true,attributeFilter:['style']});

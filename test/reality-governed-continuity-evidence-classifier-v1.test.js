@@ -108,3 +108,49 @@ test('unsigned or malformed identity is rejected before any classification',()=>
  assert.equal(classify({ownerId:'bad',shiftId:shift,
   originalGate,artifactReadback:readback}).lane_count,0);
 });
+
+
+test('a DIFFERENT signed target-review receipt advances the SAME original classification without approval',()=>{
+ const reviewed={...artifact,
+  install_target_verified:true,
+  target_review_receipt_sha256:'sha256:'+'9'.repeat(64),
+  target_review_branch:'reality/chat-direct-work-handoff-20261115',
+  target_review_head_sha:'d'.repeat(40),
+  historical_source_blob_sha:'c'.repeat(40),
+  target_review_existing_blob_sha:'c'.repeat(40)
+ };
+ const classified=call(originalGate,{...readback,items:[reviewed]});
+ assert.equal(classified.lanes.length,2);
+ const repair=classified.lanes.find(x=>x.lane_kind==='INTERNAL_CAPABILITY_REPAIR');
+ assert.ok(repair);
+ assert.equal(repair.install_target_verified,true);
+ assert.equal(repair.classified_state,
+  'EXACT_ARTIFACT_INSTALL_TARGET_INDEPENDENTLY_VERIFIED_APPROVAL_PENDING');
+ assert.equal(repair.next_governed_action,
+  'EXACT_OWNER_APPROVAL_AND_ORIGINAL_RESUME_CONTRACT_REQUIRED');
+ assert.equal(repair.owner_approval_ready,false);
+ assert.equal(repair.execution_permitted_by_classification,false);
+ assert.equal(classified.original_job_completed,false);
+ assert.equal(classified.installation_authorized,false);
+ const canonical=classified.lanes.find(x=>x.lane_kind==='CANONICAL_BUSINESS_ORIGINAL');
+ assert.equal(canonical.next_governed_action,
+  'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI');
+});
+
+test('an apparently reviewed source without exact ledger proof is never install-ready',()=>{
+ for(const updates of [
+  {install_target_verified:true,target_review_receipt_sha256:null},
+  {install_target_verified:true,target_review_receipt_sha256:'sha256:'+'9'.repeat(64),
+   target_review_branch:'main',target_review_head_sha:'d'.repeat(40),
+   historical_source_blob_sha:'c'.repeat(40),target_review_existing_blob_sha:'c'.repeat(40)},
+  {install_target_verified:true,target_review_receipt_sha256:'sha256:'+'9'.repeat(64),
+   target_review_branch:'reality/chat-direct-work-handoff-20261115',
+   target_review_head_sha:'d'.repeat(40),
+   historical_source_blob_sha:'c'.repeat(40),target_review_existing_blob_sha:'0'.repeat(40)}
+ ]){
+  const out=call(originalGate,{...readback,items:[{...artifact,...updates}]});
+  assert.equal(out.lanes.some(x=>x.lane_kind==='INTERNAL_CAPABILITY_REPAIR'),false);
+  assert.equal(out.installation_authorized,false);
+  assert.equal(out.original_job_completed,false);
+ }
+});

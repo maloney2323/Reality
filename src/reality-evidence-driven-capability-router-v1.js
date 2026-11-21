@@ -1,0 +1,165 @@
+// Reality's job-agnostic transition router.
+// The ledger chooses the next required capability. Code registers *types* of
+// safe executors, never PR numbers, customers, issue IDs or guessed outcomes.
+// A registry slot does not grant authority: the selected executor must still
+// independently claim and verify its exact signed service-role warrant.
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+const KEY=/^[A-Z][A-Z0-9_]{3,110}$/;
+const SHA=/^sha256:[a-f0-9]{64}$/;
+const URL=/^https:\/\/[a-z0-9.-]+(?:\/[a-zA-Z0-9._~!$&'()*+,;=:@%/?#-]*)?$/i;
+const stop=code=>{throw Error('GOVERNED_CAPABILITY_ROUTER_'+code)};
+const bounded=(status,other={})=>Object.freeze({
+ status,...other,executor_invoked:false,receipt_verified:false,
+ external_effect_performed:false,repair_executed:false,
+ installation_authorized:false,original_job_completed:false,
+ production_changed:false,new_shift_started:false
+});
+const safeRef=v=>typeof v==='string'&&v.length<=500&&URL.test(v)&&
+ !v.includes('@')&&!v.includes('..')&&!v.includes('#')&&
+ !v.includes('?');
+const rightOwner=(h,ownerId,shiftId)=>h&&
+ h.status==='SIGNED_OWNER_SHIFT_HANDOFF_HEALTH_READ_ONLY'&&
+ h.owner_id===ownerId&&h.shift_id===shiftId&&
+ h.read_only===true&&h.installation_authorized===false&&
+ h.original_job_completed===false&&h.production_changed===false&&
+ h.new_shift_started===false&&
+ Array.isArray(h.maintenance_handoffs)&&h.maintenance_handoffs.length<=8&&
+ Number.isSafeInteger(h.original_claim_count)&&
+ Number.isSafeInteger(h.original_independent_final_receipt_count);
+
+// This is a single common obligation evaluator for an arbitrary collection of
+// verified work. It reads the DB's next-action receipt rather than assigning a
+// procedural chain based on an issue number, source domain or work title.
+export function planGovernedCapabilitiesFromOwnerReceipts({
+ health,ownerId,shiftId,registeredActionKeys=[]
+}={}){
+ if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+    !rightOwner(health,ownerId,shiftId)||
+    !Array.isArray(registeredActionKeys)||registeredActionKeys.length>32||
+    registeredActionKeys.some(x=>!KEY.test(x)))
+  stop('SIGNED_OWNER_WORK_LEDGER_REQUIRED');
+ const registered=new Set(registeredActionKeys);
+ const pending=[];
+ function add({sourceRef,action,authority,proof,origin}){
+  if(!safeRef(sourceRef)||!KEY.test(action||'')||
+     !['APPROVED_EXACT_SOURCE_SCOPE','SIGNED_EXISTING_WARRANT',
+       'NO_ADDITIONAL_AUTHORITY'].includes(authority)||
+     !['SOURCE_RECHECKED','MISSING_INDEPENDENT_FROZEN_PROOF',
+       'INDEPENDENT_REPAIR_VERIFIED','OWNER_AUTHORITY_PENDING',
+       'MISSING_ORIGINAL_JOB'].includes(proof))return;
+  // No duplicate action for the same exact source; only truthful pending
+  // obligation. Do not auto-run approved-scope work through a maintenance
+  // warrant adapter.
+  if(pending.some(p=>p.source_ref===sourceRef&&p.next_action===action))return;
+  const ownerRequired=proof==='OWNER_AUTHORITY_PENDING';
+  pending.push(Object.freeze({
+   source_ref:sourceRef,capability_key:action,next_action:action,
+   authority_basis:authority,evidence_state:proof,origin,
+   execution_route:ownerRequired?'OWNER_CLICK_REQUIRED':
+    registered.has(action)?'REGISTERED_CAPABILITY_AVAILABLE':
+     'REGISTERED_CAPABILITY_MISSING',
+   next_actor:ownerRequired?'OWNER':'REALITY',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+ }
+ const scope=health.repair_scope;
+ if(scope&&safeRef(scope.source_ref)&&
+   ['PREPARED','APPROVED','SOURCE_RECHECKED'].includes(scope.state)&&
+   KEY.test(scope.next_action||'')){
+  const approved=scope.state!=='PREPARED'&&
+   scope.work_scope_approved===true&&
+   SHA.test(scope.owner_approval_receipt||'');
+  const safePhase=scope.state==='PREPARED'?true:approved;
+  if(safePhase&&scope.independent_frozen_ci_after_approval_verified===false){
+   add({sourceRef:scope.source_ref,action:scope.next_action,
+    authority:approved?'APPROVED_EXACT_SOURCE_SCOPE':'NO_ADDITIONAL_AUTHORITY',
+    proof:scope.state==='PREPARED'?'OWNER_AUTHORITY_PENDING':
+     scope.state==='APPROVED'?'SOURCE_RECHECKED':
+     'MISSING_INDEPENDENT_FROZEN_PROOF',
+    origin:'EXACT_OWNER_SCOPE_LEDGER'});
+  }
+ }
+ for(const m of health.maintenance_handoffs){
+  if(!safeRef(m?.source_ref)||!KEY.test(m?.next_action||''))continue;
+  if(m.status==='REPAIR_INDEPENDENTLY_VERIFIED_PREVIEW_ONLY'&&
+     typeof m.independent_install_verified_at==='string'){
+   // Post-install original settlement is *not* executable without a
+   // separately admitted original work identity and its own final warrant.
+   if(health.original_claim_count===0)continue;
+   add({sourceRef:m.source_ref,action:m.next_action,
+    authority:'NO_ADDITIONAL_AUTHORITY',
+    proof:'INDEPENDENT_REPAIR_VERIFIED',origin:'SIGNED_MAINTENANCE_LEDGER'});
+  }else if(m.status===
+    'REPAIR_NEEDS_CASE_SPECIFIC_FROZEN_CI_OR_SOURCE_REQUALIFICATION'){
+   add({sourceRef:m.source_ref,action:m.next_action,
+    authority:'SIGNED_EXISTING_WARRANT',
+    proof:'MISSING_INDEPENDENT_FROZEN_PROOF',
+    origin:'SIGNED_MAINTENANCE_LEDGER'});
+  }
+ }
+ return bounded('GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN',{
+  owner_id:ownerId,shift_id:shiftId,
+  registered_capability_count:registered.size,
+  candidate_count:pending.length,
+  executable_registered_count:pending.filter(x=>
+   x.execution_route==='REGISTERED_CAPABILITY_AVAILABLE').length,
+  missing_capability_count:pending.filter(x=>
+   x.execution_route==='REGISTERED_CAPABILITY_MISSING').length,
+  owner_decision_count:pending.filter(x=>
+   x.execution_route==='OWNER_CLICK_REQUIRED').length,
+  source_actions:Object.freeze(pending),read_only:true
+ });
+}
+
+// The *only* dispatch point. The caller supplies a trusted registered
+// capability handler. No dynamic imports, eval, arbitrary endpoint or
+// model-generated handler. A receipt with missing authority cannot execute.
+// The handler must independently verify its own DB warrant on this wake.
+export async function invokeOneRegisteredSignedCapability({
+ wake,graph,action,authorityBasis,handler,env=process.env
+}={}){
+ if(env.VERCEL_ENV!=='preview'||!UUID.test(graph?.owner_id||'')||
+    !UUID.test(graph?.shift_id||'')||
+    graph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+    graph.installation_authorized!==false||
+    graph.production_changed!==false||
+    wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    wake.shift_id!==graph.shift_id||
+    !KEY.test(action||'')||
+    authorityBasis!=='SIGNED_EXISTING_WARRANT')
+  return bounded('REGISTERED_CAPABILITY_SIGNED_AUTHORITY_NOT_VERIFIED',{
+   requested_capability:KEY.test(action||'')?action:null
+  });
+ if(typeof handler!=='function')
+  return bounded('REGISTERED_CAPABILITY_EXECUTOR_NOT_CONNECTED',{
+   requested_capability:action,
+   next_actor:'REALITY',
+   next_action:'REGISTER_AND_INDEPENDENTLY_TEST_CAPABILITY_ADAPTER'
+  });
+ let result;
+ try{result=await handler();}catch{
+  return bounded('REGISTERED_CAPABILITY_HANDLER_FAILED_SOURCE_RECHECK_REQUIRED',{
+   requested_capability:action,next_actor:'REALITY',
+   next_action:'INVESTIGATE_REGISTERED_CAPABILITY_PROVIDER_FAILURE'
+  });
+ }
+ if(!result||typeof result!=='object'||typeof result.status!=='string'||
+    result.installation_authorized!==false||
+    result.original_job_completed!==false||
+    result.production_changed!==false||
+    result.repair_executed!==false||
+    result.new_shift_started===true)
+  return bounded('REGISTERED_CAPABILITY_EXECUTION_RECEIPT_UNVERIFIED',{
+   requested_capability:action,next_actor:'REALITY',
+   next_action:'INDEPENDENTLY_RECONCILE_REGISTERED_EXECUTOR_OUTCOME'
+  });
+ // Preserve the native registered executor's real result and verification
+ // flags; a dispatch receipt is never a frozen-CI verdict or final job.
+ return Object.freeze({...result,
+  router_status:'REGISTERED_CAPABILITY_HANDLER_INVOKED',
+  registered_capability:action,governed_shift_id:graph.shift_id,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false,new_shift_started:false
+ });
+}

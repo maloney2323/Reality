@@ -55,7 +55,10 @@ test('the ORIGINAL send control is mounted inside the bordered message field and
  assert.match(workspace,/inputRow=node\('div','reality-chat-input-row'\)/);
  assert.match(workspace,/inputRow\.append\(get\('privatePrompt'\),get\('privateSend'\)\)/);
  assert.match(workspace,/composer\.append\(inputRow\)/);
- assert.match(workspace,/conversation\.insertBefore\(statusBar,composer\)/);
+ assert.match(workspace,/transcript\.append\(statusBar\)/);
+ assert.match(workspace,/statusBar\.setAttribute\('role','status'\)/);
+ assert.doesNotMatch(workspace,/conversation\.insertBefore\(statusBar,composer\)/);
+ assert.doesNotMatch(workspace,/statusExpand\.textContent/);
  assert.match(workspace,/send\.textContent='Send'/);
  assert.match(workspace,/send\.setAttribute\('aria-label','Send message to Reality'\)/);
  assert.match(css,/\.reality-chat-input-row\{/);
@@ -93,4 +96,21 @@ test('all implementation scripts parse without a new execution or owner-approval
  assert.match(html,/id="realityChatComposer"/);
  assert.ok((css.match(/\{/g)||[]).length>25);
  assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
+});
+
+test('Chat status and Work panels are inline messages; no mobile modal or mid-chat popup',()=>{
+ assert.match(workspace,/const inlinePanels=node\('article','bubble reality-chat-inline-panels'\)/);
+ assert.match(workspace,/transcript\.append\(inlinePanels\)/);
+ assert.match(workspace,/const inlineScreen=\(\)=>window\.matchMedia\('\(max-width:950px\)'\)\.matches/);
+ assert.match(workspace,/inlinePanels\.replaceChildren\(next==='history'\?sidebar:inspector\)/);
+ assert.match(workspace,/function restorePanelNodes\(\)/);
+ assert.match(workspace,/inlinePanels\.hidden=true/);
+ assert.match(workspace,/statusBar\.hidden=!valid/);
+ assert.match(workspace,/\(\?:null\)\+/);
+ assert.doesNotMatch(workspace,/statusExpand|statusBar\.dataset\.expanded|conversation\.insertBefore\(statusBar,composer\)/);
+ const frame=read('reality-chat-workspace-v1.css');
+ assert.match(frame,/\.reality-chat-inline-panels \.(?:reality-chat-sidebar|reality-chat-inspector)/);
+ assert.match(frame,/\.reality-chat-panel-scrim\{display:none!important\}/);
+ assert.match(frame,/\.reality-chat-status-bar\[hidden\]/);
+ assert.doesNotMatch(workspace,/\bfetch\s*\(/);
 });

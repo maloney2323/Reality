@@ -22,18 +22,24 @@ const receipt={ok:true,status:'OWNER_LATEST_SIGNED_SHIFT_CHAT_WAKE_VERIFIED',
 function harness(payload=receipt,httpStatus=200){
  const callbacks={};
  const el=()=>({
-  hidden:false,style:{},children:[],setAttribute(){},
-  append(...children){this.children.push(...children)},
-  insertBefore(child){this.children.unshift(child)},
+  hidden:false,style:{},children:[],parentElement:null,setAttribute(){},
+  append(...children){for(const c of children){this.children.push(c);c.parentElement=this}},
+  contains(node){return this===node||this.children.some(c=>c.contains?.(node))},
+  remove(){const p=this.parentElement;if(!p)return;
+   p.children=p.children.filter(c=>c!==this);this.parentElement=null},
+  addEventListener(){},
   scrollIntoView(){}
  });
- const composer=el(),document={
+ const composer=el(),transcript=el(),document={
   readyState:'complete',
   createElement:el,
-  getElementById:id=>id==='realityChatComposer'?composer:null,
+  getElementById:id=>id==='realityChatComposer'?composer:
+   id==='privateTranscript'?transcript:null,
   addEventListener(){}
  };
+ const store=new Map();
  const window={addEventListener(name,fn){callbacks[name]=fn},
+  sessionStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},
   realityActiveConversationId:()=>conversation};
  const calls=[];
  const fetch=async (url,opts)=>{
@@ -44,21 +50,25 @@ function harness(payload=receipt,httpStatus=200){
  };
  runInNewContext(script,{document,window,
   location:{pathname:'/chat'},localStorage:{setItem(){}},
-  fetch,AbortSignal,console});
- return {composer,callbacks,calls};
+  fetch,AbortSignal,console,
+  MutationObserver:class{observe(){}disconnect(){}}
+ });
+ return {composer,transcript,callbacks,calls};
 }
 const settle=async()=>{for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve))};
 
-test('signed wake is automatically visible directly ABOVE Chat composer with no clicks',async()=>{
+test('signed wake is a scrollable chat receipt, not a fixed composer obstruction',async()=>{
  const x=harness();
  await settle();
  assert.equal(x.calls.length,1);
  assert.equal(x.calls[0].url,'/api/reality/personal-chat-existing-shift-status');
  assert.equal(x.calls[0].opts.method,'GET');
- const panel=x.composer.children[0];
+ assert.equal(x.composer.children.length,0);
+ const panel=x.transcript.children[0];
  assert.equal(panel.id,'realityChatExistingShiftHandoff');
  assert.equal(panel.hidden,false);
- assert.match(panel.children[0].textContent,/EXISTING SHIFT HANDOFF VERIFIED/);
+ assert.match(panel.children[0].children[0].textContent,/EXISTING SHIFT HANDOFF VERIFIED/);
+ assert.equal(panel.children[0].children[1].textContent,'×');
  assert.match(panel.children[1].textContent,/19637/);
  assert.match(panel.children[2].textContent,/independent case-specific failure tests/);
  assert.doesNotMatch(panel.children[1].textContent,/job completed/i);
@@ -67,13 +77,15 @@ test('signed wake is automatically visible directly ABOVE Chat composer with no 
 test('unsupported or authority-inflated receipt cannot be displayed as verified',async()=>{
  const x=harness({...receipt,original_job_completed:true});
  await settle();
- assert.equal(x.composer.children[0].hidden,true);
+ assert.equal(x.transcript.children.length,0);
+ assert.equal(x.composer.children.length,0);
 });
 
 test('no saved owner wake stays quiet instead of inventing a receipt',async()=>{
  const x=harness({ok:true,status:'NO_OWNER_ACTIVE_SIGNED_SHIFT_CHAT_WAKE'});
  await settle();
- assert.equal(x.composer.children[0].hidden,true);
+ assert.equal(x.transcript.children.length,0);
+ assert.equal(x.composer.children.length,0);
 });
 
 test('read-only status endpoint remains independent of selected saved conversation',()=>{
