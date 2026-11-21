@@ -19,6 +19,9 @@ on:
       - 'src/reality-signed-repair-scope-handoff-v1.js'
       - 'src/reality-verified-repair-progress-projection-v1.js'
       - 'src/reality-evidence-driven-capability-router-v1.js'
+      - 'src/reality-signed-original-lineage-packet-v1.js'
+      - 'supabase/migrations/20261121143000_signed_original_source_lineage_packet_v1.sql'
+      - 'test/reality-signed-original-lineage-packet-v1.test.js'
       - 'test/reality-evidence-driven-capability-router-v1.test.js'
       - 'test/reality-signed-worker-db-claim-provider-latency-v1.test.js'
       - 'api/reality/personal-handoff-health.js'
@@ -101,6 +104,8 @@ jobs:
           node --test test/reality-owner-handoff-health-v1.test.js
           node --check src/reality-evidence-driven-capability-router-v1.js
           node --test test/reality-evidence-driven-capability-router-v1.test.js
+          node --check src/reality-signed-original-lineage-packet-v1.js
+          node --test test/reality-signed-original-lineage-packet-v1.test.js
           node --test test/reality-signed-worker-db-claim-provider-latency-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
