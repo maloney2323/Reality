@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {automaticallyQualifyVerifiedRepairOpportunity,
  canAutomaticallyQualifyResearchRepairOnSignedWake}
  from '../src/reality-governed-automatic-repair-qualification-v1.js';
@@ -212,4 +213,39 @@ test('a genuine signed owner/warrant continues repair qualification even when we
   {...good,originalGate:{...good.originalGate,original_job_completed:true}},
   {...good,originalGate:{...good.originalGate,production_changed:true}}
  ])assert.equal(canAutomaticallyQualifyResearchRepairOnSignedWake(invalid),false);
+});
+
+test('signed worker read-only repair evidence RPC is allowed exactly; no broad RPC wildcard',async()=>{
+ const expected='reality_read_owner_market_repair_proofs_v1';
+ let invoked=0;
+ const serviceDb={
+  url:'https://hvkfreoagbrphwghjajw.supabase.co',
+  secretKey:'inert-fake-service-key-never-used',
+  strictSecrets:true
+ };
+ const mock=async (uri,options)=>{
+  invoked++;
+  assert.equal(uri,serviceDb.url+'/rest/v1/rpc/'+expected);
+  assert.equal(options.method,'POST');
+  assert.equal(options.cache,'no-store');
+  assert.deepEqual(JSON.parse(options.body),{p_owner_id:owner});
+  return {ok:true,json:async()=>({
+   ok:true,status:'SOURCE_PINNED_BUDGET_REPAIR_CANDIDATE_READBACK',
+   owner_id:owner,items:[],read_only:true,
+   installation_authorized:false,production_changed:false
+  })};
+ };
+ const allowed=await shiftRpc(serviceDb,expected,{p_owner_id:owner},
+  {fetchImpl:mock});
+ assert.equal(allowed.read_only,true);
+ assert.equal(invoked,1);
+ for(const blocked of [
+  'reality_read_owner_market_repair_proofs_v1_and_authorize_install',
+  'reality_write_owner_market_repair_proofs_v1',
+  'reality_read_owner_market_repair_proofs_v2'
+ ]){
+  await assert.rejects(shiftRpc(serviceDb,blocked,{p_owner_id:owner},
+   {fetchImpl:mock}),/SHIFT_RPC_NOT_ALLOWLISTED/);
+ }
+ assert.equal(invoked,1);
 });
