@@ -7308,6 +7308,62 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
        inspect.disabled=false;
       }
      };
+     // A saved explicit owner instruction to CONTINUE the existing shift
+     // needs an actual, separately labeled action. "Check available work
+     // capability" above is only read-only inspection; never present it as
+     // execution. The server revalidates signed source, owner warrant,
+     // no-new-shift scope, and non-installation authority on every dispatch.
+     const signedShiftCommand=typeof message.text==='string'&&
+      /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+(?:(?:the|my|our)\s+)?(?:existing\s+)?authorized\s+shift\b/i.test(message.text.trim());
+     if(signedShiftCommand){
+      const continueSigned=document.createElement('button');
+      continueSigned.type='button';
+      continueSigned.textContent='Continue existing signed shift';
+      continueSigned.setAttribute('aria-label','Continue this saved instruction in the existing authorized shift');
+      continueSigned.onclick=async()=>{
+       if(continueSigned.disabled)return;
+       continueSigned.disabled=true;
+       report.textContent='Sending this exact signed saved instruction to the existing governed worker. No new shift or installation approval.';
+       try{
+        const result=await postWork('PROCESS_SIGNED_WORK_REQUEST');
+        if(!['CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
+              'CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED'].includes(result.status)||
+           result.new_shift_started!==false||
+           result.installation_authorized!==false||
+           result.original_job_completed!==false||
+           result.worker_execution_verified!==false||
+           !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(result.shift_id||''))
+         throw Error('CHAT_EXISTING_SHIFT_WAKE_NOT_VERIFIED');
+        report.textContent='Existing signed shift '+result.shift_id+
+         ': '+(result.status==='CHAT_EXISTING_SHIFT_WAKE_ENQUEUED'?
+          'governed worker wake queued':'this saved request was already queued')+
+         '. No new approval, installation or original-job completion was inferred.';
+       }catch(error){
+        report.textContent='Existing-shift dispatch outcome unverified: '+
+         String(error.message||'UNKNOWN').slice(0,110)+
+         '. Inspect the exact saved request; do not submit another shift.';
+       }
+       // Fail closed after ambiguous dispatch. Never auto-replay a work POST.
+       const status=document.createElement('button');
+       status.type='button';status.textContent='Check this exact shift wake receipt';
+       status.onclick=async()=>{
+        status.disabled=true;
+        try{
+         const read=await postWork('READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS');
+         report.textContent=read.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED'?
+          'Original signed shift '+read.shift_id+
+          ' · request '+String(read.network_request_id||'unavailable')+
+          ' is independently recorded. Worker completion remains separately unverified.':
+          'No independently verified wake receipt yet ('+
+           String(read.status||'UNKNOWN')+'). Do not duplicate the request.';
+        }catch{
+         report.textContent='Exact signed shift wake readback unavailable. Do not duplicate the request.';
+        }finally{status.disabled=false}
+       };
+       controls.append(status);
+      };
+      controls.append(continueSigned);
+     }
      controls.append(inspect,report);card.append(controls);
      const justSaved=window.realityJustSavedWorkRequest;
      if(justSaved?.conversation_id===conversationId()&&
