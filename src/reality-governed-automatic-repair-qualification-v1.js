@@ -90,7 +90,7 @@ function safeWorkOrder(p,{shiftId,withinScope,action,currentBlob,repairBlob}){
  });
 }
 export async function automaticallyQualifyVerifiedRepairOpportunity({
- db,env=process.env,graph,shiftId,workerRunId,
+ db,env=process.env,graph,originalGate,shiftId,workerRunId,
  call=shiftRpc,fetchImpl=fetch
 }={}){
  if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||!db.secretKey||
@@ -126,7 +126,21 @@ export async function automaticallyQualifyVerifiedRepairOpportunity({
   const existing=graph.jobs.find(x=>x.source_ref===ref&&
    x.independent_source_proof_verified===true&&
    /^work:[a-f0-9]{32}$/.test(x.original_work_id||''));
-  const withinScope=Boolean(existing);
+  // A job appearing in a shift's source graph is NOT enough to authorize an
+  // installation. The independent service-only same-original warrant gate
+  // must agree on owner, shift, source, original and canonical business work.
+  const withinScope=Boolean(existing&&
+   originalGate?.status==='EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+   originalGate.owner_id===graph.owner_id&&
+   originalGate.shift_id===shiftId&&
+   originalGate.original_work_id===existing.original_work_id&&
+   originalGate.source_ref===ref&&
+   originalGate.warrant_mode==='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'&&
+   originalGate.read_only===true&&
+   originalGate.canonical_owner_business_original_missing===false&&
+   originalGate.original_job_completed===false&&
+   originalGate.installation_authorized===false&&
+   originalGate.production_changed===false);
   let red,green,pr,baseFile,currentFile,repairFile;
   try{
    [red,green,pr,baseFile,currentFile,repairFile]=await Promise.all([
