@@ -180,7 +180,8 @@ export default async function handler(req,res){
     x.proposal_fingerprint===b.proposal_fingerprint&&
     x.original_work_id===receipt.original_work_id&&
     x.approval_receipt_sha256===receipt.approval_receipt_sha256&&
-    x.review_state==='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER')||[];
+    x.review_state==='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'&&
+    x.canonical_chat_original_readback_verified===true)||[];
    if(confirmed.length!==1)
     return safe(res,'EXACT_OWNER_ADMISSION_COMMITTED_READBACK_UNCERTAIN',409,{
      retry_owner_approval:false,check_status_required:true});
