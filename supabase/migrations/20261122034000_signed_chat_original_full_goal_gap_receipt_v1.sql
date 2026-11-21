@@ -46,9 +46,9 @@ begin
   end;
  v_receipt:='sha256:'||pg_catalog.encode(extensions.digest(
   v.message_id::text||':'||v.owner_id::text||':'||
-  v.message_sha256||':'||v.development->>'original_work_id'||':'||
-  v.development->'evidence'->>'artifact_commit_sha'||':'||
-  v.development->'evidence'->>'independent_ci_run_id'||':'||
+  v.message_sha256||':'||(v.development->>'original_work_id')||':'||
+  (v.development->'evidence'->>'artifact_commit_sha')||':'||
+  (v.development->'evidence'->>'independent_ci_run_id')||':'||
   'FEATURE_ACCEPTANCE_NOT_YET_PROVEN:'||v_next,'sha256'),'hex');
  update reality_internal.chat_work_handoffs_v1
  set development=pg_catalog.jsonb_set(development,'{evidence}',
