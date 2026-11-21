@@ -24,6 +24,7 @@ test('multi-original work is sourced only from the signed current owner Continui
  assert.match(sql,/p_target_original_count not between 2 and 12/);
  assert.match(sql,/where i.owner_id=p_owner_id/);
  assert.match(sql,/w.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'/);
+ assert.match(sql,/c.source_ref=r.source_ref and c.shift_id=v_shift/);
  assert.match(sql,/sc->>'source_ref'=i.source_ref/);
  assert.doesNotMatch(sql,/issues\/\d+|pull\/\d+|source_scope :=|INSERT INTO reality_internal\./i);
 });
