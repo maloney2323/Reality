@@ -228,7 +228,10 @@ test('no login / no independently readback owner scope means no approval',async(
  await forgery.flush();
  assert.equal(forgery.locate('realityChatMaintenanceAuthorize').disabled,true);
  await forgery.click('realityChatMaintenanceAuthorize');await forgery.flush();
- assert.deepEqual(forgery.calls.map(x=>x.options.method),['GET']);
+ assert.deepEqual(forgery.calls.map(x=>x.options.method),['GET','GET'],
+  'unverified broad shift scope permits only a narrow read-only recovery attempt');
+ assert.equal(forgery.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.equal(forgery.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
 });
 test('an existing signed maintenance shift blocks duplicate authorization',async()=>{
  const current=setup({readback:{...data,requested_maintenance_draft:null,
