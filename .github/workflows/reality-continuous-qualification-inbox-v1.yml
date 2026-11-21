@@ -10,6 +10,7 @@ on:
       - 'supabase/migrations/*owner_operational_continuity_qualification_projection_v1.sql'
       - 'test/reality-continuity-operational-view-v1.test.js'
       - 'supabase/migrations/*qualified_chat_original_exact_approval_bridge_v1.sql'
+      - 'supabase/migrations/*qualified_chat_original_continuity_return_v1.sql'
       - 'api/reality/personal-qualified-chat-original-approval.js'
       - 'test/reality-qualified-chat-original-exact-approval-v1.test.js'
       - 'api/reality/governed-employee-shift-worker.js'
