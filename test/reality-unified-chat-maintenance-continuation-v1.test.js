@@ -633,7 +633,10 @@ test('a verified exact owner approval, its source evidence and status all remain
  const c=exactApprovalReadback();
  const status={ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
   owner_approval_recorded:false,installation_authorized:false,
-  retry_owner_approval:false};
+  retry_owner_approval:false,
+  exact_review:{...c.exact_signed_maintenance_install_review,
+   expected_old_blob_sha:'b'.repeat(40)}
+ };
  const x=setup({readback:c,installReadback:status});await x.flush();
  assert.equal(x.locate('realityChatMaintenanceCheckStatusInChat').hidden,false);
  assert.equal(x.locate('realityChatMaintenanceEvidenceInChat').hidden,true);
@@ -644,10 +647,9 @@ test('a verified exact owner approval, its source evidence and status all remain
  await x.click('realityChatMaintenanceCheckStatusInChat');await x.flush();
  assert.deepEqual(x.calls.map(y=>[y.options.method,y.url]),[
   ['GET','/api/reality/personal-governed-employee-shift'],
-  ['GET','/api/reality/signed-maintenance-exact-install-approval'],
-  ['GET','/api/reality/personal-governed-employee-shift']
- ]);
- assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/earlier approval was NOT recorded/);
+  ['GET','/api/reality/signed-maintenance-exact-install-approval']
+ ],'owner check must never repeat the slow broad shift read');
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/no previous approval was recorded/);
  assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').disabled,false);
  assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').hidden,true);
  assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').disabled,true);
@@ -689,4 +691,29 @@ test('the approval card is concise and employee diagnostics are collapsed but re
   'opening details never grants or removes owner approval');
  assert.deepEqual(v.calls.map(x=>x.options.method),['GET'],
   'disclosing evidence cannot trigger any installation POST');
+});
+
+test('broad shift timeout recovers exact PR #308 within Chat using a narrow read-only GET',async()=>{
+ const c=exactApprovalReadback();
+ const exact={...c.exact_signed_maintenance_install_review,
+  expected_old_blob_sha:'b'.repeat(40)};
+ const narrow={ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
+  owner_approval_recorded:false,installation_authorized:false,
+  retry_owner_approval:false,exact_review:exact};
+ const x=setup({readback:null,installReadback:narrow});await x.flush();
+ assert.deepEqual(x.calls.map(v=>[v.options.method,v.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['GET','/api/reality/signed-maintenance-exact-install-approval']
+ ]);
+ assert.equal(x.locate('realityChatMaintenanceNudge').hidden,false);
+ assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').hidden,false);
+ assert.equal(x.locate('realityChatMaintenanceExactInstallApprove').disabled,false);
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/no previous approval was recorded/);
+ assert.equal(x.locate('realityChatMaintenanceContinuation').hidden,true);
+ assert.equal(x.calls.filter(v=>v.options.method==='POST').length,0);
+ await x.click('realityChatMaintenanceExactInstallApprove');await x.flush();
+ assert.equal(x.calls.filter(v=>v.options.method==='POST').length,1);
+ assert.equal(x.calls[2].url,'/api/reality/signed-maintenance-exact-install-approval');
+ assert.equal(JSON.parse(x.calls[2].options.body).candidate_commit_sha,
+  c.exact_signed_maintenance_install_review.candidate_commit_sha);
 });
