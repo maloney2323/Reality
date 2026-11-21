@@ -25,16 +25,29 @@ function respond(res,code,status,other={}){
 export function verifiedExactOwnerInstallReadback(card,ownerId){
  if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED'&&
     card.owner_id===ownerId&&
+    UUID.test(card.shift_id||'')&&
+    /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(card.source_ref||'')&&
     HASH.test(card.approval_receipt_sha256||'')&&
     ['APPROVED','FENCED','INSTALLED','VERIFIED'].includes(card.decision_state)&&
-    card.installation_authorized===true)
+    card.installation_authorized===true&&
+    card.original_job_completed===false&&card.production_changed===false&&
+    (card.decision_state!=='INSTALLED'&&card.decision_state!=='VERIFIED'||
+     card.repair_installed===true&&SHA.test(card.installed_commit_sha||''))&&
+    (card.decision_state!=='VERIFIED'||
+     HASH.test(card.independent_postinstall_receipt_sha256||'')))
   return {status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
    owner_approval_recorded:true,installation_authorized:true,
    approval_receipt_sha256:card.approval_receipt_sha256,
    decision_state:card.decision_state,
+   shift_id:card.shift_id,source_ref:card.source_ref,
+   installed_commit_sha:card.repair_installed===true&&
+     SHA.test(card.installed_commit_sha||'')?card.installed_commit_sha:null,
+   independent_postinstall_receipt_sha256:card.decision_state==='VERIFIED'?
+    card.independent_postinstall_receipt_sha256:null,
    repair_installed:card.repair_installed===true,
-   postinstall_verified:card.decision_state==='VERIFIED'&&
-    HASH.test(card.independent_postinstall_receipt_sha256||''),
+   postinstall_verified:card.decision_state==='VERIFIED',
+   original_job_completed:false,
+   production_changed:false,
    retry_owner_approval:false};
  if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
     card.owner_id===ownerId&&card.owner_approval_ready===true&&
