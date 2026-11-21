@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const sql=read('../supabase/migrations/20261121205000_qualified_chat_original_exact_approval_bridge_v1.sql');
+const continuity=read('../supabase/migrations/20261121210500_qualified_chat_original_continuity_return_v1.sql');
 const api=read('../api/reality/personal-qualified-chat-original-approval.js');
 const panel=read('../reality-chat-continuous-qualification-v1.js');
 const boundary=read('../src/reality-governed-shift-boundary-v1.js');
@@ -63,4 +64,27 @@ test('Chat only offers actionable approval after verified scope from stored sour
  assert.match(panel,/Original admitted:/);
  assert.match(panel,/No original admitted/);
  assert.doesNotMatch(panel,/authorize_employee_shift_v1|OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
+});
+
+test('real signed worker sends exact owner admission back into SAME Continuity, preserving approval',()=>{
+ for(const x of [
+  'reality_reconcile_continuity_qualification_routes_v1',
+  'owner_qualified_chat_original_review_packets_v1',
+  'QUALIFIED_CHAT_ORIGINAL_AWAITING_EXACT_OWNER_APPROVAL',
+  'QUALIFIED_CHAT_ORIGINAL_ADMITTED_PENDING_GOVERNED_EXECUTION',
+  'EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER',
+  'EXISTING_SIGNED_CHAT_WORKER_RECHECK_ORIGINAL_SOURCE_SCOPE_AND_ACCEPTANCE',
+  'PRESENT_EXISTING_EXACT_OWNER_ADMISSION_CARD_IN_REALITY_CHAT',
+  'QUALIFIED_CHAT_ORIGINAL_AWAITING_EXACT_OWNER_APPROVAL',
+  'chat_work_handoffs_v1',
+  'reality_chat_messages'
+ ])assert.ok(continuity.includes(x),'missing same-source return: '+x);
+ assert.match(continuity,/r.status='STARTED'/);
+ assert.match(continuity,/SOURCE_EPOCH_REVALIDATION_REQUIRED/);
+ assert.match(continuity,/new_original_admitted',false/);
+ assert.match(continuity,/owner_approval_granted',false/);
+ assert.match(continuity,/installation_authorized',false/);
+ assert.doesNotMatch(continuity,/INSERT INTO reality_internal\.governed_employee_original_claims_v1/i);
+ assert.doesNotMatch(continuity,/reality_authorize_employee_shift_v1/i);
+ assert.ok(continuity.length<20000,'duplicate SQL replacement content detected');
 });
