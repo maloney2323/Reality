@@ -2552,6 +2552,28 @@ export default async function handler(req,res){
       result?.status;
    const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
     outcomeCode:'RESULT_READBACK_UNVERIFIED';
+   // A signed wake is not shift progress when the same original-work
+   // blocker repeats. Route the bounded, receipt-backed signal into the
+   // EXISTING incident investigator. No approval, executor or new job here.
+   if(/(_REQUIRED|_BLOCKED|_UNVERIFIED|_NOT_READY)$/.test(safeOutcome)){
+    await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_worker_run_id:actualWorkerRunId,p_safe_result:safeOutcome
+    },{timeoutMs:8000}).then(receipt=>{
+     if(![
+      'SIGNED_SHIFT_BLOCKER_FIRST_OBSERVED',
+      'SIGNED_SHIFT_REPEATED_BLOCKER_INCIDENT_RECORDED',
+      'SIGNED_WORKER_WAKE_ALREADY_OBSERVED_NO_REPLAY'
+     ].includes(receipt?.status)||
+      receipt.new_original_admitted!==false||
+      receipt.execution_authorized!==false||
+      receipt.installation_authorized!==false||
+      receipt.production_changed!==false)
+      throw Error('SIGNED_SHIFT_NO_PROGRESS_RECEIPT_UNVERIFIED');
+    }).catch(()=>{
+     console.warn('REALITY_SIGNED_SHIFT_NO_PROGRESS_OBSERVER_UNVERIFIED');
+    });
+   }
    completedPulse=await shiftRpc(db,
     'reality_record_employee_shift_worker_pulse_v1',{
      p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',

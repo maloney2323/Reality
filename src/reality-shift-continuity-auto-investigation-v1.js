@@ -28,6 +28,23 @@ export const CONTINUITY_SELF_INQUIRY_QUESTIONS=Object.freeze([
  'What is the smallest permitted next action that preserves the same original work ID?',
  'Which independent observation would prove the fix worked and the original job finished?'
 ]);
+// A model may select a recovery investigation route, never execution authority.
+export const GOVERNED_RECOVERY_CLASSES=Object.freeze([
+ 'MISSING_SOURCE_EVIDENCE','MISSING_OWNER_AUTHORITY',
+ 'MISSING_EXECUTOR_ADAPTER','PROVIDER_TRANSIENT',
+ 'PROVIDER_EFFECT_UNKNOWN','CAPABILITY_DEFECT',
+ 'CONTINUITY_HANDOFF_DEFECT','UNKNOWN'
+]);
+export const GOVERNED_RECOVERY_ACTIONS=Object.freeze([
+ 'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
+ 'RECONCILE_EXISTING_ORIGINAL',
+ 'VERIFY_INSTALLED_EXECUTOR',
+ 'REQUEST_EXACT_OWNER_APPROVAL',
+ 'RECONCILE_PROVIDER_EFFECT_WITHOUT_REPLAY',
+ 'RUN_INDEPENDENT_FROZEN_TEST',
+ 'INVESTIGATE_EXISTING_HANDOFF',
+ 'CONTINUE_OTHER_AUTHORIZED_WORK'
+]);
 const classifyInvestigationFailure=(error,stage)=>{
  if(stage!=='MODEL_PROOF_UNAVAILABLE')return 'INDEPENDENT_SOURCE_UNAVAILABLE';
  const message=String(error?.message||'');
@@ -67,14 +84,16 @@ export function classifySignedContinuityClaimTransportError(error){
   return 'SIGNED_INVESTIGATION_CLAIM_INVALID';
  return 'INVESTIGATION_RUNTIME_UNVERIFIED';
 }
-export function parseContinuityModelInvestigation(response,roles){
+export function parseContinuityModelInvestigation(response,roles,{guidedRecovery=false}={}){
  if(response?.status==='incomplete')fail('MODEL_RESPONSE_INCOMPLETE');
  if(response?.status!=='completed')fail('MODEL_NOT_VERIFIED');
  if(!MODEL.test(response.id||''))fail('MODEL_RESPONSE_ID_MISSING');
  let value;
  try{value=JSON.parse(outputText(response))}catch{fail('MODEL_STRUCTURED_OUTPUT_REQUIRED')}
  const keys=['employee_function_id','reviewer_function_id','diagnosis',
- 'proposed_upgrade','independent_test_requirement','limitations'];
+ 'proposed_upgrade','independent_test_requirement','limitations',
+ ...(guidedRecovery?['blocker_class','next_governed_action',
+  'resume_acceptance_condition']:[])];
  if(!value||Array.isArray(value)||Object.keys(value).sort().join(',')!==
   keys.sort().join(','))fail('MODEL_SCHEMA_INVALID');
  const functions=new Map(roles.map(x=>[x.function_id,x]));
@@ -83,13 +102,19 @@ export function parseContinuityModelInvestigation(response,roles){
  if(!worker||!reviewer||worker.function_id===reviewer.function_id)
   fail('INDEPENDENT_EMPLOYEE_REVIEWER_REQUIRED');
  for(const [key,min,max] of [
-  ['diagnosis',30,1500],['proposed_upgrade',30,1600],
-  ['independent_test_requirement',30,1600],['limitations',20,1200]
+  ['diagnosis',30,1500],['proposed_upgrade',30,guidedRecovery?1100:1600],
+  ['independent_test_requirement',30,guidedRecovery?1200:1600],
+  ['limitations',20,1200],
+  ...(guidedRecovery?[['resume_acceptance_condition',30,300]]:[])
  ]){
   if(typeof value[key]!=='string'||value[key].trim()!==value[key]||
    value[key].length<min||value[key].length>max)
    fail('DIAGNOSIS_AND_TEST_SPEC_UNVERIFIED');
  }
+ if(guidedRecovery&&(
+  !GOVERNED_RECOVERY_CLASSES.includes(value.blocker_class)||
+  !GOVERNED_RECOVERY_ACTIONS.includes(value.next_governed_action)))
+  fail('GOVERNED_RECOVERY_ROUTE_UNVERIFIED');
  return Object.freeze({
   ...value,assigned_employee:worker.employee_name,
   independent_reviewer:reviewer.employee_name,
@@ -123,7 +148,8 @@ export async function investigateOneSignedShiftContinuityIncident({
   !HASH.test(claim.evidence_sha256||'')||
   !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
-    'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'].includes(claim.kind)||
+    'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
+    'SIGNED_SHIFT_REPEATED_NO_PROGRESS'].includes(claim.kind)||
   (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
    (!UUID.test(claim.source_claim_id||'')||
     !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
@@ -176,6 +202,37 @@ export async function investigateOneSignedShiftContinuityIncident({
      source_body_untrusted:String(observed.source_body||'').slice(0,4500)};
    }catch{sourceReadback={status:'CURRENT_SOURCE_READBACK_UNVERIFIED',source_ref:sourceRef}}
   }
+  const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS';
+  // Real repeated wake receipts prove no progress, not a root cause.
+  // The existing owner-scoped original preflight provides current admission
+  // gates and exact Continuity routes to the LLM without granting authority.
+  let liveWorkPreflight={status:'CURRENT_OWNER_WORK_PREFLIGHT_UNAVAILABLE'};
+  if(guidedRecovery){
+   try{
+    const observed=await call(db,'reality_read_owner_multi_original_shift_preflight_v1',{
+     p_owner_id:claim.owner_id,p_target_original_count:2
+    },{fetchImpl});
+    if(observed?.status==='OWNER_MULTI_ORIGINAL_SHIFT_INDEPENDENT_PREFLIGHT'&&
+     observed.owner_id===claim.owner_id&&observed.current_shift_id===shiftId&&
+     observed.read_only===true&&observed.model_execution_authorized===false&&
+     observed.owner_approval_granted===false&&
+     Array.isArray(observed.prioritized_source_preflight)){
+     liveWorkPreflight={
+      status:'CURRENT_OWNER_WORK_PREFLIGHT_VERIFIED',
+      current_shift_status:observed.current_shift_status,
+      source_bound_originals:observed.source_bound_originals,
+      independently_qualified_originals:observed.independently_qualified_originals_for_executor_preflight,
+      pending_exact_chat_approvals:observed.pending_exact_chat_admission_approvals,
+      next_gates:observed.prioritized_source_preflight.slice(0,8).map(x=>({
+       intake_family:x.intake_family,acceptance_gate:x.acceptance_gate,
+       route_state:x.route_state,governed_next_action:x.governed_next_action,
+       original_work_id:x.original_work_id
+      })),
+      no_execution_authority_from_read:true
+     };
+    }
+   }catch{/* Unavailable readback cannot become positive source proof. */}
+  }
   const payload={
    model,store:false,tool_choice:'none',max_output_tokens:1500,
    // GPT-5.4 supports no reasoning effort for short evidence-grounded triage.
@@ -188,9 +245,16 @@ export async function investigateOneSignedShiftContinuityIncident({
       employee_function_id:{type:'string',enum:roles.map(x=>x.function_id)},
       reviewer_function_id:{type:'string',enum:roles.map(x=>x.function_id)},
       diagnosis:{type:'string'},proposed_upgrade:{type:'string'},
-      independent_test_requirement:{type:'string'},limitations:{type:'string'}
+      independent_test_requirement:{type:'string'},limitations:{type:'string'},
+      ...(guidedRecovery?{
+       blocker_class:{type:'string',enum:GOVERNED_RECOVERY_CLASSES},
+       next_governed_action:{type:'string',enum:GOVERNED_RECOVERY_ACTIONS},
+       resume_acceptance_condition:{type:'string'}
+      }:{})
      },required:['employee_function_id','reviewer_function_id',
-       'diagnosis','proposed_upgrade','independent_test_requirement','limitations']
+       'diagnosis','proposed_upgrade','independent_test_requirement','limitations',
+       ...(guidedRecovery?['blocker_class','next_governed_action',
+        'resume_acceptance_condition']:[])]
     }}},
    input:[
     {role:'system',content:[{type:'input_text',text:
@@ -214,7 +278,16 @@ export async function investigateOneSignedShiftContinuityIncident({
      'Select two DISTINCT available role function IDs. '+
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
-     'Return only the specified fields.'
+     'Return only the specified fields.'+
+     (guidedRecovery?
+      ' A successful worker wake with the SAME unresolved gate is not job progress. '+
+      'Independently classify the cause using the live owner Continuity preflight. '+
+      'Select exact blocker_class and next_governed_action ENUM values. Prefer existing '+
+      'installed tools and requalification over new code. Missing owner permission '+
+      'means propose exact owner Chat approval, NEVER silently grant it. An uncertain '+
+      'provider effect must NOT be replayed. Unknown root causes need investigation. '+
+      'State a falsifiable resume_acceptance_condition based on independent original '+
+      'work receipts, not worker wakes. No tool execution by this model.' : '')
     }]},
     {role:'user',content:[{type:'input_text',text:JSON.stringify({
      owner_shift_id:claim.shift_id,incident_id:claim.incident_id,
@@ -234,6 +307,7 @@ export async function investigateOneSignedShiftContinuityIncident({
       phase:claim.failed_job_phase||null,
       blocker:claim.failed_job_blocker||null},
      independent_current_source_readback:sourceReadback,
+     owner_signed_current_original_preflight:liveWorkPreflight,
      self_inquiry_questions:CONTINUITY_SELF_INQUIRY_QUESTIONS,
      known_evidence_is_not_independent_root_cause_proof:true,
      code_changes_not_authorized_by_this_claim:true,
@@ -260,7 +334,19 @@ export async function investigateOneSignedShiftContinuityIncident({
    }
    response=await result.json().catch(()=>null);
   }
-  const proposal=parseContinuityModelInvestigation(response,roles);
+  const proposal=parseContinuityModelInvestigation(response,roles,{guidedRecovery});
+  // Persist a validated, machine-readable route prefix in the EXISTING
+  // signed incident record. It is NOT an executor instruction or approval.
+  const governedPlan=guidedRecovery?
+   '[GOVERNED_ACTION:'+proposal.next_governed_action+']'+
+   '[BLOCKER_CLASS:'+proposal.blocker_class+'] '+proposal.proposed_upgrade:
+   proposal.proposed_upgrade;
+  const independentGate=guidedRecovery?
+   proposal.independent_test_requirement+
+   ' Resume condition: '+proposal.resume_acceptance_condition:
+   proposal.independent_test_requirement;
+  if(governedPlan.length>1600||independentGate.length>1600)
+   fail('GOVERNED_RECOVERY_PLAN_BOUNDS_UNVERIFIED');
   stage='DURABLE_OWNER_INCIDENT_RECEIPT_UNVERIFIED';
   const receipt=await call(db,'reality_record_shift_continuity_investigation_v1',{
    p_owner_id:claim.owner_id,p_shift_id:shiftId,
@@ -271,8 +357,8 @@ export async function investigateOneSignedShiftContinuityIncident({
    p_reviewer_function_id:proposal.reviewer_function_id,
    p_reviewer:proposal.independent_reviewer,
    p_diagnosis:proposal.diagnosis,
-   p_proposed_upgrade:proposal.proposed_upgrade,
-   p_independent_test_requirement:proposal.independent_test_requirement,
+   p_proposed_upgrade:governedPlan,
+   p_independent_test_requirement:independentGate,
    p_limitations:proposal.limitations,
    p_model_response_id:proposal.model_response_id
   },{fetchImpl});
@@ -295,7 +381,12 @@ export async function investigateOneSignedShiftContinuityIncident({
    independent_reviewer:proposal.independent_reviewer,
    investigation_receipt_sha256:receipt.investigation_receipt_sha256,
    investigation_attempt:claim.investigation_attempt||1,
-   next_action:'INDEPENDENT_FROZEN_FAILURE_REPRODUCTION_AND_GOVERNED_CAPABILITY_APPROVAL_REQUIRED',
+   next_action:guidedRecovery?proposal.next_governed_action:
+    'INDEPENDENT_FROZEN_FAILURE_REPRODUCTION_AND_GOVERNED_CAPABILITY_APPROVAL_REQUIRED',
+   blocker_class:guidedRecovery?proposal.blocker_class:null,
+   independent_resume_condition:guidedRecovery?
+    proposal.resume_acceptance_condition:null,
+   action_dispatched_by_model:false,original_work_resumed:false,
    model_calls_completed:1
   });
  }catch(error){
