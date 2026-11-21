@@ -36,7 +36,12 @@ const stage={
 };
 const read={
  ...stage,status:'SIGNED_ORIGINAL_LINEAGE_EVIDENCE_INDEPENDENTLY_READ',
- packet_verified:true,canonical_customer_original_present:false
+ packet_verified:true,canonical_customer_original_present:false,
+ continuity_observation_verified:true,
+ continuity_event_id:'e70bba18-9570-5a15-b58f-a3c52b2cb492',
+ continuity_root_id:'36f0ad48-f391-549f-8622-66cd493977e7',
+ continuity_worldline_id:'694f30e8-2bdb-5221-b2b2-539ea59472d4',
+ continuity_fact:'CURRENT_ORIGINAL_REMAINS_UNFINISHED'
 };
 const db={strictSecrets:true,project:'test',
  url:'https://test.supabase.co',secretKey:'not-a-real-key'};
@@ -57,6 +62,8 @@ test('same-shift #307 source/claim independent read, no business original admiss
  assert.equal(r.source_reconciled,true);
  assert.equal(r.original_work_id,work);
  assert.equal(r.source_claim_id,'418ee1f1-7d78-42d2-88e7-c3a2efc1cd0b');
+ assert.equal(r.continuity_event_id,'e70bba18-9570-5a15-b58f-a3c52b2cb492');
+ assert.equal(r.continuity_fact,'CURRENT_ORIGINAL_REMAINS_UNFINISHED');
  assert.equal(r.customer_original_verified,false);
  assert.equal(r.original_claim_admitted,false);
  assert.equal(r.original_job_completed,false);
@@ -135,6 +142,9 @@ test('owner read refuses foreign tenants, forged original completion and stage l
   {...read,shift_id:owner},
   {...read,packet_verified:false},
   {...read,source_claim_id:'notuuid'},
+  {...read,continuity_observation_verified:false},
+  {...read,continuity_event_id:'unverified'},
+  {...read,continuity_fact:'CUSTOMER_WORK_SETTLED'},
   {...read,evidence_sha256:'bad'},
   {...read,customer_original_verified:true},
   {...read,original_claim_admitted:true},
@@ -157,6 +167,10 @@ test('SQL binds actual original PR claim and warrant, not a hardcoded claim or c
  assert.match(sql,/on conflict \(shift_id,original_work_id,source_ref,source_claim_id\)/i);
  assert.match(sql,/current_user<>'service_role'/);
  assert.match(sql,/enable row level security/i);
+ assert.match(sql,/e\.payload->>'original_source_ref'=v\.source_ref/);
+ assert.match(sql,/CURRENT_ORIGINAL_REMAINS_UNFINISHED/);
+ assert.match(sql,/e\.provenance->>'authoritative_source'/);
+ assert.match(sql,/e\.epistemic_status='VERIFIED'/);
  assert.doesNotMatch(sql,/418ee1f1|1a311d37|#307|#211|315562fe1b/);
  assert.doesNotMatch(sql,/\b(?:update|delete)\s+reality_internal\.governed_employee_original_claims_v1/i);
  assert.doesNotMatch(sql,/\bcreate\s+or\s+replace\s+function\s+public\.reality_read_same_original_postmaintenance_gate_v1/i);
