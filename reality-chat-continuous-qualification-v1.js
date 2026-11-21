@@ -254,6 +254,8 @@
      stage.type='button';stage.disabled=true;
      const approve=node('button','Approve exactly this one effect');
      approve.type='button';approve.disabled=true;approve.hidden=true;
+     const verifyApproval=node('button','Check saved effect approval status');
+     verifyApproval.type='button';verifyApproval.hidden=true;
      const ownerNote=node('p','No business effect approved or executed.');
      ownerNote.setAttribute('role','status');
      let frozen=null;
@@ -289,6 +291,7 @@
        ownerNote.textContent='Review exact target: '+proposedTarget+' · Exact content: '+
         proposedText+' · Your next click authorizes this one effect, not execution.';
        approve.disabled=false;approve.hidden=false;
+       verifyApproval.hidden=false;
       }catch(e){
        ownerNote.textContent='Exact packet not ready: '+
         String(e?.message||'PROOF_MISSING').replaceAll('_',' ').slice(0,150)+
@@ -307,6 +310,7 @@
        if(receipt.status!=='EXACT_BUSINESS_EFFECT_OWNER_APPROVED_ONE_USE'||
           receipt.packet_id!==frozen.packet_id||
           receipt.itemized_owner_approval_recorded!==true||
+          receipt.independent_approval_readback_verified!==true||
           receipt.execution_started!==false||
           receipt.provider_effect_performed!==false||
           !SHA.test(receipt.approval_receipt_sha256||''))
@@ -315,6 +319,34 @@
       }catch{
        ownerNote.textContent='Approval result uncertain: check the existing receipt. Do not retry without reconciling.';
       }
+     });
+     verifyApproval.addEventListener('click',async()=>{
+      if(!frozen)return;
+      verifyApproval.disabled=true;
+      try{
+       const r=await fetch(EFFECT_OWNER_APPROVAL+'?packet_id='+
+        encodeURIComponent(frozen.packet_id),{
+         method:'GET',credentials:'same-origin',cache:'no-store',
+         signal:AbortSignal.timeout(16000)
+        });
+       const x=await r.json().catch(()=>null);
+       if(!r.ok||x?.ok!==true||x.packet_id!==frozen.packet_id||
+          x.provider_effect_performed!==false||
+          x.execution_started!==false||x.effect_executed!==false||
+          !['OWNER_EXACT_BUSINESS_EFFECT_RECEIPT_READBACK',
+            'EXACT_BUSINESS_EFFECT_OWNER_PACKET_NOT_FOUND'].includes(x.status))
+        throw Error('RECEIPT_UNVERIFIED');
+       if(x.approval_verified===true){
+        approve.disabled=true;approve.hidden=true;
+        ownerNote.textContent='Saved owner approval independently confirmed. '+
+         (x.effect_reserved?'One-use effect was reserved; provider and final outcome still require independent reconciliation.':
+         'Awaiting signed-worker reservation; nothing has been executed.');
+       }else{
+        ownerNote.textContent='No independently verified owner approval found. Review the exact action again before any new approval attempt.';
+       }
+      }catch{
+       ownerNote.textContent='Approval status could not be independently verified. No automatic approval or provider replay.';
+      }finally{verifyApproval.disabled=false;}
      });
      check.addEventListener('click',async()=>{
       check.disabled=true;
@@ -350,7 +382,7 @@
        receipt.textContent='Exact business effect scope is unverified; nothing has been authorized or executed.';
       }finally{check.disabled=false;}
      });
-     scope.append(jobClass,effect,check,receipt,target,payload,stage,approve,ownerNote);
+     scope.append(jobClass,effect,check,receipt,target,payload,stage,approve,verifyApproval,ownerNote);
      card.append(scope);
     }
     multiSources.append(card);
