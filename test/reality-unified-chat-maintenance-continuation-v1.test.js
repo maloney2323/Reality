@@ -294,11 +294,11 @@ test('an explicit approve click from the chat message delegates to the ORIGINAL 
  assert.equal(msg.parentElement,v.thread);
  assert.equal(msg.hidden,false,'signed result must stay in the conversation');
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /You authorized 2 exact earlier repairs/);
+  /Reality found a verified repair|Your existing shift is still active|Reality found 2 unfinished employee repairs/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /under shift/);
+  /existing shift|existing work/);
  assert.match(v.locate('realityChatMaintenanceNudge').children[1].textContent,
-  /not reached independent final verification/);
+  /remaining repairs|independently verified repair steps|exact approval|existing work/);
  assert.equal(v.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
 });
 test('an already signed shift is reported IN Chat instead of asking for another approval',async()=>{
@@ -315,8 +315,8 @@ test('an already signed shift is reported IN Chat instead of asking for another 
  const msg=active.locate('realityChatMaintenanceNudge');
  assert.equal(msg.hidden,false);
  assert.equal(msg.parentElement,active.thread);
- assert.match(msg.children[1].textContent,/You authorized 2 exact earlier repairs/);
- assert.match(msg.children[1].textContent,new RegExp(signedShiftId));
+ assert.match(msg.children[1].textContent,/Your existing shift is still active/);
+ assert.match(msg.children[1].textContent,/existing shift/);
  assert.equal(active.locate('realityChatMaintenanceInlineAuthorize').disabled,true);
  await active.click('realityChatMaintenanceInlineAuthorize');await active.flush();
  assert.equal(active.calls.length,1,'no new signed shift was created');
@@ -662,4 +662,31 @@ test('conversation-native actions are mobile reachable without opening the Work 
  assert.match(ui,/review\.addEventListener\('click'/);
  assert.match(ui,/checkStatusInChat\.addEventListener\('click'/);
  assert.match(ui,/chatStatus\.textContent='Approval outcome unverified/);
+});
+
+test('the approval card is concise and employee diagnostics are collapsed but recoverable within Chat',async()=>{
+ const c=exactApprovalReadback();
+ const v=setup({readback:c});await v.flush();
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').hidden,false);
+ const brief=v.locate('realityChatMaintenanceNudge').children[1].textContent;
+ assert.match(brief,/verified repair/);
+ assert.ok(brief.length<180,'plain-language summary must fit a mobile chat bubble');
+ const details=v.locate('realityChatMaintenanceDetails');
+ assert.equal(details.hidden,true,'technical evidence must not overwhelm owner');
+ assert.equal(v.locate('realityChatMaintenanceEvidenceInChat').hidden,true);
+ assert.equal(v.locate('realityChatMaintenanceOpen').textContent,'View details');
+ assert.match(v.locate('realityChatMaintenanceExactInstallDetails').textContent,
+  /isolated preview only, not production/);
+ await v.click('realityChatMaintenanceOpen');await v.flush();
+ assert.equal(details.hidden,false);
+ assert.equal(v.locate('realityChatMaintenanceEvidenceInChat').hidden,false);
+ assert.match(collectedText(details),/Riley/);
+ assert.match(collectedText(details),/Taylor/);
+ assert.match(collectedText(details),/Independent installation-target receipt/);
+ await v.click('realityChatMaintenanceOpen');await v.flush();
+ assert.equal(details.hidden,true);
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').disabled,false,
+  'opening details never grants or removes owner approval');
+ assert.deepEqual(v.calls.map(x=>x.options.method),['GET'],
+  'disclosing evidence cannot trigger any installation POST');
 });
