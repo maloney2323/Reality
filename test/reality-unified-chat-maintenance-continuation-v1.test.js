@@ -167,8 +167,11 @@ test('unified signed-in Chat actually loads existing maintenance controls, not o
  assert.match(html,/id="privateTranscript"/);
  assert.doesNotMatch(html,/id="realityChatConversation"/);
  assert.doesNotMatch(ui,/get\('realityChatConversation'\)/);
- assert.match(ui,/get\('realityChatTabApprovals'\)/);
- assert.match(ui,/get\('realityChatOpenInspector'\)/);
+ // Decision, proof and check-status controls are native to the transcript.
+ assert.doesNotMatch(ui,/get\('realityChatTabApprovals'\)/);
+ assert.doesNotMatch(ui,/get\('realityChatOpenInspector'\)/);
+ assert.match(ui,/realityChatMaintenanceCheckStatusInChat/);
+ assert.match(ui,/realityChatMaintenanceEvidenceInChat/);
  assert.doesNotMatch(ui,/reality-chat-simple\.html|\/chat-simple/);
  assert.doesNotThrow(()=>new Script(ui));
 });
@@ -547,12 +550,13 @@ test('an actual current-owner signed repair target is visible on the real Chat D
  assert.equal(approve.disabled,false);
  const decisionButton=x.locate('realityChatMaintenanceApprovalInboxInstall');
  assert.ok(decisionButton);
- assert.equal(decisionButton.hidden,false);
- assert.equal(decisionButton.disabled,false);
+ assert.equal(decisionButton.hidden,true,'no separate duplicate Work approval');
+ assert.equal(decisionButton.disabled,true);
  assert.ok(x.locate('realityChatMaintenanceContinuation').contains(decisionButton));
  assert.equal(approve.parentElement?.id,'','exact approval is in the chat message actions');
- assert.match(x.locate('realityChatMaintenanceExactInstallDetails').textContent,
-  /One-use exact approval/);
+ assert.match(x.locate('realityChatMaintenanceExactInstallDetails').textContent,/PR #308/);
+ assert.equal(x.locate('realityChatMaintenanceCheckStatusInChat').hidden,false);
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/Ready for your one-time decision/);
  assert.equal(x.locate('realityChatMaintenanceContinuation').parentElement,x.inbox);
  // Read-only rendering never causes installation, approval, or a new shift.
  assert.deepEqual(x.calls.map(x=>x.options.method),['GET']);
@@ -569,13 +573,14 @@ test('the exact install approval button remains hidden for unsigned / missing ta
 });
 
 
-test('clicking owner Decisions exact approval performs one POST directly, without a second fallible full shift GET',async()=>{
+test('clicking exact approval inside Reality Chat performs one POST, never opening a separate panel',async()=>{
  const c=exactApprovalReadback();
  const x=setup({readback:c});await x.flush();
- const button=x.locate('realityChatMaintenanceApprovalInboxInstall');
+ const button=x.locate('realityChatMaintenanceExactInstallApprove');
  assert.equal(button.hidden,false);
  assert.equal(button.disabled,false);
- await x.click('realityChatMaintenanceApprovalInboxInstall');
+ assert.equal(x.locate('realityChatMaintenanceApprovalInboxInstall').hidden,true);
+ await x.click('realityChatMaintenanceExactInstallApprove');
  await x.flush();
  assert.deepEqual(x.calls.map(x=>[x.options.method,x.url]),[
   ['GET','/api/reality/personal-governed-employee-shift'],
@@ -598,8 +603,9 @@ test('clicking owner Decisions exact approval performs one POST directly, withou
  assert.equal(button.hidden,true);
  assert.equal(button.disabled,true);
  assert.match(x.locate('realityChatMaintenanceFeedback').textContent,/Owner approval receipt/);
- await x.click('realityChatMaintenanceApprovalInboxInstall');await x.flush();
+ await x.click('realityChatMaintenanceExactInstallApprove');await x.flush();
  assert.equal(x.calls.length,2,'one exact owner click must never replay the installation decision');
+ assert.match(x.locate('realityChatMaintenanceChatStatus').textContent,/Approval recorded/);
 });
 test('uncertain exact owner POST is not silently retried and preserves the same original shift',async()=>{
  const c=exactApprovalReadback();
