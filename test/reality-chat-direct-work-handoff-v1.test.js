@@ -860,3 +860,20 @@ test('saved original Chat continuation offers a separate explicit existing-shift
  assert.doesNotMatch(ui,/void continueSigned\.onclick\(\)/,
   'no implicit replay of signed historical instructions or approval');
 });
+
+test('database standing-shift router accepts negated install instructions without bypassing signed owner scope',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261121021543_signed_existing_shift_continuation_accepts_negative_safety_instructions_v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/for v_clause in select/);
+ assert.match(sql,/regexp_split_to_table\(v_message\.content/);
+ assert.match(sql,/do\[\[:space:\]\]\+not/);
+ assert.match(sql,/but\|however\|instead\|then/);
+ assert.match(sql,/v_clause !~\*/);
+ assert.doesNotMatch(sql,/v_message\.content ~\* '\(\^\|\[\^a-z\]\)\(install\|deploy/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/w\.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'/);
+ assert.match(sql,/jsonb_array_length\(w\.source_scope\) between 1 and 4/);
+ assert.match(sql,/from reality_internal\.owner_chat_existing_shift_wakes_v1/);
+ assert.match(sql,/on conflict do nothing/);
+ assert.match(sql,/net\.http_post\(/);
+ assert.doesNotMatch(sql,/SECURITY DEFINER|GRANT ALL TO PUBLIC|reality_start_owner_shift/);
+});
