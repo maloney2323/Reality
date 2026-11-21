@@ -74,13 +74,30 @@ export async function shiftRpc(db,rpc,payload,{
    body:JSON.stringify(payload)
   });
   const result=await response.json().catch(()=>null);
-  if(!response.ok||result===null||typeof result!=='object')
+  if(!response.ok||result===null||typeof result!=='object'){
+   // A failed owner decision must not be ambiguously reported as a generic
+   // transport failure. Only log the numeric HTTP status and a validated
+   // five-character SQLSTATE; never emit provider body, token or user data.
+   if(rpc==='reality_record_owner_signed_maintenance_install_decision_v1'){
+    const safeStatus=Number.isInteger(response.status)&&
+     response.status>=100&&response.status<=599?response.status:'NO_STATUS';
+    const safeCode=/^[A-Z0-9]{5}$/.test(String(result?.code||''))?
+     result.code:'NO_SQLSTATE';
+    console.warn('REALITY_EXACT_APPROVAL_DB_REJECTED',safeStatus,safeCode);
+   }
    throw Error('SHIFT_DATABASE_RPC_'+rpc+'_UNAVAILABLE');
+  }
   return result;
  }catch(error){
   if(signal.aborted||error?.name==='TimeoutError'||
-     error?.name==='AbortError')
+     error?.name==='AbortError'){
+   if(rpc==='reality_record_owner_signed_maintenance_install_decision_v1')
+    console.warn('REALITY_EXACT_APPROVAL_DB_TIMEOUT',timeoutMs);
    throw Error('SHIFT_DATABASE_RPC_'+rpc+'_TIMEOUT');
+  }
+  // A network failure has no PostgREST HTTP response or SQLSTATE.
+  if(!response&&rpc==='reality_record_owner_signed_maintenance_install_decision_v1')
+   console.warn('REALITY_EXACT_APPROVAL_DB_NO_RESPONSE');
   // No internal provider errors or secrets are surfaced.
   throw Error('SHIFT_DATABASE_RPC_'+rpc+'_UNAVAILABLE');
  }
