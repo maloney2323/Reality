@@ -31,8 +31,9 @@ test('frozen staged CI candidate independently matches GitHub PR, origin release
 test('staged reconciliation never invokes model generation, new admission, install or settlement',()=>{
  const ci=edge.slice(edge.indexOf('async function verifyCI('),edge.indexOf('\nDeno.serve(',edge.indexOf('async function verifyCI(')));
  assert.doesNotMatch(ci,/\b(?:PUT|PATCH|DELETE)\b|\/git\/refs|\/pulls','POST'|\/contents\/[^']+,'PUT'|reality_owner_approve|reality_admit_chat|reality_install|reality_settle/);
- assert.match(ci,/original_job_completed:false/);
- assert.match(ci,/installation_authorized:false/);
+ // All CI readback statuses use the common no-effect response envelope.
+ assert.match(edge,/status,source_installed:false,installation_authorized:false/);
+ assert.match(edge,/original_job_completed:false,production_changed:false/);
  const stage=edge.slice(edge.indexOf('async function stage('),edge.indexOf('async function verifyCI('));
  assert.match(stage,/reality_fence_chat_new_development_publish_v1/);
  assert.match(stage,/gh\(token,'\/contents\/'\+target,'PUT'/);
