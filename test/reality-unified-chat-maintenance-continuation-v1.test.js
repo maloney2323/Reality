@@ -639,7 +639,7 @@ test('a verified exact owner approval, its source evidence and status all remain
  assert.equal(x.locate('realityChatMaintenanceEvidenceInChat').hidden,true);
  await x.click('realityChatMaintenanceOpen');await x.flush();
  assert.equal(x.locate('realityChatMaintenanceEvidenceInChat').hidden,false);
- assert.match(x.locate('realityChatMaintenanceEvidenceInChat').children.map(p=>p.textContent||'').join('|'),
+ assert.match(x.locate('realityChatMaintenanceEvidenceInChat').children.map(p=>p.children?.[0]?.textContent||p.textContent||'').join('|'),
   /Independent installation-target receipt/);
  await x.click('realityChatMaintenanceCheckStatusInChat');await x.flush();
  assert.deepEqual(x.calls.map(y=>[y.options.method,y.url]),[
