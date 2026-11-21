@@ -153,6 +153,8 @@ import {independentlyReconcileSignedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-postinstall-verification-bridge-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
+import {stageVerifiedSignedOriginalLineagePacket}
+ from '../../src/reality-signed-original-lineage-packet-v1.js';
 import {classifyRealityGovernedContinuityEvidence}
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
@@ -513,6 +515,28 @@ export default async function handler(req,res){
      original_job_completed:false,
      independent_final_receipt_verified:false,
      installation_authorized:false,production_changed:false};
+  // Bind only the ALREADY EXISTING source PR claim to the original-review
+  // evidence. A separate service read checks the persisted packet. This is
+  // not a new customer-original admission or an execution authorization.
+  workerStage='SIGNED_ORIGINAL_EVIDENCE_LINEAGE_BINDING';
+  const signedOriginalLineageEvidence=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')&&
+   isSignedMaintenanceOriginalLineageMissing(sameOriginalPostmaintenanceGate)?
+    await stageVerifiedSignedOriginalLineagePacket({
+     db,env:process.env,gate:sameOriginalPostmaintenanceGate,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     fetchImpl:fetch
+    }).catch(()=>({
+      status:'SIGNED_ORIGINAL_LINEAGE_PROVIDER_OR_SOURCE_UNVERIFIED',
+      packet_staged:false,source_reconciled:false,
+      original_job_completed:false,installation_authorized:false,
+      production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_ORIGINAL_LINEAGE_EVIDENCE_STAGE_DUE',
+     packet_staged:false,source_reconciled:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
   // Durable next-wake routing: the signed source-epoch is persisted, so
   // a later wake must use the database readback, not replay the attestation.
   // This is a classification receipt, NOT a claim that an executor ran.
@@ -2575,6 +2599,7 @@ export default async function handler(req,res){
     signed_maintenance_epoch_handoff:maintenanceEpochHandoff,
     signed_external_maintenance_review:signedExternalMaintenanceReview,
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
+    signed_original_lineage_evidence:signedOriginalLineageEvidence,
     durable_maintenance_handoff:durableMaintenanceHandoff,
     signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
     signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
