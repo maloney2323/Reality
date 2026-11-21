@@ -23,9 +23,29 @@ const fail=(code,status=409)=>{throw Object.assign(new Error(code),{status})};
 // A precise saved owner command, never a model-only explanation or approval.
 export function isExplicitSignedShiftContinuation(message){
  const t=String(message||'').trim();
- return t.length>0&&t.length<=6000&&
-  /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+.{0,140}(?:shift|existing|original)/i.test(t)&&
-  !/\b(?:install|deploy|production|approve)\b/i.test(t);
+ if(!t||t.length>6000||
+    !/^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+.{0,140}(?:shift|existing|original)/i.test(t))
+  return false;
+ // A prohibition is not a request to install. Previously the word
+ // "install" anywhere, including "DO NOT install", rejected the owner's
+ // signed existing-shift command before it reached the governed worker.
+ // Keep affirmative high-consequence instructions on their own authority
+ // path. Only an explicitly NEGATED sentence can contain these words.
+ // Splitting adversatives prevents "do not install BUT deploy" from being
+ // mistaken for a safe continuation. The worker remains independently
+ // fenced by its service-role owner warrant, including installation scope.
+ const statements=t.split(/(?:[.!?]+(?=\s|$)|\n+|;\s*|\b(?:but|however|instead|then|also|afterward)\b)/i);
+ return statements.every(part=>{
+  const clause=part.trim();
+  if(!/\b(?:install|deploy|production|approve)\b/i.test(clause))
+   return true;
+  if(!/^(?:do\s+not|don't|never)\b/i.test(clause))
+   return false;
+  // A conditional or later permission is not an unqualified prohibition.
+  if(/\b(?:unless|except|as\s+soon\s+as|go\s+ahead\s+and|please\s+(?:install|deploy|approve))\b/i.test(clause))
+   return false;
+  return true;
+ });
 }
 
 // These are INSTALLED server adapters, not model-suggested permissions.
