@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {verifiedExactOwnerInstallReadback}
+import {verifiedExactOwnerInstallReadback,
+ EXACT_APPROVAL_READ_TIMEOUT_MS,EXACT_APPROVAL_WRITE_TIMEOUT_MS,maxDuration}
  from '../api/reality/signed-maintenance-exact-install-approval.js';
+import {shiftRpc,isShiftDatabaseTransportUnreachable}
+ from '../src/reality-governed-shift-boundary-v1.js';
 
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const otherOwner='00000000-0000-4000-8000-000000000000';
@@ -87,4 +90,59 @@ test('only the signed POST can record an approval; GET and Check status are read
  assert.match(ui,/A background refresh MUST NOT unlock a failed\/unknown owner POST/);
  assert.match(ui,/installUncertain=true/);
  assert.doesNotMatch(ui,/setInterval\([^]*?installApprove\.click\(\)/);
+});
+
+test('approved PREVIEW decision transport has separate bounded budgets and never retries the write',()=>{
+ const api=read('api/reality/signed-maintenance-exact-install-approval.js');
+ assert.equal(maxDuration,60);
+ assert.equal(EXACT_APPROVAL_READ_TIMEOUT_MS,15000);
+ assert.equal(EXACT_APPROVAL_WRITE_TIMEOUT_MS,20000);
+ assert.match(api,/reality_read_owner_signed_maintenance_install_decision_v1'[\s\S]*timeoutMs:EXACT_APPROVAL_READ_TIMEOUT_MS/);
+ assert.match(api,/reality_record_owner_signed_maintenance_install_decision_v1'[\s\S]*timeoutMs:EXACT_APPROVAL_WRITE_TIMEOUT_MS/);
+ assert.match(api,/Never automatically resend an ambiguous decision/);
+ assert.match(api,/retry_owner_approval:false/);
+ assert.doesNotMatch(api,/\bsetTimeout\([^]*?fetch\([^]*?method:'POST'/);
+});
+test('owner decision SQL error is fail-closed, with HTTP/SQLSTATE only and no retry',async()=>{
+ const db={url:'https://example.supabase.co',secretKey:'nonsecret-fixture-key'};
+ const calls=[];
+ const rpc='reality_record_owner_signed_maintenance_install_decision_v1';
+ const oldWarn=console.warn;
+ const notices=[];
+ try{
+  console.warn=(...x)=>notices.push(x);
+  const error=await shiftRpc(db,rpc,{test_only:true},{
+   timeoutMs:EXACT_APPROVAL_WRITE_TIMEOUT_MS,
+   fetchImpl:async(url,options)=>{
+    calls.push({url,options});
+    return {ok:false,status:500,json:async()=>({
+     code:'P0001',message:'PRIVATE_DATABASE_EXCEPTION_DO_NOT_LOG',
+     hint:'PRIVATE_DATA_DO_NOT_LOG'})};
+   }
+  }).catch(e=>e);
+  assert.equal(error.message,'SHIFT_DATABASE_RPC_'+rpc+'_UNAVAILABLE');
+  assert.equal(isShiftDatabaseTransportUnreachable(error),true);
+  assert.equal(calls.length,1);
+  assert.ok(calls[0].options.signal instanceof AbortSignal);
+  assert.equal(calls[0].options.method,'POST');
+  assert.equal(calls[0].options.redirect,'error');
+  assert.deepEqual(notices,[['REALITY_EXACT_APPROVAL_DB_REJECTED',500,'P0001']]);
+  assert.ok(!JSON.stringify(notices).includes('PRIVATE'));
+ }finally{console.warn=oldWarn}
+});
+test('owner decision verified response is accepted as one RPC; no automatic second write',async()=>{
+ const db={url:'https://example.supabase.co',secretKey:'nonsecret-fixture-key'};
+ let calls=0;
+ const r=await shiftRpc(db,'reality_record_owner_signed_maintenance_install_decision_v1',
+  {test_only:true},{
+   timeoutMs:EXACT_APPROVAL_WRITE_TIMEOUT_MS,
+   fetchImpl:async(url,options)=>{
+    calls++;
+    assert.equal(options.method,'POST');
+    assert.ok(options.signal instanceof AbortSignal);
+    return {ok:true,status:200,json:async()=>({status:'APPROVAL_FIXTURE_ONLY'})};
+   }
+  });
+ assert.equal(r.status,'APPROVAL_FIXTURE_ONLY');
+ assert.equal(calls,1);
 });
