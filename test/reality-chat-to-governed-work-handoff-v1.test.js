@@ -234,7 +234,8 @@ test('real SQL trigger and existing worker dispatch are wired, no second shift o
  assert.match(worker,/await chatWorkPromise/);
  assert.match(worker,/authenticated_chat_work_handoff:chatWorkHandoff/);
  assert.match(api,/work_handoff:(?:await readOwnerChatWorkHandoff|context\.values\.work_handoff)/);
- assert.match(html,/GOVERNED WORK · AUTHENTICATED RECEIPT/);
+ assert.match(html,/id="realityChatActivityEntries"/);
+ assert.match(html,/id="realityChatShiftTimeline"/);
  assert.doesNotMatch(sql,/update reality_internal\.governed_employee_shifts_v1/);
  assert.doesNotMatch(sql,/insert into reality_internal\.genuine_capability_queue_v1/);
 });
