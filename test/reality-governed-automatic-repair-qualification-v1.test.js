@@ -70,12 +70,21 @@ function setup({record=proof,repairSource='different',greenConclusion='success',
   else throw Error('unexpected source request');
   return {ok:true,json:async()=>v};
  };
- return {actualGraph,call,fetchImpl,urls};
+ const originalGate=existing?{
+  status:'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE',
+  owner_id:owner,shift_id:shift,original_work_id:'work:'+'1'.repeat(32),
+  source_ref:url,warrant_mode:'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS',
+  read_only:true,canonical_owner_business_original_missing:false,
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false
+ }:null;
+ return {actualGraph,originalGate,call,fetchImpl,urls};
 }
 async function run(x){
  return automaticallyQualifyVerifiedRepairOpportunity({
   db,env,shiftId:shift,workerRunId:worker,
-  graph:x.actualGraph,call:x.call,fetchImpl:x.fetchImpl
+  graph:x.actualGraph,originalGate:x.originalGate,
+  call:x.call,fetchImpl:x.fetchImpl
  });
 }
 test('real RED/GREEN #211 packet is automatically qualified but cannot widen signed #307/#308 warrant',async()=>{
@@ -109,6 +118,14 @@ test('same candidate inside independently proven original scope can prepare revi
  assert.equal(w.owner_scope_decision_ready,false);
  assert.equal(w.exact_install_approval_required,true);
  assert.equal(w.installation_authorized,false);
+});
+test('a candidate appearing in the source graph remains out of scope without a fresh exact service gate',async()=>{
+ const g=setup({repairSource:'baseline',existing:true});
+ g.originalGate.canonical_owner_business_original_missing=true;
+ const r=await run(g);
+ assert.equal(r.work_orders[0].status,
+  'REPAIR_REQUIRES_EXACT_OWNER_ORIGINAL_WORK_BINDING');
+ assert.equal(r.work_orders[0].installation_authorized,false);
 });
 test('already-installed bytes are not installed twice, and drift requires new frozen proof',async()=>{
  const installed=await run(setup({repairSource:'installed'}));
