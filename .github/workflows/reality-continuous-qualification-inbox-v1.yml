@@ -7,6 +7,8 @@ on:
       - 'supabase/migrations/*continuity_qualification_governed_routes_v1.sql'
       - 'supabase/migrations/*continuity_routes_owner_chat_readback_v1.sql'
       - 'test/reality-continuity-governed-routes-v1.test.js'
+      - 'supabase/migrations/*owner_operational_continuity_qualification_projection_v1.sql'
+      - 'test/reality-continuity-operational-view-v1.test.js'
       - 'api/reality/governed-employee-shift-worker.js'
       - 'api/reality/personal-continuous-qualification.js'
       - 'src/reality-governed-shift-boundary-v1.js'
@@ -25,4 +27,4 @@ jobs:
         with:
           node-version: '20'
       - name: Independently test continuous qualification source and authority boundaries
-        run: node --test test/reality-continuous-qualification-inbox-v1.test.js test/reality-continuity-governed-routes-v1.test.js
+        run: node --test test/reality-continuous-qualification-inbox-v1.test.js test/reality-continuity-governed-routes-v1.test.js test/reality-continuity-operational-view-v1.test.js

@@ -46,7 +46,7 @@
     (x.governed_next_action||'RECHECK_SIGNED_WORKER_CONTINUITY_ROUTE')
      .replaceAll('_',' '));
    const continuity=x.continuity_ref?
-    node('small','Continuity receipt: '+x.continuity_ref.slice(0,35)+'…'):
+    node('small','Qualification route key (not a final job receipt): '+x.continuity_ref.slice(0,35)+'…'):
     node('small','Continuity routing is awaiting a verified signed worker.');
    card.append(label,title,state,route,continuity);
    if(x.existing_approval_adapter==='EXISTING_QUALIFIED_CAPABILITY_CHAT'){
