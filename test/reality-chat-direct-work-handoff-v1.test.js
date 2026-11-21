@@ -845,3 +845,18 @@ test('affirmative high-consequence actions never pass as existing-shift-only wor
   'Do not invent customer work, restart the shift, repeat diagnostics, install code without exact authorization, or claim completion.'
  ])assert.equal(isExplicitSignedShiftContinuation(prefix+safe),true,safe);
 });
+
+test('saved original Chat continuation offers a separate explicit existing-shift action, not a fake read-only check',()=>{
+ const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(ui,/inspect\.textContent='Check available work capability'/);
+ assert.match(ui,/continueSigned\.textContent='Continue existing signed shift'/);
+ assert.match(ui,/continueSigned\.onclick=async\(\)=>/);
+ assert.match(ui,/postWork\('PROCESS_SIGNED_WORK_REQUEST'\)/);
+ assert.match(ui,/postWork\('READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS'\)/);
+ assert.match(ui,/controls\.append\(continueSigned\)/);
+ assert.match(ui,/result\.new_shift_started!==false/);
+ assert.match(ui,/result\.installation_authorized!==false/);
+ assert.match(ui,/result\.worker_execution_verified!==false/);
+ assert.doesNotMatch(ui,/void continueSigned\.onclick\(\)/,
+  'no implicit replay of signed historical instructions or approval');
+});
