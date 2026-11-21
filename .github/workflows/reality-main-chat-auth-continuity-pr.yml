@@ -1,0 +1,27 @@
+name: Reality Main Chat Auth Continuity Proof
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/chat.js'
+      - 'api/reality/intelligence.js'
+      - 'src/reality-authenticated-chat-continuity-v0.1.js'
+      - 'test/reality-authenticated-chat-continuity-v0.1.test.js'
+      - '.github/workflows/reality-main-chat-auth-continuity-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-chat-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check Node runtime
+        run: node --version
+      - name: Prove scoped continuity and identity boundary without calling a model
+        run: node --test test/reality-authenticated-chat-continuity-v0.1.test.js
