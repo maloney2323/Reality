@@ -118,7 +118,8 @@
  // The saved Chat history uses replaceChildren(). Re-attach this owner-ledger
  // projection once after each transcript reload. No new AI message or shift.
  const threadObserver=new MutationObserver(()=>{
-  if(signedIn()&&(approvedScope?.count>0||approvedScope?.finalReceipt)&&
+  if(signedIn()&&(approvedScope?.count>0||approvedScope?.finalReceipt||
+    approvedScope?.exactInstallCard||approvedScope?.exactInstallDecision)&&
      !thread.contains(hint))
    thread.append(hint);
  });
@@ -661,6 +662,7 @@
    render(scope);
   }catch(e){
    approvedScope=null;authorize.disabled=true;installApprove.disabled=true;
+   installDetails.hidden=true;installDetails.textContent='';
    installApprove.hidden=true;
    installApproveInInbox.disabled=true;installApproveInInbox.hidden=true;
    inlineContinue.disabled=true;root.hidden=false;hint.hidden=false;
@@ -673,7 +675,12 @@
    description.textContent='Reality cannot independently read the unfinished maintenance ledger.';
    feedback.textContent='Approval not confirmed. '+safeError(e)+'. Check status in Chat.';
    if(!thread.contains(hint))thread.append(hint);
-  }finally{loading=false;reload.disabled=false}
+  }finally{
+   loading=false;reload.disabled=false;
+   // The full shift read can time out while the tiny, owner-scoped exact
+   // decision RPC is healthy. GET never approves or installs anything.
+   if(!approvedScope)void checkExactOwnerApprovalStatus();
+  }
  }
  function showApprovals(){
   if(!signedIn())return;
@@ -692,9 +699,9 @@
  });
  checkStatusInChat.addEventListener('click',()=>{
   if(!signedIn()||loading||installAuthorizing)return;
-  if(installUncertain||approvedScope?.exactInstallCard||
-     approvedScope?.exactInstallDecision)void checkExactOwnerApprovalStatus();
-  else void refresh();
+  // Always use the small, owner-scoped read. Never route a status check
+  // back through the broad 25-second shift snapshot that just timed out.
+  void checkExactOwnerApprovalStatus();
  });
  reply.addEventListener('click',()=>{
   if(!signedIn())return;
@@ -740,7 +747,7 @@
      target_review_receipt_sha256:c.target_review_receipt_sha256,
      intent:'OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR',
      request_id:crypto.randomUUID()
-    }),signal:AbortSignal.timeout(25000)
+    }),signal:AbortSignal.timeout(55000)
    });
    const r=await response.json().catch(()=>null);
    if(!response.ok||r?.ok!==true||
@@ -760,7 +767,8 @@
     ' recorded. No repeat approval or shift restart. Installation and final job verification are pending.';
    chatStatus.textContent='Approval recorded · '+r.approval_receipt_sha256+
     '. Reality must now install, independently verify, and resume the SAME shift. No second click.';
-   void refresh();
+   // A successful signed decision is already a verified receipt. A broad
+   // shift refresh must not overwrite it with an unrelated GET timeout.
   }catch(e){
    installUncertain=true;installApprove.disabled=true;installApproveInInbox.disabled=true;
    feedback.textContent='The exact installation decision could not be independently confirmed ('+
@@ -769,6 +777,62 @@
     '). Tap Check approval status here in Chat. Do not approve again.';
   }finally{installAuthorizing=false;reload.disabled=false}
  });
+ // Narrow, authenticated ledger readback permits an owner to review the
+ // exact independently tested artifact even if the unrelated broad shift
+ // dashboard is overloaded. Every POST separately revalidates all hashes.
+ function renderExactReviewFromNarrowReadback(card){
+  if(!card||!UUID.test(card.maintenance_id||'')||
+     !UUID.test(card.shift_id||'')||
+     !REF.test(card.source_ref||'')||
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/.test(card.source_ref)||
+     card.target_branch!=='reality/chat-direct-work-handoff-20261115'||
+     !/^src\/[a-z0-9_./-]+\.js$/.test(card.target_path||'')||
+     card.target_path.includes('..')||
+     !GIT.test(card.candidate_commit_sha||'')||
+     !GIT.test(card.candidate_source_blob_sha||'')||
+     !GIT.test(card.target_head_sha||'')||
+     !GIT.test(card.expected_old_blob_sha||'')||
+     !SHA.test(card.artifact_receipt_sha256||'')||
+     !SHA.test(card.case_ci_receipt_sha256||'')||
+     !SHA.test(card.target_review_receipt_sha256||''))
+   fail('NARROW_EXACT_ARTIFACT_READBACK_INVALID');
+  approvedScope=Object.freeze({exactInstallCard:Object.freeze(card)});
+  root.hidden=true;
+  hint.hidden=false;
+  hintLabel.textContent='Reality verified PR #'+card.source_ref.split('/').pop()+
+   ' for your existing shift. The larger work report is delayed, but this exact approval was independently read from the ledger.';
+  decisionHeadline.hidden=false;
+  decisionHeadline.textContent='Your decision · Verified preview repair';
+  installDetails.hidden=false;
+  installDetails.textContent='Approve only '+card.target_path+
+   ' in Reality’s isolated preview. Production is unchanged.';
+  checkStatusInChat.hidden=false;
+  installApprove.hidden=false;
+  installApprove.disabled=false;
+  installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
+  inlineContinue.hidden=true;
+  watch.hidden=true;
+  chatEvidence.replaceChildren();
+  for(const [label,value] of [
+   ['Original shift',card.shift_id],
+   ['Exact repair',card.source_ref],
+   ['Candidate commit',card.candidate_commit_sha],
+   ['Independent frozen test',card.case_ci_receipt_sha256],
+   ['Independent artifact receipt',card.artifact_receipt_sha256],
+   ['Independent target proof',card.target_review_receipt_sha256],
+   ['Installation scope','Isolated preview only; not production']
+  ]){
+   const p=make('p','');
+   p.append(make('strong','',label+': '),make('span','',value));
+   chatEvidence.append(p);
+  }
+  detailDisclosure.hidden=true;chatEvidence.hidden=true;
+  review.textContent='View details';
+  review.setAttribute('aria-expanded','false');
+  chatStatus.textContent='Checked: no previous approval was recorded. This exact reviewed repair is ready for one explicit owner decision.';
+  feedback.textContent='Owner decision readback verified. No installation was authorized by checking status.';
+  if(!thread.contains(hint))thread.append(hint);
+ }
  async function checkExactOwnerApprovalStatus(){
   if(!signedIn()||loading||authorizing||installAuthorizing)return;
   reload.disabled=true;
@@ -788,7 +852,10 @@
     installUncertain=true;
     installApprove.hidden=true;installApprove.disabled=true;
     installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
+    hint.hidden=false;
+    checkStatusInChat.hidden=false;
     hintLabel.textContent='Reality independently read back your original exact approval. No duplicate owner click is needed.';
+    if(!thread.contains(hint))thread.append(hint);
     feedback.textContent='Exact owner approval receipt '+r.approval_receipt_sha256+
      ' verified. Installer and original-job completion remain separately unverified. No repeat approval.';
     chatStatus.textContent='Owner decision VERIFIED · '+r.approval_receipt_sha256+
@@ -797,14 +864,10 @@
    }
    if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK'&&
       r.owner_approval_recorded===false&&r.installation_authorized===false){
+    if(!r.exact_review)fail('NARROW_EXACT_REVIEW_MISSING');
+    // No automatic retry or approval: this renders only the exact evidence.
+    renderExactReviewFromNarrowReadback(r.exact_review);
     installUncertain=false;
-    await refresh();
-    feedback.textContent=approvedScope?.exactInstallCard?
-     'Independent owner readback: the earlier approval was NOT recorded. The exact repair must be reviewed again before one new explicit owner click. No automatic retry.':
-     'Independent owner readback: no approval recorded. The exact repair is not currently verified as ready for approval.';
-    chatStatus.textContent=approvedScope?.exactInstallCard?
-     'Checked: the earlier approval was NOT recorded. Re-read the exact evidence above before choosing one new explicit approval. No automatic retry.':
-     'Checked: no approval is recorded and no verified exact target is ready. No installation permitted.';
     return;
    }
    if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_SCOPE_UNAVAILABLE'&&
