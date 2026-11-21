@@ -70,26 +70,93 @@ begin
    'new_shift_started',false,'installation_authorized',false,
    'production_changed',false,'original_job_completed_by_read',false);
  end if;
- v_source_current:=v.routed_original=p_original_work_id and
+ v_source_current:=coalesce(v.routed_original=p_original_work_id and
   v.continuity_ref~'^reality:qualification:[a-f0-9]{64}$' and
   v.source_proof_sha256~'^sha256:[a-f0-9]{64}$' and
   v.terminal_observation is false and
   v.last_checked_at>=v_now-interval '30 minutes' and
-  v.last_seen_at>=v_now-interval '30 minutes';
- v_exact_warrant:=v.warrant_state='ACTIVE' and
+  v.last_seen_at>=v_now-interval '30 minutes',false);
+ v_exact_warrant:=coalesce(v.warrant_state='ACTIVE' and
   v.warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS' and
   v.shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK') and
   v.closed_at is null and
   pg_catalog.jsonb_typeof(v.source_scope)='array' and
   exists(select 1 from pg_catalog.jsonb_array_elements(
    coalesce(v.source_scope,'[]'::jsonb)) a
-   where a->>'source_ref'=v.source_ref);
- v_goal_worldline:=v.universe_status='VERIFIED' and
+   where a->>'source_ref'=v.source_ref),false);
+ v_goal_worldline:=coalesce(v.universe_status='VERIFIED' and
   v.continuity_root_id is not null and v.worldline_id is not null and
   v.universe_payload->>'principal_id'=p_owner_id::text and
   v.universe_payload->>'original_work_id'=p_original_work_id and
   v.universe_payload->>'acceptance_contract_sha256'
-    ~'^sha256:[a-f0-9]{64}$';
+    ~'^sha256:[a-f0-9]{64}
+ v_terminal:=exists(
+  select 1 from reality_internal.governed_original_independent_final_receipts_v1 f
+  where f.owner_id=p_owner_id and f.shift_id=v.shift_id and
+   f.original_work_id=p_original_work_id and f.source_ref=v.source_ref and
+   f.outcome='SUCCEEDED' and
+   f.final_evidence_sha256~'^sha256:[a-f0-9]{64}$');
+ v_provider_id:=case when v.source_ref like 'connector:%:%' then
+  pg_catalog.split_part(v.source_ref,':',2) else null end;
+ v_provider_verified:=exists(
+  select 1 from reality_internal.owner_connector_setup_requests_v1 x
+  where x.owner_id=p_owner_id and x.provider_id=v_provider_id
+  and x.credential_saved is true and x.provider_access_verified is true);
+ select a.adapter_id,a.registered_execution_adapter,
+  a.independently_verified_acceptance_sha256,a.effect_authority_policy_sha256,
+  a.independent_verifier_ref
+ into v_adapter
+ from reality_internal.business_original_executor_contracts_v1 a
+ where a.job_class=p_job_class and a.provider_id=v_provider_id
+  and a.enabled is true and
+  a.evidence_checked_at>=v_now-interval '30 days'
+  and a.independently_verified_acceptance_sha256~'^sha256:[a-f0-9]{64}$'
+  and a.effect_authority_policy_sha256~'^sha256:[a-f0-9]{64}$'
+  and length(a.independent_verifier_ref)>=8
+ order by a.evidence_checked_at desc limit 1;
+ v_adapter_verified:=found and v_provider_verified;
+ v_ready:=v_source_current and v_exact_warrant and v_goal_worldline
+  and v_adapter_verified and not v_terminal;
+ v_next:=case
+  when v_terminal then 'INDEPENDENT_FINAL_ORIGINAL_ALREADY_PRESENT_NO_REPLAY'
+  when not v_source_current then 'CURRENT_SOURCE_PROVENANCE_REQUALIFICATION_REQUIRED'
+  when not v_goal_worldline then 'INDEPENDENT_OWNER_GOAL_ACCEPTANCE_WORLDLINE_REQUIRED'
+  when not v_exact_warrant then 'EXACT_BUSINESS_ORIGINAL_SHIFT_WARRANT_REQUIRED'
+  when not v_provider_verified then 'OWNER_CONSENTED_PROVIDER_CONNECTION_PROOF_REQUIRED'
+  when not v_adapter_verified then 'REGISTER_AND_INDEPENDENTLY_VERIFY_EXECUTOR_ADAPTER'
+  else 'OWNER_MUST_REVIEW_EXACT_EFFECT_TARGET_PAYLOAD_AND_ONE_USE_AUTHORIZATION'
+ end;
+ return pg_catalog.jsonb_build_object(
+  'status','OWNER_EXACT_BUSINESS_EFFECT_AUTHORITY_PREFLIGHT',
+  'owner_id',p_owner_id,'shift_id',v.shift_id,
+  'original_work_id',p_original_work_id,
+  'continuity_ref',v.continuity_ref,'source_ref',v.source_ref,
+  'job_class',p_job_class,'effect_type',p_effect_type,
+  'consequence_class',v_consequence,
+  'canonical_source_current',v_source_current,
+  'exact_business_shift_warrant_verified',v_exact_warrant,
+  'independent_goal_acceptance_worldline_verified',v_goal_worldline,
+  'consented_business_provider_verified',v_provider_verified,
+  'registered_executor_independently_verified',v_adapter_verified,
+  'registered_executor_adapter',case when v_adapter_verified
+   then v_adapter.registered_execution_adapter else null end,
+  'independent_verifier_ref',case when v_adapter_verified
+   then v_adapter.independent_verifier_ref else null end,
+  'independent_final_original_already_present',v_terminal,
+  'ready_for_exact_effect_review',v_ready,
+  'next_gate',v_next,
+  'itemized_approval_granted',false,
+  'execution_authorized',false,
+  'executor_claimed',false,'read_only',true,
+  'original_job_completed_by_read',false,
+  'new_shift_started',false,'installation_authorized',false,
+  'production_changed',false);
+end $function$;
+revoke all on function public.reality_read_owner_exact_business_effect_preflight_v1(uuid,text,text,text)
+ from public,anon,authenticated;
+grant execute on function public.reality_read_owner_exact_business_effect_preflight_v1(uuid,text,text,text)
+ to service_role;
+,false);
  v_terminal:=exists(
   select 1 from reality_internal.governed_original_independent_final_receipts_v1 f
   where f.owner_id=p_owner_id and f.shift_id=v.shift_id and
