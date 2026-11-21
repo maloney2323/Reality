@@ -384,12 +384,12 @@
   decisionHeadline.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   decisionHeadline.textContent=scope.exactInstallCard?
    'Approval needed · Repair ready':
-   scope.exactInstallDecision?'Approval recorded · Reality continuing work':'';
+   scope.exactInstallDecision?'Approval recorded · Installation status in Chat':'';
   checkStatusInChat.hidden=!scope.exactInstallCard&&!scope.exactInstallDecision;
   if(!installUncertain)chatStatus.textContent=scope.exactInstallCard?
    'Ready for your one-time decision. This approves only the exact reviewed file in the isolated preview, not production.':
    scope.exactInstallDecision?
-   'Exact owner approval is already recorded. Reality must independently prove installation and return to the same original work.':
+   'Owner approval is recorded. The verified installation-status message in Chat shows source installation and independent verification separately. Original work remains open until proven.':
    'The original shift is preserved. Reality will only ask for authority when a verified repair is ready.';
   chatEvidence.replaceChildren();
   const evidence=scope.exactInstallCard||scope.exactInstallDecision;
@@ -428,7 +428,7 @@
    'PR #'+scope.exactInstallCard.source_ref.split('/').pop()+
    ' passed independent review. This approves installation in the isolated preview only, not production.':
    scope.exactInstallDecision?
-   'Approval recorded. Independent installation and the original job are still pending verification.':'';
+   'Approval recorded. See Reality’s verified installation-status message in this conversation for the installed commit and the independent post-installation result.':'';
   list.replaceChildren();
   root.hidden=scope.count===0;
   hint.hidden=scope.count===0&&!scope.finalReceipt;
@@ -462,7 +462,7 @@
    scope.exactInstallCard?
     'Reality found a verified repair for your existing shift. One exact approval is needed before installation.':
    scope.exactInstallDecision?
-    'Your approval is recorded. Reality must independently verify installation and return to the same job.':
+    'Your approval is recorded. Reality tracks installed source, independent verification and the original job separately. No repeat approval is needed.':
     'Your existing shift is still active. Reality is investigating the remaining repairs.':
    scope.activeId?
     'Reality preserved the existing shift, but must verify its authority before proceeding.':
@@ -488,7 +488,10 @@
   dialogueProof.textContent=scope.activeId&&scope.warrantVerified?
    'Signed shift '+scope.activeId+' · '+scope.signedCount+
    ' repairs in scope; '+scope.outsideCount+
-   ' additional incidents outside scope. Exact installation still requires owner approval and independent receipts.':
+   ' additional incidents outside scope. '+
+   (scope.exactInstallDecision?
+    'The exact repair approval is already recorded. Do not approve again. Independent installation and verification are tracked separately.':
+    'Any further installation requires its own exact owner approval and independent receipts.'):
    'This source readback never grants installation authority.';
   if(hint.parentElement!==thread)thread.append(hint);
   for(const item of scope.jobs){
@@ -519,7 +522,9 @@
   feedback.textContent=scope.activeId?
    'Existing shift: '+scope.activeId+' · '+scope.signedCount+
     ' exact signed repairs · '+scope.outsideCount+
-    ' outside-scope incidents. No installation or completed repair is implied.':
+    (scope.exactInstallDecision?
+     ' outside-scope incidents. Owner approval recorded; see the live installation message in Chat. No duplicate click.':
+     ' outside-scope incidents. This shift receipt alone does not prove installation or completion.'):
    scope.valid?'No work is started by reading this card. Press Continue to authorize the exact preserved maintenance set.':
     'Could not prepare an exact continuation; review and refresh the signed maintenance readback.';
  }
@@ -849,17 +854,54 @@
    if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK'&&
       r.owner_approval_recorded===true&&r.installation_authorized===true&&
       SHA.test(r.approval_receipt_sha256||'')){
+    // Approval is immutable, but installed source and independent verification
+    // advance separately. Never imply that a verified installed commit is
+    // uninstalled or that GitHub success alone settled the repair.
+    const installed=['INSTALLED','VERIFIED'].includes(r.decision_state)&&
+     r.repair_installed===true&&GIT.test(r.installed_commit_sha||'');
+    const verified=installed&&r.decision_state==='VERIFIED'&&
+     r.postinstall_verified===true&&
+     SHA.test(r.independent_postinstall_receipt_sha256||'');
+    if((['INSTALLED','VERIFIED'].includes(r.decision_state)&&!installed)||
+       (r.decision_state==='VERIFIED'&&!verified))
+     fail('EXACT_POSTINSTALL_RECEIPT_CONTRADICTORY');
     installUncertain=true;
     installApprove.hidden=true;installApprove.disabled=true;
     installApproveInInbox.hidden=true;installApproveInInbox.disabled=true;
     hint.hidden=false;
     checkStatusInChat.hidden=false;
-    hintLabel.textContent='Reality independently read back your original exact approval. No duplicate owner click is needed.';
+    const number=String(r.source_ref||'').split('/').pop();
+    const title=verified?'Independent repair verification recorded':
+     installed?'Repair installed · Independent verification pending':
+     'Owner approval recorded · Installation not yet verified';
+    decisionHeadline.hidden=false;
+    decisionHeadline.textContent=title;
+    hintLabel.textContent=verified?
+     'Reality independently verified the installed repair for PR #'+number+
+     '. Original business work remains a separate unfinished acceptance gate.':
+     installed?
+     'Reality installed PR #'+number+
+     ' in the isolated preview. Independent verification is not yet recorded. No repeat approval.':
+     'Reality independently read back your exact owner approval. The installation step is still separate. No repeat approval.';
     if(!thread.contains(hint))thread.append(hint);
-    feedback.textContent='Exact owner approval receipt '+r.approval_receipt_sha256+
-     ' verified. Installer and original-job completion remain separately unverified. No repeat approval.';
-    chatStatus.textContent='Owner decision VERIFIED · '+r.approval_receipt_sha256+
-     '. Installation, independent postinstall verification, and original-work settlement are separate pending gates.';
+    feedback.textContent=verified?
+     'Repair verification receipt '+r.independent_postinstall_receipt_sha256+
+     ' recorded. Original job completion still requires independent proof.':
+     installed?
+     'Installed commit '+r.installed_commit_sha+
+     ' verified in the owner ledger; waiting for the separate post-installation receipt.':
+     'Exact owner approval receipt '+r.approval_receipt_sha256+
+     ' verified. Installation is separately governed; no repeat approval.';
+    installDetails.hidden=false;
+    installDetails.textContent=verified?
+     'Installed commit '+r.installed_commit_sha+
+     ' was independently accepted. Original work is not yet settled.':
+     installed?
+     'Installed commit '+r.installed_commit_sha+
+     ' is recorded in the isolated preview. Independent post-install verification is pending.':
+     'Approval is recorded. Reality has not yet verified an installed commit.';
+    chatStatus.textContent='PR #'+number+' · '+title+
+     '. The existing shift remains open until its own work is independently reconciled.';
     return;
    }
    if(r.status==='EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK'&&
