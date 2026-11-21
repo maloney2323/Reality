@@ -1,0 +1,22 @@
+name: Reality original full-goal feature acceptance and installer authority preflight
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*chat_development_full_goal_completion_preflight_v1.sql'
+      - 'api/reality/personal-chat-development-completion-preflight.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'test/reality-chat-development-full-goal-completion-preflight-v1.test.js'
+  workflow_dispatch:
+jobs:
+  original-completion-preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check api/reality/personal-chat-development-completion-preflight.js && node --check reality-chat-continuous-qualification-v1.js
+      - run: node --test test/reality-chat-development-full-goal-completion-preflight-v1.test.js test/reality-continuous-qualification-inbox-v1.test.js
