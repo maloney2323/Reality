@@ -249,3 +249,16 @@ test('signed worker read-only repair evidence RPC is allowed exactly; no broad R
  }
  assert.equal(invoked,1);
 });
+
+test('worker exposes only bounded source-proof failure categories, not raw provider text',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const start=worker.indexOf('let automaticRepairOpportunityQualification=');
+ const end=worker.indexOf('let weeklyEmployeeInvestigations=',start);
+ assert.ok(start>=0&&end>start);
+ const segment=worker.slice(start,end);
+ assert.match(segment,/failure_code:failureCode/);
+ assert.match(segment,/SHIFT_RPC_NOT_ALLOWLISTED/);
+ assert.match(segment,/REPAIR_SOURCE_OR_PROVIDER_UNVERIFIED/);
+ assert.doesNotMatch(segment,/error\.stack|console\.log\(error/);
+});
