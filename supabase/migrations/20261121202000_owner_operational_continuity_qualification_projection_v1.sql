@@ -194,7 +194,7 @@ BEGIN
    'calendar_does_not_grant_execution',true,
    'read_only',true,'created_new_work',false,'installation_authorized',false,
    'original_customer_job_completed',false,'production_changed',false);
-END $function$
+END $function$;
 
 revoke all on function public.reality_read_owner_operational_continuity_v1(uuid) from public,anon,authenticated;
 grant execute on function public.reality_read_owner_operational_continuity_v1(uuid) to service_role;
