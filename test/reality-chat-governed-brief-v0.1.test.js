@@ -5,7 +5,7 @@ const brief = buildRealityBrief({
   statement: 'Review unread business emails, identify follow-ups, draft responses, and send them.',
 });
 
-assert.equal(brief.brief_version, '0.1.0');
+assert.equal(brief.brief_version, '1.0.0');
 assert.equal(brief.status, 'proposed');
 assert.equal(brief.understood.statement, 'Review unread business emails, identify follow-ups, draft responses, and send them.');
 assert.deepEqual(brief.intended_plan, [
@@ -24,4 +24,4 @@ const simple = buildRealityBrief({ statement: 'Review my business emails.' });
 assert.equal(simple.authority_map.some((x) => x.status === 'NOT_AUTHORIZED'), false);
 assert.equal(simple.execution.status, 'NOT_EXECUTED');
 
-console.log('Reality Chat Governed Brief v0.1: PASS');
+console.log('Reality Chat Governed Brief v1.0: PASS');
