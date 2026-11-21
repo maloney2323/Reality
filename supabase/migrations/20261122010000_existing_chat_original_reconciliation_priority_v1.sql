@@ -114,7 +114,7 @@ begin
   'shift_authorized_by_read',false,'execution_authorized',false,
   'installation_authorized',false,'production_changed',false
  );
-end $function$
+end; $function$;
 
 revoke all on function public.reality_read_owner_continuous_qualification_inbox_v1(uuid) from public,anon,authenticated;
 grant execute on function public.reality_read_owner_continuous_qualification_inbox_v1(uuid) to service_role;
