@@ -38,7 +38,15 @@ export default async function handler(req,res){
      result.items.some(x=>typeof x.intake_family!=='string'||
       typeof x.intake_key!=='string'||typeof x.title!=='string'||
       typeof x.qualification_state!=='string'||
-      typeof x.next_action!=='string'||x.approval_ready!==false||
+      typeof x.next_action!=='string'||
+      typeof x.governed_route_state!=='string'||
+      typeof x.governed_next_action!=='string'||
+      (x.continuity_ref!==null&&!/^reality:qualification:[a-f0-9]{64}$/.test(x.continuity_ref||''))||
+      (x.matched_original_work_id!==null&&
+       !/^work:[a-f0-9]{32}$/.test(x.matched_original_work_id||''))||
+      (x.existing_approval_adapter!==null&&
+       x.existing_approval_adapter!=='EXISTING_QUALIFIED_CAPABILITY_CHAT')||
+      x.approval_ready!==false||
       x.executable_original_admitted!==false))
    throw Error('CONTINUOUS_QUALIFIER_OWNER_RECEIPT_UNVERIFIED');
   return res.status(200).json({ok:true,...result});
