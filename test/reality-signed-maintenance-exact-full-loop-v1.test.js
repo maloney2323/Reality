@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // Include exact owner readback regression in the existing signed CI gate.
 import './reality-signed-maintenance-owner-approval-readback-v1.test.js';
+import './reality-chat-installation-status-v1.test.js';
 // The old saved-shift receipt must not cover the Chat composer.
 import './reality-chat-existing-shift-handoff-dismiss-v1.test.js';
 // A preview session 503 must never hide Reality's real sign-in form.
