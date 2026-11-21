@@ -137,7 +137,11 @@
   const candidates=data.items.filter(x=>x.intake_family==='AUTHENTICATED_CHAT'&&
    !x.terminal_observation&&UUID.test(x.intake_key||'')&&
    ROUTE.test(x.continuity_ref||'')&&
-   x.governed_route_state==='SAVED_CHAT_INTENT_NEEDS_GOVERNED_CLASSIFICATION'&&
+   ['SAVED_CHAT_INTENT_NEEDS_GOVERNED_CLASSIFICATION',
+    'QUALIFIED_CHAT_ORIGINAL_AWAITING_EXACT_OWNER_APPROVAL',
+    'QUALIFIED_CHAT_ORIGINAL_ADMITTED_PENDING_GOVERNED_EXECUTION',
+    'EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER']
+    .includes(x.governed_route_state)&&
    x.source_ref==='supabase:reality_chat_messages:'+x.intake_key).slice(0,5);
   exactStatus.textContent=candidates.length?
    candidates.length+' previously saved signed Chat instruction(s) ready for independent scope classification. This is not approval.' :
@@ -151,6 +155,7 @@
    const button=node('button','Verify exact original and registered capability');
    button.type='button';
    const verdict=node('div');
+   verdict.dataset.signedReviewSource=item.intake_key;
    const feedback=node('p','No original admitted. No executor started.');
    feedback.setAttribute('role','status');
    button.addEventListener('click',async()=>{
@@ -178,6 +183,38 @@
    });
    card.append(title,key,button,feedback,verdict);
    exactItems.append(card);
+   // Independently re-read persisted packets so exact approvals do not
+   // disappear after a signed worker routes an existing Chat original.
+   void (async()=>{
+    try{
+     const read=await exactApi();
+     if(!isReady()||!Array.isArray(read.items))return;
+     const matching=read.items.filter(p=>p.message_id===item.intake_key&&
+      p.continuity_ref===item.continuity_ref&&p.source_ref===item.source_ref);
+     if(matching.length!==1)return;
+     const p=matching[0];
+     if(p.review_state==='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'&&
+      /^work:[a-f0-9]{32}$/.test(p.original_work_id||'')&&
+      SHA.test(p.approval_receipt_sha256||'')){
+      button.disabled=true;
+      feedback.textContent='Already admitted: '+p.original_work_id+
+       '. Owner approval receipt '+p.approval_receipt_sha256+
+       '. Execution and independent settlement are separate.';
+     }else if(p.review_state==='AWAITING_OWNER_EXACT_APPROVAL'){
+      const packet={...p,
+       status:'QUALIFIED_CHAT_EXACT_OWNER_ADMISSION_APPROVAL_READY',
+       owner_approval_ready:true,
+       approval_scope:'ISOLATED_NEW_DEVELOPMENT_ADMISSION_ONLY',
+       installation_authorized:false,model_execution_authorized:false,
+       new_shift_started:false};
+      if(checkedPacket(packet,item)){
+       renderApprovalPacket(item,verdict,packet);
+       button.disabled=true;
+       feedback.textContent='Persisted exact approval is pending. No original admitted.';
+      }
+     }
+    }catch{/* Provider readback failure cannot grant authority. */}
+   })();
   }
  }
 
