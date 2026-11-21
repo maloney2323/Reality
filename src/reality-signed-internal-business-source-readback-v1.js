@@ -33,7 +33,61 @@ export async function probeOneSignedInternalBusinessProviderSource({
  const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
  // Public anonymous GitHub reads are not proof the Reality credential is
  // installed. Don't call a public URL and mislabel it a connected account.
- if(token.length<20)return safe('SIGNED_INTERNAL_SOURCE_PROVIDER_CREDENTIAL_MISSING');
+ if(token.length<20){
+  // Existing isolated Supabase Edge broker holds Reality's provider
+  // credential. Do NOT copy a production token into Vercel preview or fall
+  // back to an anonymous GET masquerading as an authenticated connection.
+  let response,receipt;
+  try{
+   response=await fetchImpl(db.url+
+    '/functions/v1/reality-signed-internal-repo-business-source-v1',{
+     method:'POST',redirect:'error',cache:'no-store',
+     signal:AbortSignal.timeout(25000),
+     headers:{apikey:db.secretKey,
+      authorization:'Bearer '+db.secretKey,
+      'content-type':'application/json',accept:'application/json'},
+     body:JSON.stringify({mode:'source_reobserve',
+      repository_full_name:repo,worker_run_id:workerRunId})
+    });
+   receipt=await response.json().catch(()=>null);
+  }catch{
+   return safe('SIGNED_INTERNAL_SOURCE_EXISTING_BROKER_UNAVAILABLE');
+  }
+  if(!response?.ok||!receipt||typeof receipt!=='object'||
+     Array.isArray(receipt))
+   return safe('SIGNED_INTERNAL_SOURCE_EXISTING_BROKER_PROOF_UNAVAILABLE');
+  if(receipt.status==='NO_DUE_SIGNED_INTERNAL_PROVIDER_BUSINESS_SOURCE'&&
+   receipt.model_execution_authorized===false&&
+   receipt.customer_source_connection_verified===false&&
+   receipt.new_shift_started===false)
+   return safe(receipt.status);
+  if(receipt.status==='INTERNAL_BUSINESS_SOURCE_PROVIDER_EPOCH_CHANGED_NO_RECEIPT'&&
+   receipt.internal_source_provider_readback_verified===false&&
+   receipt.customer_source_connection_verified===false)
+   return safe(receipt.status);
+  if(receipt.status!=='SIGNED_INTERNAL_BUSINESS_SOURCE_DOUBLE_PROVIDER_READBACK_RECORDED'||
+   receipt.internal_source_provider_readback_verified!==true||
+   !REF.test(receipt.source_ref||'')||
+   !receipt.source_ref.startsWith('https://github.com/'+repo+'/')||
+   !ROUTE.test(receipt.continuity_ref||'')||
+   !SHA.test(receipt.provider_proof_sha256||'')||
+   receipt.customer_source_connection_verified!==false||
+   receipt.business_original_admitted!==false||
+   receipt.original_customer_job_completed!==false||
+   receipt.model_execution_authorized!==false||
+   receipt.owner_approval_granted!==false||
+   receipt.new_shift_started!==false||
+   receipt.installation_authorized!==false||
+   receipt.production_changed!==false)
+   return safe('SIGNED_INTERNAL_SOURCE_EXISTING_BROKER_RECEIPT_UNVERIFIED');
+  return safe(receipt.status,{
+   internal_company_provider_source_verified:true,
+   source_ref:receipt.source_ref,
+   provider_proof_sha256:receipt.provider_proof_sha256,
+   continuity_ref:receipt.continuity_ref,
+   signed_worker_run_id:workerRunId
+  });
+ }
 
  const scope=await call(db,'reality_read_next_signed_internal_repo_business_source_v1',{
   p_worker_run_id:workerRunId,p_repo_full_name:repo

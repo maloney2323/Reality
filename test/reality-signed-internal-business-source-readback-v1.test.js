@@ -9,6 +9,7 @@ const worker=read('../api/reality/governed-employee-shift-worker.js');
 const ui=read('../reality-chat-continuous-qualification-v1.js');
 const api=read('../api/reality/personal-internal-business-provider-proof.js');
 const boundary=read('../src/reality-governed-shift-boundary-v1.js');
+const broker=read('../supabase/functions/reality-signed-internal-repo-business-source-v1/index.ts');
 const ownerId='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const workerRun='aae83122-d88e-4e8b-adfe-e1b527cf8fd0';
 const hash='sha256:'+'b'.repeat(64);
@@ -98,14 +99,44 @@ test('an unstable second read or a provider failure never persists a source proo
   assert.equal(calls.length,1);
  }
 });
-test('no existing provider token means no anonymous GET can count as an owner connector',async()=>{
+test('without a Vercel GitHub token reuse only the existing service-authenticated isolated Supabase broker',async()=>{
+ const urls=[];
+ const receipt={status:'SIGNED_INTERNAL_BUSINESS_SOURCE_DOUBLE_PROVIDER_READBACK_RECORDED',
+  source_ref:ref,continuity_ref:continuity,provider_proof_sha256:hash,
+  internal_source_provider_readback_verified:true,
+  customer_source_connection_verified:false,business_original_admitted:false,
+  original_customer_job_completed:false,owner_approval_granted:false,
+  model_execution_authorized:false,new_shift_started:false,
+  installation_authorized:false,production_changed:false};
  const r=await probeOneSignedInternalBusinessProviderSource({
-  db,workerRunId:workerRun,env:{...env,REALITY_GITHUB_TOKEN:''},
-  call:async()=>assert.fail('cannot reach database on missing credential'),
-  readSource:async()=>assert.fail('cannot call public provider anonymously')
+  db:{...db,url:'https://isolated-example.supabase.co'},workerRunId:workerRun,
+  env:{...env,REALITY_GITHUB_TOKEN:''},
+  fetchImpl:async (url,options)=>{
+   urls.push({url,options});
+   return {ok:true,json:async()=>receipt};
+  },
+  call:async()=>assert.fail('the broker alone selects the owner source'),
+  readSource:async()=>assert.fail('no anonymous public GitHub GET from Vercel')
  });
- assert.equal(r.status,'SIGNED_INTERNAL_SOURCE_PROVIDER_CREDENTIAL_MISSING');
+ assert.equal(r.internal_company_provider_source_verified,true);
+ assert.equal(r.customer_source_connection_verified,false);
+ assert.equal(urls.length,1);
+ assert.equal(urls[0].url,'https://isolated-example.supabase.co/functions/v1/reality-signed-internal-repo-business-source-v1');
+ assert.equal(urls[0].options.headers.apikey,db.secretKey);
+ assert.equal(urls[0].options.headers.authorization,'Bearer '+db.secretKey);
+ assert.equal(JSON.parse(urls[0].options.body).worker_run_id,workerRun);
+});
+test('broker failure never downgrades to anonymous public GitHub access',async()=>{
+ const r=await probeOneSignedInternalBusinessProviderSource({
+  db:{...db,url:'https://isolated-example.supabase.co'},
+  workerRunId:workerRun,env:{...env,REALITY_GITHUB_TOKEN:''},
+  fetchImpl:async()=>({ok:false,json:async()=>({status:'SERVICE_AUTH_REJECTED'})}),
+  call:async()=>assert.fail('broker response is not independently signed source evidence'),
+  readSource:async()=>assert.fail('no fallback anonymous GitHub GET allowed')
+ });
+ assert.equal(r.status,'SIGNED_INTERNAL_SOURCE_EXISTING_BROKER_PROOF_UNAVAILABLE');
  assert.equal(r.internal_company_provider_source_verified,false);
+ assert.equal(r.model_execution_authorized,false);
 });
 test('live source and permission must originate from same signed worker and owner Continuity',()=>{
  for(const v of [
@@ -139,4 +170,25 @@ test('single signed worker calls installed source reader, Reality Chat displays 
  assert.match(ui,/Internal company source · live provider proof/);
  assert.match(ui,/loadInternalCompanySourceProviderProof\(\)/);
  assert.match(ui,/No customer connection or executable original granted/);
+});
+
+test('existing isolated provider broker never returns secret or expands business/execution authority',()=>{
+ for(const part of [
+  "REALITY_GITHUB_BROKER_TOKEN","SUPABASE_SERVICE_ROLE_KEY",
+  "SIGNED_OWNER_INTERNAL_PROVIDER_SOURCE_SELECTED",
+  "reality_read_next_signed_internal_repo_business_source_v1",
+  "reality_record_signed_internal_repo_provider_proof_v1",
+  "SIGNED_INTERNAL_BUSINESS_SOURCE_DOUBLE_PROVIDER_READBACK_RECORDED",
+  "INTERNAL_BUSINESS_SOURCE_PROVIDER_EPOCH_CHANGED_NO_RECEIPT",
+  "customer_source_connection_verified:false",
+  "model_execution_authorized:false",
+  "business_original_admitted:false",
+  "owner_approval_granted:false","new_shift_started:false",
+  "production_changed:false"
+ ])assert.ok(broker.includes(part),part);
+ assert.match(broker,/if\(!same\(req\.headers\.get\('apikey'\)\|\|'',c\.key\)/);
+ assert.match(broker,/method:'GET'/);
+ assert.match(broker,/first\.provider_proof_sha256!==second\.provider_proof_sha256/);
+ assert.doesNotMatch(broker,/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[0-9]+/);
+ assert.doesNotMatch(broker,/method:'PATCH'|method:'PUT'|method:'DELETE'/);
 });
