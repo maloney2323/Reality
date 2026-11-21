@@ -2256,6 +2256,13 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    // A verified internal repair is not customer original work. Give the
+    // missing exact owner business-work lineage priority over a generic
+    // successful classification/routing message on the signed worker pulse.
+    (signedMaintenanceCanonicalBusinessLineageMissing||
+     signedMaintenanceOriginalReturnDispatch?.status===
+      'CANONICAL_OWNER_BUSINESS_ORIGINAL_EVIDENCE_REQUIRED')?
+    'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
     governedContinuityEvidenceClassification?.status===
      'GOVERNED_CONTINUITY_EVIDENCE_SEPARATED_AND_ROUTED'&&
     governedContinuityEvidenceClassification.lanes.some(l=>
@@ -2265,8 +2272,6 @@ export default async function handler(req,res){
     'SIGNED_MAINTENANCE_REPAIR_AND_ORIGINAL_LINEAGE_SEPARATELY_ROUTED':
     signedMaintenanceArtifactHandoff?.verified_repair_artifact===true?
     'SIGNED_MAINTENANCE_EXACT_REPAIR_ARTIFACT_REVIEW_READY':
-    signedMaintenanceCanonicalBusinessLineageMissing?
-    'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
     signedMaintenanceAuthorizedCaseRedOutstanding?
     'SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED':
     signedMaintenanceAuthorizedSourceRequalificationPending?
