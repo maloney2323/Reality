@@ -324,6 +324,46 @@ export default async function handler(req,res){
       model_execution_authorized:false,owner_approval_granted:false,
       new_original_admitted:false,new_shift_started:false,
       installation_authorized:false,production_changed:false};
+  // Existing signed worker performs ONLY independent readback before choosing
+  // a registered business executor. Owner approval never directly invokes it.
+  // An installed handler must independently check the one-use claim.
+  workerStage='EXACT_APPROVED_BUSINESS_EFFECT_SIGNED_HANDOFF';
+  const exactApprovedBusinessEffectHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await shiftRpc(db,'reality_read_next_signed_business_effect_handoff_v1',{
+    p_worker_run_id:actualWorkerRunId
+   },{timeoutMs:12000}).then(r=>{
+    if(![
+     'NO_OWNER_APPROVED_BUSINESS_EFFECT_TO_HANDOFF',
+     'SIGNED_BUSINESS_EFFECT_CURRENT_WORKER_LEASE_REQUIRED',
+     'SIGNED_BUSINESS_EFFECT_SOURCE_OR_ADAPTER_DRIFT_NO_DISPATCH',
+     'EXACT_APPROVED_BUSINESS_EFFECT_REGISTERED_HANDLER_REQUIRED'
+    ].includes(r?.status)||
+      r.execution_authorized_by_read!==false||
+      r.effect_reserved!==false||
+      r.original_job_completed!==false||
+      r.production_changed!==false)
+     throw Error('SIGNED_BUSINESS_EFFECT_HANDOFF_RECEIPT_INVALID');
+    if(r.status==='EXACT_APPROVED_BUSINESS_EFFECT_REGISTERED_HANDLER_REQUIRED'&&(
+      r.shift_id!==wakeReceipt.shift_id||
+      !/^[a-f0-9-]{36}$/i.test(r.packet_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(r.original_work_id||'')||
+      !/^reality_[a-z0-9_]+_v[0-9]+$/.test(
+       r.registered_execution_adapter||'')||
+      !/^sha256:[a-f0-9]{64}$/.test(r.approval_receipt_sha256||'')||
+      r.owner_exact_one_use_approval_verified!==true||
+      r.handler_installed_and_verified_by_read!==false))
+     throw Error('SIGNED_BUSINESS_EFFECT_APPROVED_SOURCE_INVALID');
+    return r;
+   }).catch(()=>({
+    status:'EXACT_BUSINESS_EFFECT_SIGNED_SERVICE_READBACK_UNVERIFIED',
+    next_action:'RECHECK_OWNER_APPROVAL_AND_REGISTERED_EXECUTOR',
+    effect_reserved:false,original_job_completed:false,
+    execution_authorized_by_read:false,production_changed:false
+   })):
+   {status:'NO_VERIFIED_SIGNED_BUSINESS_EFFECT_WORKER_PULSE',
+    effect_reserved:false,original_job_completed:false,
+    execution_authorized_by_read:false,production_changed:false};
   // First real INTERNAL company source connection proof: reobserve an
   // already signed owner GitHub issue/PR with Reality's installed provider
   // reader. This is an optional, bounded two-GET source probe, never an
@@ -2752,6 +2792,7 @@ export default async function handler(req,res){
     actual_worker_completion_receipt:completedPulse,
     continuous_qualification_inbox:continuousQualificationInbox,
     continuity_qualification_routes:continuityQualificationRoutes,
+    exact_approved_business_effect_handoff:exactApprovedBusinessEffectHandoff,
     automatic_work_supervisor:automaticWorkSupervisor,
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,
