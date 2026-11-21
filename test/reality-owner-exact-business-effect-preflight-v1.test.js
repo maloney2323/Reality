@@ -59,7 +59,7 @@ test('reject guessed owner, forged approval, and false review readiness',()=>{
  assert.throws(()=>check({...base,production_changed:true}),/RECEIPT_UNVERIFIED/);
 });
 test('effect contract is source neutral, service-only and never mutates the existing job ledger',()=>{
- const sql=readFileSync(new URL('../supabase/migrations/20261121213000_owner_exact_business_effect_preflight_v1.sql',import.meta.url),'utf8');
+ const sql=readFileSync(new URL('../supabase/migrations/20261121235900_owner_exact_business_effect_preflight_v1.sql',import.meta.url),'utf8');
  assert.match(sql,/current_user<>'service_role'/);
  assert.match(sql,/revoke all on function public\.reality_read_owner_exact_business_effect_preflight_v1/);
  assert.match(sql,/grant execute on function public\.reality_read_owner_exact_business_effect_preflight_v1/);
