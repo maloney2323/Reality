@@ -180,6 +180,8 @@ export default async function handler(req,res){
  let governedWakeClaimId=null;
  let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
+ let workerCompletionAttestedBeforeResponse=false;
+ let wakeLeaseReleasedBeforeResponse=false;
  let workerStage='SHIFT_DB_BOUNDARY';
  let shiftDbTransportUnreachable=false;
  try{
@@ -2344,6 +2346,44 @@ export default async function handler(req,res){
   }
   const employeeTemporalInquiry=await employeeTemporalInquiryPromise;
   workerStage='WORKER_RESPONSE_PUBLICATION';
+  // Finish the signed wake lifecycle BEFORE responding: serverless execution
+  // after an HTTP response cannot guarantee release of this singleflight lease.
+  // A successful wake is still NOT original-job settlement.
+  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
+   try{
+    const attested=await shiftRpc(activePulseDb,
+     'reality_record_signed_worker_actual_run_v1',{
+      p_run_id:actualWorkerRunId,p_status:'COMPLETED',
+      p_stage:workerStage
+     });
+    workerCompletionAttestedBeforeResponse=
+     attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+     attested.run_id===actualWorkerRunId&&
+     attested.original_job_completed===false&&
+     attested.installation_authorized===false&&
+     attested.production_changed===false;
+    if(!workerCompletionAttestedBeforeResponse)
+     console.warn('REALITY_SIGNED_WORKER_PRE_RESPONSE_ATTESTATION_UNVERIFIED');
+   }catch{
+    console.warn('REALITY_SIGNED_WORKER_PRE_RESPONSE_ATTESTATION_UNAVAILABLE');
+   }
+  }
+  if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
+   try{
+    const released=await shiftRpc(activePulseDb,
+     'reality_release_governed_shift_worker_run_v1',{
+      p_claim_id:governedWakeClaimId
+     });
+    wakeLeaseReleasedBeforeResponse=
+     released?.status==='WAKE_RELEASED'&&
+     released.original_job_completed===false&&
+     released.installation_authorized===false;
+    if(!wakeLeaseReleasedBeforeResponse)
+     console.warn('REALITY_SHIFT_WORKER_PRE_RESPONSE_LEASE_NOT_RELEASED');
+   }catch{
+    console.warn('REALITY_SHIFT_WORKER_PRE_RESPONSE_LEASE_RELEASE_UNAVAILABLE');
+   }
+  }
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
@@ -2486,7 +2526,8 @@ export default async function handler(req,res){
  }finally{
   // Independently attest actual completion or failure even when a worker
   // response has already been sent. No false 'successful job' claim.
-  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
+  if(actualWorkerRunId&&!workerCompletionAttestedBeforeResponse&&
+      activePulseDb&&!shiftDbTransportUnreachable){
    const result=res.statusCode>=500?'FAILED':'COMPLETED';
    const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
     workerStage:'UNCLASSIFIED_STAGE';
@@ -2500,7 +2541,8 @@ export default async function handler(req,res){
   }
   // A failed release leaves a bounded lease, not another concurrent worker.
   // This does not settle customer work or change any authorization.
-  if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
+  if(governedWakeClaimId&&!wakeLeaseReleasedBeforeResponse&&
+      activePulseDb&&!shiftDbTransportUnreachable){
    try{
     const released=await shiftRpc(activePulseDb,
      'reality_release_governed_shift_worker_run_v1',
