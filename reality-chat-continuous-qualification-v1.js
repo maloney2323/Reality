@@ -41,7 +41,17 @@
    const title=node('p',x.title.slice(0,170));
    const state=node('small',x.qualification_state.replaceAll('_',' ')+
     ' · '+x.next_action.replaceAll('_',' '));
-   card.append(label,title,state);
+   const route=node('p',(x.governed_route_state||'SIGNED_WORKER_ROUTE_RECONCILIATION_PENDING')
+     .replaceAll('_',' ')+' · '+
+    (x.governed_next_action||'RECHECK_SIGNED_WORKER_CONTINUITY_ROUTE')
+     .replaceAll('_',' '));
+   const continuity=x.continuity_ref?
+    node('small','Continuity receipt: '+x.continuity_ref.slice(0,35)+'…'):
+    node('small','Continuity routing is awaiting a verified signed worker.');
+   card.append(label,title,state,route,continuity);
+   if(x.existing_approval_adapter==='EXISTING_QUALIFIED_CAPABILITY_CHAT'){
+    card.append(node('p','A verified capability may already have an exact owner approval card. Reality must recheck its existing authenticated approval preflight before displaying or accepting a decision.'));
+   }
    if(typeof x.source_ref==='string'&&
       /^https:\/\/github\.com\/[^/]+\/[^/]+\/(issues|pull)\/[1-9][0-9]*$/.test(x.source_ref)){
     const link=node('a','Inspect source');
@@ -89,6 +99,10 @@
    'Source reference: '+String(item.source_ref||'(owner ledger source)').slice(0,350)+'\n'+
    'Qualification state: '+item.qualification_state+'\n'+
    'Required next check: '+item.next_action+'\n'+
+   'Continuity reference: '+String(item.continuity_ref||'NOT_YET_RECONCILED')+'\n'+
+   'Governed route: '+item.governed_route_state+'\n'+
+   'Next governed check: '+item.governed_next_action+'\n'+
+   'Existing verified original match: '+String(item.matched_original_work_id||'NONE')+'\n'+
    'Verify current owner, goal, source, frozen acceptance, and permitted scope. '+
    'If an exact executable original is independently qualified, present the governed approval request once. '+
    'Do not create a new shift, infer approval, replay uncertain effects, or install anything.';
