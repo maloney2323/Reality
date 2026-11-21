@@ -306,16 +306,60 @@ async function stage(s,db,secret,token,base){
   return bodySafe('CHAT_NEW_DEV_PR_PROVIDER_READBACK_UNVERIFIED');
  return recordCandidate(s,db,secret,check);
 }
-async function verifyCI(s,db,secret,token,base){
+// For an ALREADY-STAGED immutable source candidate, later preview releases
+// may change. Reconcile GitHub CI against the original frozen source and
+// recorded draft PR, not the current worker release. No source write here.
+async function verifyCI(s,db,secret,token){
  const e=s.evidence;
  const commit=e.artifact_commit_sha,pr=e.pull_request_number;
- if(!SHA.test(commit||'')||!Number.isSafeInteger(pr)||pr<=0)
+ if(!SHA.test(commit||'')||!Number.isSafeInteger(pr)||pr<=0||
+    !SHA.test(s.release_sha||'')||
+    !SHA.test(e.artifact_blob_sha||'')||
+    !SHA.test(e.source_blob_sha||'')||
+    typeof e.target_path!=='string'||!PATH.test(e.target_path)||
+    e.target_path.includes('..')||e.target_path.includes('//')||
+    e.pr_url!=='https://github.com/'+REPO+'/pull/'+pr)
   return bodySafe('CHAT_NEW_DEV_PROVENANCE_NOT_FINAL');
  const prs=await gh(token,'/pulls/'+pr);
  if(!prs.ok||prs.data?.head?.sha!==commit||
     prs.data?.head?.ref!==branchAndArtifact(s).branch||
-    prs.data?.base?.ref!==base)
+    prs.data?.head?.repo?.full_name!==REPO||
+    prs.data?.base?.repo?.full_name!==REPO||
+    prs.data?.draft!==true||prs.data?.merged!==false||
+    !BRANCH.test(prs.data?.base?.ref||'')||
+    prs.data.base.ref.includes('..')||
+    prs.data.base.ref.startsWith('reality/chat-development/')||
+    prs.data.base.ref.startsWith('reality/riley/'))
   return bodySafe('CHAT_NEW_DEV_CANDIDATE_PR_IDENTITY_DRIFT');
+ // Re-read the immutable ORIGINAL candidate parent chain and artifact.
+ // A successful CI on a changed/misidentified PR cannot settle this source.
+ const artifact='evidence/reality-chat-development/'+s.message_id+'.json';
+ const [head,proof,frozen]=await Promise.all([
+  gh(token,'/commits/'+commit),
+  gh(token,'/contents/'+artifact+'?ref='+commit),
+  gh(token,'/contents/'+e.target_path+'?ref='+s.release_sha)
+ ]);
+ // The stored artifact commit's parent is itself the source-modification
+ // commit. Some older evidence records omit source_commit_sha; resolve the
+ // parent from GitHub, then independently read the source modification.
+ if(!head.ok||head.data?.sha!==commit||
+    head.data?.parents?.length!==1||
+    head.data?.files?.length!==1||
+    head.data.files[0]?.filename!==artifact||
+    head.data.files[0]?.status!=='added'||
+    !SHA.test(head.data.parents[0]?.sha||'')||
+    !proof.ok||proof.data?.sha!==e.artifact_blob_sha||
+    !frozen.ok||frozen.data?.sha!==e.source_blob_sha)
+  return bodySafe('CHAT_NEW_DEV_FROZEN_CANDIDATE_SOURCE_PROOF_REQUIRED');
+ const parent=head.data.parents[0].sha;
+ const sourceRead=await gh(token,'/commits/'+parent);
+ if(!sourceRead.ok||sourceRead.data?.sha!==parent||
+    sourceRead.data?.parents?.length!==1||
+    sourceRead.data.parents[0]?.sha!==s.release_sha||
+    sourceRead.data.files?.length!==1||
+    sourceRead.data.files[0]?.filename!==e.target_path||
+    sourceRead.data.files[0]?.status!=='modified')
+  return bodySafe('CHAT_NEW_DEV_FROZEN_CANDIDATE_PARENT_DRIFT');
  const runs=await gh(token,'/actions/runs?head_sha='+commit+
   '&event=pull_request&per_page=100');
  if(!runs.ok||!Array.isArray(runs.data?.workflow_runs))
@@ -385,13 +429,17 @@ Deno.serve(async req=>{
    'reality_read_next_chat_new_development_candidate_v2');
   if(s.status==='NO_CURRENT_CHAT_NEW_DEVELOPMENT_CANDIDATE')
    return bodySafe(s.status);
-  if(!cleanScope(s)||s.release_sha!==body.base_sha)
+  if(!cleanScope(s))
+   return bodySafe('NEW_CHAT_DEVELOPMENT_SIGNED_SOURCE_DRIFT');
+  // Release drift forbids ALL staging/writes. Only an already recorded
+  // CANDIDATE_STAGED original may independently reconcile past GitHub CI.
+  if(s.phase!=='CANDIDATE_STAGED'&&s.release_sha!==body.base_sha)
    return bodySafe('NEW_CHAT_DEVELOPMENT_SIGNED_SOURCE_DRIFT');
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<24)
    return bodySafe('NEW_CHAT_DEVELOPMENT_PROVIDER_WRITER_UNAVAILABLE');
   if(s.phase==='CANDIDATE_STAGED')
-   return await verifyCI(s,project.origin,secret,token,body.base_branch);
+   return await verifyCI(s,project.origin,secret,token);
   return await stage(s,project.origin,secret,token,body.base_branch);
  }catch(e){
   const code=String(e instanceof Error?e.message:'');
