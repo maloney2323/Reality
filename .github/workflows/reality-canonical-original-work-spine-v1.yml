@@ -1,0 +1,31 @@
+name: Canonical original-work Continuity proof
+on:
+  pull_request:
+    branches:
+      - repair/maintenance-artifact-to-same-shift-review-20261120
+    paths:
+      - 'src/reality-canonical-original-work-spine-v1.js'
+      - 'api/reality/personal-multi-original-shift-preflight.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'test/reality-canonical-original-work-spine-v1.test.js'
+      - '.github/workflows/reality-canonical-original-work-spine-v1.yml'
+permissions:
+  contents: read
+concurrency:
+  group: canonical-original-work-spine-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  independent-stage-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check canonical stage and authority negative tests
+        run: node --test test/reality-canonical-original-work-spine-v1.test.js
+      - name: Parse authenticated projection and Chat UI without provider side effects
+        run: |
+          node --check api/reality/personal-multi-original-shift-preflight.js
+          node --check reality-chat-continuous-qualification-v1.js
