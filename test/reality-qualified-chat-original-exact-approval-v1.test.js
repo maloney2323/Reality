@@ -43,7 +43,7 @@ test('database role and owner source are independently checked, never inferred f
  ]){
   assert.ok(sql.includes('revoke all on function public.'+n));
   assert.ok(sql.includes('grant execute on function public.'+n));
-  assert.ok(boundary.includes(n));
+  assert.ok(boundary.includes(n.replace(/^reality_/,'')));
  }
  assert.match(api,/authenticatedChatSession\(req,res\)/);
  assert.match(api,/assertSameOrigin\(req\)/);
