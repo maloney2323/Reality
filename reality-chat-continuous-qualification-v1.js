@@ -20,6 +20,17 @@
  const summary=node('p','Reality checks existing work before any approval or execution.');
  summary.setAttribute('role','status');
  const entries=node('div');
+ // A multi-job acceptance target is a test objective, not a new job,
+ // second shift, model execution permission or new qualifying engine.
+ const multiOriginal=node('section');
+ multiOriginal.setAttribute('aria-label','Multi-original shift acceptance');
+ const multiHeading=node('h4','Multi-original shift · acceptance');
+ const multiSummary=node('p','Checking real business originals, independent evidence, and exact authority…');
+ multiSummary.setAttribute('role','status');
+ const multiSources=node('div');
+ const multiRefresh=node('button','Verify multi-job readiness');
+ multiRefresh.type='button';
+ multiOriginal.append(multiHeading,multiSummary,multiSources,multiRefresh);
  const exactReview=node('section');
  exactReview.setAttribute('aria-label','Saved signed Chat originals awaiting exact qualification');
  const exactHeading=node('h4','Signed Chat originals · exact approval');
@@ -32,14 +43,61 @@
  const review=node('button','Discuss next qualification in Chat');
  review.type='button';review.disabled=true;
  const footer=node('p','Evidence intake is not executable work. A specific, current, independently qualified job must be presented through the existing governed owner approval flow.');
- root.append(heading,summary,entries,exactReview,refresh,review,footer);
+ root.append(heading,summary,multiOriginal,entries,exactReview,refresh,review,footer);
  panel.prepend(root);
  let active=null,loading=false,verified=null;
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const ROUTE=/^reality:qualification:[a-f0-9]{64}$/;
  const APPROVAL_API='/api/reality/personal-qualified-chat-original-approval';
- let checkingExact=false,approvalUncertain=false;
+ let checkingExact=false,approvalUncertain=false,multiLoading=false;
+ const MULTI_PREFLIGHT='/api/reality/personal-multi-original-shift-preflight?target=5';
+ async function loadMultiOriginal(){
+  if(multiLoading||!isReady())return;
+  multiLoading=true;multiRefresh.disabled=true;
+  try{
+   const response=await fetch(MULTI_PREFLIGHT,{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(19000)});
+   const data=await response.json().catch(()=>null);
+   if(!response.ok||data?.ok!==true||
+    data.status!=='OWNER_MULTI_ORIGINAL_SHIFT_INDEPENDENT_PREFLIGHT'||
+    data.target_original_count!==5||data.read_only!==true||
+    data.ready_to_start_multi_original_execution!==false||
+    data.source_qualification_is_not_authority!==true||
+    data.owner_approval_granted!==false||
+    data.model_execution_authorized!==false||
+    data.new_shift_started!==false||
+    !Number.isSafeInteger(data.independently_qualified_originals_for_executor_preflight)||
+    !Array.isArray(data.prioritized_source_preflight)||
+    data.prioritized_source_preflight.length>20)
+     throw Error('MULTI_ORIGINAL_ACCEPTANCE_READBACK_UNVERIFIED');
+   multiSummary.textContent=
+    String(data.independently_qualified_originals_for_executor_preflight)+
+    ' of '+String(data.target_original_count)+
+    ' proposed originals independently qualified for further governed checks; '+
+    String(data.source_bound_originals)+' existing source-bound originals; '+
+    String(data.independent_original_final_receipts)+
+    ' independent final original receipts. '+String(data.readiness_reason||'').replaceAll('_',' ')+
+    '. No blanket execution authority.';
+   multiSources.replaceChildren();
+   const details=data.prioritized_source_preflight;
+   for(const item of details.slice(0,8)){
+    const card=node('p');
+    card.className='reality-qualification-source';
+    const title=node('strong',(item.employee?item.employee+' · ':'')+
+     String(item.title||item.intake_family).slice(0,125));
+    const blocker=node('small',' · '+String(item.acceptance_gate).replaceAll('_',' '));
+    card.append(title,blocker);
+    multiSources.append(card);
+   }
+   if(!details.length)multiSources.append(node('p','No qualified source candidates in the current signed worker readback.'));
+  }catch{
+   multiSources.replaceChildren();
+   multiSummary.textContent='Independent multi-job preflight unavailable. No customer jobs, owner permissions or final receipts can be inferred.';
+  }finally{multiLoading=false;multiRefresh.disabled=false;}
+ }
+ multiRefresh.addEventListener('click',()=>void loadMultiOriginal());
  function isReady(){return ready.style.display==='block';}
  async function exactApi(body){
   const r=await fetch(APPROVAL_API,{
@@ -274,6 +332,7 @@
       !Array.isArray(data.items)||data.items.length>30)
     throw Error('OWNER_QUALIFICATION_RECEIPT_NOT_AVAILABLE');
    verified=data;paint(data);
+   void loadMultiOriginal();
   }catch{
    verified=null;active=null;review.disabled=true;
    summary.textContent='Qualification source readback unavailable. This does not mean work is approved, finished, or safe to replay.';
