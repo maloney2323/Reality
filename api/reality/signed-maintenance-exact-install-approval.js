@@ -16,6 +16,35 @@ function respond(res,code,status,other={}){
   installation_completed:false,original_job_completed:false,
   production_changed:false,new_shift_started:false,...other});
 }
+// Pure verifier: never project a positive owner decision from a model claim
+// or a partial/unscoped source. Used by the read-only GET and regression tests.
+export function verifiedExactOwnerInstallReadback(card,ownerId){
+ if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED'&&
+    card.owner_id===ownerId&&
+    HASH.test(card.approval_receipt_sha256||'')&&
+    ['APPROVED','FENCED','INSTALLED','VERIFIED'].includes(card.decision_state)&&
+    card.installation_authorized===true)
+  return {status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
+   owner_approval_recorded:true,installation_authorized:true,
+   approval_receipt_sha256:card.approval_receipt_sha256,
+   decision_state:card.decision_state,
+   repair_installed:card.repair_installed===true,
+   postinstall_verified:card.decision_state==='VERIFIED'&&
+    HASH.test(card.independent_postinstall_receipt_sha256||''),
+   retry_owner_approval:false};
+ if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
+    card.owner_id===ownerId&&card.owner_approval_ready===true&&
+    card.installation_authorized===false)
+  return {status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
+   owner_approval_recorded:false,installation_authorized:false,
+   retry_owner_approval:false};
+ if(card?.status==='NO_EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_READY'&&
+    card.owner_approval_ready===false&&card.installation_authorized===false)
+  return {status:'EXACT_SIGNED_OWNER_APPROVAL_SCOPE_UNAVAILABLE',
+   owner_approval_recorded:false,installation_authorized:false,
+   retry_owner_approval:false};
+ return null;
+}
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private,no-store');
  res.setHeader('X-Content-Type-Options','nosniff');
@@ -59,30 +88,12 @@ export default async function handler(req,res){
     p_owner_id:session.user_id
    });
   if(req.method==='GET'){
-   // Exact state after an uncertain POST, using the same signed owner RPC.
-   // A status read grants no authority and does not invoke the installer.
-   if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED'&&
-      card.owner_id===session.user_id&&
-      HASH.test(card.approval_receipt_sha256||'')&&
-      card.installation_authorized===true)
-    return respond(res,200,'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',{
-     owner_approval_recorded:true,installation_authorized:true,
-     approval_receipt_sha256:card.approval_receipt_sha256,
-     decision_state:card.decision_state,
-     repair_installed:card.repair_installed===true,
-     postinstall_verified:HASH.test(card.independent_postinstall_receipt_sha256||''),
-     retry_owner_approval:false});
-   if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
-      card.owner_id===session.user_id&&card.owner_approval_ready===true&&
-      card.installation_authorized===false)
-    return respond(res,200,'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',{
-     owner_approval_recorded:false,installation_authorized:false,
-     retry_owner_approval:false});
-   if(card?.status==='NO_EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_READY'&&
-      card.owner_approval_ready===false&&card.installation_authorized===false)
-    return respond(res,200,'EXACT_SIGNED_OWNER_APPROVAL_SCOPE_UNAVAILABLE',{
-     owner_approval_recorded:false,installation_authorized:false,
-     retry_owner_approval:false});
+   // The owner-specific GET cannot record a decision or resume work.
+   const verified=verifiedExactOwnerInstallReadback(card,session.user_id);
+   if(verified){
+    const {status,...safeFields}=verified;
+    return respond(res,200,status,safeFields);
+   }
    return respond(res,503,'EXACT_SIGNED_OWNER_APPROVAL_READBACK_UNVERIFIED',{
     retry_owner_approval:false});
   }
