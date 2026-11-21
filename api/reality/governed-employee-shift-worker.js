@@ -370,6 +370,58 @@ export default async function handler(req,res){
     {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false};
+  // An exact signed model decision invokes ONLY an installed governed route.
+  // A different signed worker later independently rechecks its actual effect.
+  workerStage='SIGNED_CONTINUITY_RECOVERY_INDEPENDENT_RECHECK';
+  const signedContinuityRecoveryVerification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_verify_signed_continuity_recovery_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    }).then(r=>{
+     if(![
+      'NO_CURRENT_INDEPENDENT_SIGNED_REVIEW_SCOPE',
+      'NO_DISTINCT_WORKER_RECOVERY_REVIEW_READY',
+      'SOURCE_REQUALIFICATION_VERIFIED_BUSINESS_WARRANT_STILL_MISSING',
+      'SOURCE_REQUALIFICATION_VERIFIED_ORIGINAL_STILL_UNQUALIFIED',
+      'SIGNED_SOURCE_REQUALIFICATION_VERIFIED_NEW_ORIGINAL_ADMITTED'
+     ].includes(r?.status)||r.original_resumed!==false||
+      r.execution_authorized!==false||
+      r.installation_authorized!==false||r.production_changed!==false)
+      throw Error('SIGNED_CONTINUITY_RECOVERY_REVIEW_RECEIPT_INVALID');
+     return r;
+    }).catch(()=>({
+     status:'SIGNED_CONTINUITY_RECOVERY_REVIEW_PROOF_UNAVAILABLE',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_INDEPENDENT_SIGNED_REVIEW_SCOPE',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  workerStage='SIGNED_CONTINUITY_GOVERNED_RECOVERY_ACTION';
+  const signedContinuityRecoveryAction=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_execute_signed_continuity_recovery_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    },{timeoutMs:12000}).then(r=>{
+     if(![
+      'SIGNED_RECOVERY_CURRENT_AUTHORIZED_WORKER_REQUIRED',
+      'NO_SOURCE_VERIFIED_SIGNED_RECOVERY_INCIDENT_READY',
+      'SIGNED_RECOVERY_ACTION_ALREADY_RECORDED_NO_REPLAY',
+      'GOVERNED_RECOVERY_ACTION_HAS_NO_PROVEN_INSTALLED_ADAPTER',
+      'SIGNED_RECOVERY_SOURCE_REQUALIFICATION_EXECUTED_AWAITING_INDEPENDENT_CHECK'
+     ].includes(r?.status)||r.original_resumed!==false||
+      r.execution_authorized!==false||
+      r.installation_authorized!==false||r.production_changed!==false)
+      throw Error('SIGNED_CONTINUITY_RECOVERY_ACTION_RECEIPT_INVALID');
+     return r;
+    }).catch(()=>({
+     status:'SIGNED_CONTINUITY_RECOVERY_ACTION_PROOF_UNAVAILABLE',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SOURCE_VERIFIED_SIGNED_RECOVERY_INCIDENT_READY',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
   // A DIFFERENT signed worker, not the diagnosing model, re-observes
   // the actual provider source for the assigned independent reviewer.
   workerStage='INDEPENDENT_SHIFT_CONTINUITY_SOURCE_REVIEW';
@@ -2713,6 +2765,8 @@ export default async function handler(req,res){
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
+    signed_continuity_recovery_action:signedContinuityRecoveryAction,
+    signed_continuity_recovery_verification:signedContinuityRecoveryVerification,
     shift_continuity_independent_review:continuityIndependentReview,
     independent_business_qualification_review:businessQualificationReview,
     signed_internal_maintenance_work:internalMaintenanceWork,
