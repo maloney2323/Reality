@@ -82,7 +82,7 @@ begin
    and r.intake_key=i.intake_key
   left join reality_internal.governed_employee_original_claims_v1 c
    on c.owner_id=r.owner_id and c.original_work_id=r.original_work_id
-   and c.source_ref=r.source_ref
+   and c.source_ref=r.source_ref and c.shift_id=v_shift
   left join reality_internal.owner_qualified_chat_original_review_packets_v1 p
    on p.owner_id=i.owner_id and p.message_id::text=i.intake_key
    and p.continuity_ref=r.continuity_ref and i.intake_family='AUTHENTICATED_CHAT'
