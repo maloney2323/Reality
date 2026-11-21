@@ -497,21 +497,52 @@
     'EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER']
     .includes(x.governed_route_state)&&
    x.source_ref==='supabase:reality_chat_messages:'+x.intake_key).slice(0,5);
+  const existingCount=candidates.filter(x=>
+   /^work:[a-f0-9]{32}$/.test(x.matched_original_work_id||'')&&
+   x.governed_route_state==='EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER').length;
   exactStatus.textContent=candidates.length?
-   candidates.length+' previously saved signed Chat instruction(s) ready for independent scope classification. This is not approval.' :
+   existingCount+' existing source-bound original(s) require same-job reconciliation; '+
+   (candidates.length-existingCount)+' other saved instruction(s) require independent classification. '+
+   'No business shift warrant or new approval is inferred.' :
    'No signed Chat intake qualified for exact classification in this owner-scoped readback.';
   for(const item of candidates){
+   const existingOriginal=item.governed_route_state===
+    'EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER'&&
+    /^work:[a-f0-9]{32}$/.test(item.matched_original_work_id||'');
    const card=node('article');
    card.className='reality-qualification-source';
-   const title=node('strong','Saved owner instruction · source verified by signed ledger');
+   const title=node('strong',existingOriginal?
+    'Existing original · preserve work identity and reconcile':'Saved owner instruction · source verified by signed ledger');
    const key=node('small','Source: '+item.source_ref+
-    ' · governed route: '+item.governed_route_state.replaceAll('_',' '));
-   const button=node('button','Verify exact original and registered capability');
+    ' · governed route: '+item.governed_route_state.replaceAll('_',' ')+
+    (existingOriginal?' · original: '+item.matched_original_work_id:''));
+   const button=node('button',existingOriginal?
+    'Review existing original handoff in Chat':'Verify exact original and registered capability');
    button.type='button';
    const verdict=node('div');
    verdict.dataset.signedReviewSource=item.intake_key;
-   const feedback=node('p','No original admitted. No executor started.');
+   const feedback=node('p',existingOriginal?
+    'Existing Chat-development original is not current business-shift authority. Verify exact source, staged candidate, independent acceptance and required owner decision; do not re-admit or replay.':
+    'No original admitted. No executor started.');
    feedback.setAttribute('role','status');
+   if(existingOriginal){
+    button.addEventListener('click',()=>{
+     if(!isReady())return;
+     prompt.value='Reality, independently reconcile this EXISTING source-bound original using your recorded shift recovery diagnosis.\\n'+
+      'Original work ID: '+item.matched_original_work_id+'\\n'+
+      'Saved signed source: '+item.source_ref+'\\n'+
+      'Continuity route: '+item.continuity_ref+'\\n'+
+      'Governed action: '+item.governed_next_action+'\\n'+
+      'Re-read the exact original goal, provider candidate, independent acceptance and owner scope. '+
+      'Report the next verifiable action and present an exact authority decision only if qualified. '+
+      'Preserve this original and the existing shift. Do not re-admit, replay, approve, install or claim completion from this discussion.';
+     prompt.focus();
+     prompt.scrollIntoView({behavior:'smooth',block:'center'});
+    });
+    card.append(title,key,button,feedback,verdict);
+    exactItems.append(card);
+    continue;
+   }
    button.addEventListener('click',async()=>{
     if(!isReady()||button.disabled||checkingExact)return;
     button.disabled=true;checkingExact=true;
