@@ -7,6 +7,7 @@ const worker=source('../api/reality/governed-employee-shift-worker.js');
 const api=source('../api/reality/personal-continuous-qualification.js');
 const ui=source('../reality-chat-continuous-qualification-v1.js');
 const home=source('../index.html');
+const boundary=source('../src/reality-governed-shift-boundary-v1.js');
 
 test('every existing source family reaches a single signed qualification inbox, not a new dispatcher',()=>{
  for(const table of [
@@ -52,6 +53,8 @@ test('qualification is triage, not a fake executable original or installation pe
 
 test('signed worker invokes exactly the source-neutral durable qualifier and never grants authority',()=>{
  assert.match(worker,/reality_reconcile_continuous_qualification_inbox_v1/);
+ assert.match(boundary,/reconcile_continuous_qualification_inbox_v1/);
+ assert.match(boundary,/read_owner_continuous_qualification_inbox_v1/);
  assert.match(worker,/p_worker_run_id:actualWorkerRunId/);
  assert.match(worker,/continuous_qualification_inbox:continuousQualificationInbox/);
  assert.match(worker,/new_original_job_admitted!==false/);
