@@ -65,6 +65,9 @@ export function fingerprintCognitiveGenome(genome) {
     modules: genome.modules,
     research_objective: genome.research_objective,
     evaluation_contract: genome.evaluation_contract,
+    // Budget configuration is part of a candidate's observable identity.
+    // Omitting it made differently bounded candidates indistinguishable.
+    resource_budget: genome.resource_budget,
     governance_boundary: genome.governance_boundary,
   });
 }
@@ -180,6 +183,21 @@ export function evaluateCognitivePopulation({
   requireFunction(evaluator, 'CAPABILITY_EVALUATOR_REQUIRED');
   if (!Array.isArray(cases) || !cases.length) throw new Error('VISIBLE_CASES_REQUIRED');
   if (!Array.isArray(hiddenCases) || !hiddenCases.length) throw new Error('HIDDEN_CASES_REQUIRED');
+
+  // The same evaluation engine can be run directly or through
+  // beginCognitiveResearch. Protect both paths BEFORE the first evaluator
+  // callback. This is a call-count quota, NOT a claim of dollar/token
+  // metering or a generalized runtime kill switch.
+  const configuredBudget = baselineGenome.resource_budget || {};
+  if (Object.prototype.hasOwnProperty.call(configuredBudget, 'max_evaluator_calls')) {
+    const allowedCalls = configuredBudget.max_evaluator_calls;
+    if (typeof allowedCalls !== 'number' ||
+      !Number.isSafeInteger(allowedCalls) || allowedCalls < 1)
+      throw new Error('COGNITIVE_EVALUATION_BUDGET_INVALID');
+    const requiredCalls = population.candidates.length * 2;
+    if (!Number.isSafeInteger(requiredCalls) || requiredCalls > allowedCalls)
+      throw new Error('COGNITIVE_EVALUATION_BUDGET_EXCEEDED');
+  }
 
   const visible = population.candidates.map((candidate) => evaluator({
     candidate,
