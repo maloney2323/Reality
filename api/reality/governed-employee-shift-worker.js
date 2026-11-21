@@ -1702,6 +1702,7 @@ export default async function handler(req,res){
     automaticRepairOpportunityQualification=
      await automaticallyQualifyVerifiedRepairOpportunity({
       db,env:process.env,graph:unifiedGraph,
+      originalGate:sameOriginalPostmaintenanceGate,
       shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
       fetchImpl:fetch
      });
