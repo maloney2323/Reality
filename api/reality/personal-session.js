@@ -1,4 +1,5 @@
 import {privateChatConfig,authenticatedChatSession,loginChat,logoutChat,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
+export const maxDuration=45;
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
@@ -23,11 +24,16 @@ export default async function handler(req,res){
  }catch(e){
   // Log only the safe failure classification. Never log passwords, email,
   // tokens, provider response bodies, or the sealed session cookie.
-  if(req.method==='POST'){
+  if(req.method==='POST'||req.method==='GET'){
    const code=String(e?.message||'');
-   const safe=/^CHAT_[A-Z0-9_]{3,90}$/.test(code)?
+   const safe=/^(?:CHAT_|PRIVATE_CHAT_)[A-Z0-9_]{3,90}$/.test(code)?
     code:'CHAT_SESSION_UNAVAILABLE';
-   console.warn('REALITY_PREVIEW_SIGN_IN_RESULT',safe);
+   // Log only an error category, never owner email, password, cookies,
+   // tokens, or provider response bodies. Distinguish a service outage
+   // from a configuration mismatch without changing authentication rules.
+   console.warn(req.method==='POST'?
+    'REALITY_PREVIEW_SIGN_IN_RESULT':
+    'REALITY_PREVIEW_SESSION_READBACK_FAILED',safe);
   }
   return res.status(e.status||503).json({error:e.message||'CHAT_SESSION_UNAVAILABLE'});
  }

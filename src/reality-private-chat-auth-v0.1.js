@@ -51,10 +51,11 @@ async function provider(config,route,{method='GET',body,token,fetchImpl=fetch}={
    method,headers:{apikey:config.key,...(token?{authorization:'Bearer '+token}:{}),
     ...(body?{'content-type':'application/json'}:{})},
    ...(body?{body:JSON.stringify(body)}:{}),
-   // Vercel's server-to-Supabase Auth round trip can exceed seven seconds
-   // under a heavy Chat readback fan-out. Keep a bounded fail-closed identity
+   // Supabase Auth has produced provider-side 504s and >11-second user
+   // readbacks. Allow a bounded recovery window without trusting a cookie
+   // alone. Keep a fail-closed identity
    // read; NEVER infer session validity from a signed cookie alone.
-   signal:AbortSignal.timeout(11000),
+   signal:AbortSignal.timeout(16500),
   });
   return {ok:response.ok,status:response.status,
    body:await response.json().catch(()=>null)};

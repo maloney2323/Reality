@@ -12,22 +12,55 @@ const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const INTENT='OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR';
 function respond(res,code,status,other={}){
- return res.status(code).json({ok:code===202,status,
+ return res.status(code).json({ok:code===200||code===202,status,
   installation_completed:false,original_job_completed:false,
   production_changed:false,new_shift_started:false,...other});
+}
+// Pure verifier: never project a positive owner decision from a model claim
+// or a partial/unscoped source. Used by the read-only GET and regression tests.
+export function verifiedExactOwnerInstallReadback(card,ownerId){
+ if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED'&&
+    card.owner_id===ownerId&&
+    HASH.test(card.approval_receipt_sha256||'')&&
+    ['APPROVED','FENCED','INSTALLED','VERIFIED'].includes(card.decision_state)&&
+    card.installation_authorized===true)
+  return {status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
+   owner_approval_recorded:true,installation_authorized:true,
+   approval_receipt_sha256:card.approval_receipt_sha256,
+   decision_state:card.decision_state,
+   repair_installed:card.repair_installed===true,
+   postinstall_verified:card.decision_state==='VERIFIED'&&
+    HASH.test(card.independent_postinstall_receipt_sha256||''),
+   retry_owner_approval:false};
+ if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
+    card.owner_id===ownerId&&card.owner_approval_ready===true&&
+    card.installation_authorized===false)
+  return {status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
+   owner_approval_recorded:false,installation_authorized:false,
+   retry_owner_approval:false};
+ if(card?.status==='NO_EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_READY'&&
+    card.owner_approval_ready===false&&card.installation_authorized===false)
+  return {status:'EXACT_SIGNED_OWNER_APPROVAL_SCOPE_UNAVAILABLE',
+   owner_approval_recorded:false,installation_authorized:false,
+   retry_owner_approval:false};
+ return null;
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private,no-store');
  res.setHeader('X-Content-Type-Options','nosniff');
+ // Both paths require authenticated owner readback; only POST records an
+ // approval. A failed POST must not be automatically retried.
+ let stage='VALIDATE_REQUEST';
  try{
-  if(req.method!=='POST'||Object.keys(req.query||{}).length)
-   return respond(res,405,'EXACT_SIGNED_MAINTENANCE_OWNER_POST_ONLY');
+  if(!['GET','POST'].includes(req.method)||Object.keys(req.query||{}).length)
+   return respond(res,405,'EXACT_SIGNED_MAINTENANCE_OWNER_METHOD_REQUIRED');
   if(req.headers?.['sec-fetch-site']==='cross-site'||
-   !req.headers?.origin||
-   !String(req.headers?.['content-type']||'').toLowerCase()
-     .startsWith('application/json'))
+   (req.method==='POST'&&(!req.headers?.origin||
+     !String(req.headers?.['content-type']||'').toLowerCase()
+       .startsWith('application/json'))))
    return respond(res,403,'EXACT_SIGNED_MAINTENANCE_SAME_ORIGIN_CLICK_REQUIRED');
   assertSameOrigin(req);
+  stage='AUTHENTICATE_OWNER';
   privateChatConfig();
   const session=await authenticatedChatSession(req,res);
   if(!session?.user_id||!session?.access_token)
@@ -41,18 +74,29 @@ export default async function handler(req,res){
    typeof db.secretKey!=='string'||db.secretKey.length<25)
    return respond(res,503,'EXACT_SIGNED_PREVIEW_SERVICE_SCOPE_INVALID');
   const b=req.body;
-  if(!b||typeof b!=='object'||Array.isArray(b)||
+  if(req.method==='POST'&&(!b||typeof b!=='object'||Array.isArray(b)||
    Object.getPrototypeOf(b)!==Object.prototype||
    Object.keys(b).sort().join(',')!==
     'candidate_commit_sha,intent,maintenance_id,request_id,shift_id,target_review_receipt_sha256'||
    !UUID.test(b.maintenance_id||'')||!UUID.test(b.shift_id||'')||
    !UUID.test(b.request_id||'')||!SHA.test(b.candidate_commit_sha||'')||
-   !HASH.test(b.target_review_receipt_sha256||'')||b.intent!==INTENT)
+   !HASH.test(b.target_review_receipt_sha256||'')||b.intent!==INTENT))
    return respond(res,403,'EXACT_SIGNED_MAINTENANCE_ARTIFACT_CLICK_REQUIRED');
+  stage='READ_EXACT_OWNER_DECISION';
   const card=await shiftRpc(db,
    'reality_read_owner_signed_maintenance_install_decision_v1',{
     p_owner_id:session.user_id
    });
+  if(req.method==='GET'){
+   // The owner-specific GET cannot record a decision or resume work.
+   const verified=verifiedExactOwnerInstallReadback(card,session.user_id);
+   if(verified){
+    const {status,...safeFields}=verified;
+    return respond(res,200,status,safeFields);
+   }
+   return respond(res,503,'EXACT_SIGNED_OWNER_APPROVAL_READBACK_UNVERIFIED',{
+    retry_owner_approval:false});
+  }
   if(card?.status!=='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'||
    card.owner_id!==session.user_id||
    card.shift_id!==b.shift_id||card.maintenance_id!==b.maintenance_id||
@@ -68,6 +112,7 @@ export default async function handler(req,res){
    card.repair_installed!==false||card.original_job_completed!==false||
    card.production_changed!==false||card.new_shift_started!==false)
    return respond(res,409,'EXACT_SIGNED_OWNER_INSTALL_REVIEW_CHANGED_REFRESH_REQUIRED');
+  stage='RECORD_EXACT_OWNER_DECISION';
   const r=await shiftRpc(db,
    'reality_record_owner_signed_maintenance_install_decision_v1',{
     p_owner_id:session.user_id,p_shift_id:b.shift_id,
@@ -92,8 +137,15 @@ export default async function handler(req,res){
    owner_approval_recorded:true,installation_authorized:true,
    next_gate:'AUTOMATIC_SAME_SIGNED_SHIFT_INSTALL_AND_INDEPENDENT_RECHECK',
    retry_owner_approval:false,no_third_confirmation:true});
- }catch{
+ }catch(error){
+  // Never log customer identifiers, tokens, request payloads, or receipt bytes.
+  const message=String(error?.message||'');
+  const category=message.includes('CHAT_AUTH')?'AUTH_PROVIDER':
+   message.includes('SHIFT_DATABASE_RPC_')?'DATABASE_RPC_TRANSPORT':
+   message.includes('PROJECT_')||message.includes('CHAT_DATABASE')?
+    'PREVIEW_CONFIGURATION':'UNCLASSIFIED_FAIL_CLOSED';
+  console.warn('REALITY_EXACT_INSTALL_APPROVAL_OUTCOME_UNVERIFIED',stage,category);
   return respond(res,503,'EXACT_SIGNED_OWNER_APPROVAL_OUTCOME_UNCERTAIN_CHECK_READBACK',{
-   retry_owner_approval:false});
+   failed_stage:stage,failure_category:category,retry_owner_approval:false});
  }
 }

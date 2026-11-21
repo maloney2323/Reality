@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+// Include exact owner readback regression in the existing signed CI gate.
+import './reality-signed-maintenance-owner-approval-readback-v1.test.js';
+// A preview session 503 must never hide Reality's real sign-in form.
+import './reality-session-provider-503-recovery-v1.test.js';
 import {readFileSync} from 'node:fs';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../src/reality-signed-maintenance-approved-install-bridge-v1.js';
@@ -92,7 +96,7 @@ test('Reality Chat exact approval requires fresh signed read, explicit click and
  assert.match(ui,/installApprove\.addEventListener\('click',async/);
  assert.match(ui,/installApproveInInbox\.addEventListener\('click'/);
  assert.match(ui,/installApprove\.click\(\)/);
- assert.match(ui,/installApproveInInbox\.disabled=installApprove\.disabled/);
+ assert.match(ui,/installApproveInInbox\.disabled=true/);
  assert.match(ui,/const fresh=await read\(\)/);
  assert.match(ui,/!approvedScope\?\.exactInstallCard/);
  assert.match(ui,/crypto\.randomUUID\(\)/);
