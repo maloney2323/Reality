@@ -6,7 +6,11 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
-export const maxDuration=25;
+// Auth + owner-scoped read + one exact database write can need separate
+// bounded budgets under PostgREST congestion. This is NOT authorization.
+export const maxDuration=60;
+export const EXACT_APPROVAL_READ_TIMEOUT_MS=15000;
+export const EXACT_APPROVAL_WRITE_TIMEOUT_MS=20000;
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -86,7 +90,7 @@ export default async function handler(req,res){
   const card=await shiftRpc(db,
    'reality_read_owner_signed_maintenance_install_decision_v1',{
     p_owner_id:session.user_id
-   });
+   },{timeoutMs:EXACT_APPROVAL_READ_TIMEOUT_MS});
   if(req.method==='GET'){
    // The owner-specific GET cannot record a decision or resume work.
    const verified=verifiedExactOwnerInstallReadback(card,session.user_id);
@@ -120,7 +124,8 @@ export default async function handler(req,res){
     p_candidate_commit_sha:b.candidate_commit_sha,
     p_target_review_receipt_sha256:b.target_review_receipt_sha256,
     p_intent:INTENT
-   });
+   },{timeoutMs:EXACT_APPROVAL_WRITE_TIMEOUT_MS});
+  // One signed POST only. Never automatically resend an ambiguous decision.
   if(r?.status!=='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVED_FOR_AUTOMATIC_CONTINUATION'||
    r.owner_id!==session.user_id||r.maintenance_id!==b.maintenance_id||
    r.shift_id!==b.shift_id||r.candidate_commit_sha!==b.candidate_commit_sha||
