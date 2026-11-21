@@ -65,7 +65,16 @@
    d.governed_capability_plan.candidate_count>=0&&
    Array.isArray(d.governed_capability_plan.source_actions)&&
    d.governed_capability_plan.source_actions.length===
-    d.governed_capability_plan.candidate_count;
+    d.governed_capability_plan.candidate_count&&
+   d.original_lineage_packet&&
+   d.original_lineage_packet.original_job_completed===false&&
+   d.original_lineage_packet.installation_authorized===false&&
+   d.original_lineage_packet.production_changed===false&&
+   ['SIGNED_ORIGINAL_LINEAGE_EVIDENCE_INDEPENDENTLY_READ',
+    'NO_SIGNED_ORIGINAL_LINEAGE_PACKET',
+    'SIGNED_ORIGINAL_LINEAGE_PACKET_SOURCE_DRIFT',
+    'SIGNED_ORIGINAL_LINEAGE_READ_UNAVAILABLE'].includes(
+     d.original_lineage_packet.status);
  }
  const time=x=>{
   const ms=typeof x==='string'?Date.parse(x):NaN;
@@ -172,6 +181,24 @@
     settled?'Reconcile original customer acceptance separately':
       'Reality: '+String(x.next_action||'verify missing source proof').replaceAll('_',' ').toLowerCase());
   }
+  const originalPacket=d.original_lineage_packet;
+  const packetVerified=originalPacket.status===
+   'SIGNED_ORIGINAL_LINEAGE_EVIDENCE_INDEPENDENTLY_READ'&&
+   originalPacket.packet_verified===true&&
+   originalPacket.customer_original_verified===false;
+  lane('Original evidence → customer-work handoff',
+   packetVerified?'source claim and maintenance evidence bound':
+    'exact source-binding packet not verified',
+   packetVerified?
+    'Existing PR-review original '+originalPacket.original_work_id+
+    ' links to the exact claim '+originalPacket.source_claim_id+
+    ' and source '+originalPacket.source_ref+
+    '. Evidence receipt: '+originalPacket.evidence_sha256+
+    '. No verified customer-original admission or final receipt exists.':
+    'Reality has not independently verified a durable source-to-original evidence packet for this shift.',
+   packetVerified?
+    'Independently identify and authorize the actual customer/business original and acceptance criteria; do not translate a PR-review claim into completion':
+    'Restore authenticated source-bound handoff readback and investigate missing evidence');
   lane('Original customer work',
    d.original_independent_final_receipt_count+' final receipts for this shift',
    d.original_claim_count+' original jobs admitted. Evidence work and repair installation do not count as original completion.',
