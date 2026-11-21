@@ -53,10 +53,25 @@ test('owner mismatch, invalid receipt, and unknown phase fail closed rather than
 test('verified absent decision is not authority, and a missing scope is not readiness',()=>{
  const ready=verifiedExactOwnerInstallReadback({
   status:'EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY',owner_id:owner,
-  owner_approval_ready:true,installation_authorized:false
+  owner_approval_ready:true,installation_authorized:false,
+  repair_installed:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false,
+  maintenance_id:'05d1e1a9-8f9e-43a5-94ba-acd367cc2611',
+  shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  target_branch:'reality/chat-direct-work-handoff-20261115',
+  target_path:'src/reality-qualified-source-requalification-v1.js',
+  target_head_sha:'c'.repeat(40),expected_old_blob_sha:'d'.repeat(40),
+  candidate_source_blob_sha:'e'.repeat(40),
+  candidate_commit_sha:'f'.repeat(40),
+  artifact_receipt_sha256:'sha256:'+'a'.repeat(64),
+  case_ci_receipt_sha256:'sha256:'+'b'.repeat(64),
+  target_review_receipt_sha256:'sha256:'+'c'.repeat(64)
  },owner);
  assert.equal(ready.status,'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK');
  assert.equal(ready.owner_approval_recorded,false);
+ assert.equal(ready.exact_review.source_ref,'https://github.com/maloney2323/Reality/pull/308');
+ assert.equal(ready.exact_review.shift_id,'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce');
  assert.equal(ready.retry_owner_approval,false);
  assert.equal(verifiedExactOwnerInstallReadback({
   status:'EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY',owner_id:otherOwner,
@@ -85,7 +100,9 @@ test('only the signed POST can record an approval; GET and Check status are read
  assert.match(api,/failed_stage:stage,failure_category:category/);
  assert.match(ui,/async function checkExactOwnerApprovalStatus/);
  assert.match(ui,/method:'GET',credentials:'same-origin'/);
- assert.match(ui,/installUncertain\|\|approvedScope\?\.exactInstallCard/);
+ assert.match(ui,/renderExactReviewFromNarrowReadback/);
+ assert.match(ui,/void checkExactOwnerApprovalStatus\(\)/);
+ assert.doesNotMatch(ui,/await refresh\(\);\s*feedback\.textContent=approvedScope\?\.exactInstallCard/);
  assert.match(ui,/void checkExactOwnerApprovalStatus\(\)/);
  assert.match(ui,/A background refresh MUST NOT unlock a failed\/unknown owner POST/);
  assert.match(ui,/installUncertain=true/);
@@ -156,4 +173,29 @@ test('persisted approval migration fixes operator precedence without widening au
  assert.match(ddl,/OWNER_APPROVE_EXACT_SIGNED_ISOLATED_MAINTENANCE_REPAIR/);
  assert.match(ddl,/UPDATE reality_internal\.owner_internal_maintenance_jobs_v1/);
  assert.doesNotMatch(ddl,/SECURITY DEFINER|GRANT ALL TO PUBLIC|DROP TABLE|TRUNCATE/);
+});
+
+test('narrow exact approval GET cannot turn a wrong-owner or stale artifact into a decision',()=>{
+ const data={
+  status:'EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY',owner_id:owner,
+  owner_approval_ready:true,installation_authorized:false,
+  repair_installed:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false,
+  maintenance_id:'05d1e1a9-8f9e-43a5-94ba-acd367cc2611',
+  shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  target_branch:'reality/chat-direct-work-handoff-20261115',
+  target_path:'src/reality-qualified-source-requalification-v1.js',
+  target_head_sha:'c'.repeat(40),expected_old_blob_sha:'d'.repeat(40),
+  candidate_source_blob_sha:'e'.repeat(40),candidate_commit_sha:'f'.repeat(40),
+  artifact_receipt_sha256:'sha256:'+'a'.repeat(64),
+  case_ci_receipt_sha256:'sha256:'+'b'.repeat(64),
+  target_review_receipt_sha256:'sha256:'+'c'.repeat(64)
+ };
+ assert.equal(verifiedExactOwnerInstallReadback(data,otherOwner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...data,source_ref:'https://other.example'},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...data,target_path:'src/../x.js'},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...data,target_review_receipt_sha256:'unverified'},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...data,repair_installed:true},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...data,installation_authorized:true},owner),null);
 });
