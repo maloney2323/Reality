@@ -28,9 +28,16 @@
  const multiSummary=node('p','Checking real business originals, independent evidence, and exact authority…');
  multiSummary.setAttribute('role','status');
  const multiSources=node('div');
+ const businessContract=node('section');
+ businessContract.setAttribute('aria-label','Business source and executor proof');
+ const contractHeading=node('h4','Five business work lanes · source & executor proof');
+ const contractStatus=node('p','Checking independently verified source connections and registered executors…');
+ contractStatus.setAttribute('role','status');
+ const contractRows=node('div');
+ businessContract.append(contractHeading,contractStatus,contractRows);
  const multiRefresh=node('button','Verify multi-job readiness');
  multiRefresh.type='button';
- multiOriginal.append(multiHeading,multiSummary,multiSources,multiRefresh);
+ multiOriginal.append(multiHeading,multiSummary,multiSources,businessContract,multiRefresh);
  const exactReview=node('section');
  exactReview.setAttribute('aria-label','Saved signed Chat originals awaiting exact qualification');
  const exactHeading=node('h4','Signed Chat originals · exact approval');
@@ -50,8 +57,53 @@
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const ROUTE=/^reality:qualification:[a-f0-9]{64}$/;
  const APPROVAL_API='/api/reality/personal-qualified-chat-original-approval';
- let checkingExact=false,approvalUncertain=false,multiLoading=false;
+ let checkingExact=false,approvalUncertain=false,multiLoading=false,contractLoading=false;
  const MULTI_PREFLIGHT='/api/reality/personal-multi-original-shift-preflight?target=5';
+ const CONTRACT_PREFLIGHT='/api/reality/personal-business-original-admission-contract';
+ async function loadBusinessSourceExecutorContract(){
+  if(contractLoading||!isReady())return;
+  contractLoading=true;
+  try{
+   const response=await fetch(CONTRACT_PREFLIGHT,{
+    method:'GET',credentials:'same-origin',cache:'no-store',
+    signal:AbortSignal.timeout(18000)});
+   const d=await response.json().catch(()=>null);
+   if(!response.ok||d?.ok!==true||
+    d.status!=='OWNER_BUSINESS_ORIGINAL_SOURCE_EXECUTOR_CONTRACT_READ_ONLY'||
+    d.read_only!==true||d.requested_job_class_count!==5||
+    d.owner_approval_granted!==false||d.model_execution_authorized!==false||
+    d.new_shift_started!==false||d.installation_authorized!==false||
+    d.source_observation_is_not_an_original!==true||
+    d.approved_employee_list_is_not_an_execution_warrant!==true||
+    d.itemized_originals_ready_for_exact_approval!==0||
+    !Array.isArray(d.classes)||d.classes.length!==5)
+     throw Error('BUSINESS_SOURCE_EXECUTOR_PROOF_UNVERIFIED');
+   contractStatus.textContent=
+    String(d.verified_owner_provider_source_connections)+
+    ' verified business data connections · '+
+    String(d.independently_verified_installed_business_executor_manifests)+
+    ' independently verified installed business executor adapters · '+
+    String(d.itemized_originals_ready_for_exact_approval)+
+    ' real original jobs ready for exact itemized approval.';
+   contractRows.replaceChildren();
+   for(const lane of d.classes){
+    if(typeof lane.job_class!=='string'||lane.execution_authorized!==false||
+     lane.itemized_authorization_ready!==false)return;
+    const card=node('p');card.className='reality-qualification-source';
+    const name=node('strong',lane.job_class.replaceAll('_',' '));
+    const reason=node('small',' · '+String(lane.next_verified_evidence||'SOURCE_RECHECK_REQUIRED')
+     .replaceAll('_',' '));
+    card.append(name,reason);
+    contractRows.append(card);
+   }
+   contractRows.append(node('p',
+    'These are configurable work categories, not invented customer jobs. Each original still requires current connected source proof, owner goal, acceptance criteria, an independently verified installed executor, exact authority and independent completion.'));
+  }catch{
+   contractStatus.textContent=
+    'Business source/executor contract unavailable. Do not infer installed connectors, customer jobs, approvals or an executable shift.';
+   contractRows.replaceChildren();
+  }finally{contractLoading=false;}
+ }
  async function loadMultiOriginal(){
   if(multiLoading||!isReady())return;
   multiLoading=true;multiRefresh.disabled=true;
@@ -333,6 +385,7 @@
     throw Error('OWNER_QUALIFICATION_RECEIPT_NOT_AVAILABLE');
    verified=data;paint(data);
    void loadMultiOriginal();
+   void loadBusinessSourceExecutorContract();
   }catch{
    verified=null;active=null;review.disabled=true;
    summary.textContent='Qualification source readback unavailable. This does not mean work is approved, finished, or safe to replay.';
