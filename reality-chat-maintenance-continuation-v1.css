@@ -254,3 +254,47 @@ body[data-reality-route="chat"] #privateTranscript
  body[data-reality-route="chat"] #privateTranscript
   .reality-chat-maintenance-chat-evidence{padding:10px}
 }
+
+/* Single-action conversational maintenance card. The source evidence and
+   worker diagnostics remain in the authenticated transcript but are collapsed
+   by default. No authority, receipt, or data is discarded. */
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-detail-disclosure[hidden]{display:none!important;}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-detail-disclosure{
+ display:grid;gap:10px;margin:12px 0 0;padding:12px;
+ background:#0a1c2d;border:1px solid #395c78;border-radius:11px;
+ min-width:0;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-detail-disclosure .reality-chat-maintenance-chat-evidence{
+ margin:0;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-detail-disclosure .reality-chat-maintenance-watch,
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-detail-disclosure .reality-chat-maintenance-reply{
+ min-height:42px;width:100%;border:1px solid #5987a6;
+ border-radius:9px;padding:9px 12px;font-size:12px;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-dialogue-actions #realityChatMaintenanceOpen{
+ flex:1 1 125px;min-height:44px;
+ background:transparent;border:1px solid #507e9c;color:#cdefff;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-dialogue-actions #realityChatMaintenanceInlineAuthorize{
+ flex:1 1 100%;min-height:46px;
+}
+body[data-reality-route="chat"] #privateTranscript
+ .reality-chat-maintenance-dialogue .reality-chat-maintenance-nudge-text{
+ font-size:14px;line-height:1.5;margin-bottom:8px;
+}
+@media(max-width:600px){
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-maintenance-detail-disclosure{padding:10px}
+ body[data-reality-route="chat"] #privateTranscript
+  .reality-chat-maintenance-dialogue-actions #realityChatMaintenanceOpen{
+  grid-column:auto;
+ }
+}
