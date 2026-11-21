@@ -183,15 +183,45 @@
     String(data.independent_original_final_receipts)+
     ' independent final original receipts. '+String(data.readiness_reason||'').replaceAll('_',' ')+
     '. No blanket execution authority.';
+   // Stage readback is built from the same signed owner-scoped source facts.
+   // It never turns a model suggestion or maintenance warrant into approval.
+   const stages=[
+    'RAW_SIGNAL','TRANSFORMATION','OBSERVATION','SITUATION','WORK',
+    'AUTHORITY','EXECUTION','VERIFICATION','OUTCOME','LEARNING','CAPABILITY'
+   ];
+   if(!Array.isArray(data.canonical_spine_sequence)||
+     data.canonical_spine_sequence.join('|')!==stages.join('|')||
+     !Array.isArray(data.original_stage_readbacks)||
+     data.original_stage_readbacks.length!==data.prioritized_source_preflight.length||
+     data.original_stage_readbacks.some((x,i)=>
+      x?.continuity_ref!==data.prioritized_source_preflight[i].continuity_ref||
+      x?.execution_authorized_by_projection!==false||
+      x?.owner_approval_granted_by_projection!==false||
+      x?.original_job_completed_by_projection!==false||
+      x?.production_changed!==false||
+      !Array.isArray(x.canonical_spine)||x.canonical_spine.length!==11||
+      x.canonical_spine.some((y,j)=>y.stage!==stages[j])))
+    throw Error('CANONICAL_ORIGINAL_STAGE_PROOF_UNVERIFIED');
    multiSources.replaceChildren();
    const details=data.prioritized_source_preflight;
-   for(const item of details.slice(0,8)){
+   for(const [i,item] of details.slice(0,8).entries()){
     const card=node('p');
     card.className='reality-qualification-source';
     const title=node('strong',(item.employee?item.employee+' · ':'')+
      String(item.title||item.intake_family).slice(0,125));
     const blocker=node('small',' · '+String(item.acceptance_gate).replaceAll('_',' '));
     card.append(title,blocker);
+    const spine=data.original_stage_readbacks[i];
+    card.append(node('small',' · Next governed transition: '+
+     String(spine.next_governed_action||'SOURCE_REVALIDATION_REQUIRED')
+      .replaceAll('_',' ').slice(0,140)));
+    const evidenceDetails=node('details');
+    evidenceDetails.append(node('summary','View 11-stage original-work evidence'));
+    for(const stage of spine.canonical_spine){
+     evidenceDetails.append(node('p',stage.stage.replaceAll('_',' ')+' · '+
+      String(stage.state).replaceAll('_',' ')));
+    }
+    card.append(evidenceDetails);
     multiSources.append(card);
    }
    if(!details.length)multiSources.append(node('p','No qualified source candidates in the current signed worker readback.'));

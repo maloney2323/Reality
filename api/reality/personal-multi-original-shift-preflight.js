@@ -5,6 +5,8 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {CANONICAL_ORIGINAL_STAGES,projectMultiOriginalCanonicalSpine}
+ from '../../src/reality-canonical-original-work-spine-v1.js';
 
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -63,7 +65,12 @@ export default async function handler(req,res){
     x.execution_authorized_by_read!==false||
     x.owner_approval_granted_by_read!==false))
    throw Error('MULTI_ORIGINAL_INDEPENDENT_SCOPE_UNVERIFIED');
-  return res.status(200).json({ok:true,...result});
+  // Read the SAME verified owner-scoped originals, not a shadow job history.
+  // Stage projection never grants execution or writes an outcome.
+  const stageReadbacks=projectMultiOriginalCanonicalSpine(result);
+  return res.status(200).json({ok:true,...result,
+   canonical_spine_sequence:CANONICAL_ORIGINAL_STAGES,
+   original_stage_readbacks:stageReadbacks});
  }catch(e){
   console.warn('MULTI_ORIGINAL_PREFLIGHT_UNAVAILABLE',
    /^MULTI_ORIGINAL_/.test(String(e?.message||''))?'OWNER_PROOF':'PROVIDER_UNVERIFIED');
