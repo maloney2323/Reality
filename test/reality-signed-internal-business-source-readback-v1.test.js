@@ -186,7 +186,10 @@ test('existing isolated provider broker never returns secret or expands business
   "owner_approval_granted:false","new_shift_started:false",
   "production_changed:false"
  ])assert.ok(broker.includes(part),part);
- assert.match(broker,/if\(!same\(req\.headers\.get\('apikey'\)\|\|'',c\.key\)/);
+ assert.match(broker,/const incomingKey=req\.headers\.get\('apikey'\)\|\|''/);
+ assert.match(broker,/p_repo_full_name:b\.repository_full_name},incomingKey/);
+ assert.match(broker,/current_user='service_role'/);
+ assert.match(broker,/!same\(req\.headers\.get\('authorization'\)\|\|'','Bearer '\+incomingKey\)/);
  assert.match(broker,/method:'GET'/);
  assert.match(broker,/first\.provider_proof_sha256!==second\.provider_proof_sha256/);
  assert.doesNotMatch(broker,/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[0-9]+/);
