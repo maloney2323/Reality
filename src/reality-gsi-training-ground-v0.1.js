@@ -74,3 +74,11 @@ export function promoteLearningCandidate({evaluation,promotionAuthority,promotio
   if(evaluation?.verdict!=='VERIFIED')throw new Error('CANDIDATE_NOT_VERIFIED');if(promotionAuthority?.approved!==true)throw new Error('PROMOTION_AUTHORIZATION_REQUIRED');req(promotionRef,'PROMOTION_REF_REQUIRED');
   return Object.freeze({state:'PROMOTED',promotion_ref:promotionRef,approved_by:promotionAuthority.authorized_by||'explicit_promotion_authority',candidate_id:evaluation.evidence.candidate_id,baseline_id:evaluation.evidence.baseline_id,learning_commit:{verified_outcome:true,hidden_generalization_verified:evaluation.metrics.hidden_generalization_delta>0,regression_verified:evaluation.metrics.regression_passed,governance_preserved:evaluation.metrics.governance_preserved},promotion_hash:digest({candidate_id:evaluation.evidence.candidate_id,promotionRef,governance_kernel_hash:evaluation.evidence.governance_kernel_hash})});
 }
+
+// Evidence-based four-lane evaluation and top-to-bottom CEO Update lineage.
+// Reporting only: it does not grant code, tool or deployment authority.
+export {
+  COMPARISON_VERSION, COMPARISON_LANES, FAILURE_MEASURES,
+  createFrozenComparisonContract, sealCeoEventChain, verifyCeoEventChain,
+  recordComparisonTrial, compareTrainingGroundRuns, createCeoUpdateTrace,
+} from './reality-training-ground-comparison-v0.1.js';
