@@ -71,6 +71,8 @@
  let checkingExact=false,approvalUncertain=false,multiLoading=false,contractLoading=false,internalProviderLoading=false;
  const MULTI_PREFLIGHT='/api/reality/personal-multi-original-shift-preflight?target=5';
  const CONTRACT_PREFLIGHT='/api/reality/personal-business-original-admission-contract';
+ const EXACT_EFFECT_PREFLIGHT='/api/reality/personal-business-effect-authority-preflight';
+ let verifiedBusinessClasses=[];
  const INTERNAL_PROOF_API='/api/reality/personal-internal-business-provider-proof';
  async function loadInternalCompanySourceProviderProof(){
   if(internalProviderLoading||!isReady())return;
@@ -137,6 +139,8 @@
     String(d.itemized_originals_ready_for_exact_approval)+
     ' real original jobs ready for exact itemized approval.';
    contractRows.replaceChildren();
+   verifiedBusinessClasses=d.classes.map(x=>x.job_class)
+    .filter(x=>/^[a-z][a-z0-9_-]{2,90}$/.test(x));
    for(const lane of d.classes){
     if(typeof lane.job_class!=='string'||lane.execution_authorized!==false||
      lane.itemized_authorization_ready!==false)return;
@@ -222,6 +226,55 @@
       String(stage.state).replaceAll('_',' ')));
     }
     card.append(evidenceDetails);
+    // Each exact original can request a read-only consequence-classified
+    // proof, but never an approval or a side-effect through this display.
+    if(/^work:[a-f0-9]{32}$/.test(item.original_work_id||'')&&
+       verifiedBusinessClasses.length){
+     const scope=node('details');
+     scope.append(node('summary','Check exact business-effect authority'));
+     const jobClass=node('select'), effect=node('select');
+     for(const name of verifiedBusinessClasses){
+      const option=node('option',name.replaceAll('_',' '));option.value=name;
+      jobClass.append(option);
+     }
+     for(const name of ['INTERNAL_READ','INTERNAL_DRAFT','CUSTOMER_SEND',
+                         'MARKETING_PUBLISH','PROCUREMENT_COMMIT','FINANCIAL_COMMIT']){
+      const option=node('option',name.replaceAll('_',' '));option.value=name;
+      effect.append(option);
+     }
+     const check=node('button','Verify exact effect scope');check.type='button';
+     const receipt=node('p','No action is authorized by this preflight.');
+     receipt.setAttribute('role','status');
+     check.addEventListener('click',async()=>{
+      check.disabled=true;
+      receipt.textContent='Rechecking canonical original, owner warrant, source, executor and authority…';
+      try{
+       const url=EXACT_EFFECT_PREFLIGHT+'?original_work_id='+
+        encodeURIComponent(item.original_work_id)+'&job_class='+
+        encodeURIComponent(jobClass.value)+'&effect_type='+
+        encodeURIComponent(effect.value);
+       const response=await fetch(url,{method:'GET',credentials:'same-origin',
+        cache:'no-store',signal:AbortSignal.timeout(18000)});
+       const r=await response.json().catch(()=>null);
+       if(!response.ok||r?.ok!==true||r.read_only!==true||
+          r.original_work_id!==item.original_work_id||
+          r.job_class!==jobClass.value||r.effect_type!==effect.value||
+          r.execution_authorized!==false||
+          r.itemized_approval_granted!==false||
+          r.original_job_completed_by_read!==false||
+          r.new_shift_started!==false||r.production_changed!==false||
+          typeof r.next_gate!=='string')throw Error('EFFECT_SCOPE_UNVERIFIED');
+       receipt.textContent=(r.ready_for_exact_effect_review?
+        'Ready only for exact owner review · ':'Blocked · ')+
+        r.next_gate.replaceAll('_',' ')+
+        '. No execution, publication or purchase authorized.';
+      }catch{
+       receipt.textContent='Exact business effect scope is unverified; nothing has been authorized or executed.';
+      }finally{check.disabled=false;}
+     });
+     scope.append(jobClass,effect,check,receipt);
+     card.append(scope);
+    }
     multiSources.append(card);
    }
    if(!details.length)multiSources.append(node('p','No qualified source candidates in the current signed worker readback.'));
