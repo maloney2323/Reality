@@ -245,3 +245,25 @@ test('unknown installed commit and ungrounded verifier receipt cannot appear as 
  assert.equal(verifiedExactOwnerInstallReadback({...b,installed_commit_sha:'a'.repeat(40),
   original_job_completed:true},owner),null);
 });
+
+test('installed PR #308 post-install receipt SQL hashes exact fields without undefined text JSON operators',()=>{
+ const ddl=read('supabase/migrations/20261121014359_fix_signed_maintenance_postinstall_receipt_hash_operator_precedence_v1.sql');
+ const start=ddl.indexOf("result_hash:='sha256:'");
+ const end=ddl.indexOf("UPDATE reality_internal.owner_signed_maintenance_install_decisions_v1",start);
+ assert.ok(start>0&&end>start);
+ const hash=ddl.slice(start,end);
+ const fields=['shift_id','approval_receipt_sha256','target_review_receipt_sha256','case_ci_receipt_sha256'];
+ let stripped=hash;
+ for(const field of fields){
+  const grouped="(s->>'"+field+"')";
+  assert.ok(hash.includes(grouped),'JSON field must be grouped: '+field);
+  stripped=stripped.replace(grouped,'');
+ }
+ assert.doesNotMatch(stripped,/s->>/,'no unparenthesized JSON text extraction in receipt digest');
+ assert.match(ddl,/current_user<>'service_role'/);
+ assert.match(ddl,/FOR UPDATE/);
+ assert.match(ddl,/AND state='INSTALLED'/);
+ assert.match(ddl,/repaired_capability_receipt_sha256 IS NULL/);
+ assert.match(ddl,/original_job_completed',false/);
+ assert.doesNotMatch(ddl,/SECURITY DEFINER|GRANT ALL TO PUBLIC|DROP TABLE|TRUNCATE/);
+});
