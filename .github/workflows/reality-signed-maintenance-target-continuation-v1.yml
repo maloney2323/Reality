@@ -18,6 +18,8 @@ on:
       - 'src/reality-governed-automatic-repair-qualification-v1.js'
       - 'src/reality-signed-repair-scope-handoff-v1.js'
       - 'src/reality-verified-repair-progress-projection-v1.js'
+      - 'src/reality-evidence-driven-capability-router-v1.js'
+      - 'test/reality-evidence-driven-capability-router-v1.test.js'
       - 'api/reality/personal-handoff-health.js'
       - 'reality-chat-handoff-health-v1.js'
       - 'reality-chat-handoff-health-v1.css'
@@ -96,5 +98,7 @@ jobs:
           node --check api/reality/personal-handoff-health.js
           node --check reality-chat-handoff-health-v1.js
           node --test test/reality-owner-handoff-health-v1.test.js
+          node --check src/reality-evidence-driven-capability-router-v1.js
+          node --test test/reality-evidence-driven-capability-router-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
