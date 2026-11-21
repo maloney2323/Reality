@@ -4,7 +4,7 @@ on:
     branches:
       - repair/maintenance-artifact-to-same-shift-review-20261120
     paths:
-      - 'supabase/migrations/20261121213000_owner_exact_business_effect_preflight_v1.sql'
+      - 'supabase/migrations/20261121235900_owner_exact_business_effect_preflight_v1.sql'
       - 'api/reality/personal-business-effect-authority-preflight.js'
       - 'src/reality-governed-shift-boundary-v1.js'
       - 'test/reality-owner-exact-business-effect-preflight-v1.test.js'
