@@ -9,6 +9,7 @@ on:
       - 'supabase/migrations/20261122002000_one_use_business_effect_approval_reservation_v1.sql'
       - 'supabase/migrations/20261122003000_business_effect_exact_payload_persistence_v1.sql'
       - 'supabase/migrations/20261122004000_signed_worker_next_approved_business_effect_v1.sql'
+      - 'supabase/migrations/20261122005000_owner_business_effect_approval_independent_readback_v1.sql'
       - 'api/reality/governed-employee-shift-worker.js'
       - 'api/reality/personal-exact-business-effect-approval.js'
       - 'reality-chat-continuous-qualification-v1.js'
