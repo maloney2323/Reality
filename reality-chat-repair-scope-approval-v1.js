@@ -36,8 +36,17 @@
  check.type='button';
  const status=el('p','reality-repair-scope-status','');
  status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+ const operational=el('section','reality-repair-scope-operational');
+ operational.setAttribute('aria-label','Reality verified work progress and next action');
+ operational.setAttribute('aria-live','polite');
+ const phase=el('strong','reality-repair-scope-phase','');
+ const last=el('p','reality-repair-scope-last','');
+ const done=el('p','reality-repair-scope-done','');
+ const blocked=el('p','reality-repair-scope-blocked','');
+ const next=el('p','reality-repair-scope-next','');
+ operational.append(phase,last,done,blocked,next);
  buttons.append(approve,check);
- card.append(top,head,detail,evidence,warning,buttons,status);
+ card.append(top,head,detail,operational,evidence,warning,buttons,status);
  thread.append(card);
  const signedIn=()=>ready.style.display==='block';
  const safe=()=>({
@@ -65,12 +74,60 @@
   if(body.status==='NO_VERIFIED_REPAIR_SCOPE_DECISION'&&
      body.card===null)return null;
   if(!validate(body.card))throw Error('SOURCE_IDENTITY_UNVERIFIED');
-  return body.card;
+  const p=body.verified_operational_progress;
+  if(!p||p.handoff_id!==body.card.handoff_id||
+   p.shift_id!==body.card.shift_id||
+   p.source_ref!==body.card.source_ref||
+   p.work_scope_fingerprint!==body.card.work_order_fingerprint||
+   p.installation_authorized!==false||
+   p.production_changed!==false||
+   p.original_job_completed!==false||
+   p.read_only!==true||
+   !['AWAITING_EXACT_OWNER_WORK_SCOPE_APPROVAL',
+    'OWNER_SCOPE_APPROVED_WAITING_FOR_SIGNED_SOURCE_RECHECK',
+    'SOURCE_RECHECKED_AWAITING_NEW_INDEPENDENT_FROZEN_CI']
+    .includes(p.status))throw Error('OPERATIONAL_RECEIPT_NOT_VERIFIED');
+  return {...body.card,verifiedOperationalProgress:p};
+ }
+ function timeLabel(iso){
+  const time=typeof iso==='string'?Date.parse(iso):NaN;
+  return Number.isFinite(time)?
+   new Date(time).toLocaleString([],{
+    month:'short',day:'numeric',hour:'numeric',minute:'2-digit'
+   }):'Not yet verified';
+ }
+ function renderOperationalProgress(c){
+  const p=c?.verifiedOperationalProgress;
+  if(!p){operational.hidden=true;return;}
+  operational.hidden=false;
+  // This is a projection of signed source receipts, NOT a simulated stream.
+  if(p.status==='AWAITING_EXACT_OWNER_WORK_SCOPE_APPROVAL'){
+   phase.textContent='Current status · Waiting for your decision';
+   last.textContent='Verified source: historical independent repair tests.';
+   done.textContent='Completed: Reality qualified the candidate and prepared an exact work order.';
+   blocked.textContent='Waiting on: work-scope approval. No installation authorization.';
+   next.textContent='Next: review and approve investigation/testing only, or leave the work unapproved.';
+  }else if(p.status==='OWNER_SCOPE_APPROVED_WAITING_FOR_SIGNED_SOURCE_RECHECK'){
+   phase.textContent='Current status · Approved, source recheck pending';
+   last.textContent='Last verified event: '+timeLabel(p.owner_approved_at)+
+    ' · owner approval receipt recorded';
+   done.textContent='Completed: exact source qualification and your work-scope approval.';
+   blocked.textContent='Not verified yet: a subsequent signed source recheck or new independent CI result.';
+   next.textContent='Next: Reality must recheck this exact repair on the existing shift. You do not need to approve scope again.';
+  }else if(p.status==='SOURCE_RECHECKED_AWAITING_NEW_INDEPENDENT_FROZEN_CI'){
+   phase.textContent='Current status · Source rechecked; independent testing pending';
+   last.textContent='Last verified activity: '+timeLabel(p.source_verified_at)+
+    ' · signed worker resumed on the existing shift';
+   done.textContent='Completed: source qualification, one owner scope approval, and postapproval source verification.';
+   blocked.textContent='What is stopping completion: this handoff has no new independent frozen CI test receipt. Installation and original-job settlement are not proven.';
+   next.textContent='Next: Reality must register and run case-specific independent frozen tests, verify their results, then request a separate exact installation approval only if required. No additional work-scope approval is needed.';
+  }
  }
  function render(c,fromExplicitCheck=false){
   current=c;
-  if(!c){card.hidden=true;approve.disabled=true;return;}
+  if(!c){card.hidden=true;operational.hidden=true;approve.disabled=true;return;}
   card.hidden=false;
+  renderOperationalProgress(c);
   const no=String(c.source_ref.split('/').pop());
   head.textContent='Reality found verified repair #'+no;
   detail.textContent='I verified a real implementation defect and a source-pinned candidate. '+
@@ -180,7 +237,9 @@
  document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&signedIn())void refresh();
  });
+ // The signed worker wakes every five minutes. Read-only owner progress
+ // refresh keeps the Chat explanation current without scheduling new work.
  window.setInterval(()=>{
   if(document.visibilityState==='visible'&&signedIn())void refresh();
- },60000);
+ },20000);
 })();

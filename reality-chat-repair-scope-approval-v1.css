@@ -11,3 +11,12 @@
 .reality-repair-scope-buttons button:disabled{opacity:.45;cursor:default}
 .reality-repair-scope-status{font-size:.8rem;color:#b8d1ec;overflow-wrap:anywhere;line-height:1.5;margin:8px 0 0}
 @media(max-width:600px){.reality-repair-scope-chat-card{padding:14px;margin:9px 0}.reality-repair-scope-buttons{flex-direction:column}.reality-repair-scope-buttons button{width:100%;min-height:44px}}
+
+.reality-repair-scope-operational{border-top:1px solid rgba(155,193,244,.25);border-bottom:1px solid rgba(155,193,244,.25);margin:12px 0;padding:12px 0;display:grid;gap:7px}
+.reality-repair-scope-operational[hidden]{display:none!important}
+.reality-repair-scope-operational .reality-repair-scope-phase{font-size:.92rem;line-height:1.4;color:#e8f2ff}
+.reality-repair-scope-operational p{margin:0;font-size:.83rem;line-height:1.5;overflow-wrap:anywhere}
+.reality-repair-scope-last{color:#bbd4f3}
+.reality-repair-scope-done{color:#c9f4de}
+.reality-repair-scope-blocked{color:#ffdcc3}
+.reality-repair-scope-next{color:#f4f9ff}

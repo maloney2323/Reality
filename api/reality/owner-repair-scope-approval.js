@@ -5,6 +5,8 @@ import {privateChatConfig,authenticatedChatSession,assertSameOrigin}
 import {resolveReliabilityBenchmarkDb}
  from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
+import {projectVerifiedOwnerRepairWorkProgress}
+ from '../../src/reality-verified-repair-progress-projection-v1.js';
 export const maxDuration=60;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -95,6 +97,7 @@ export default async function handler(req,res){
    const safe=verifyOwnerRepairScopeCard(card,session.user_id);
    if(!safe)return respond(res,503,'REPAIR_WORK_SCOPE_CARD_UNVERIFIED');
    return respond(res,200,safe.status,{card:safe,
+    verified_operational_progress:projectVerifiedOwnerRepairWorkProgress(safe,session.user_id),
     owner_approval_recorded:safe.owner_work_scope_approved===true});
   }
   const verified=verifyOwnerRepairScopeCard(card,session.user_id);
@@ -134,6 +137,7 @@ export default async function handler(req,res){
   return respond(res,202,'EXACT_REPAIR_OWNER_SCOPE_APPROVED_SAME_SHIFT_CONTINUES',{
    owner_approval_recorded:true,handoff_id:confirmed.handoff_id,
    shift_id:confirmed.shift_id,
+   verified_operational_progress:projectVerifiedOwnerRepairWorkProgress(confirmed,session.user_id),
    approval_receipt_sha256:confirmed.approval_receipt_sha256,
    next_action:'AUTOMATIC_SAME_SHIFT_INDEPENDENT_SOURCE_RECHECK',
    retry_owner_approval:false,no_second_scope_approval_required:true
