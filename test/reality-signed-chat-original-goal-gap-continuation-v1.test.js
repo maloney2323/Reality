@@ -12,7 +12,7 @@ test('signed worker writes one source-and-CI-bound goal-gap receipt without new 
   "h.development->>'source_sha256'=h.message_sha256",
   "h.development->>'original_work_id' ~ '^work:[a-f0-9]{32}$'",
   "'SYNTAX_AND_SOURCE_IDENTITY_ONLY'","'CI_VERIFIED'",
-  "and not (h.development->'evidence' ? 'goal_gap_receipt_sha256')",
+  "not (h.development->'evidence' ? 'goal_gap_receipt_sha256')",
   "for update of h skip locked","extensions.digest",
   "goal_gap_same_original_work_id","goal_gap_source_sha256",
   "INDEPENDENT_FULL_GOAL_FEATURE_TEST_AND_COMPATIBLE_SAME_ORIGINAL_INSTALL_ADAPTER_REQUIRED",
