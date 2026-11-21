@@ -1,0 +1,20 @@
+{
+  "version": "reality-chat-new-development-candidate-v1",
+  "message_id": "db1d42a9-759f-4d4c-8a62-b819c16393f1",
+  "original_work_id": "work:d135a3649035a7360b44f9ef3903533a",
+  "base_sha": "66284c453b8604f1a9e819bdd78b3cfc6eb2c09e",
+  "candidate": {
+    "find": "  const bytes=Buffer.from(source.content.replace(/\\s/g,''),'base64');\n  if(bytes.length!==source.size||blobSHA(bytes)!==source.sha)\n   fail('MODEL_SOURCE_GIT_BLOB_BYTES_INVALID');\n  const text=bytes.toString('utf8');\n  failure='MODEL_GENERATION_UNVERIFIED';\n",
+    "reason": "Adds a bounded validation that the fetched GitHub blob is real UTF-8 text and not binary or lossy-decoded content before sending excerpts to the model or persisting a patch. This hardens the chat-to-build handoff against non-text source reads causing unreliable draft generation.",
+    "replace": "  const bytes=Buffer.from(source.content.replace(/\\s/g,''),'base64');\n  if(bytes.length!==source.size||blobSHA(bytes)!==source.sha)\n   fail('MODEL_SOURCE_GIT_BLOB_BYTES_INVALID');\n  const text=bytes.toString('utf8');\n  if(Buffer.from(text,'utf8').length!==bytes.length)\n   fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');\n  if(/\\u0000/.test(text))\n   fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');\n  failure='MODEL_GENERATION_UNVERIFIED';\n",
+    "base_sha": "66284c453b8604f1a9e819bdd78b3cfc6eb2c09e",
+    "target_path": "src/reality-chat-new-development-worker-v1.js",
+    "source_blob_sha": "ca94ce29c47dd0596f1a0e4c9632402682408c31"
+  },
+  "source_message_sha256": "b239b1b38dc5a68c74df1d082b1a27fdf68bbced8eb6475c798e28c20e3cd43a",
+  "candidate_sha256": "sha256:6805bd6617335673739ffa8b6b7b28d294554876ac8de49ff1cdd41759d70bcc",
+  "installation_authorized": false,
+  "original_job_completed": false,
+  "production_changed": false,
+  "feature_acceptance_verified": false
+}

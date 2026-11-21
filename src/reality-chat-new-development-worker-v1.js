@@ -208,6 +208,10 @@ export async function generateNextSignedChatDevelopmentDraft({
   if(bytes.length!==source.size||blobSHA(bytes)!==source.sha)
    fail('MODEL_SOURCE_GIT_BLOB_BYTES_INVALID');
   const text=bytes.toString('utf8');
+  if(Buffer.from(text,'utf8').length!==bytes.length)
+   fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');
+  if(/\u0000/.test(text))
+   fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');
   failure='MODEL_GENERATION_UNVERIFIED';
   const patch=await askModel({
    apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
