@@ -13,7 +13,10 @@ const SHA=/^[a-f0-9]{40}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const PATH=/^(?:src\/[A-Za-z0-9_./-]+\.js|api\/reality\/[A-Za-z0-9_./-]+\.js|reality-[A-Za-z0-9_.-]+\.(?:js|css)|index\.html)$/;
-const BRANCH=/^reality\/[A-Za-z0-9/_-]{10,160}$/;
+// A signed repair/* preview can ONLY reconcile an already staged immutable
+// candidate's independent CI. Source staging stays limited to reality/*.
+const BRANCH=/^(?:reality|repair)\/[A-Za-z0-9/_-]{10,160}$/;
+const SOURCE_STAGING_BRANCH=/^reality\/[A-Za-z0-9/_-]{10,160}$/;
 const allowed=new Set([
  'reality_read_next_chat_new_development_candidate_v2',
  'reality_fence_chat_new_development_publish_v1',
@@ -433,7 +436,9 @@ Deno.serve(async req=>{
    return bodySafe('NEW_CHAT_DEVELOPMENT_SIGNED_SOURCE_DRIFT');
   // Release drift forbids ALL staging/writes. Only an already recorded
   // CANDIDATE_STAGED original may independently reconcile past GitHub CI.
-  if(s.phase!=='CANDIDATE_STAGED'&&s.release_sha!==body.base_sha)
+  if(s.phase!=='CANDIDATE_STAGED'&&
+     (!SOURCE_STAGING_BRANCH.test(body.base_branch)||
+      s.release_sha!==body.base_sha))
    return bodySafe('NEW_CHAT_DEVELOPMENT_SIGNED_SOURCE_DRIFT');
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<24)
