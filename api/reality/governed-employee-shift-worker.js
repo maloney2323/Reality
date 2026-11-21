@@ -137,6 +137,8 @@ import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
 import {routeSignedMaintenanceContinuityTrigger}
  from '../../src/reality-governed-auto-trigger-v1.0.js';
+import {advanceVerifiedMaintenanceOriginalHandoff}
+ from '../../src/reality-signed-maintenance-original-return-handoff-v1.js';
 import {enforceSignedMaintenanceReceiptContinuity}
  from '../../src/reality-signed-maintenance-continuity-enforcement-v1.js';
 import {independentlyReconcileSignedMaintenanceInstall}
@@ -847,6 +849,29 @@ export default async function handler(req,res){
     ownerId:sameOriginalPostmaintenanceGate?.owner_id,
     shiftId:wakeReceipt.shift_id
    });
+  // Consume the independently verified Universe-to-original return through
+  // the existing single-use owner/shift executor, not only a status field.
+  // The same durable obligation may be retried on a later signed wake.
+  workerStage='SIGNED_MAINTENANCE_GOVERNED_ORIGINAL_RETURN_HANDOFF';
+  const signedMaintenanceOriginalReturnDispatch=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceVerifiedMaintenanceOriginalHandoff({
+     trigger:signedMaintenanceReturnTrigger.same_original_work_due===true?
+      signedMaintenanceReturnTrigger:signedMaintenanceGovernedTrigger,
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch,call:shiftRpc,
+     executeCaseCi:executeOneRegisteredMaintenanceCiWake,
+     executeSourceRequalification:executeOneRegisteredMaintenanceAction
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_RETURN_HANDOFF_NOT_VERIFIED',
+     failure_code:String(error?.message||'RETURN_HANDOFF_FAILED').slice(0,145),
+     executor_invoked:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_SIGNED_WORKER_RETURN_HANDOFF',executor_invoked:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
   // Independent verifier facts -> Reality-governed classification ->
   // existing Continuity Ledger. A classification cannot create execution
   // authority, install code, reopen an original, or mutate the Universe.
@@ -2354,6 +2379,7 @@ export default async function handler(req,res){
     signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity,
     signed_maintenance_governed_trigger:signedMaintenanceGovernedTrigger,
     signed_maintenance_universe_return_trigger:signedMaintenanceReturnTrigger,
+    signed_maintenance_original_return_dispatch:signedMaintenanceOriginalReturnDispatch,
     signed_maintenance_universe_postinstall_return:signedMaintenanceUniverseReconciliation,
     signed_maintenance_approved_auto_install:signedMaintenanceApprovedInstall,
     signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
