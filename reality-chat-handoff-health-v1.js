@@ -53,7 +53,19 @@
    d.employee_independently_verified_evidence_jobs>=0&&
    Array.isArray(d.maintenance_handoffs)&&d.maintenance_handoffs.length<=8&&
    d.maintenance_handoffs.every(x=>REF.test(x.source_ref||''))&&
-   d.ceo_operational_decision_handoff==='NOT_INDEPENDENTLY_ATTESTED_BY_THIS_READ';
+   d.ceo_operational_decision_handoff==='NOT_INDEPENDENTLY_ATTESTED_BY_THIS_READ'&&
+   d.governed_capability_plan?.status==='GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN'&&
+   d.governed_capability_plan.owner_id===d.owner_id&&
+   d.governed_capability_plan.shift_id===d.shift_id&&
+   d.governed_capability_plan.executor_invoked===false&&
+   d.governed_capability_plan.original_job_completed===false&&
+   d.governed_capability_plan.installation_authorized===false&&
+   d.governed_capability_plan.production_changed===false&&
+   Number.isSafeInteger(d.governed_capability_plan.candidate_count)&&
+   d.governed_capability_plan.candidate_count>=0&&
+   Array.isArray(d.governed_capability_plan.source_actions)&&
+   d.governed_capability_plan.source_actions.length===
+    d.governed_capability_plan.candidate_count;
  }
  const time=x=>{
   const ms=typeof x==='string'?Date.parse(x):NaN;
@@ -90,6 +102,34 @@
   for(const text of actions.slice(0,3))key.append(create('p','',text));
   if(!actions.length)key.append(create('p','',
    'No next action inferred. Review independent evidence before declaring completion.'));
+  const routes=d.governed_capability_plan;
+  lane('Generic capability routing',
+   routes.missing_capability_count+
+    ' capability adapter(s) not connected',
+   'Reality selected '+routes.candidate_count+
+    ' source-backed next action(s) from owner work receipts. '+
+    'No job identity or customer-specific action was hardcoded into the router.',
+   routes.missing_capability_count?
+    'Reality must register and independently test the missing handler types':
+    'Reality should execute authorized work only through registered handlers');
+  for(const step of routes.source_actions.slice(0,8)){
+   const route=step.execution_route;
+   const display=step.source_ref.length>110?
+    step.source_ref.slice(0,110)+'…':step.source_ref;
+   const kind=route==='REGISTERED_CAPABILITY_AVAILABLE'?
+    'registered executor':
+    route==='OWNER_CLICK_REQUIRED'?'owner decision needed':
+    'missing executor';
+   lane('Next capability · '+kind,
+    String(step.capability_key).replaceAll('_',' ').toLowerCase(),
+    'Verified work source: '+display+
+    ' · Current evidence: '+String(step.evidence_state).replaceAll('_',' ').toLowerCase(),
+    route==='OWNER_CLICK_REQUIRED'?
+     'Owner reviews the exact scope; Reality cannot self-approve':
+    route==='REGISTERED_CAPABILITY_AVAILABLE'?
+     'Reality routes this action only after signed executor authority checks':
+     'Reality must connect and verify a capability handler before executing');
+  }
   lane('Scheduled executor',
    d.worker_status==='SCHEDULED_WORKER_RECENT_WAKE_COMPLETED'?
     'recent real wake recorded':'worker freshness not verified',
