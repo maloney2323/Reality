@@ -1,0 +1,21 @@
+name: Reality signed original goal gap independent continuity receipt
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*signed_chat_original_full_goal_gap_receipt_v1.sql'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'test/reality-signed-chat-original-goal-gap-continuation-v1.test.js'
+  workflow_dispatch:
+jobs:
+  feature-gap-continuity:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@4abbe8d357dd0de4d9dd6a7e5d4cbfd9d0d71315
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: node --check api/reality/governed-employee-shift-worker.js
+      - run: node --test test/reality-signed-chat-original-goal-gap-continuation-v1.test.js test/reality-chat-development-full-goal-completion-preflight-v1.test.js
