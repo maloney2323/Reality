@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment,readSignedChatDevelopmentStatus}
+import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment,readSignedChatDevelopmentStatus,isExplicitSignedShiftContinuation}
  from '../src/reality-saved-chat-work-adapter-v1.js';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 
@@ -791,4 +791,57 @@ test('existing signed shift notice has a real X; dismissal persists across saved
  await reloaded.rehydrate();
  assert.equal(reloaded.transcript.children.length,0,'dismissed notice stays gone after browser reload');
  assert.ok(fetches.every(x=>x.action==='READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS'));
+});
+
+test('explicit existing-shift continuation retains safety PROHIBITIONS without authorizing installation',async()=>{
+ const signed='Reality, continue existing authorized shift "ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce".\n\n'+
+  'PR #308 is independently verified and its result has returned to the Universe. '+
+  'The remaining PR #307 original-work review is blocked because the governed original-work admission and execution trigger are missing.\n\n'+
+  'Investigate your existing authenticated Chat instructions, original-work ledger, Governed Trigger System, and work-admission pipeline. '+
+  'Determine whether a legitimate source-backed original instruction already exists for this internal development/review job.\n\n'+
+  'If verified evidence exists, reconcile and qualify it through your existing governed admission system, then continue the authorized work. '+
+  'If it does not, identify the exact missing owner authorization or source evidence.\n\n'+
+  'Do not invent customer work, restart the shift, repeat completed CI diagnostics, install code without exact authorization, or claim completion without independent verification.\n\n'+
+  'Report the actual admission result, execution result, and next governed action in this Chat.';
+ assert.equal(isExplicitSignedShiftContinuation(signed),true);
+ let continued=0,classified=0,admissions=0;
+ const r=await processSignedSavedChatWork({...args,
+  messages:[{...messages[0],text:signed}],
+  inspect:async()=>{classified++;throw Error('MUST_NOT_RECLASSIFY')},
+  admitNew:async()=>{admissions++;throw Error('MUST_NOT_CREATE_NEW_SHIFT')},
+  continueExistingShift:async()=>{
+   continued++;
+   return {status:'CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
+    shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+    new_shift_started:false,installation_authorized:false,
+    original_job_completed:false,worker_execution_verified:false};
+  }
+ });
+ assert.equal(r.status,'CHAT_EXISTING_SHIFT_WAKE_ENQUEUED');
+ assert.equal(continued,1);
+ assert.equal(classified,0);
+ assert.equal(admissions,0);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(r.original_job_completed,false);
+});
+test('affirmative high-consequence actions never pass as existing-shift-only work',()=>{
+ const prefix='Reality, continue the existing authorized shift. ';
+ for(const unsafe of [
+  'Install the candidate repair now.',
+  'Deploy to production.',
+  'Please approve the patch.',
+  'Do not install, but deploy to production.',
+  'Do not install. Then approve the repair.',
+  'Do not install unless I say so.',
+  'Do not install; go ahead and deploy.',
+  'Do not install, however approve it now.',
+  'Do not install, instead deploy.',
+  'Do not install; please approve the release.'
+ ])assert.equal(isExplicitSignedShiftContinuation(prefix+unsafe),false,unsafe);
+ for(const safe of [
+  'Do not install without exact authorization.',
+  'Never deploy to production.',
+  'Do not approve any additional installation.',
+  'Do not invent customer work, restart the shift, repeat diagnostics, install code without exact authorization, or claim completion.'
+ ])assert.equal(isExplicitSignedShiftContinuation(prefix+safe),true,safe);
 });
