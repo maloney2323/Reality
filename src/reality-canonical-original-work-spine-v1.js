@@ -12,9 +12,6 @@ export const CANONICAL_ORIGINAL_STAGES=Object.freeze([
 const itemStatus=(name,state,evidenceRef=null)=>Object.freeze({
  stage:name,state,evidence_ref:evidenceRef
 });
-const evidence=(condition,state,ref)=>condition?
- itemStatus(state[0],'EVIDENCE_VERIFIED',ref):
- itemStatus(state[0],state[1]);
 const noEffects=Object.freeze({
  execution_authorized_by_projection:false,
  owner_approval_granted_by_projection:false,
@@ -40,7 +37,7 @@ export function projectOriginalAgainstCanonicalSpine(preflight,item){
    !preflight.prioritized_source_preflight.includes(item)||
    !item||typeof item!=='object'||
    !ROUTE.test(item.continuity_ref||'')||
-   !String(item.source_ref||'').trim()||
+   (item.source_ref!==null&&typeof item.source_ref!=='string')||
    item.original_work_id!==null&&!WORK.test(item.original_work_id||'')||
    typeof item.acceptance_gate!=='string'||
    item.execution_authorized_by_read!==false||
@@ -64,7 +61,7 @@ export function projectOriginalAgainstCanonicalSpine(preflight,item){
  const identity=item.continuity_ref;
  const original=bound?item.original_work_id:null;
  const stages=[
-  itemStatus('RAW_SIGNAL','SOURCE_OBSERVED',item.source_ref),
+  itemStatus('RAW_SIGNAL',item.source_ref?'SOURCE_OBSERVED':'SOURCE_PROVENANCE_REQUIRED',item.source_ref||null),
   itemStatus('TRANSFORMATION','CONTINUITY_ROUTE_RECORDED',identity),
   itemStatus('OBSERVATION',current?'SOURCE_EPOCH_RECHECK_REQUIRED_FOR_EXECUTION':
    'SOURCE_REOBSERVATION_REQUIRED',identity),
@@ -95,6 +92,7 @@ export function projectOriginalAgainstCanonicalSpine(preflight,item){
   throw Error('CANONICAL_ORIGINAL_SPINE_ORDER_DRIFT');
  let next;
  if(final)next='INDEPENDENT_UNIVERSE_OUTCOME_AND_LEARNING_RECONCILIATION';
+ else if(!item.source_ref)next='VERIFY_ORIGINAL_SOURCE_PROVENANCE';
  else if(!current)next='REFRESH_SIGNED_SOURCE_AND_REQUALIFY';
  else if(!bound)next='EXACT_OWNER_ORIGINAL_ADMISSION_REQUIRED';
  else if(!eligible)next=item.acceptance_gate;
