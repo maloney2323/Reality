@@ -5,6 +5,8 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {planGovernedCapabilitiesFromOwnerReceipts}
+ from '../../src/reality-evidence-driven-capability-router-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/;
@@ -92,7 +94,21 @@ export default async function handler(req,res){
   },{timeoutMs:12000});
   const v=verifyOwnerSignedHandoffHealth(raw,session.user_id);
   if(!v)return res.status(503).json({ok:false,status:'HANDOFF_HEALTH_INDEPENDENT_LEDGER_READ_UNVERIFIED'});
-  return res.status(200).json({ok:true,...v});
+  if(v.status==='NO_CURRENT_SIGNED_MAINTENANCE_SHIFT_HANDOFF')
+   return res.status(200).json({ok:true,...v,governed_capability_plan:null});
+  const plan=planGovernedCapabilitiesFromOwnerReceipts({
+   health:v,ownerId:session.user_id,shiftId:v.shift_id,
+   registeredActionKeys:process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED===
+    'true'?['RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED']:[]
+  });
+  if(plan.status!=='GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN'||
+     plan.executor_invoked!==false||
+     plan.original_job_completed!==false||
+     plan.installation_authorized!==false||
+     plan.production_changed!==false)
+   return res.status(503).json({
+    ok:false,status:'GOVERNED_HANDOFF_CAPABILITY_PLAN_UNVERIFIED'});
+  return res.status(200).json({ok:true,...v,governed_capability_plan:plan});
  }catch{
   return res.status(503).json({ok:false,status:'HANDOFF_HEALTH_SOURCE_OR_PROVIDER_UNAVAILABLE'});
  }

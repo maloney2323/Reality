@@ -133,6 +133,9 @@ import {executeOneRegisteredMaintenanceAction}
  from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
 import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
+import {planGovernedCapabilitiesFromOwnerReceipts,
+ invokeOneRegisteredSignedCapability}
+ from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 import {reconcileSignedVerifiedMaintenanceArtifact,
@@ -560,7 +563,11 @@ export default async function handler(req,res){
   // Selection occurs only if the source executor returned an unclaimed
   // 'no registered handler' result. Reuse the original signed worker run.
   workerStage='SIGNED_MAINTENANCE_CASE_CI_EXECUTOR';
-  const signedMaintenanceCaseCi=
+  // A capability type is registered once. Specific work and authority are
+  // determined by signed ledger facts, never a PR number or scripted job ID.
+  const registeredMaintenanceCiAction=
+   'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED';
+  const ciRegistrationReady=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
    process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
    (signedMaintenanceExecutorHandoff.status===
@@ -568,19 +575,21 @@ export default async function handler(req,res){
     (signedMaintenanceExecutorHandoff.status===
      'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'&&
      signedMaintenanceExecutorHandoff.next_action===
-      'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'))?
-    await executeOneRegisteredMaintenanceCiWake({
-      db,env:process.env,shiftId:wakeReceipt.shift_id,
-      workerRunId:actualWorkerRunId,fetchImpl:fetch
-    }).catch(error=>({
-     status:'SIGNED_MAINTENANCE_CASE_CI_EXECUTOR_UNVERIFIED',
-     error_code:String(error?.message||'SIGNED_CI_UNVERIFIED').slice(0,115),
-     repair_executed:false,original_job_completed:false,
-     installation_authorized:false,production_changed:false
-    })):
-    {status:'NO_AUTHORIZED_CASE_CI_RUNNER_WAKE',
-     repair_executed:false,original_job_completed:false,
-     installation_authorized:false,production_changed:false};
+      registeredMaintenanceCiAction));
+  const signedMaintenanceCaseCi=ciRegistrationReady?
+   await invokeOneRegisteredSignedCapability({
+    wake:wakeReceipt,graph:unifiedGraph,
+    action:registeredMaintenanceCiAction,
+    authorityBasis:'SIGNED_EXISTING_WARRANT',
+    env:process.env,
+    handler:()=>executeOneRegisteredMaintenanceCiWake({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    })
+   }):
+   {status:'NO_AUTHORIZED_CASE_CI_RUNNER_WAKE',
+    repair_executed:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false};
   const signedMaintenanceResult=
    signedMaintenanceCaseCi.status==='NO_AUTHORIZED_CASE_CI_RUNNER_WAKE'?
     signedMaintenanceExecutorHandoff:signedMaintenanceCaseCi;
@@ -2468,6 +2477,35 @@ export default async function handler(req,res){
     }
    }catch{/* Signed execution continues; no guessed work status. */}
   }
+  // Same signed wake: derive outstanding actions for ANY source-backed
+  // owner work from its independent ledger, not hardcoded job numbers.
+  // The planner cannot mutate, lease, approve, dispatch or settle jobs.
+  let governedCapabilityPlan={
+   status:'GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN_UNAVAILABLE',
+   executor_invoked:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(signedOwnerHandoffHealth?.status===
+     'SIGNED_OWNER_SHIFT_HANDOFF_HEALTH_READ_ONLY'){
+   try{
+    const exactHealth=await shiftRpc(db,
+     'reality_read_owner_shift_handoff_health_v1',{
+      p_owner_id:unifiedGraph.owner_id
+     });
+    governedCapabilityPlan=planGovernedCapabilitiesFromOwnerReceipts({
+     health:exactHealth,ownerId:unifiedGraph.owner_id,
+     shiftId:wakeReceipt.shift_id,
+     registeredActionKeys:process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED===
+      'true'?[registeredMaintenanceCiAction]:[]
+    });
+   }catch{
+    governedCapabilityPlan={
+     status:'GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN_UNVERIFIED',
+     executor_invoked:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -2516,6 +2554,7 @@ export default async function handler(req,res){
     automatic_repair_work_order_qualification:automaticRepairOpportunityQualification,
     signed_repair_owner_scope_handoff:signedRepairOwnerScopeHandoff,
     signed_owner_handoff_health:signedOwnerHandoffHealth,
+    governed_capability_plan:governedCapabilityPlan,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
