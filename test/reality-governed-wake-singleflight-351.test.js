@@ -38,8 +38,21 @@ test('worker releases only its own lease and falls back to bounded expiry',()=>{
  assert.match(lease,/interval '6 minutes'/);
  assert.match(lease,/interval '4 minutes'/);
  assert.match(worker,/'reality_release_governed_shift_worker_run_v1'/);
- assert.ok(worker.indexOf("'reality_release_governed_shift_worker_run_v1'")>
-           worker.indexOf('}finally{'));
+ // Serverless runtimes can stop after the response is sent. The success
+ // path must attest and release BEFORE response publication; the finally path
+ // remains a bounded best-effort fallback for early failure.
+ const publication=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'");
+ const response=worker.indexOf('return res.status(200).json({...result,');
+ const firstRelease=worker.indexOf("'reality_release_governed_shift_worker_run_v1'");
+ const fallback=worker.indexOf('}finally{');
+ assert.ok(publication>0&&firstRelease>publication&&response>firstRelease,
+  'lease release must be attempted before success response');
+ assert.ok(worker.lastIndexOf("'reality_release_governed_shift_worker_run_v1'")>fallback,
+  'finally must preserve fallback release for failures');
+ assert.match(worker,/if\(governedWakeClaimId&&!wakeLeaseReleasedBeforeResponse&&/);
+ assert.match(worker,/workerCompletionAttestedBeforeResponse/);
+ assert.match(worker,/SIGNED_WORKER_RUN_COMPLETED/);
+ assert.match(worker,/original_job_completed===false/);
 });
 test('preview scheduler patch is fail-closed on exact command drift',()=>{
  assert.match(cron,/jobname='reality-riley-preview-original-execution-wake-v1'/);
