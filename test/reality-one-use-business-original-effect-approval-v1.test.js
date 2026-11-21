@@ -64,7 +64,7 @@ test('Reality Chat requires two explicit owner clicks and cannot claim or execut
  const endpoint=readFileSync(new URL('../api/reality/personal-exact-business-effect-approval.js',import.meta.url),'utf8');
  assert.match(ui,/PREPARE_EXACT_BUSINESS_EFFECT/);
  assert.match(ui,/APPROVE_EXACT_BUSINESS_EFFECT/);
- assert.match(ui,/Exact one/);
+ assert.match(ui,/Approve exactly this one effect/);
  assert.match(ui,/stage\.addEventListener\('click'/);
  assert.match(ui,/approve\.addEventListener\('click'/);
  assert.doesNotMatch(ui,/claim_approved_business_original_effect_v1/);
