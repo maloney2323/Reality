@@ -720,3 +720,44 @@ test('broad shift timeout recovers exact PR #308 within Chat using a narrow read
  assert.equal(JSON.parse(x.calls[2].options.body).candidate_commit_sha,
   c.exact_signed_maintenance_install_review.candidate_commit_sha);
 });
+
+test('Chat status reconciles exact installed source without stale pending-installation language',async()=>{
+ const installed={
+  ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
+  owner_approval_recorded:true,installation_authorized:true,
+  approval_receipt_sha256:HASH('7'),retry_owner_approval:false,
+  shift_id:signedShiftId,source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  decision_state:'INSTALLED',repair_installed:true,
+  installed_commit_sha:'8'.repeat(40),postinstall_verified:false,
+  independent_postinstall_receipt_sha256:null,
+  production_changed:false,original_job_completed:false
+ };
+ const v=setup({readback:null,installReadback:installed});await v.flush();
+ assert.deepEqual(v.calls.map(x=>[x.options.method,x.url]),[
+  ['GET','/api/reality/personal-governed-employee-shift'],
+  ['GET','/api/reality/signed-maintenance-exact-install-approval']
+ ]);
+ assert.match(v.locate('realityChatMaintenanceChatStatus').textContent,/Repair installed · Independent verification pending/);
+ assert.match(v.locate('realityChatMaintenanceExactInstallDetails').textContent,/Installed commit/);
+ assert.match(v.locate('realityChatMaintenanceExactInstallDetails').textContent,/Independent post-install verification is pending/);
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
+ assert.equal(v.calls.filter(x=>x.options.method==='POST').length,0);
+ assert.doesNotMatch(ui,/Approval recorded\. Independent installation and the original job are still pending verification/);
+});
+test('Chat only reports independent repair acceptance with a verified post-install receipt, never original-job settlement',async()=>{
+ const verified={
+  ok:true,status:'EXACT_SIGNED_OWNER_APPROVAL_RECORDED_READBACK',
+  owner_approval_recorded:true,installation_authorized:true,
+  approval_receipt_sha256:HASH('7'),retry_owner_approval:false,
+  shift_id:signedShiftId,source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  decision_state:'VERIFIED',repair_installed:true,
+  installed_commit_sha:'8'.repeat(40),postinstall_verified:true,
+  independent_postinstall_receipt_sha256:HASH('9'),
+  production_changed:false,original_job_completed:false
+ };
+ const v=setup({readback:null,installReadback:verified});await v.flush();
+ assert.match(v.locate('realityChatMaintenanceChatStatus').textContent,/Independent repair verification recorded/);
+ assert.match(v.locate('realityChatMaintenanceFeedback').textContent,/Original job completion still requires independent proof/);
+ assert.equal(v.locate('realityChatMaintenanceExactInstallApprove').disabled,true);
+ assert.equal(v.calls.filter(x=>x.options.method==='POST').length,0);
+});
