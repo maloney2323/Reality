@@ -2,7 +2,7 @@
 // the existing registered maintenance executors. This creates no new job,
 // authority, shift, installer or settlement. The service RPC independently
 // rereads the exact owner/shift/original obligation before any executor claim.
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const ACTIONS=new Set([
  'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED',
