@@ -261,6 +261,34 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // Continuous, standing EVIDENCE qualification intake: all existing employee
+  // schedule, capabilities, incidents, Chat work and signed shift steps.
+  // The source-neutral database function deduplicates by authoritative ledger
+  // identity and NEVER admits a new original or changes owner authority.
+  // Its failure is visible but cannot strand an already authorized shift.
+  workerStage='CONTINUOUS_QUALIFICATION_INBOX_RECONCILIATION';
+  const continuousQualificationInbox=await shiftRpc(db,
+   'reality_reconcile_continuous_qualification_inbox_v1',
+   {p_worker_run_id:actualWorkerRunId},{timeoutMs:12000}
+  ).then(r=>{
+   if(r?.status!=='CONTINUOUS_QUALIFICATION_INBOX_DURABLY_RECONCILED'||
+      r.worker_run_id!==actualWorkerRunId||
+      r.new_shift_started!==false||
+      r.new_original_job_admitted!==false||
+      r.owner_approval_granted!==false||
+      r.execution_authorized!==false||
+      r.installation_authorized!==false||
+      r.production_changed!==false)
+    throw Error('CONTINUOUS_QUALIFIER_AUTHORITY_READBACK_INVALID');
+   return r;
+  }).catch(e=>({
+   status:'CONTINUOUS_QUALIFICATION_INBOX_RECONCILIATION_UNVERIFIED',
+   failure_code:String(e?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+     'SIGNED_DATABASE_INTAKE_UNAVAILABLE':'INTAKE_RECEIPT_UNVERIFIED',
+   new_shift_started:false,new_original_job_admitted:false,
+   execution_authorized:false,installation_authorized:false,
+   production_changed:false
+  }));
   // A detected stall is not a model guess or a reason to start another shift.
   // It is a durable independently observed incident; investigate it on THIS
   // signed wake before normal employee discovery, preserving exact authority.
@@ -2584,6 +2612,7 @@ export default async function handler(req,res){
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
+    continuous_qualification_inbox:continuousQualificationInbox,
     automatic_work_supervisor:automaticWorkSupervisor,
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,

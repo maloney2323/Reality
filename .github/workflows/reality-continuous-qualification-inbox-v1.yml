@@ -1,0 +1,24 @@
+name: Reality continuous qualification inbox contract
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*continuous_evidence_qualification_inbox_v1.sql'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'api/reality/personal-continuous-qualification.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'index.html'
+      - 'test/reality-continuous-qualification-inbox-v1.test.js'
+  workflow_dispatch:
+jobs:
+  continuous-qualification-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Independently test continuous qualification source and authority boundaries
+        run: node --test test/reality-continuous-qualification-inbox-v1.test.js
