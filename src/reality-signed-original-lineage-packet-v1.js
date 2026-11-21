@@ -19,6 +19,11 @@ const exact=(r,ownerId,shiftId,workId,sourceRef)=>r&&
  UUID.test(r.packet_id||'')&&UUID.test(r.source_claim_id||'')&&
  UUID.test(r.maintenance_id||'')&&HASH.test(r.evidence_sha256||'')&&
  r.packet_verified===true&&r.customer_original_verified===false&&
+ r.continuity_observation_verified===true&&
+ UUID.test(r.continuity_event_id||'')&&
+ UUID.test(r.continuity_root_id||'')&&
+ UUID.test(r.continuity_worldline_id||'')&&
+ r.continuity_fact==='CURRENT_ORIGINAL_REMAINS_UNFINISHED'&&
  r.original_claim_admitted===false&&
  r.original_job_completed===false&&r.installation_authorized===false&&
  r.production_changed===false&&r.new_shift_started===false;
@@ -87,6 +92,9 @@ export async function stageVerifiedSignedOriginalLineagePacket({
   original_work_id:gate.original_work_id,source_ref:gate.source_ref,
   source_claim_id:read.source_claim_id,packet_id:read.packet_id,
   evidence_sha256:read.evidence_sha256,
+  continuity_event_id:read.continuity_event_id,
+  continuity_root_id:read.continuity_root_id,
+  continuity_fact:read.continuity_fact,
   next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
   missing_evidence:'CANONICAL_CUSTOMER_BUSINESS_ORIGINAL_AND_ACCEPTANCE',
   executor_invoked:false,independent_final_receipt_verified:false,
