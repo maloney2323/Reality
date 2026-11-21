@@ -7,6 +7,7 @@ const worker=source('../api/reality/governed-employee-shift-worker.js');
 const api=source('../api/reality/personal-continuous-qualification.js');
 const ui=source('../reality-chat-continuous-qualification-v1.js');
 const home=source('../index.html');
+const prioritySql=source('../supabase/migrations/20261121183500_continuous_qualification_owner_fair_priority_v1.sql');
 const boundary=source('../src/reality-governed-shift-boundary-v1.js');
 
 test('every existing source family reaches a single signed qualification inbox, not a new dispatcher',()=>{
@@ -83,4 +84,17 @@ test('Reality Chat displays next source proof and does not silently approve or s
  assert.match(ui,/A specific, current, independently qualified job/);
  assert.match(ui,/setInterval\(\(\)=>\{if\(isReady\(\)\)void load\(\);\},120000\)/);
  assert.doesNotMatch(ui,/reality_authorize_employee_shift_v1|AUTHORIZE_EXACT_EMPLOYEE_SHIFT|reality_owner_approve/);
+});
+
+test('Chat readback fairly samples every source family and puts unqualified current work first',()=>{
+ assert.match(prioritySql,/partition by i\.intake_family/);
+ assert.match(prioritySql,/where ranked\.family_rank<=5/);
+ assert.match(prioritySql,/CURRENT_SOURCE_QUALIFICATION_REQUIRED/);
+ assert.match(prioritySql,/INDEPENDENT_CAPABILITY_GAP_PROOF_REQUIRED/);
+ assert.match(prioritySql,/SIGNED_CHAT_SCOPE_CLASSIFICATION_REQUIRED/);
+ assert.match(prioritySql,/ranked\.intake_priority/);
+ assert.match(prioritySql,/items_are_qualifier_inputs_not_approved_jobs/);
+ assert.match(prioritySql,/execution_authorized',false/);
+ assert.match(prioritySql,/approval_ready',false/);
+ assert.doesNotMatch(prioritySql,/issues\/378|work:[a-f0-9]{32}/);
 });

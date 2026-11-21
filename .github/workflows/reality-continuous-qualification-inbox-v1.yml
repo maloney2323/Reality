@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/*continuous_evidence_qualification_inbox_v1.sql'
+      - 'supabase/migrations/*continuous_qualification_owner_fair_priority_v1.sql'
       - 'api/reality/governed-employee-shift-worker.js'
       - 'api/reality/personal-continuous-qualification.js'
       - 'src/reality-governed-shift-boundary-v1.js'
