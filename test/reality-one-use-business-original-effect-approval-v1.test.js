@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {verifyExactBusinessEffectPacket}
+import {verifyExactBusinessEffectPacket,exactOwnerEffectReceiptReadback}
  from '../api/reality/personal-exact-business-effect-approval.js';
 
 const owner='11111111-1111-4111-8111-111111111111';
@@ -93,4 +93,41 @@ test('signed worker recognizes next owner-approved original but cannot claim whe
  assert.match(worker,/exact_approved_business_effect_handoff:exactApprovedBusinessEffectHandoff/);
  assert.doesNotMatch(worker,/reality_claim_approved_business_original_effect_v1/);
  assert.match(boundary,/read_next_signed_business_effect_handoff_v1/);
+});
+
+test('independent owner receipt readback resolves lost approval response without second approval click',()=>{
+ const packet='22222222-2222-4222-8222-222222222222';
+ const receipt={
+  status:'OWNER_EXACT_BUSINESS_EFFECT_RECEIPT_READBACK',
+  owner_id:owner,packet_id:packet,shift_id:'33333333-3333-4333-8333-333333333333',
+  original_work_id:original,proposal_fingerprint:'sha256:'+'c'.repeat(64),
+  authority_state:'APPROVED_ONE_USE_NOT_EXECUTED',
+  approval_request_id:'44444444-4444-4444-8444-444444444444',
+  approval_receipt_sha256:'sha256:'+'d'.repeat(64),
+  approval_verified:true,effect_reserved:false,read_only:true,
+  execution_authorized_by_read:false,provider_effect_performed:false,
+  original_job_completed:false,production_changed:false
+ };
+ assert.equal(exactOwnerEffectReceiptReadback(receipt,owner,packet),true);
+ assert.equal(exactOwnerEffectReceiptReadback({...receipt,owner_id:packet},owner,packet),false);
+ assert.equal(exactOwnerEffectReceiptReadback({...receipt,approval_verified:false},owner,packet),false);
+ assert.equal(exactOwnerEffectReceiptReadback({...receipt,effect_reserved:true},owner,packet),false);
+ assert.equal(exactOwnerEffectReceiptReadback({...receipt,provider_effect_performed:true},owner,packet),false);
+ assert.equal(exactOwnerEffectReceiptReadback({...receipt,
+  status:'EXACT_BUSINESS_EFFECT_OWNER_PACKET_NOT_FOUND',approval_verified:false,
+  effect_reserved:false},owner,packet),true);
+});
+test('owner receipt status is read-only and never discloses exact payload or grants provider permissions',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261122005000_owner_business_effect_approval_independent_readback_v1.sql',import.meta.url),'utf8');
+ const endpoint=readFileSync(new URL('../api/reality/personal-exact-business-effect-approval.js',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../reality-chat-continuous-qualification-v1.js',import.meta.url),'utf8');
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/EXACT_BUSINESS_EFFECT_OWNER_PACKET_NOT_FOUND/);
+ assert.doesNotMatch(sql,/'effect_payload',p\.effect_payload/);
+ assert.match(sql,/execution_authorized_by_read',false/);
+ assert.match(endpoint,/exactOwnerEffectReceiptReadback\(confirm,owner,body.packet_id\)/);
+ assert.match(endpoint,/independent_approval_readback_verified:true/);
+ assert.match(ui,/Check saved effect approval status/);
+ assert.match(ui,/approval_verified===true/);
+ assert.doesNotMatch(ui,/claim_approved_business_original_effect_v1/);
 });
