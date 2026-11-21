@@ -72,6 +72,7 @@
  const MULTI_PREFLIGHT='/api/reality/personal-multi-original-shift-preflight?target=5';
  const CONTRACT_PREFLIGHT='/api/reality/personal-business-original-admission-contract';
  const EXACT_EFFECT_PREFLIGHT='/api/reality/personal-business-effect-authority-preflight';
+ const EFFECT_OWNER_APPROVAL='/api/reality/personal-exact-business-effect-approval';
  let verifiedBusinessClasses=[];
  const INTERNAL_PROOF_API='/api/reality/personal-internal-business-provider-proof';
  async function loadInternalCompanySourceProviderProof(){
@@ -245,6 +246,76 @@
      const check=node('button','Verify exact effect scope');check.type='button';
      const receipt=node('p','No action is authorized by this preflight.');
      receipt.setAttribute('role','status');
+     const target=node('input');target.type='text';target.maxLength=450;
+     target.placeholder='Exact recipient, destination or supplier';
+     const payload=node('textarea');payload.rows=4;payload.maxLength=4000;
+     payload.placeholder='Exact text or action to authorize';
+     const stage=node('button','Prepare exact effect for owner approval');
+     stage.type='button';stage.disabled=true;
+     const approve=node('button','Approve exactly this one effect');
+     approve.type='button';approve.disabled=true;approve.hidden=true;
+     const ownerNote=node('p','No business effect approved or executed.');
+     ownerNote.setAttribute('role','status');
+     let frozen=null;
+     async function effectPost(body){
+      const r=await fetch(EFFECT_OWNER_APPROVAL,{method:'POST',credentials:'same-origin',
+       cache:'no-store',headers:{'content-type':'application/json'},
+       body:JSON.stringify(body),signal:AbortSignal.timeout(22000)});
+      const x=await r.json().catch(()=>null);
+      if(!r.ok||x?.ok!==true)throw Error(String(x?.next_gate||x?.status||'UNVERIFIED').slice(0,140));
+      if(x.effect_executed!==false||x.original_job_completed!==false||
+         x.production_changed!==false||x.new_shift_started!==false)
+       throw Error('EFFECT_AUTHORITY_SCOPE_UNVERIFIED');
+      return x;
+     }
+     stage.addEventListener('click',async()=>{
+      stage.disabled=true;approve.disabled=true;approve.hidden=true;
+      const proposedTarget=target.value.trim(),proposedText=payload.value;
+      const chosenClass=jobClass.value,chosenEffect=effect.value;
+      try{
+       const p=await effectPost({action:'PREPARE_EXACT_BUSINESS_EFFECT',
+        original_work_id:item.original_work_id,job_class:chosenClass,
+        effect_type:chosenEffect,target_ref:proposedTarget,payload_text:proposedText});
+       if(p.status!=='EXACT_BUSINESS_EFFECT_OWNER_REVIEW_STAGED'||
+          p.original_work_id!==item.original_work_id||
+          p.job_class!==chosenClass||p.effect_type!==chosenEffect||
+          p.target_ref!==proposedTarget||p.owner_approval_ready!==true||
+          p.authorization_scope!=='EXACT_ONE_USE_EFFECT_ONLY'||
+          p.execution_started!==false||
+          !UUID.test(p.packet_id||'')||!SHA.test(p.proposal_fingerprint||''))
+        throw Error('EXACT_PACKET_UNVERIFIED');
+       frozen=p;
+       target.disabled=true;payload.disabled=true;jobClass.disabled=true;effect.disabled=true;
+       ownerNote.textContent='Review exact target: '+proposedTarget+' · Exact content: '+
+        proposedText+' · Your next click authorizes this one effect, not execution.';
+       approve.disabled=false;approve.hidden=false;
+      }catch(e){
+       ownerNote.textContent='Exact packet not ready: '+
+        String(e?.message||'PROOF_MISSING').replaceAll('_',' ').slice(0,150)+
+        '. Nothing has been approved or performed.';
+       stage.disabled=false;
+      }
+     });
+     approve.addEventListener('click',async()=>{
+      if(!frozen||approve.disabled)return;
+      approve.disabled=true;
+      ownerNote.textContent='Recording owner authorization; no effect executing.';
+      try{
+       const receipt=await effectPost({action:'APPROVE_EXACT_BUSINESS_EFFECT',
+        packet_id:frozen.packet_id,proposal_fingerprint:frozen.proposal_fingerprint,
+        approval_request_id:crypto.randomUUID()});
+       if(receipt.status!=='EXACT_BUSINESS_EFFECT_OWNER_APPROVED_ONE_USE'||
+          receipt.packet_id!==frozen.packet_id||
+          receipt.itemized_owner_approval_recorded!==true||
+          receipt.execution_started!==false||
+          receipt.provider_effect_performed!==false||
+          !SHA.test(receipt.approval_receipt_sha256||''))
+        throw Error('OWNER_APPROVAL_READBACK_UNVERIFIED');
+       ownerNote.textContent='One-use owner approval recorded. Only Reality’s signed worker may reserve it; provider execution and independent final verification are still required.';
+      }catch{
+       ownerNote.textContent='Approval result uncertain: check the existing receipt. Do not retry without reconciling.';
+      }
+     });
      check.addEventListener('click',async()=>{
       check.disabled=true;
       receipt.textContent='Rechecking canonical original, owner warrant, source, executor and authority…';
@@ -264,15 +335,22 @@
           r.original_job_completed_by_read!==false||
           r.new_shift_started!==false||r.production_changed!==false||
           typeof r.next_gate!=='string')throw Error('EFFECT_SCOPE_UNVERIFIED');
-       receipt.textContent=(r.ready_for_exact_effect_review?
-        'Ready only for exact owner review · ':'Blocked · ')+
+       const reviewable=r.canonical_original_admission_verified===true&&
+         r.canonical_source_current===true&&
+         r.consented_business_provider_verified===true&&
+         r.registered_executor_independently_verified===true&&
+         r.independent_final_original_already_present===false&&
+         r.execution_claim_created===false&&
+         r.owner_review_before_execution_claim===true;
+       stage.disabled=!reviewable;
+       receipt.textContent=(reviewable?'Exact source, goal, provider and adapter verified. Owner review required · ':'Blocked · ')+
         r.next_gate.replaceAll('_',' ')+
         '. No execution, publication or purchase authorized.';
       }catch{
        receipt.textContent='Exact business effect scope is unverified; nothing has been authorized or executed.';
       }finally{check.disabled=false;}
      });
-     scope.append(jobClass,effect,check,receipt);
+     scope.append(jobClass,effect,check,receipt,target,payload,stage,approve,ownerNote);
      card.append(scope);
     }
     multiSources.append(card);
