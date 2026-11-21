@@ -194,7 +194,8 @@
     ' links to the exact claim '+originalPacket.source_claim_id+
     ' and source '+originalPacket.source_ref+
     '. Evidence receipt: '+originalPacket.evidence_sha256+
-    '. No verified customer-original admission or final receipt exists.':
+    '. Continuity event: '+originalPacket.continuity_event_id+
+    ' (original remains unfinished). No verified customer-original admission or final receipt exists.':
     'Reality has not independently verified a durable source-to-original evidence packet for this shift.',
    packetVerified?
     'Independently identify and authorize the actual customer/business original and acceptance criteria; do not translate a PR-review claim into completion':
