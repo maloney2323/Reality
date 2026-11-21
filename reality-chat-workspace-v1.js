@@ -204,38 +204,40 @@
   composer.append(composerControls);
   composer.append(node('p','reality-chat-typing-note','Enter to send on desktop · Shift+Enter for a new line · No message grants installation permission.'));
 
-  const statusBar = node('div', 'reality-chat-status-bar');
-  // Mirror the existing response/verification status into the conversation.
-  // Keep its original live-region outside the authenticated panel so login
-  // and session errors remain visible even before sign-in.
+  // No floating 'Details' strip between Chat and the message composer.
+  // Project genuine delivery/verification feedback as a plain in-thread
+  // message, reattached after saved-history rerenders. This read-only
+  // projection never triggers a work request, approval or second API call.
+  const statusBar = node('article','bubble reality-chat-status-bar');
+  statusBar.id='realityChatInlineStatus';
+  statusBar.hidden=true;
+  statusBar.setAttribute('role','status');
+  statusBar.setAttribute('aria-live','polite');
   const originalStatus = get('privateStatus');
-  const statusCopy = node('p', 'muted');
-  statusCopy.id = 'realityChatStatusSummary';
-  if (originalStatus) {
-    const syncStatus = () => {
-      const raw = String(originalStatus.textContent ?? '').trim();
-      // No provider evidence should appear as a bare serialized "null".
-      statusCopy.textContent = /^(?:null|undefined|nan|\[object object\])$/i.test(raw) ? '' : raw;
+  const statusCopy = node('p','muted');
+  statusCopy.id='realityChatStatusSummary';
+  statusBar.append(statusCopy);
+  const inlinePanels=node('article','bubble reality-chat-inline-panels');
+  inlinePanels.id='realityChatInlinePanels';
+  inlinePanels.hidden=true;
+  inlinePanels.setAttribute('aria-label','Conversation controls and verified work');
+  const attachInlineStatus=()=>{
+    if(!statusBar.hidden&&!transcript.contains(statusBar))
+      transcript.append(statusBar);
+  };
+  if(originalStatus){
+    const syncStatus=()=>{
+      const raw=String(originalStatus.textContent??'').trim();
+      const valid=raw&& !/^(?:null)+$|^(?:undefined|nan|\[object object\])$/i.test(raw);
+      statusCopy.textContent=valid?raw:'';
+      statusBar.hidden=!valid;
+      attachInlineStatus();
     };
-    new MutationObserver(syncStatus).observe(originalStatus, {
-      childList:true, characterData:true, subtree:true
+    new MutationObserver(syncStatus).observe(originalStatus,{
+      childList:true,characterData:true,subtree:true
     });
     syncStatus();
   }
-  statusBar.append(statusCopy);
-  const statusExpand = node('button', '', 'Details');
-  statusExpand.type = 'button';
-  statusExpand.setAttribute('aria-expanded', 'false');
-  statusExpand.addEventListener('click', () => {
-    const expanded = statusBar.dataset.expanded !== 'true';
-    statusBar.dataset.expanded = String(expanded);
-    statusExpand.textContent = expanded ? 'Less' : 'Details';
-    statusExpand.setAttribute('aria-expanded',String(expanded));
-  });
-  statusBar.append(statusExpand);
-  // The actual message field remains the lowest interactive Chat control.
-  // Its existing delivery status is compact and appears ABOVE the composer.
-  conversation.insertBefore(statusBar,composer);
 
   // Right: the existing authenticated provider readbacks and real approval UI.
   const closeInspector = node('button','reality-chat-panel-close','Close work panel');
@@ -391,24 +393,48 @@
     syncKeyboardViewport();
   }
 
-  // On smaller screens the conversation fills the page. The side panels
-  // overlay it only when explicitly opened, and remain available to screen readers.
+  // Small-screen Chats and Work are expandable IN the transcript. Never
+  // display a fixed overlay, scrim, modal or mid-chat pop-up. Move the
+  // original nodes, keeping every authenticated handler and approval intact.
+  const inlineScreen=()=>window.matchMedia('(max-width:950px)').matches;
+  function restorePanelNodes(){
+    if(sidebar.parentElement===inlinePanels)
+      workspace.insertBefore(sidebar,conversation);
+    if(inspector.parentElement===inlinePanels)
+      workspace.append(inspector);
+    inlinePanels.hidden=true;
+    if(inlinePanels.parentElement)inlinePanels.remove();
+  }
   function closePanel() {
     document.body.dataset.realityChatPanel='';
     historyToggle.setAttribute('aria-expanded','false');
     inspectorToggle.setAttribute('aria-expanded','false');
+    restorePanelNodes();
   }
   function openPanel(name) {
-    const next = document.body.dataset.realityChatPanel===name?'':name;
+    const next=document.body.dataset.realityChatPanel===name?'':name;
+    closePanel();
+    if(!next)return;
     document.body.dataset.realityChatPanel=next;
     historyToggle.setAttribute('aria-expanded',String(next==='history'));
     inspectorToggle.setAttribute('aria-expanded',String(next==='work'));
-    if(next==='history') closeSidebar.focus({preventScroll:true});
-    if(next==='work') closeInspector.focus({preventScroll:true});
-    if(!next) (name==='history'?historyToggle:inspectorToggle).focus({preventScroll:true});
+    if(inlineScreen()){
+      inlinePanels.replaceChildren(next==='history'?sidebar:inspector);
+      inlinePanels.hidden=false;
+      transcript.append(inlinePanels);
+      inlinePanels.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }else{
+      // Desktop retains original sidebar/inspector columns.
+      (next==='history'?sidebar:inspector).scrollIntoView({
+        behavior:'smooth',block:'nearest'
+      });
+    }
   }
   historyToggle.addEventListener('click',()=>openPanel('history'));
   inspectorToggle.addEventListener('click',()=>openPanel('work'));
+  window.addEventListener('resize',()=>{
+    if(document.body.dataset.realityChatPanel&&!inlineScreen())closePanel();
+  });
   closeSidebar.addEventListener('click',closePanel);
   closeInspector.addEventListener('click',closePanel);
   scrim.addEventListener('click',closePanel);
@@ -440,6 +466,15 @@
   });
   transcriptObserver.observe(transcript,{childList:true});
   renderEmpty();
+  // Saved transcripts are allowed to rerender; keep the compact status and
+  // any owner-requested inline work card in their conversation, not a layer
+  // above it. This is a projection, not a new persisted customer message.
+  const inlineRerender=new MutationObserver(()=>{
+    attachInlineStatus();
+    if(inlineScreen()&&!inlinePanels.hidden&&!transcript.contains(inlinePanels))
+      transcript.append(inlinePanels);
+  });
+  inlineRerender.observe(transcript,{childList:true});
 
   // Work-in-progress indicator reflects the REAL request lifecycle only.
   const prompt=get('privatePrompt'),send=get('privateSend');
