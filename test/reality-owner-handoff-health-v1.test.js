@@ -120,3 +120,15 @@ test('Chat receives owner-only health read and shows actual gaps, never invents 
  assert.match(sql,/public\.universe_events/);
  assert.doesNotMatch(sql,/\b(?:INSERT INTO|DELETE FROM|UPDATE reality_internal)\b/i);
 });
+
+test('same signed worker exposes bounded owner-reconciled all-handoff health and cannot stop shift if read fails',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/reality_read_owner_shift_handoff_health_v1/);
+ assert.match(worker,/signed_owner_handoff_health:signedOwnerHandoffHealth/);
+ assert.match(worker,/SIGNED_OWNER_HANDOFF_HEALTH_UNVERIFIED/);
+ assert.match(worker,/h\.installation_authorized===false/);
+ assert.match(worker,/h\.original_job_completed===false/);
+ assert.match(worker,/h\.production_changed===false/);
+ assert.match(worker,/catch\{\/\* Signed execution continues; no guessed work status\. \*\/\}/);
+});
