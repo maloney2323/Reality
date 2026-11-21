@@ -1695,8 +1695,21 @@ export default async function handler(req,res){
    installation_authorized:false,production_changed:false,
    original_job_completed:false,new_shift_started:false,read_only:true
   };
-  if(integratedWorkIntake?.status===
-     'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+  // This is independent of the advisory weekly/Home intake. Its only
+  // prerequisites are this worker's signed wake, exact validated owner graph,
+  // and the independent read-only current owner/shift warrant gate.
+  // A broken optional supervisor intake must not silence a real research
+  // repair's safe next-action decision.
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     unifiedGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+     sameOriginalPostmaintenanceGate?.status===
+       'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE'&&
+     sameOriginalPostmaintenanceGate.owner_id===unifiedGraph.owner_id&&
+     sameOriginalPostmaintenanceGate.shift_id===wakeReceipt.shift_id&&
+     sameOriginalPostmaintenanceGate.read_only===true&&
+     sameOriginalPostmaintenanceGate.original_job_completed===false&&
+     sameOriginalPostmaintenanceGate.installation_authorized===false&&
+     sameOriginalPostmaintenanceGate.production_changed===false){
    try{
     workerStage='AUTOMATIC_OWNER_REPAIR_SOURCE_AND_SCOPE_QUALIFICATION';
     automaticRepairOpportunityQualification=
