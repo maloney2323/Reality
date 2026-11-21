@@ -1713,9 +1713,17 @@ export default async function handler(req,res){
       shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
       fetchImpl:fetch
      });
-   }catch{
+   }catch(error){
+    // A bounded diagnostic category helps Reality investigate the next
+    // blocker without disclosing provider responses, credentials or model text.
+    const code=String(error?.message||'');
+    const failureCode=/^AUTO_REPAIR_QUALIFICATION_[A-Z0-9_]{4,100}$/.test(code)||
+      code==='SHIFT_RPC_NOT_ALLOWLISTED'||
+      /^SHIFT_DATABASE_RPC_reality_read_owner_market_repair_proofs_v1_(?:TIMEOUT|UNAVAILABLE)$/.test(code)?
+      code:'REPAIR_SOURCE_OR_PROVIDER_UNVERIFIED';
     automaticRepairOpportunityQualification={
      status:'AUTOMATIC_REPAIR_SOURCE_SCOPE_OR_PROVIDER_UNVERIFIED',
+     failure_code:failureCode,
      reviewed_candidate_count:0,work_orders:[],
      installation_authorized:false,production_changed:false,
      original_job_completed:false,new_shift_started:false,read_only:true
