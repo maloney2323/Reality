@@ -607,7 +607,14 @@ export default async function handler(req,res){
       registeredMaintenanceCiAction));
   const signedMaintenanceCaseCi=ciRegistrationReady?
    await invokeOneRegisteredSignedCapability({
-    wake:wakeReceipt,graph:unifiedGraph,
+    wake:wakeReceipt,
+     // Re-read the existing signed shift before invoking its registered
+     // capability. The later unifiedGraph declaration is not yet initialized.
+     // No new shift, job, authorization or completion is inferred here.
+     graph:assertRealityUnifiedShiftGraph(await shiftRpc(db,
+      'reality_read_current_shift_execution_graph_v1',{}),{
+       expectedShiftId:wakeReceipt.shift_id
+      }),
     action:registeredMaintenanceCiAction,
     authorityBasis:'SIGNED_EXISTING_WARRANT',
     env:process.env,
