@@ -32,14 +32,14 @@ function env(){
   err('ISOLATED_EXISTING_BROKER_CREDENTIAL_NOT_AVAILABLE');
  return {url,key,github};
 }
-async function rpc(c:{url:string;key:string},fn:string,payload:Record<string,unknown>){
+async function rpc(c:{url:string;key:string},fn:string,payload:Record<string,unknown>,callerServiceKey:string=c.key){
  if(!['reality_read_next_signed_internal_repo_business_source_v1',
   'reality_record_signed_internal_repo_provider_proof_v1'].includes(fn))
   err('SOURCE_RPC_NOT_REGISTERED');
  const r=await fetch(c.url+'/rest/v1/rpc/'+fn,{
   method:'POST',redirect:'error',cache:'no-store',
   signal:AbortSignal.timeout(10000),
-  headers:{apikey:c.key,authorization:'Bearer '+c.key,
+  headers:{apikey:callerServiceKey,authorization:'Bearer '+callerServiceKey,
    'content-type':'application/json',accept:'application/json'},
   body:JSON.stringify(payload)});
  if(!r.ok)err('OWNER_SIGNED_DB_SCOPE_UNAVAILABLE');
@@ -88,8 +88,13 @@ Deno.serve(async req=>{
   if(req.method!=='POST')
    return result(405,'INTERNAL_BUSINESS_BROKER_POST_ONLY');
   const c=env();
-  if(!same(req.headers.get('apikey')||'',c.key)||
-   !same(req.headers.get('authorization')||'','Bearer '+c.key))
+  // Supabase projects may use either an older service-role JWT or a
+  // newer sb_secret server credential. NEVER equate the latter to the
+  // Edge runtime's internal SUPABASE_SERVICE_ROLE_KEY. Instead the exact
+  // signed-source RPC must independently prove current_user='service_role'.
+  const incomingKey=req.headers.get('apikey')||'';
+  if(incomingKey.length<25||
+   !same(req.headers.get('authorization')||'','Bearer '+incomingKey))
    return result(403,'INTERNAL_BUSINESS_BROKER_SERVICE_ROLE_AUTH_REQUIRED');
   if(req.headers.get('content-type')!=='application/json')
    return result(415,'INTERNAL_BUSINESS_BROKER_JSON_ONLY');
@@ -103,7 +108,7 @@ Deno.serve(async req=>{
    !REPO.test(b.repository_full_name||''))
    return result(400,'INTERNAL_BUSINESS_BROKER_SIGNED_SOURCE_SCOPE_REQUIRED');
   const scope=await rpc(c,'reality_read_next_signed_internal_repo_business_source_v1',{
-   p_worker_run_id:b.worker_run_id,p_repo_full_name:b.repository_full_name});
+   p_worker_run_id:b.worker_run_id,p_repo_full_name:b.repository_full_name},incomingKey);
   if(scope.status==='NO_DUE_SIGNED_INTERNAL_PROVIDER_BUSINESS_SOURCE'&&
    scope.model_execution_authorized===false&&scope.new_shift_started===false)
    return result(200,scope.status,{internal_source_provider_readback_verified:false});
