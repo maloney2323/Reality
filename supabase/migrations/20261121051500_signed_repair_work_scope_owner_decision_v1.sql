@@ -97,7 +97,15 @@ BEGIN
  VALUES(p_owner_id,p_shift_id,p_worker_run_id,p_source_ref,v_p.source_file,
   p_candidate_commit_sha,p_current_blob_sha,p_candidate_blob_sha,
   v_p.baseline_run_id,v_p.green_run_id,v_p.frozen_test_sha256,v_fp)
- ON CONFLICT(owner_id,shift_id,source_ref,candidate_commit_sha) DO NOTHING;
+ ON CONFLICT(owner_id,shift_id,source_ref,candidate_commit_sha)
+ DO UPDATE SET
+  -- Refresh only an unchanged source-proof proposal that has never been
+  -- approved, so the 60-minute owner click window does not expire forever.
+  created_at=now(),updated_at=now(),
+  worker_run_id=EXCLUDED.worker_run_id
+ WHERE reality_internal.owner_repair_scope_handoffs_v1.state='PREPARED'
+  AND reality_internal.owner_repair_scope_handoffs_v1.work_order_fingerprint=
+   EXCLUDED.work_order_fingerprint;
  SELECT * INTO v_actual FROM reality_internal.owner_repair_scope_handoffs_v1
  WHERE owner_id=p_owner_id AND shift_id=p_shift_id
  AND source_ref=p_source_ref AND candidate_commit_sha=p_candidate_commit_sha;
