@@ -36,6 +36,17 @@ button:hover{filter:brightness(1.15)}
 @media(max-width:700px){.telemetry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .metricrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .metricrow .value{font-size:22px}
+.comparison{margin-top:26px;border:1px solid #356977;background:#111d2b;border-radius:14px;padding:22px}
+.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.comparison-panel{background:#172635;border:1px solid #334c59;border-radius:12px;padding:16px;min-width:0}
+.comparison-panel h3{font-size:16px;margin:6px 0 13px}
+.comparison-row{border-top:1px solid #2d4654;padding:11px 0;overflow-wrap:anywhere}
+.comparison-row strong{display:block;font-size:13px;color:#e9f5f8}
+.comparison-row span{display:block;font-size:12px;line-height:1.55;color:#a8c0cb;margin-top:4px}
+.comparison-note{font-size:12px;color:#e0c394;background:#322a20;border:1px solid #746041;border-radius:8px;padding:11px 12px;margin-top:14px}
+.incident-lineage{margin-top:20px;border-top:1px solid #325162;padding-top:18px}
+.incident-lineage p{margin:5px 0;font-size:13px}
+@media(max-width:700px){.comparison-grid{grid-template-columns:1fr}.comparison{padding:15px}}
 .diagnostics{background:#152534;border:1px solid #324858;border-radius:12px;padding:19px;margin:24px 0}
 .status{border-radius:20px;border:1px solid #3c786b;padding:5px 10px;background:#1a473e;color:#9bf6d4;font-size:11px;font-weight:750}
 .status.warn{border-color:#806641;background:#3f3120;color:#f7d6a3}
@@ -86,6 +97,21 @@ a{color:#75e6d4}
  <div class="measurement"><span>Bitemporal event audit / externally anchored signature</span><strong class="unknown">Not captured in this sandbox</strong></div>
  <p class="telemetry-note" id="tele-run-note">No receipts measured yet. Session totals reset when the page reloads; permanent business metrics require authenticated durable evidence.</p>
 </section>
+<section class="comparison" aria-label="Underlying model versus Reality evidence">
+ <div class="small">DUAL EVIDENCE LEDGER · VERIFIED FIELDS ONLY</div>
+ <h2 style="margin:9px 0 6px">Underlying model vs Reality — what actually happened</h2>
+ <p class="telemetry-note">The left column records correct answers and mistakes only from independently adjudicated model outputs. The right column records Reality's own detector, authorization, correction and verification receipts. Every step must identify its evidence and turn or sequence.</p>
+ <div class="comparison-grid">
+  <div class="comparison-panel"><div class="small">UNDERLYING MODEL</div><h3>Correct work and mistakes</h3>
+   <div id="model-column"><div class="comparison-row"><strong>Model results not measured</strong><span>This proof has no raw underlying model call; no made-up drift, hallucination or correctness percentage.</span></div></div>
+  </div>
+  <div class="comparison-panel"><div class="small">REALITY FOUNDATION</div><h3>Detected, blocked, corrected, verified</h3>
+   <div id="reality-column"><div class="comparison-row"><strong>Run a sandbox scenario above</strong><span>Receipt-backed operations will appear with their sequence and evidence hash.</span></div></div>
+  </div>
+ </div>
+ <div id="incident-lineage" class="incident-lineage"><h3 style="font-size:16px">Incident lifecycle</h3><p>Original turn · detector turn · proposed correction turn · independently verified repair turn</p><p>Run an isolated case to display its actual receipt timeline.</p></div>
+ <div class="comparison-note" id="comparison-roi">Business ROI: not measured. Sandbox verification is not evidence of real dollars or minutes saved.</div>
+</section>
 <section class="card" aria-label="Real external Github evidence" style="margin-top:22px;border-color:#467075">
  <div class="small">PROOF 1 · REAL EXTERNAL GITHUB PROVIDER · FROZEN REGRESSION</div>
  <h2 style="margin:9px 0 12px">Same failing test, independently rechecked after the fix</h2>
@@ -114,6 +140,32 @@ const get=id=>document.getElementById(id);
 const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sessionTelemetry=[];
 const showRate=v=>v===null||v===undefined?'N/A':v.toFixed(1)+'%';
+function renderComparison(c){
+ if(!c||c.version!=='reality-incident-comparison-v0.1'||c.source_scope!=='SYNTHETIC_SANDBOX_ONLY')
+   throw Error('Unsupported or unverified evidence comparison');
+ const m=c.model||{}, r=c.reality||{};
+ const modelRows=(m.events||[]).map(x=>'<div class="comparison-row"><strong>'+escapeHtml(x.category||'Model evidence')+'</strong><span>'+escapeHtml(x.detail||'')+'</span></div>');
+ get('model-column').innerHTML=modelRows.length?modelRows.join(''):
+   '<div class="comparison-row"><strong>Correct model turns: Not measured</strong><span>No model outputs were independently adjudicated.</span></div>'+
+   '<div class="comparison-row"><strong>Drift / hallucinations: Not measured</strong><span>'+escapeHtml(m.explanation||'No model evidence provided')+'</span></div>';
+ get('reality-column').innerHTML=(r.events||[]).map(x=>
+   '<div class="comparison-row"><strong>Step '+escapeHtml(x.sequence)+' · '+escapeHtml(x.category)+'</strong>'+
+   '<span>Evidence receipt '+escapeHtml((x.evidence_id||'').slice(0,16))+'… · '+escapeHtml(x.source_scope)+'</span></div>').join('')||
+   '<div class="comparison-row"><strong>No verified Reality activity</strong></div>';
+ const incidents=(c.incidents||[]).map(x=>
+   '<div class="comparison-row"><strong>'+escapeHtml(x.type)+' · '+escapeHtml(x.repair_kind)+'</strong>'+
+   '<span>Turn: N/A (no model turns). Original step: '+escapeHtml(x.origin_step??'N/A')+
+   ' · Detector step: '+escapeHtml(x.detected_step??'N/A')+
+   ' · Sandbox outcome verified at step: '+escapeHtml(x.sandbox_outcome_verified_step??'Not verified')+
+   '</span><span>Detector: '+escapeHtml(x.detected_by)+
+   ' · Cause attribution: '+escapeHtml(x.root_cause_scope)+' · Record: '+escapeHtml(x.incident_id)+'</span></div>').join('');
+ get('incident-lineage').innerHTML='<h3 style="font-size:16px">Incident lifecycle · receipt-backed only</h3>'+
+   (incidents||'<p>No incident receipts provided.</p>');
+ get('comparison-roi').textContent='Sandbox: '+(r.authority_gate_blocked?'unauthorized attempt blocked; ':'')+
+   String(r.sandbox_verified_recoveries??0)+' independently reconstructed sandbox outcome(s). '+
+   'Real model mistakes prevented, supervision minutes, human touches, costs and dollars saved: NOT MEASURED. '+
+   'Do not treat this as model-vs-Reality or competitor ROI.';
+}
 function renderTelemetry(t){
  sessionTelemetry.push(t);
  const good=sessionTelemetry.filter(x=>x.receipt_chain_valid===true);
@@ -161,6 +213,7 @@ async function run(mode){
   if(!body.telemetry||body.telemetry.evidence_scope!=='EPHEMERAL_SANDBOX_RECONSTRUCTION')
     throw Error('Receipt-derived telemetry missing or wrong scope');
   renderTelemetry(body.telemetry);
+  renderComparison(body.comparison);
   const rows=proof.receipts||proof.steps||[];
   get('state').textContent=proof.status;
   get('work').textContent='Same task '+(proof.original_attempt_blocked?'preserved':'unverified');

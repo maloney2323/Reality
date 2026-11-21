@@ -3,12 +3,16 @@
 // Not the production autonomous agent and never a proof of customer ROI.
 import {runFullLoopSandboxProof} from '../../src/reality-full-loop-sandbox-proof-v0.1.js';
 import {scoreFullLoopProof} from '../../src/reality-proof-telemetry-v0.1.js';
-const TARGET_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
+import {buildSandboxEvidenceComparison} from '../../src/reality-incident-comparison-v0.1.js';
+const ALLOWED_PREVIEW_BRANCHES=new Set([
+  'feature/reality-drift-live-continuity-v1-20261024',
+  'feature/reality-incident-lifecycle-evidence-v1-20261024',
+]);
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({ok:false,code:'METHOD_NOT_ALLOWED'});
   if(process.env.VERCEL_ENV!=='preview' ||
-      process.env.VERCEL_GIT_COMMIT_REF!==TARGET_BRANCH)
+      !ALLOWED_PREVIEW_BRANCHES.has(process.env.VERCEL_GIT_COMMIT_REF))
     return res.status(404).json({ok:false,code:'SANDBOX_ONLY_PREVIEW_ROUTE'});
   const mode=req.body?.mode||'success';
   if(!['success','withhold_approval','failed_readback'].includes(mode))
@@ -19,6 +23,8 @@ export default async function handler(req,res){
       ownerApproval:mode!=='withhold_approval',
       denyIndependentReadback:mode==='failed_readback',
     });
+    const telemetry=scoreFullLoopProof(result);
+    const comparison=buildSandboxEvidenceComparison({proof:result,telemetry});
     return res.status(200).json({
       ok:true,
       proof_kind:'EPHEMERAL_ISOLATED_SANDBOX',
@@ -27,7 +33,8 @@ export default async function handler(req,res){
       paid_model_calls:0,
       expected_scenario:mode,
       result,
-      telemetry:scoreFullLoopProof(result),
+      telemetry,
+      comparison,
     });
   } catch(e){
     return res.status(500).json({
