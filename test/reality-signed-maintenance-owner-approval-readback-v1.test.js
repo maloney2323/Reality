@@ -82,7 +82,8 @@ test('only the signed POST can record an approval; GET and Check status are read
  assert.match(api,/failed_stage:stage,failure_category:category/);
  assert.match(ui,/async function checkExactOwnerApprovalStatus/);
  assert.match(ui,/method:'GET',credentials:'same-origin'/);
- assert.match(ui,/if\(installUncertain\)void checkExactOwnerApprovalStatus\(\)/);
+ assert.match(ui,/installUncertain\|\|approvedScope\?\.exactInstallCard/);
+ assert.match(ui,/void checkExactOwnerApprovalStatus\(\)/);
  assert.match(ui,/A background refresh MUST NOT unlock a failed\/unknown owner POST/);
  assert.match(ui,/installUncertain=true/);
  assert.doesNotMatch(ui,/setInterval\([^]*?installApprove\.click\(\)/);
