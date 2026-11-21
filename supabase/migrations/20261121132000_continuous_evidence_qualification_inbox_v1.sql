@@ -87,6 +87,31 @@ begin
     and s.installation_authorized=false and s.production_changed=false
 
   union all
+  -- A discovered source not yet materialized by the normal schedule must
+  -- still enter evidence qualification. Never create a customer original.
+  select o.owner_id,'EMPLOYEE_DISCOVERY'::text,o.source_identity,
+   o.source_ref,o.employee,coalesce(nullif(o.title,''),'Discovered source'),
+   o.disposition,o.evidence_sha256,o.source_observed_at,
+   case when o.disposition in('SOURCE_NO_LONGER_CURRENT','SETTLED_NO_REPLAY')
+     then 'HISTORICAL_OR_TERMINAL_NO_REPLAY'
+    else 'DISCOVERY_CURRENT_SOURCE_QUALIFICATION_REQUIRED' end,
+   case when o.disposition in('SOURCE_NO_LONGER_CURRENT','SETTLED_NO_REPLAY')
+     then 'PRESERVE_EXISTING_RECEIPT_NO_REPLAY'
+    else 'VERIFY_CURRENT_SOURCE_AND_LINK_EXISTING_WORK_CALENDAR' end,
+   o.disposition in('SOURCE_NO_LONGER_CURRENT','SETTLED_NO_REPLAY')
+  from reality_internal.employee_discovery_observations_v1 o
+  join eligible e on e.owner_id=o.owner_id
+  where o.last_reconciled_at>v_now-interval '48 hours'
+   and o.shift_authorized=false and o.production_changed=false
+   and o.installation_authorized=false
+   and not exists(
+    select 1 from reality_internal.owner_employee_operating_schedule_v1 s
+    where s.owner_id=o.owner_id and s.employee=o.employee
+     and s.source_ref=o.source_ref and s.source_family=o.source_family
+     and s.last_reconciled_at>v_now-interval '48 hours'
+   )
+
+  union all
   select c.owner_id,'EMPLOYEE_CAPABILITY'::text,c.capability_key,
    c.source_url,c.assigned_employee,
    coalesce(nullif(c.source_title,''),'Employee capability inquiry'),
@@ -244,12 +269,30 @@ begin
   'last_seen_at',x.last_seen_at,
   'terminal_observation',x.terminal_observation,
   'approval_ready',false,'executable_original_admitted',false
- ) order by x.terminal_observation,x.last_seen_at desc,x.intake_family,x.intake_key),
+ ) order by x.terminal_observation,
+    case x.intake_family
+      when 'SIGNED_SHIFT_SOURCE' then 0
+      when 'EMPLOYEE_SCHEDULE' then 1
+      when 'EMPLOYEE_DISCOVERY' then 2
+      when 'GOVERNED_CAPABILITY' then 3
+      when 'EMPLOYEE_CAPABILITY' then 4
+      when 'RECOVERY_INCIDENT' then 5
+      when 'AUTHENTICATED_CHAT' then 6 else 7 end,
+    x.last_seen_at desc,x.intake_key),
  '[]'::jsonb) into v_items
  from (
   select * from reality_internal.owner_continuous_qualification_inbox_v1
   where owner_id=p_owner_id
-  order by terminal_observation, last_seen_at desc,intake_family,intake_key
+  order by terminal_observation,
+    case intake_family
+      when 'SIGNED_SHIFT_SOURCE' then 0
+      when 'EMPLOYEE_SCHEDULE' then 1
+      when 'EMPLOYEE_DISCOVERY' then 2
+      when 'GOVERNED_CAPABILITY' then 3
+      when 'EMPLOYEE_CAPABILITY' then 4
+      when 'RECOVERY_INCIDENT' then 5
+      when 'AUTHENTICATED_CHAT' then 6 else 7 end,
+    last_seen_at desc,intake_key
   limit 30
  ) x;
  return pg_catalog.jsonb_build_object(
