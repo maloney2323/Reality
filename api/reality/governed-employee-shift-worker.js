@@ -56,7 +56,8 @@ import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
-import {automaticallyQualifyVerifiedRepairOpportunity}
+import {automaticallyQualifyVerifiedRepairOpportunity,
+ canAutomaticallyQualifyResearchRepairOnSignedWake}
  from '../../src/reality-governed-automatic-repair-qualification-v1.js';
 import {runCurrentShiftWeeklyInvestigations}
  from '../../src/reality-active-weekly-source-investigator-v1.js';
@@ -1695,8 +1696,14 @@ export default async function handler(req,res){
    installation_authorized:false,production_changed:false,
    original_job_completed:false,new_shift_started:false,read_only:true
   };
-  if(integratedWorkIntake?.status===
-     'CURRENT_WARRANT_AND_EXISTING_WORK_INVENTORY_RECONCILED_READ_ONLY'){
+  // This is independent of the advisory weekly/Home intake. Its only
+  // prerequisites are this worker's signed wake, exact validated owner graph,
+  // and the independent read-only current owner/shift warrant gate.
+  // A broken optional supervisor intake must not silence a real research
+  // repair's safe next-action decision.
+  if(canAutomaticallyQualifyResearchRepairOnSignedWake({
+   wakeReceipt,graph:unifiedGraph,originalGate:sameOriginalPostmaintenanceGate
+  })){
    try{
     workerStage='AUTOMATIC_OWNER_REPAIR_SOURCE_AND_SCOPE_QUALIFICATION';
     automaticRepairOpportunityQualification=

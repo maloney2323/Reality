@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {automaticallyQualifyVerifiedRepairOpportunity}
+import {automaticallyQualifyVerifiedRepairOpportunity,
+ canAutomaticallyQualifyResearchRepairOnSignedWake}
  from '../src/reality-governed-automatic-repair-qualification-v1.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const shift='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
@@ -176,4 +177,39 @@ test('the signed worker automatically runs qualified opportunity review without 
  assert.match(source,/automatic_repair_work_order_qualification:/);
  assert.match(source,/WEEKLY_AND_HOMEPAGE_INTAKE_PROVIDER_READ_UNAVAILABLE/);
  assert.match(source,/AUTOMATIC_OWNER_REPAIR_SOURCE_AND_SCOPE_QUALIFICATION/);
+});
+
+test('a genuine signed owner/warrant continues repair qualification even when weekly intake failed',()=>{
+ const good={
+  wakeReceipt:{status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',shift_id:shift},
+  graph,
+  originalGate:{
+   status:'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE',
+   owner_id:owner,shift_id:shift,read_only:true,
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  },
+  integratedWorkIntake:null,
+  integratedWorkIntakeStatus:'NO_VERIFIED_EXISTING_WORK_INTAKE',
+  supervisorStatus:'AUTOMATIC_WORK_TRIAGE_SOURCE_UNAVAILABLE'
+ };
+ assert.equal(canAutomaticallyQualifyResearchRepairOnSignedWake(good),true);
+ const workerSource=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const start=workerSource.indexOf('let automaticRepairOpportunityQualification=');
+ const end=workerSource.indexOf('let weeklyEmployeeInvestigations=',start);
+ assert.ok(start>0&&end>start);
+ const section=workerSource.slice(start,end);
+ assert.match(section,/canAutomaticallyQualifyResearchRepairOnSignedWake\(/);
+ assert.doesNotMatch(section,/integratedWorkIntake\?\.status/);
+ assert.match(section,/await automaticallyQualifyVerifiedRepairOpportunity\(/);
+ for(const invalid of [
+  {...good,wakeReceipt:{...good.wakeReceipt,status:'MISSING_SIGNED_WAKE'}},
+  {...good,graph:{...graph,owner_id:'11111111-1111-1111-1111-111111111111'}},
+  {...good,originalGate:{...good.originalGate,shift_id:'11111111-1111-1111-1111-111111111111'}},
+  {...good,originalGate:{...good.originalGate,installation_authorized:true}},
+  {...good,originalGate:{...good.originalGate,read_only:false}},
+  {...good,originalGate:{...good.originalGate,original_job_completed:true}},
+  {...good,originalGate:{...good.originalGate,production_changed:true}}
+ ])assert.equal(canAutomaticallyQualifyResearchRepairOnSignedWake(invalid),false);
 });
