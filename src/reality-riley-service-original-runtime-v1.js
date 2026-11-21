@@ -222,6 +222,8 @@ export function createRileyServiceOriginalRuntime({
     'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF':
    outcome.execution_status==='VERIFIED'?
     'ORIGINAL_JOB_OUTCOME_NEEDS_DURABLE_SETTLEMENT':
+   outcome.execution_status==='UNRESOLVED'?
+    'SAME_ORIGINAL_JOB_SHARED_REPAIR_HANDOFF_MISSING_QUEUE_CONFIRMATION':
     'ORIGINAL_JOB_UNRESOLVED_NO_UNSAFE_RETRY';
   return Object.freeze({
    original_work_id:qualifiedOriginal.original_work_id,
