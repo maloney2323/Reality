@@ -126,7 +126,7 @@ begin
   or not exists (
    select 1 from public.reality_chat_messages m
    where m.id=p_message_id and m.user_id=p_owner_id and m.role='user'
-    and pg_catalog.position(p_source_quote in m.content)>0)
+    and pg_catalog.strpos(m.content,p_source_quote)>0)
  then return pg_catalog.jsonb_build_object(
   'status','QUALIFIED_CHAT_REVIEW_ADMISSION_NOT_ELIGIBLE',
   'owner_approval_ready',false,'new_original_admitted',false,
@@ -228,7 +228,7 @@ begin
  v_receipt:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
   pg_catalog.convert_to('qualified-chat-owner-admission-v1|'||
    p.packet_id::text||'|'||p_approval_request_id::text||'|'||
-   p.proposal_fingerprint||'|'||admitted->>'original_work_id',
+   p.proposal_fingerprint||'|'||(admitted->>'original_work_id'),
    'UTF8')),'hex');
  update reality_internal.owner_qualified_chat_original_review_packets_v1
  set review_state='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER',
