@@ -38,9 +38,35 @@ export function verifiedExactOwnerInstallReadback(card,ownerId){
    retry_owner_approval:false};
  if(card?.status==='EXACT_OWNER_MAINTENANCE_INSTALL_APPROVAL_READY'&&
     card.owner_id===ownerId&&card.owner_approval_ready===true&&
-    card.installation_authorized===false)
+    card.installation_authorized===false&&card.repair_installed===false&&
+    card.original_job_completed===false&&card.production_changed===false&&
+    card.new_shift_started===false&&
+    UUID.test(card.maintenance_id||'')&&UUID.test(card.shift_id||'')&&
+    /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(card.source_ref||'')&&
+    card.target_branch==='reality/chat-direct-work-handoff-20261115'&&
+    /^src\/[a-z0-9_./-]+\.js$/.test(card.target_path||'')&&
+    !card.target_path.includes('..')&&
+    SHA.test(card.target_head_sha||'')&&SHA.test(card.expected_old_blob_sha||'')&&
+    SHA.test(card.candidate_source_blob_sha||'')&&
+    SHA.test(card.candidate_commit_sha||'')&&
+    HASH.test(card.artifact_receipt_sha256||'')&&
+    HASH.test(card.case_ci_receipt_sha256||'')&&
+    HASH.test(card.target_review_receipt_sha256||''))
   return {status:'EXACT_SIGNED_OWNER_APPROVAL_NOT_RECORDED_READBACK',
    owner_approval_recorded:false,installation_authorized:false,
+   // Only the EXACT owner-scoped independently reviewed artifact needed by
+   // the Chat one-use button. GET makes no approval or installer write.
+   exact_review:{
+    maintenance_id:card.maintenance_id,shift_id:card.shift_id,
+    source_ref:card.source_ref,target_path:card.target_path,
+    target_branch:card.target_branch,target_head_sha:card.target_head_sha,
+    expected_old_blob_sha:card.expected_old_blob_sha,
+    candidate_source_blob_sha:card.candidate_source_blob_sha,
+    candidate_commit_sha:card.candidate_commit_sha,
+    target_review_receipt_sha256:card.target_review_receipt_sha256,
+    artifact_receipt_sha256:card.artifact_receipt_sha256,
+    case_ci_receipt_sha256:card.case_ci_receipt_sha256
+   },
    retry_owner_approval:false};
  if(card?.status==='NO_EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_READY'&&
     card.owner_approval_ready===false&&card.installation_authorized===false)
