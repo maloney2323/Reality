@@ -59,6 +59,8 @@ import {projectRealityExistingShiftIntegratedIntake}
 import {automaticallyQualifyVerifiedRepairOpportunity,
  canAutomaticallyQualifyResearchRepairOnSignedWake}
  from '../../src/reality-governed-automatic-repair-qualification-v1.js';
+import {advanceSignedRepairScopeOwnerHandoff}
+ from '../../src/reality-signed-repair-scope-handoff-v1.js';
 import {runCurrentShiftWeeklyInvestigations}
  from '../../src/reality-active-weekly-source-investigator-v1.js';
 import {admitCurrentShiftInvestigatedSourceWithFrozenProof}
@@ -1730,6 +1732,33 @@ export default async function handler(req,res){
     };
    }
   }
+  // The signed verified candidate becomes a durable exact owner decision,
+  // available in Reality Chat; once approved, the same worker independently
+  // repeats source readback on the SAME shift. No code install or final claim.
+  let signedRepairOwnerScopeHandoff={
+   status:'NO_VERIFIED_OWNER_REPAIR_SCOPE_HANDOFF',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  };
+  if(canAutomaticallyQualifyResearchRepairOnSignedWake({
+   wakeReceipt,graph:unifiedGraph,originalGate:sameOriginalPostmaintenanceGate
+  })){
+   try{
+    workerStage='SIGNED_REPAIR_SCOPE_OWNER_DECISION_AND_CONTINUATION';
+    signedRepairOwnerScopeHandoff=await advanceSignedRepairScopeOwnerHandoff({
+     db,env:process.env,graph:unifiedGraph,
+     qualification:automaticRepairOpportunityQualification,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     fetchImpl:fetch
+    });
+   }catch{
+    signedRepairOwnerScopeHandoff={
+     status:'SIGNED_REPAIR_SCOPE_HANDOFF_OR_CONTINUATION_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    };
+   }
+  }
   // Actual employee source investigations now RUN on the existing signed
   // worker, rather than merely appearing as proposed jobs on the Homepage.
   // Provider GETs + idempotent service-only receipts; no extra authorization.
@@ -2442,6 +2471,7 @@ export default async function handler(req,res){
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,
     automatic_repair_work_order_qualification:automaticRepairOpportunityQualification,
+    signed_repair_owner_scope_handoff:signedRepairOwnerScopeHandoff,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,

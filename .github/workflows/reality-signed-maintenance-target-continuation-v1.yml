@@ -16,6 +16,14 @@ on:
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'src/reality-signed-maintenance-original-return-handoff-v1.js'
       - 'src/reality-governed-automatic-repair-qualification-v1.js'
+      - 'src/reality-signed-repair-scope-handoff-v1.js'
+      - 'test/reality-signed-repair-scope-chat-approval-v1.test.js'
+      - 'api/reality/owner-repair-scope-approval.js'
+      - 'reality-chat-repair-scope-approval-v1.js'
+      - 'reality-chat-repair-scope-approval-v1.css'
+      - 'supabase/migrations/20261121051500_signed_repair_work_scope_owner_decision_v1.sql'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'index.html'
       - 'test/reality-governed-automatic-repair-qualification-v1.test.js'
       - 'test/reality-signed-maintenance-original-return-handoff-v1.test.js'
       - 'test/reality-signed-maintenance-governed-auto-trigger-v1.test.js'
@@ -72,5 +80,9 @@ jobs:
           node --test test/reality-signed-maintenance-original-return-handoff-v1.test.js
           node --check src/reality-governed-automatic-repair-qualification-v1.js
           node --test test/reality-governed-automatic-repair-qualification-v1.test.js
+          node --check src/reality-signed-repair-scope-handoff-v1.js
+          node --check api/reality/owner-repair-scope-approval.js
+          node --check reality-chat-repair-scope-approval-v1.js
+          node --test test/reality-signed-repair-scope-chat-approval-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
