@@ -289,6 +289,39 @@ export default async function handler(req,res){
    execution_authorized:false,installation_authorized:false,
    production_changed:false
   }));
+  // Reconcile the SAME governed source identities into their next lawful
+  // Continuity transition. This is evidence-only routing, not an LLM dispatch,
+  // original admission, approval, installation, or replay. A missing receipt
+  // is visible and cannot authorize the next stage by default.
+  workerStage='CONTINUITY_QUALIFICATION_GOVERNED_ROUTE';
+  const continuityQualificationRoutes=
+    continuousQualificationInbox.status===
+     'CONTINUOUS_QUALIFICATION_INBOX_DURABLY_RECONCILED'?
+     await shiftRpc(db,'reality_reconcile_continuity_qualification_routes_v1',
+      {p_worker_run_id:actualWorkerRunId},{timeoutMs:12000})
+      .then(r=>{
+       if(r?.status!=='CONTINUITY_QUALIFICATION_ROUTES_RECONCILED'||
+          r.worker_run_id!==actualWorkerRunId||
+          r.model_execution_authorized!==false||
+          r.owner_approval_granted!==false||
+          r.new_original_admitted!==false||
+          r.new_shift_started!==false||
+          r.installation_authorized!==false||
+          r.production_changed!==false)
+        throw Error('CONTINUITY_QUALIFICATION_ROUTE_AUTHORITY_INVALID');
+       return r;
+      }).catch(e=>({
+       status:'CONTINUITY_QUALIFICATION_ROUTE_UNVERIFIED',
+       failure_code:String(e?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+        'SIGNED_CONTINUITY_DB_UNAVAILABLE':'ROUTE_PROOF_UNVERIFIED',
+       model_execution_authorized:false,owner_approval_granted:false,
+       new_original_admitted:false,new_shift_started:false,
+       installation_authorized:false,production_changed:false
+      })):
+     {status:'CONTINUITY_QUALIFICATION_INTAKE_NOT_VERIFIED',
+      model_execution_authorized:false,owner_approval_granted:false,
+      new_original_admitted:false,new_shift_started:false,
+      installation_authorized:false,production_changed:false};
   // A detected stall is not a model guess or a reason to start another shift.
   // It is a durable independently observed incident; investigate it on THIS
   // signed wake before normal employee discovery, preserving exact authority.
@@ -2613,6 +2646,7 @@ export default async function handler(req,res){
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
     continuous_qualification_inbox:continuousQualificationInbox,
+    continuity_qualification_routes:continuityQualificationRoutes,
     automatic_work_supervisor:automaticWorkSupervisor,
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,
