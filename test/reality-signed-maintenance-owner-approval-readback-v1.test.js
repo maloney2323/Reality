@@ -16,6 +16,9 @@ test('owner-scoped approval GET distinguishes recorded decision from an unverifi
  const s=verifiedExactOwnerInstallReadback({
   status:'EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED',
   owner_id:owner,decision_state:'APPROVED',
+  shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  original_job_completed:false,production_changed:false,
   approval_receipt_sha256:receipt,installation_authorized:true,
   repair_installed:false,independent_postinstall_receipt_sha256:null
  },owner);
@@ -32,17 +35,26 @@ test('recorded decision may be verified separately but never implies customer-jo
  const s=verifiedExactOwnerInstallReadback({
   status:'EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED',
   owner_id:owner,decision_state:'VERIFIED',
+  shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  original_job_completed:false,production_changed:false,
   approval_receipt_sha256:receipt,installation_authorized:true,
-  repair_installed:true,independent_postinstall_receipt_sha256:'sha256:'+'b'.repeat(64)
+  repair_installed:true,installed_commit_sha:'a'.repeat(40),
+  independent_postinstall_receipt_sha256:'sha256:'+'b'.repeat(64)
  },owner);
  assert.equal(s.postinstall_verified,true);
  assert.equal(s.repair_installed,true);
- assert.equal(Object.hasOwn(s,'original_job_completed'),false);
+ assert.equal(s.original_job_completed,false);
+ assert.equal(s.independent_postinstall_receipt_sha256,'sha256:'+'b'.repeat(64));
+ assert.equal(s.installed_commit_sha,'a'.repeat(40));
 });
 
 test('owner mismatch, invalid receipt, and unknown phase fail closed rather than claiming approval',()=>{
  const c={status:'EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED',
   owner_id:owner,decision_state:'APPROVED',installation_authorized:true,
+  shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  original_job_completed:false,production_changed:false,
   approval_receipt_sha256:receipt};
  assert.equal(verifiedExactOwnerInstallReadback(c,otherOwner),null);
  assert.equal(verifiedExactOwnerInstallReadback({...c,approval_receipt_sha256:'bad'},owner),null);
@@ -198,4 +210,38 @@ test('narrow exact approval GET cannot turn a wrong-owner or stale artifact into
  assert.equal(verifiedExactOwnerInstallReadback({...data,target_review_receipt_sha256:'unverified'},owner),null);
  assert.equal(verifiedExactOwnerInstallReadback({...data,repair_installed:true},owner),null);
  assert.equal(verifiedExactOwnerInstallReadback({...data,installation_authorized:true},owner),null);
+});
+
+test('installed maintenance readback proves the installed commit without fabricating independent acceptance',()=>{
+ const s=verifiedExactOwnerInstallReadback({
+  status:'EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED',
+  owner_id:owner,shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  original_job_completed:false,production_changed:false,
+  decision_state:'INSTALLED',
+  approval_receipt_sha256:receipt,installation_authorized:true,
+  repair_installed:true,installed_commit_sha:'8'.repeat(40),
+  independent_postinstall_receipt_sha256:null
+ },owner);
+ assert.equal(s.decision_state,'INSTALLED');
+ assert.equal(s.postinstall_verified,false);
+ assert.equal(s.installed_commit_sha,'8'.repeat(40));
+ assert.equal(s.independent_postinstall_receipt_sha256,null);
+ assert.equal(s.retry_owner_approval,false);
+});
+test('unknown installed commit and ungrounded verifier receipt cannot appear as a milestone',()=>{
+ const b={status:'EXACT_OWNER_MAINTENANCE_INSTALL_DECISION_RECORDED',
+  owner_id:owner,shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+  source_ref:'https://github.com/maloney2323/Reality/pull/308',
+  original_job_completed:false,production_changed:false,
+  decision_state:'INSTALLED',approval_receipt_sha256:receipt,
+  installation_authorized:true,repair_installed:true,
+  independent_postinstall_receipt_sha256:null};
+ assert.equal(verifiedExactOwnerInstallReadback({...b,installed_commit_sha:null},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...b,installed_commit_sha:'a'.repeat(39)},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...b,decision_state:'VERIFIED',
+  installed_commit_sha:'a'.repeat(40),
+  independent_postinstall_receipt_sha256:null},owner),null);
+ assert.equal(verifiedExactOwnerInstallReadback({...b,installed_commit_sha:'a'.repeat(40),
+  original_job_completed:true},owner),null);
 });
