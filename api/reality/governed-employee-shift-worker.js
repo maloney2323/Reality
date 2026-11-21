@@ -165,6 +165,8 @@ import {independentlyReviewSignedMaintenanceTarget}
  from '../../src/reality-signed-maintenance-candidate-target-review-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
+import {probeOneSignedInternalBusinessProviderSource}
+ from '../../src/reality-signed-internal-business-source-readback-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -322,6 +324,35 @@ export default async function handler(req,res){
       model_execution_authorized:false,owner_approval_granted:false,
       new_original_admitted:false,new_shift_started:false,
       installation_authorized:false,production_changed:false};
+  // First real INTERNAL company source connection proof: reobserve an
+  // already signed owner GitHub issue/PR with Reality's installed provider
+  // reader. This is an optional, bounded two-GET source probe, never an
+  // external customer connector or an executable original. It cannot
+  // interrupt an already warranted maintenance shift.
+  workerStage='SIGNED_INTERNAL_BUSINESS_PROVIDER_REOBSERVATION';
+  const internalBusinessProviderSource=
+   continuityQualificationRoutes.status==='CONTINUITY_QUALIFICATION_ROUTES_RECONCILED'?
+    await probeOneSignedInternalBusinessProviderSource({
+     db,env:process.env,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(e=>({
+     status:String(e?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_INTERNAL_SOURCE_DATABASE_UNAVAILABLE':
+      'SIGNED_INTERNAL_SOURCE_PROVIDER_PROOF_UNAVAILABLE',
+     internal_company_provider_source_verified:false,
+     customer_source_connection_verified:false,
+     original_job_admitted:false,owner_approval_granted:false,
+     model_execution_authorized:false,new_shift_started:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'SIGNED_CONTINUITY_SOURCE_ROUTING_NOT_PROVEN',
+     internal_company_provider_source_verified:false,
+     customer_source_connection_verified:false,
+     original_job_admitted:false,owner_approval_granted:false,
+     model_execution_authorized:false,new_shift_started:false,
+     installation_authorized:false,production_changed:false};
+  // A current provider source remains an observation until it enters exact
+  // owner-goal qualification, itemized approval, governed job execution,
+  // independent original acceptance and Universe reconciliation.
   // A detected stall is not a model guess or a reason to start another shift.
   // It is a durable independently observed incident; investigate it on THIS
   // signed wake before normal employee discovery, preserving exact authority.
