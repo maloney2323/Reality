@@ -153,6 +153,15 @@
   if(!box.hidden&&box.parentElement===null)attach();
  });
  observer.observe(transcript,{childList:true});
+ // A later shift readback can render the current maintenance approval after
+ // this old saved-handoff notice. Remove the redundant receipt immediately.
+ const decision=document.getElementById('realityChatMaintenanceNudge');
+ if(decision){
+  const decisionObserver=new MutationObserver(()=>{
+   if(!decision.hidden){box.hidden=true;box.remove()}
+  });
+  decisionObserver.observe(decision,{attributes:true,attributeFilter:['hidden']});
+ }
  window.addEventListener('reality:chat-intake-saved',()=>{void refresh()});
  window.addEventListener('pageshow',()=>{void refresh()});
  if(document.readyState==='loading')
