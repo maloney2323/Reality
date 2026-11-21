@@ -86,7 +86,7 @@ test('signed worker recognizes next owner-approved original but cannot claim whe
  assert.match(sql,/registered_execution_adapter/);
  assert.match(sql,/effect_reserved',false/);
  assert.match(sql,/handler_installed_and_verified_by_read',false/);
- assert.doesNotMatch(sql,/\\b(update|insert into|delete from)\\s+reality_internal\\./i);
+ assert.doesNotMatch(sql,/\b(update|insert into|delete from)\s+reality_internal\./i);
  assert.match(worker,/reality_read_next_signed_business_effect_handoff_v1/);
  assert.match(worker,/p_worker_run_id:actualWorkerRunId/);
  assert.match(worker,/EXACT_APPROVED_BUSINESS_EFFECT_REGISTERED_HANDLER_REQUIRED/);
