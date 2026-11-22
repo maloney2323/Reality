@@ -1,0 +1,19 @@
+name: Reality signed Chat review incident observation
+on:
+  pull_request:
+  push:
+    branches:
+      - fix/observe-expired-review-in-existing-continuity-20261122
+      - repair/maintenance-artifact-to-same-shift-review-20261120
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check api/reality/governed-employee-shift-worker.js
+      - run: node --test test/reality-signed-chat-review-incident-observation-v1.test.js test/reality-signed-chat-review-failure-reentry-v1.test.js test/reality-signed-continuity-recovery-action-v1.test.js test/reality-signed-chat-recovery-spec-target-review-v1.test.js
