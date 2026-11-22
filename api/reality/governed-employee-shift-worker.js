@@ -1437,6 +1437,18 @@ export default async function handler(req,res){
   // A rejected exact-source model patch can be re-claimed ONLY after a
   // changed verified preview release, once, while retaining its rejection
   // memory. The owner original, diagnosis and checkpoint are unchanged.
+  // A true independent rejection can qualify a distinct, graph-constrained
+  // candidate, on the same original. Preserve the old draft/review epoch.
+  workerStage='SIGNED_CHAT_RECOVERY_REJECTED_TARGET_COMPILATION';
+  const signedRecoveryTargetRevision=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_recompile_signed_rejected_chat_target_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
+     p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+    }).catch(()=>({status:'SIGNED_CHAT_RECOVERY_TARGET_COMPILATION_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_TARGET_COMPILATION_SCOPE',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
   workerStage='SIGNED_CHAT_RECOVERY_DISTINCT_STRATEGY_COMPILATION';
   const signedRecoveryStrategy=await shiftRpc(db,
    'reality_recompile_signed_chat_recovery_line_span_v1',{
