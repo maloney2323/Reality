@@ -57,6 +57,28 @@ test('unrecognized provider statuses and missing no-replay proof do not gain tru
  const clean=await stage('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',{});
  assert.equal(clean.broker_read_only_diagnosis,undefined);
 });
+test('initial GitHub branch-write refusal is passed intact as typed no-replay evidence',async()=>{
+ for(const [status,diagnostic] of [
+  [403,'GITHUB_BRANCH_CREATE_PROVIDER_AUTH_REJECTED'],
+  [422,'GITHUB_BRANCH_CREATE_REF_CONFLICT_UNVERIFIED'],
+  [500,'GITHUB_BRANCH_CREATE_EFFECT_UNKNOWN']
+ ]){
+  const result=await stage('RECOVERY_GITHUB_BRANCH_EFFECT_UNKNOWN_NO_REPLAY',{
+   broker_read_only_diagnosis:diagnostic,
+   provider_write_http_status:status,
+   provider_effect_settled:false,write_replay_authorized:false});
+  assert.equal(result.provider_write_http_status,status);
+  assert.equal(result.broker_read_only_diagnosis,diagnostic);
+  assert.equal(result.write_replay_authorized,false);
+  assert.equal(result.installation_authorized,false);
+ }
+ const malformed=await stage('RECOVERY_GITHUB_BRANCH_EFFECT_UNKNOWN_NO_REPLAY',{
+  broker_read_only_diagnosis:'GITHUB_BRANCH_CREATE_EFFECT_UNKNOWN',
+  provider_write_http_status:'403',
+  provider_effect_settled:false,write_replay_authorized:false});
+ assert.equal(malformed.provider_write_http_status,undefined);
+ assert.equal(malformed.installation_authorized,false);
+});
 test('fenced broker path only performs GET reobservations and cannot recreate an uncertain branch',()=>{
  const fenced=broker.indexOf("if(s.phase==='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED')");
  const fresh=broker.indexOf("const before=await gh(token,'/git/ref/heads/'+branch)");
