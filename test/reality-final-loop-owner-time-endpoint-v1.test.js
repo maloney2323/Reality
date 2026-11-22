@@ -39,6 +39,8 @@ const proof={
  original_job_completed:false,execution_authorized:false,
  installation_authorized:false,production_changed:false,
  jobs:[{source_ref:source,source_proof_sha256:sha('6'),
+  source_step_index:2,source_phase:'SOURCE_ADMITTED',
+  native_next_governed_action:'GENERATE_AND_TEST_ORIGINAL',
   original_work_id:work,independent_source_proof_verified:true,
   original_acceptance_verified:false,authority_proof_verified:false,
   capacity_proof_verified:false,final_outcome_verified:false,
