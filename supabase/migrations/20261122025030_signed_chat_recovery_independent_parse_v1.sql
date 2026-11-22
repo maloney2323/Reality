@@ -189,8 +189,8 @@ begin
   or p_source_blob_sha !~ '^[a-f0-9]{40}$'
   or p_source_blob_sha = q.qualified_candidate->>'source_blob_sha'
   or p_artifact_blob_sha !~ '^[a-f0-9]{40}$'
-  or p_branch is distinct from 'reality/chat-recovery/'||q.trigger_id::text||
-    case when q.recovery_spec->>'syntax_revision_epoch'='1' then '-syntax-r1' else '' end
+  or p_branch is distinct from ('reality/chat-recovery/'||q.trigger_id::text||
+    (case when q.recovery_spec->>'syntax_revision_epoch'='1' then '-syntax-r1' else '' end))
   or p_pr_number is null or p_pr_number<1
  then raise exception 'SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_RECEIPT_INVALID';end if;
  proof:=pg_catalog.jsonb_build_object(
