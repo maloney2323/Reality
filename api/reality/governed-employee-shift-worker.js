@@ -1359,6 +1359,18 @@ export default async function handler(req,res){
    installation_authorized:false,original_job_completed:false,
    production_changed:false,new_shift_started:false
   }));
+  // A rejected exact-source model patch can be re-claimed ONLY after a
+  // changed verified preview release, once, while retaining its rejection
+  // memory. The owner original, diagnosis and checkpoint are unchanged.
+  workerStage='SIGNED_CHAT_RECOVERY_REJECTED_PATCH_RECONCILIATION';
+  const signedRecoveryRevision=await shiftRpc(db,
+   'reality_requeue_signed_chat_recovery_after_upgrade_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_REVISION_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_SPEC_COMPILATION';
   const signedRecoverySpec=await shiftRpc(db,
    'reality_admit_next_signed_chat_recovery_spec_v1',{}
@@ -1398,8 +1410,18 @@ export default async function handler(req,res){
      signedRecoveryDraft.candidate_sha256||'')&&
    signedRecoveryDraft.installation_authorized===false&&
    signedRecoveryDraft.original_job_completed===false;
+  const recoveryRevisionProgress=
+   signedRecoveryRevision.status===
+    'SIGNED_CHAT_RECOVERY_SAME_ORIGINAL_REQUEUED_ON_CHANGED_RELEASE'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryRevision.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryRevision.negative_memory_receipt_sha256||'')&&
+   signedRecoveryRevision.installation_authorized===false&&
+   signedRecoveryRevision.original_job_completed===false;
   const newDevelopmentAdvanced=recoverySourceProgress||
-   recoveryDraftProgress||recoverySpecProgress||goalGapRecorded||
+   recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
+   goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
   // This lane already owns its signed ledger. A successful or blocked feature
@@ -1411,7 +1433,8 @@ export default async function handler(req,res){
     development_result:recoverySourceProgress?signedRecoveryQuarantine:
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
-       goalGapRecorded?chatFeatureGap:
+       recoveryRevisionProgress?signedRecoveryRevision:
+        goalGapRecorded?chatFeatureGap:
         publisherProgress.has(chatNewPublished.status)?
          chatNewPublished:chatNewBuild,
     original_job_completed:false,installation_authorized:false,
