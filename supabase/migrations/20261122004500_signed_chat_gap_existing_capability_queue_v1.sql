@@ -149,7 +149,7 @@ begin
   blocker_receipt_sha256,recovery_spec,recovery_spec_sha256)
  values(h.owner_id,h.conversation_id,h.development->>'original_work_id',
   null,'signed-chat-development:'||h.message_id::text,null,null,
-  pg_catalog.substring(h.development->'evidence'->>'goal_gap_receipt_sha256' from 8),
+  pg_catalog.substr(h.development->'evidence'->>'goal_gap_receipt_sha256',8),
   'reality.chat-original.full-goal-installer-adapter-v1',
   h.development->>'source_ref',
   'recovery-spec:'||digest,
