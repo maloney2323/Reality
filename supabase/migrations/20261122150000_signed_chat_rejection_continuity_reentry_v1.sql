@@ -471,7 +471,9 @@ begin
  or pg_catalog.jsonb_typeof(p_ci_proof) is distinct from 'object'
  or p_ci_proof->>'schema' is distinct from 'reality-independent-signed-rejection-reentry-ci-v1'
  or p_ci_proof->>'release_sha' is distinct from p_release_sha
- or p_ci_proof->>'branch' is distinct from 'repair/maintenance-artifact-to-same-shift-review-20261120'
+ or coalesce(p_ci_proof->>'branch','') !~ '^(repair|reality)/[A-Za-z0-9/_-]{10,135}$'
+ or p_ci_proof->>'branch' like '%..%' or p_ci_proof->>'branch' like '%//%'
+ or p_ci_proof->>'branch' like 'reality/chat-recovery/%'
  or p_ci_proof->>'workflow' is distinct from '.github/workflows/reality-continuity-format-remediation.yml'
  or p_ci_proof->>'step' is distinct from 'Verify bounds and unchanged authority'
  or p_ci_proof->>'event' is distinct from 'push'
