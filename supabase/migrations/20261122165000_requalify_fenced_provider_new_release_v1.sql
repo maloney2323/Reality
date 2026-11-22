@@ -69,7 +69,7 @@ begin
   and m.conversation_id=w.conversation_id
   and m.request_id=w.request_id
  where w.message_id=q.source_message_id and w.owner_id=q.owner_id
-  and w.conversation_id=q.conversation_id and w.shift_id=p_shift_id
+  and w.conversation_id=q.conversation_id
   and w.message_sha256=q.source_sha256
   and w.message_sha256=pg_catalog.encode(pg_catalog.sha256(
    pg_catalog.convert_to(m.content,'UTF8')),'hex')
@@ -80,6 +80,17 @@ begin
   and w.development->>'installation_authorized'='false'
   and w.development->>'production_changed'='false';
  if not found then raise exception 'SIGNED_FENCED_PROVIDER_ORIGINAL_SOURCE_UNVERIFIED';end if;
+ -- The authenticated original may have begun in an earlier shift; Reality's
+ -- signed continuity lineage (not shift-id equality) binds that original
+ -- to the current authorized shift without admitting a new original.
+ if not reality_internal.signed_chat_goal_shift_lineage_v1(
+  pg_catalog.jsonb_build_object(
+   'owner_id',q.owner_id,'attempt_id',q.trigger_id,
+   'original_work_id',q.original_work_id,'source_ref',q.source_ref,
+   'source_sha256',q.source_sha256,
+   'source_proof_sha256',q.blocker_receipt_sha256,
+   'source_original_shift_id',h.shift_id),p_shift_id)
+ then raise exception 'SIGNED_FENCED_PROVIDER_SAME_ORIGINAL_SHIFT_LINEAGE_UNVERIFIED';end if;
  v_epoch:=coalesce((q.recovery_spec->>'syntax_revision_epoch')::int,0);
  previous_branch:='reality/chat-recovery/'||q.trigger_id::text||
   (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0'
