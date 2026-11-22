@@ -31,11 +31,12 @@ test('reject fabricated, duplicate, malformed and identical model patches',()=>{
   validateExactUniqueDevelopmentPatch(src,choice).ok,false);
 });
 test('one verifier-guided model correction, never open ended or model authority',()=>{
- assert.match(model,/role:'patch_correction'/);
- assert.match(model,/if\(!checked\.ok&&recoveryMode\)/);
- assert.match(model,/MODEL_REPEATED_INVALID_PATCH/);
- assert.match(model,/JSON\.stringify\(patch\.choice\)/);
- assert.match(model,/validateExactUniqueDevelopmentPatch\(text,patch\.choice\)/);
+ assert.match(model,/role:'patch_line_correction'/);
+ assert.match(model,/if\(!derived\.ok\)/);
+ assert.match(model,/MODEL_REPEATED_INVALID_LINE_SPAN/);
+ assert.match(model,/JSON\.stringify\(raw\.choice\)/);
+ assert.match(model,/deriveExactPatchFromFrozenLineSpan\(/);
+ assert.match(model,/if\(!derived\.ok\)\s*fail\('MODEL_FROZEN_LINE_SPAN_INVALID'\)/);
  assert.match(model,/if\(!checked\.ok\)\s*fail\('MODEL_BOUNDED_UNIQUE_CODE_CHANGE_NOT_VERIFIED'\)/);
  assert.match(model,/Buffer\.from\(text,'utf8'\)\.length!==bytes\.length/);
  assert.match(model,/text\.includes\('\\0'\)/);
