@@ -6,6 +6,8 @@ import {readFileSync} from 'node:fs';
 const installer=readFileSync(new URL(
  '../supabase/functions/reality-governed-general-original-installer-v1/index.ts',
  import.meta.url),'utf8');
+const helperSource=installer.slice(installer.indexOf('const CHAT_SOURCE='),
+ installer.indexOf('\nconst fail=',installer.indexOf('const CHAT_SOURCE=')));
 const scopeSource=installer.slice(installer.indexOf('function validScope(x){'),
  installer.indexOf('\nasync function reconcile(',installer.indexOf('function validScope(x){')));
 const reconcileSource=installer.slice(installer.indexOf('async function reconcile('),
@@ -16,7 +18,7 @@ const sha=/^[a-f0-9]{40}$/, hash=/^sha256:[a-f0-9]{64}$/,
  branch=/^reality\/[a-zA-Z0-9/_-]{10,135}$/,
  sourcePath=/^src\/[a-zA-Z0-9/_-]+\.js$/;
 const validScope=Function('SHA','HASH','WORK','UUID','BRANCH','SOURCE',
- scopeSource+'\nreturn validScope;')(
+ helperSource+'\n'+scopeSource+'\nreturn validScope;')(
  sha,hash,work,uuid,branch,sourcePath);
 function scope(phase){
  return {status:'GENERAL_INSTALL_OWNER_APPROVED_SOURCE_SCOPE',
@@ -82,7 +84,7 @@ function harness(){
    production_changed:false};
  };
  const run=Function('SHA','safe','fail','gh','checkedSource','digest',
-  'rpc','TextEncoder',reconcileSource+'\nreturn reconcile;')(
+  'rpc','TextEncoder',helperSource+'\n'+reconcileSource+'\nreturn reconcile;')(
   sha,safe,fail,gh,checkedSource,digest,rpc,TextEncoder);
  return {run,calls};
 }
