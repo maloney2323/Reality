@@ -169,7 +169,8 @@ import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
 import {stageVerifiedSignedOriginalLineagePacket}
  from '../../src/reality-signed-original-lineage-packet-v1.js';
-import {classifyRealityGovernedContinuityEvidence}
+import {classifyRealityGovernedContinuityEvidence,
+ classifyRealityContinuityRecoveryHandoff}
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
@@ -2062,6 +2063,37 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // The EXISTING categorizer reads the durable investigation/action/review
+  // receipts, not the model's description or this wake's success status.
+  // Source-bound next actions remain advisory until an installed governed
+  // executor independently checks its own authority and effect.
+  workerStage='SIGNED_CONTINUITY_DURABLE_RECOVERY_CATEGORIZATION';
+  const continuityRecoveryHandoffClassification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   /^[a-f0-9-]{36}$/i.test(unifiedGraph.owner_id||'')?
+    await Promise.all([
+     shiftRpc(db,'reality_read_owner_shift_continuity_incidents_v1',{
+      p_owner_id:unifiedGraph.owner_id
+     },{timeoutMs:6000}),
+     shiftRpc(db,'reality_read_owner_signed_shift_recovery_actions_v1',{
+      p_owner_id:unifiedGraph.owner_id
+     },{timeoutMs:6000})
+    ]).then(([incidentsReadback,actionsReadback])=>
+     classifyRealityContinuityRecoveryHandoff({
+      ownerId:unifiedGraph.owner_id,shiftId:wakeReceipt.shift_id,
+      incidentsReadback,actionsReadback
+     })
+    ).catch(()=>({
+     status:'GOVERNED_RECOVERY_DURABLE_READBACK_UNVERIFIED',
+     classification_only:true,action_dispatched:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_SIGNED_RECOVERY_CLASSIFICATION_SCOPE',
+     classification_only:true,action_dispatched:false,
+     repair_executed:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false};
+
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
@@ -3122,6 +3154,7 @@ export default async function handler(req,res){
     signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
     governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
+    governed_continuity_recovery_handoff:continuityRecoveryHandoffClassification,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
