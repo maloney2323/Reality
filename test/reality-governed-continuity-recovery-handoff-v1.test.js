@@ -124,3 +124,19 @@ test('different genuine blocker labels remain data-driven without job or provide
   assert.equal(got.items[0].execution_permitted_by_classification,false);
  }
 });
+
+test('an owner\'s historical action receipts are ignored for the active shift',()=>{
+ const prior={incident_id:'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
+  shift_id:'ffffffff-ffff-4fff-ffff-ffffffffffff',
+  kind:'HISTORICAL_RECOVERY',incident_phase:'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
+  action_receipt_sha256:sha('a'),action_independently_rechecked:true,
+  independent_review_receipt_sha256:sha('b'),
+  original_job_completed:false,installation_authorized:false,
+  production_changed:false};
+ const got=call(incidentLedger(),actionLedger([prior]));
+ assert.equal(got.status,'GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED');
+ assert.equal(got.count,1);
+ assert.equal(got.items[0].continuity_state,
+  'DIAGNOSIS_RECORDED_CORRECTIVE_ACTION_UNVERIFIED');
+ assert.equal(got.original_job_completed,false);
+});
