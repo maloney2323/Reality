@@ -148,7 +148,7 @@ import {executeOneRegisteredMaintenanceAction}
 import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {planGovernedCapabilitiesFromOwnerReceipts,
- invokeOneRegisteredSignedCapability}
+ planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability}
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
@@ -2094,6 +2094,16 @@ export default async function handler(req,res){
      repair_executed:false,original_job_completed:false,
      installation_authorized:false,production_changed:false};
 
+  // Registered handlers are reusable capability TYPES, never work IDs.
+  // The existing signed executor owns the source-requalification action;
+  // classification does not independently authorize or replay that effect.
+  // Missing provider authority is a proof/owner boundary, NOT an excuse
+  // to synthesize a successful repair or restart the fenced GitHub write.
+  const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
+   classification:continuityRecoveryHandoffClassification,
+   ownerId:unifiedGraph.owner_id,shiftId:wakeReceipt.shift_id,
+   registeredActionKeys:['REQUALIFY_EXISTING_CONTINUITY_SOURCE']
+  });
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
@@ -3155,6 +3165,7 @@ export default async function handler(req,res){
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
     governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     governed_continuity_recovery_handoff:continuityRecoveryHandoffClassification,
+    governed_continuity_registered_recovery_route:continuityRecoveryRegisteredRouting,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
