@@ -49,7 +49,8 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
-import {inspectFinalLoopOnExistingSignedWorker}
+import {inspectFinalLoopOnExistingSignedWorker,
+ recordOneFinalLoopEvidenceCheckpoint}
  from '../../src/reality-final-loop-signed-worker-bridge-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
  reconcileVerifiedCurrentShiftCommitTriage}
@@ -2073,6 +2074,13 @@ export default async function handler(req,res){
   const finalLoopEngineShadow=await inspectFinalLoopOnExistingSignedWorker({
    db,wake:wakeReceipt,graph:unifiedGraph,env:process.env,fetchImpl:fetch
   });
+  // A gated, one-use diagnostic checkpoint records only a verified
+  // missing-acceptance obligation. No model invocation, external effect,
+  // installation, original settlement or shift restart is permitted.
+  const finalLoopEvidenceCheckpoint=await recordOneFinalLoopEvidenceCheckpoint({
+   db,wake:wakeReceipt,workerRunId:actualWorkerRunId,
+   inspection:finalLoopEngineShadow,env:process.env,fetchImpl:fetch
+  });
   // The EXISTING categorizer reads the durable investigation/action/review
   // receipts, not the model's description or this wake's success status.
   // Source-bound next actions remain advisory until an installed governed
@@ -3220,6 +3228,7 @@ export default async function handler(req,res){
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
     final_loop_engine_shadow:finalLoopEngineShadow,
+    final_loop_evidence_checkpoint:finalLoopEvidenceCheckpoint,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
      next_action:unifiedGraph.next_action,
