@@ -5,7 +5,8 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {projectRealityFinalLoopTimeHorizon}
  from './reality-final-loop-time-horizon-v1.js';
-import {verifyFinalLoopCanonicalContinuityHandoff}
+import {verifyFinalLoopCanonicalContinuityHandoff,
+ derivePendingFinalLoopSourceDecisions}
  from './reality-final-loop-canonical-handoff-v1.js';
 import {
  assertRealityUnifiedShiftGraph,evaluateRealityFinalLoopEngine
@@ -122,6 +123,9 @@ export async function inspectFinalLoopOnExistingSignedWorker({
      source_ref:item.source_ref
     }));
   }
+  const canonicalSourceDecisions=derivePendingFinalLoopSourceDecisions(p);
+  if(canonicalSourceDecisions===null)
+   return safe('FINAL_LOOP_CANONICAL_SOURCE_ADMISSION_POLICY_UNVERIFIED');
   const temporal=projectRealityFinalLoopTimeHorizon({engine:{
    schema:'reality-final-loop-signed-worker-bridge-v1',
    status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',
@@ -133,14 +137,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    revision:p.revision,missing_proofs:p.missing_proofs,
    original_job_completed:false,shift_completed:false,
    installation_authorized:false,production_changed:false,
-   decisions:p.jobs.map(item=>({
-    original_work_id:item.original_work_id||null,source_ref:item.source_ref,
-    decision:'REFRESH',
-    next_governed_action:
-     'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS',
-    reason:'CUSTOMER_ORIGINAL_ACCEPTANCE_NOT_INDEPENDENTLY_PROVEN',
-    transition_committed:false
-   }))
+   decisions:canonicalSourceDecisions
   }});
   const handoff=verifyFinalLoopCanonicalContinuityHandoff({
    proof:p,expectedOwnerId:graph.owner_id,
@@ -161,7 +158,9 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
    continuity_head_sha256:p.continuity_head_sha256,
    revision:p.revision,checkpoint_candidates:Object.freeze(pending),
-   next_governed_action:
+   next_governed_action:canonicalSourceDecisions.some(d=>
+    d.decision==='SUSPEND')?
+    'QUALIFY_DISTINCT_SOURCE_TO_ORIGINAL_BEFORE_ACCEPTANCE':
     'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS'
   });
  }
