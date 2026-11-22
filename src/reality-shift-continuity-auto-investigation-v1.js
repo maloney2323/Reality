@@ -237,6 +237,7 @@ export async function investigateOneSignedShiftContinuityIncident({
    !HASH.test(claim.source_evidence.target_review_receipt_sha256||'')||
    !HASH.test(claim.source_evidence.blocker_receipt_sha256||'')||
    !/^[a-f0-9]{40}$/.test(claim.source_evidence.candidate_base_sha||'')||
+   typeof claim.source_evidence.expected_quarantine_branch!=='string'||
    claim.source_evidence.expected_quarantine_branch!==
      'reality/chat-recovery/'+claim.source_evidence.trigger_id+
       (claim.source_evidence.expected_quarantine_branch.includes('-feature-r')?
