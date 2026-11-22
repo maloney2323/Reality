@@ -21,6 +21,39 @@ export function parseOnlyModule(source,spawn=spawnSync){
   return 'INVALID_SYNTAX';
  return 'PARSE_PROVIDER_UNAVAILABLE';
 }
+// Independently classify a FULL, never-executed ESM module parse failure.
+// Only a fixed category and bounded source line leave this parser: never
+// forward model-controlled stderr or source text as trusted instructions.
+export function parseOnlyModuleFailureCategory(source,spawn=spawnSync){
+ if(typeof source!=='string'||Buffer.byteLength(source,'utf8')>280000)
+  return Object.freeze({verdict:'PARSE_INPUT_UNVERIFIED'});
+ const result=spawn(process.execPath,['--input-type=module','--check'],{
+  input:source,encoding:'utf8',env:{},timeout:2500,maxBuffer:256000,
+  windowsHide:true});
+ if(result?.error||result?.signal||!Number.isInteger(result?.status))
+  return Object.freeze({verdict:'PARSE_PROVIDER_UNAVAILABLE'});
+ if(result.status===0)
+  return Object.freeze({verdict:'VALID_SYNTAX'});
+ if(result.status!==1||typeof result.stderr!=='string'||
+  !/SyntaxError:/.test(result.stderr))
+  return Object.freeze({verdict:'PARSE_PROVIDER_UNAVAILABLE'});
+ const diagnostic=result.stderr.match(/SyntaxError:\\s*([^\\r\\n]{1,140})/);
+ const message=diagnostic?.[1]||'';
+ const category=/Unexpected end of input|Unexpected end of file/i.test(message)?
+  'UNEXPECTED_END_OF_MODULE':
+  /Unexpected token/i.test(message)?'UNEXPECTED_TOKEN':
+  /Missing catch or finally after try/i.test(message)?'INCOMPLETE_TRY_STATEMENT':
+  /Identifier .* has already been declared/i.test(message)?'DUPLICATE_DECLARATION':
+  /Invalid or unexpected token/i.test(message)?'INVALID_TOKEN':
+  'OTHER_SYNTAX_ERROR';
+ const match=result.stderr.match(/\\[stdin\\]:(\\d{1,6})/);
+ const position=match?Number(match[1]):null;
+ return Object.freeze({
+  verdict:'INVALID_SYNTAX',category,
+  line:Number.isSafeInteger(position)&&position>=1&&position<=100000?
+   position:null,source_executed:false
+ });
+}
 export function compareFrozenCandidateSyntax(original,find,replace,parse=parseOnlyModule){
  if(typeof original!=='string'||typeof find!=='string'||typeof replace!=='string'||
   !find.length||find===replace)return null;
