@@ -55,6 +55,8 @@ const proof={
  original_job_completed:false,production_changed:false,
  jobs:[{
   source_ref:source,original_work_id:original,
+  source_step_index:2,source_phase:'SOURCE_ADMITTED',
+  native_next_governed_action:'RECONCILE_UNFINISHED_ORIGINAL',
   source_proof_sha256:h('d'),independent_source_proof_verified:true,
   original_acceptance_verified:false,authority_proof_verified:false,
   capacity_proof_verified:false,final_outcome_verified:false,
@@ -122,9 +124,12 @@ test('mixed live-shaped shift: admitted blocked original vs selected unadmitted 
   jobs:[{...raw.jobs[0],source_ref:'https://github.com/maloney2323/Reality/pull/307',
    phase:'BLOCKED',original_kind:'REAL_PR_REVIEW_ORIGINAL'},unadmitted]};
  const proof2={...proof,jobs:[{
-  ...proof.jobs[0],source_ref:'https://github.com/maloney2323/Reality/pull/307'
+  ...proof.jobs[0],source_ref:'https://github.com/maloney2323/Reality/pull/307',
+  source_phase:'BLOCKED'
  },{
   ...proof.jobs[0],source_ref:unadmitted.source_ref,
+  source_step_index:3,source_phase:'NOT_ADMITTED',
+  native_next_governed_action:unadmitted.next_governed_action,
   source_proof_sha256:unadmitted.source_proof_sha256,
   original_work_id:null
  }]};
