@@ -228,12 +228,8 @@ Deno.serve(async req=>{
    vercel_status_id:matchingStatus[0].id,
    vercel_app_check_run_id:matchingCheck[0].id,
    vercel_app_id:matchingCheck[0].app.id,
-   production_changed:false};
-  if(isChat){
-   evidence.workflow_blob_sha=context.workflow_blob_sha;
-   evidence.functional_suite_blob_sha=context.functional_suite_blob_sha;
-   evidence.independent_functional_postinstall_verified=true;
-  }
+   production_changed:false,...(isChat?{workflow_blob_sha:context.workflow_blob_sha,
+    functional_suite_blob_sha:context.functional_suite_blob_sha,independent_functional_postinstall_verified:true}:{})};
   const digest='sha256:'+await sha('SHA-256',new TextEncoder().encode(
    JSON.stringify(evidence)));
   const saved=isChat?await rpc(url.origin,key,'reality_record_signed_chat_goal_settlement_v1',{
