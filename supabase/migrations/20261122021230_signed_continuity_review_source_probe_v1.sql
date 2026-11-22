@@ -44,8 +44,8 @@ begin
  if not found then return pg_catalog.jsonb_build_object(
   'status','NO_INDEPENDENT_CONTINUITY_SOURCE_PROBE_READY','installation_authorized',false,
   'original_job_completed',false,'production_changed',false,'new_shift_started',false);end if;
- select * into q from reality_internal.genuine_capability_queue_v1
- where owner_id=i.owner_id and trigger_id::text=i.source_evidence->>'trigger_id'
+ select g.* into q from reality_internal.genuine_capability_queue_v1 g
+ where g.owner_id=i.owner_id and trigger_id::text=i.source_evidence->>'trigger_id'
  and claim_id=i.source_claim_id and original_work_id=i.source_evidence->>'original_work_id'
  and phase='SIGNED_CHAT_RECOVERY_TARGET_REVIEW_UNVERIFIED'
  and quarantine_receipt_sha256 is null
@@ -60,15 +60,15 @@ begin
  and exists(select 1 from reality_internal.chat_work_handoffs_v1 w
   join public.reality_chat_messages m on m.id=w.message_id and m.user_id=w.owner_id
    and m.conversation_id=w.conversation_id and m.request_id=w.request_id and m.role='user'
-  where w.message_id=source_message_id and w.owner_id=i.owner_id
-   and w.message_sha256=source_sha256
+  where w.message_id=g.source_message_id and w.owner_id=i.owner_id
+   and w.conversation_id=g.conversation_id and w.message_sha256=g.source_sha256
    and w.message_sha256=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(m.content,'UTF8')),'hex')
-   and w.development->>'original_work_id'=original_work_id
+   and w.development->>'original_work_id'=g.original_work_id
    and w.development->>'phase'='CI_VERIFIED'
    and w.development->>'installation_authorized'='false'
    and w.development->>'original_job_completed'='false'
    and w.development->>'production_changed'='false'
-   and w.development->'evidence'->>'goal_gap_receipt_sha256'=blocker_receipt_sha256)
+   and w.development->'evidence'->>'goal_gap_receipt_sha256'=g.blocker_receipt_sha256)
  for update;
  if not found then raise exception 'CONTINUITY_SOURCE_PROBE_ORIGINAL_OR_EVIDENCE_DRIFT';end if;
  probe:=pg_catalog.gen_random_uuid();
@@ -118,6 +118,36 @@ begin
  for update;
  if not found then raise exception 'CONTINUITY_SOURCE_PROBE_STALE_OR_CONSUMED';end if;
  stamp:=q.qualification_receipt->'continuity_source_probe';
+ if not exists(select 1 from reality_internal.owner_shift_continuity_incidents_v1 i
+  join reality_internal.governed_employee_shifts_v1 sh on sh.shift_id=i.shift_id and sh.owner_id=i.owner_id
+  join reality_internal.governed_employee_shift_worker_pulses_v1 pulse on pulse.shift_id=sh.shift_id and pulse.owner_id=sh.owner_id
+  join reality_internal.signed_worker_actual_runs_v1 r on r.run_id=p_worker_run_id
+  join reality_internal.chat_work_handoffs_v1 w on w.message_id=q.source_message_id and w.owner_id=q.owner_id and w.conversation_id=q.conversation_id
+  join public.reality_chat_messages m on m.id=w.message_id and m.user_id=w.owner_id
+    and m.conversation_id=w.conversation_id and m.request_id=w.request_id and m.role='user'
+  where i.incident_id::text=stamp->>'incident_id' and i.owner_id=q.owner_id
+   and i.shift_id::text=stamp->>'shift_id'
+   and i.source_claim_id=q.claim_id
+   and i.source_evidence->>'original_work_id'=q.original_work_id
+   and i.source_evidence->>'trigger_id'=q.trigger_id::text
+   and i.investigation_receipt_sha256=stamp->>'investigation_receipt_sha256'
+   and i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'
+   and i.investigated_at<r.started_at and i.assigned_function_id<>i.reviewer_function_id
+   and sh.authorized_at is not null and sh.closed_at is null
+   and sh.planned_start_at<=clock_timestamp() and sh.planned_end_at>clock_timestamp()
+   and sh.status in('RUNNING','QUEUED','AWAITING_EXACT_ORIGINAL_WORK')
+   and pulse.last_worker_status='WAKE_RECEIVED'
+   and pulse.last_worker_seen_at>clock_timestamp()-interval '3 minutes'
+   and w.message_sha256=q.source_sha256
+   and w.message_sha256=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(m.content,'UTF8')),'hex')
+   and w.development->>'original_work_id'=q.original_work_id
+   and w.development->>'phase'='CI_VERIFIED'
+   and w.development->>'installation_authorized'='false'
+   and w.development->>'original_job_completed'='false'
+   and w.development->>'production_changed'='false'
+   and w.development->'evidence'->>'goal_gap_receipt_sha256'=q.blocker_receipt_sha256)
+ then raise exception 'CONTINUITY_SOURCE_PROBE_ORIGINAL_SCOPE_CHANGED';end if;
+
  if p_failure_code is not null then
   if p_failure_code !~ '^[A-Z][A-Z0-9_]{5,95}$' or p_tree_sha is not null or p_roots is not null or p_target_in_graph is not null
   then raise exception 'CONTINUITY_SOURCE_PROBE_FAILURE_CONFLICT';end if;
