@@ -257,6 +257,13 @@ begin
   and e.payload->>'original_work_id'=c->>'original_work_id' and e.payload->>'owner_id'=c->>'owner_id'
   and e.payload->>'independent_functional_acceptance_receipt_sha256'=a->>'proof_sha256' and e.epistemic_status='VERIFIED')
  then return null;end if;
+ if ph not in ('READY_FOR_EXACT_OWNER_APPROVAL','OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED','ORIGINAL_SETTLED') or ph is null then return null;end if;
+ if ph='ORIGINAL_SETTLED' and (c->>'original_job_completed' is distinct from 'true'
+ or a->>'final_receipt_sha256' is distinct from 'sha256:'||pg_catalog.encode(extensions.digest((a->'final_proof')::text,'sha256'),'hex')
+ or not exists(select 1 from public.universe_events e where e.event_id=(a->>'final_receipt_id')::uuid and e.parent_event_id=(a->>'original_event_id')::uuid
+  and e.event_kind='OUTCOME' and e.epistemic_status='VERIFIED' and e.payload->>'original_work_id'=c->>'original_work_id'
+  and e.payload->>'owner_id'=c->>'owner_id' and e.payload->>'original_job_completed'='true' and e.payload->>'provider_outcome_digest'=a->>'final_receipt_sha256'))
+ then return null;end if;
  if ph<>'ORIGINAL_SETTLED' and not reality_internal.signed_chat_goal_active_shift_v1((c->>'owner_id')::uuid,(a->>'shift_id')::uuid)
  then return null;end if;
  if ph in ('OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED','ORIGINAL_SETTLED')
@@ -716,3 +723,580 @@ begin
 end $$;
 revoke all on function public.reality_record_signed_chat_install_fence_observation_v1(uuid,text,text,text) from public,anon,authenticated;
 grant execute on function public.reality_record_signed_chat_install_fence_observation_v1(uuid,text,text,text) to service_role;
+
+-- Reuse the existing Auto Qualifier routing and owner readback, without a second original.
+CREATE OR REPLACE FUNCTION public.reality_reconcile_continuity_qualification_routes_v1(p_worker_run_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare v_now timestamptz:=clock_timestamp();v_count int:=0;v_matched int:=0;
+ v_owner int:=0;v_review int:=0;
+begin
+ if current_user<>'service_role' or p_worker_run_id is null then
+  raise exception 'CONTINUITY_ROUTE_SIGNED_SERVICE_REQUIRED';
+ end if;
+ -- The existing single-flight signed worker is the only lawful automatic
+ -- trigger. An arbitrary Chat request cannot advance even evidence routing.
+ if not exists (
+  select 1 from reality_internal.signed_worker_actual_runs_v1 r
+  where r.run_id=p_worker_run_id and r.status='STARTED'
+   and r.started_at>v_now-interval '3 minutes'
+ ) then raise exception 'CONTINUITY_ROUTE_CURRENT_SIGNED_WORKER_REQUIRED'; end if;
+
+ with eligible as (
+  select distinct g.owner_id from reality_internal.owner_routine_delegations_v1 g
+  where g.scope='EVIDENCE_ONLY_EMPLOYEE_DISCOVERY_V1'
+   and g.enabled is true and g.activated_at<=v_now and g.expires_at>v_now
+ ),
+ matching as (
+  select i.*,c.original_work_id as claim_original_work_id,
+   c.shift_id as claim_shift_id,c.phase as original_claim_phase,
+   sh.status as claim_shift_status,w.mode as claim_warrant_mode,
+   w.state as claim_warrant_state,
+   coalesce((
+    select true from reality_internal.governed_original_independent_final_receipts_v1 f
+    where f.owner_id=i.owner_id and f.original_work_id=c.original_work_id
+     and f.shift_id=c.shift_id and f.source_ref=i.source_ref
+     and f.outcome='SUCCEEDED'
+     and f.final_evidence_sha256~'^sha256:[a-f0-9]{64}$'
+    limit 1
+   ),false) as independently_settled,
+   q.trigger_id as qualified_trigger_id,
+   q.original_work_id as qualified_original_work_id,
+   a.approval_id as approved_employee_list_id,
+   packet.review_state as exact_chat_review_state,
+   packet.original_work_id as exact_chat_original_work_id,
+   (existing_chat.development->>'original_work_id') as existing_chat_original_work_id,
+   chat_goal.scope as signed_chat_goal_install,
+   chat_goal.queue_phase as signed_chat_recovery_queue_phase
+  from reality_internal.owner_continuous_qualification_inbox_v1 i
+  join eligible e on e.owner_id=i.owner_id
+  left join lateral(
+   select x.* from reality_internal.governed_employee_original_claims_v1 x
+   where x.owner_id=i.owner_id and x.source_ref=i.source_ref
+    and x.original_work_id~'^work:[a-f0-9]{32}$'
+   order by x.updated_at desc,x.original_work_id limit 1
+  ) c on true
+  left join reality_internal.governed_employee_shifts_v1 sh
+   on sh.shift_id=c.shift_id and sh.owner_id=c.owner_id
+  left join reality_internal.governed_employee_completion_warrants_v1 w
+   on w.shift_id=sh.shift_id and w.owner_id=sh.owner_id
+  left join lateral (
+   select g.trigger_id,g.original_work_id from reality_internal.genuine_capability_queue_v1 g
+   where g.owner_id=i.owner_id and g.source_ref=i.source_ref
+    and g.phase='AWAITING_OWNER_APPROVAL'
+    and g.qualification_receipt is not null
+    and g.qualified_candidate->>'artifact_sha256'~'^[a-f0-9]{64}$'
+    and g.original_work_id~'^work:[a-f0-9]{32}$'
+   order by g.updated_at desc,g.trigger_id limit 1
+  ) q on true
+  left join reality_internal.owner_continuity_qualification_routes_v1 prior_route
+   on prior_route.owner_id=i.owner_id and prior_route.intake_family=i.intake_family
+    and prior_route.intake_key=i.intake_key
+  left join lateral (
+   select p.review_state,p.original_work_id from
+    reality_internal.owner_qualified_chat_original_review_packets_v1 p
+   where i.intake_family='AUTHENTICATED_CHAT'
+    and p.owner_id=i.owner_id and p.message_id::text=i.intake_key
+    and p.continuity_ref=prior_route.continuity_ref
+   limit 1
+  ) packet on true
+  left join lateral (
+   select h.development from reality_internal.chat_work_handoffs_v1 h
+   join public.reality_chat_messages m on m.id=h.message_id
+    and m.user_id=h.owner_id and m.conversation_id=h.conversation_id
+    and m.request_id=h.request_id and m.role='user'
+    and h.message_sha256=pg_catalog.encode(pg_catalog.sha256(
+      pg_catalog.convert_to(m.content,'UTF8')),'hex')
+   where i.intake_family='AUTHENTICATED_CHAT'
+    and h.owner_id=i.owner_id and h.message_id::text=i.intake_key
+    and h.development->>'original_work_id'~'^work:[a-f0-9]{32}$'
+   limit 1
+  ) existing_chat on true
+  left join lateral (
+   select reality_internal.signed_chat_install_scope_v1(g.trigger_id) as scope,g.phase as queue_phase
+   from reality_internal.genuine_capability_queue_v1 g
+   where g.owner_id=i.owner_id and g.source_ref=i.source_ref
+    and g.source_kind='SIGNED_CHAT_DEVELOPMENT_RECOVERY'
+    and g.original_work_id=existing_chat.development->>'original_work_id'
+   order by g.updated_at desc limit 1
+  ) chat_goal on true
+  left join lateral (
+   select a.approval_id from reality_internal.approved_chat_employee_assignments_v1 a
+   where i.intake_family='AUTHENTICATED_CHAT'
+    and a.owner_id=i.owner_id
+    and i.intake_key=a.source_message_id::text
+    and a.approval_status='APPROVED'
+    and a.execution_authorized is false
+   order by a.approved_at desc limit 1
+  ) a on true
+  where i.last_seen_at>v_now-interval '48 hours'
+ ),
+ classified as (
+  select m.*,
+   case
+    when m.terminal_observation then 'TERMINAL_RECEIPT_PRESERVED_NO_REPLAY'
+    when m.independently_settled then 'INDEPENDENT_ORIGINAL_RECEIPT_RECONCILE_UNIVERSE'
+    when m.exact_chat_review_state='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'
+     then 'QUALIFIED_CHAT_ORIGINAL_ADMITTED_PENDING_GOVERNED_EXECUTION'
+    when m.signed_chat_goal_install->>'phase'='ORIGINAL_SETTLED' then 'INDEPENDENT_ORIGINAL_RECEIPT_RECONCILE_UNIVERSE'
+    when m.signed_chat_goal_install->>'phase'='READY_FOR_EXACT_OWNER_APPROVAL' then 'EXISTING_SIGNED_CHAT_ORIGINAL_AWAITING_EXACT_INSTALL_APPROVAL'
+    when m.signed_chat_goal_install->>'phase' in ('OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED') then 'EXISTING_SIGNED_CHAT_ORIGINAL_RECHECK_GOVERNED_INSTALLER'
+    when m.signed_chat_recovery_queue_phase='SIGNED_CHAT_RECOVERY_CANDIDATE_QUARANTINED' then 'EXISTING_SIGNED_CHAT_ORIGINAL_INDEPENDENT_FULL_GOAL_ACCEPTANCE_REQUIRED'
+    when m.existing_chat_original_work_id~'^work:[a-f0-9]{32}
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'QUALIFIED_CHAT_ORIGINAL_AWAITING_EXACT_OWNER_APPROVAL'
+    when m.qualified_trigger_id is not null
+     then 'EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'EXISTING_ORIGINAL_RECHECK_GOVERNED_TRIGGER'
+    when m.claim_original_work_id is not null
+     then 'EXISTING_ORIGINAL_AUTHORITY_SCOPE_RECHECK_REQUIRED'
+    when m.approved_employee_list_id is not null
+     then 'APPROVED_JOB_LIST_NEEDS_INDEPENDENT_ORIGINAL_QUALIFICATION'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'SAVED_CHAT_INTENT_NEEDS_GOVERNED_CLASSIFICATION'
+    when m.source_ref is null or m.source_ref=''
+     then 'MISSING_EXACT_SOURCE_LINEAGE_RECHECK'
+    when m.qualification_state like '%PROVIDER%'
+     or m.qualification_state like '%EPOCH%'
+     then 'SOURCE_EPOCH_REVALIDATION_REQUIRED'
+    else 'OWNER_GOAL_ORIGINAL_AND_INDEPENDENT_SOURCE_QUALIFICATION_REQUIRED'
+   end as next_route,
+   case
+    when m.terminal_observation or m.independently_settled
+     then 'RECONCILE_VERIFIED_RECEIPT_IN_UNIVERSE_WITHOUT_REPLAY'
+    when m.exact_chat_review_state='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'
+     then 'EXISTING_SIGNED_CHAT_WORKER_RECHECK_ORIGINAL_SOURCE_SCOPE_AND_ACCEPTANCE'
+    when m.signed_chat_goal_install->>'phase'='ORIGINAL_SETTLED' then 'RECONCILE_VERIFIED_RECEIPT_IN_UNIVERSE_WITHOUT_REPLAY'
+    when m.signed_chat_goal_install->>'phase'='READY_FOR_EXACT_OWNER_APPROVAL' then 'PRESENT_EXISTING_EXACT_OWNER_INSTALL_CARD_IN_REALITY_CHAT'
+    when m.signed_chat_goal_install->>'phase' in ('OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED') then 'RECONCILE_EXACT_APPROVED_INSTALL_AND_INDEPENDENT_FINAL_RECEIPT_WITHOUT_REPLAY'
+    when m.signed_chat_recovery_queue_phase='SIGNED_CHAT_RECOVERY_CANDIDATE_QUARANTINED' then 'VERIFY_PINNED_FULL_GOAL_FUNCTIONAL_ACCEPTANCE_AND_INSTALLER_COMPATIBILITY'
+    when m.existing_chat_original_work_id~'^work:[a-f0-9]{32}
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'PRESENT_EXISTING_EXACT_OWNER_ADMISSION_CARD_IN_REALITY_CHAT'
+    when m.qualified_trigger_id is not null
+     then 'READ_EXISTING_QUALIFIED_CAPABILITY_PREFLIGHT_IN_REALITY_CHAT'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'GOVERNED_TRIGGER_MUST_RECHECK_SOURCE_GOAL_AND_EXACT_AUTHORITY'
+    when m.claim_original_work_id is not null
+     then 'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION'
+    when m.approved_employee_list_id is not null
+     then 'INDEPENDENTLY_QUALIFY_APPROVED_TASK_LIST_AS_ACTUAL_ORIGINALS'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'VERIFY_AUTHENTICATED_MESSAGE_GOAL_SOURCE_AND_CONSEQUENCE'
+    when m.source_ref is null or m.source_ref=''
+     then 'FIND_EXACT_SOURCE_BEFORE_OWNER_PROPOSAL'
+    else 'INDEPENDENTLY_VERIFY_CURRENT_SOURCE_AND_OWNER_BUSINESS_OBLIGATION'
+   end as route_action
+  from matching m
+ ),
+ saved as(
+  insert into reality_internal.owner_continuity_qualification_routes_v1(
+   owner_id,intake_family,intake_key,continuity_ref,source_ref,
+   original_work_id,qualified_capability_trigger_id,source_epoch_fingerprint,
+   route_state,governed_next_action,existing_approval_adapter,last_checked_at
+  )
+  select owner_id,intake_family,intake_key,
+   'reality:qualification:'||pg_catalog.encode(pg_catalog.sha256(
+    pg_catalog.convert_to(owner_id::text||'|'||intake_family||'|'||intake_key,'UTF8')),'hex'),
+   source_ref,coalesce(claim_original_work_id,qualified_original_work_id,
+     exact_chat_original_work_id,
+     case when existing_chat_original_work_id~'^work:[a-f0-9]{32}$'
+      then existing_chat_original_work_id else null end),
+   qualified_trigger_id,evidence_fingerprint,next_route,route_action,
+   case when next_route='EXISTING_SIGNED_CHAT_ORIGINAL_AWAITING_EXACT_INSTALL_APPROVAL' then 'EXISTING_GENERALIZED_ORIGINAL_INSTALL_CHAT'
+   when qualified_trigger_id is not null then 'EXISTING_QUALIFIED_CAPABILITY_CHAT'
+   else null end,
+   v_now
+  from classified
+  on conflict(owner_id,intake_family,intake_key) do update set
+   source_ref=excluded.source_ref,
+   original_work_id=excluded.original_work_id,
+   qualified_capability_trigger_id=excluded.qualified_capability_trigger_id,
+   source_epoch_fingerprint=excluded.source_epoch_fingerprint,
+   route_state=excluded.route_state,
+   governed_next_action=excluded.governed_next_action,
+   existing_approval_adapter=excluded.existing_approval_adapter,
+   last_checked_at=excluded.last_checked_at
+  returning owner_id,original_work_id,route_state
+ )
+ select count(*),count(*) filter(where original_work_id is not null),
+  count(distinct owner_id),
+  count(*) filter(where route_state='EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER')
+ into v_count,v_matched,v_owner,v_review from saved;
+
+ return pg_catalog.jsonb_build_object(
+  'status','CONTINUITY_QUALIFICATION_ROUTES_RECONCILED',
+  'worker_run_id',p_worker_run_id,'owner_count',v_owner,
+  'routed_source_count',v_count,'existing_original_matches',v_matched,
+  'existing_qualified_capability_adapter_checks',v_review,
+  'model_execution_authorized',false,'owner_approval_granted',false,
+  'new_original_admitted',false,'new_shift_started',false,
+  'installation_authorized',false,'production_changed',false);
+end $function$
+
+     then 'EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER'
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'QUALIFIED_CHAT_ORIGINAL_AWAITING_EXACT_OWNER_APPROVAL'
+    when m.qualified_trigger_id is not null
+     then 'EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'EXISTING_ORIGINAL_RECHECK_GOVERNED_TRIGGER'
+    when m.claim_original_work_id is not null
+     then 'EXISTING_ORIGINAL_AUTHORITY_SCOPE_RECHECK_REQUIRED'
+    when m.approved_employee_list_id is not null
+     then 'APPROVED_JOB_LIST_NEEDS_INDEPENDENT_ORIGINAL_QUALIFICATION'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'SAVED_CHAT_INTENT_NEEDS_GOVERNED_CLASSIFICATION'
+    when m.source_ref is null or m.source_ref=''
+     then 'MISSING_EXACT_SOURCE_LINEAGE_RECHECK'
+    when m.qualification_state like '%PROVIDER%'
+     or m.qualification_state like '%EPOCH%'
+     then 'SOURCE_EPOCH_REVALIDATION_REQUIRED'
+    else 'OWNER_GOAL_ORIGINAL_AND_INDEPENDENT_SOURCE_QUALIFICATION_REQUIRED'
+   end as next_route,
+   case
+    when m.terminal_observation or m.independently_settled
+     then 'RECONCILE_VERIFIED_RECEIPT_IN_UNIVERSE_WITHOUT_REPLAY'
+    when m.exact_chat_review_state='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'
+     then 'EXISTING_SIGNED_CHAT_WORKER_RECHECK_ORIGINAL_SOURCE_SCOPE_AND_ACCEPTANCE'
+    when m.existing_chat_original_work_id~'^work:[a-f0-9]{32}$'
+     then 'RECONCILE_EXISTING_SIGNED_CHAT_ORIGINAL_WITH_EXECUTOR_NO_REPLAY'
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'PRESENT_EXISTING_EXACT_OWNER_ADMISSION_CARD_IN_REALITY_CHAT'
+    when m.qualified_trigger_id is not null
+     then 'READ_EXISTING_QUALIFIED_CAPABILITY_PREFLIGHT_IN_REALITY_CHAT'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'GOVERNED_TRIGGER_MUST_RECHECK_SOURCE_GOAL_AND_EXACT_AUTHORITY'
+    when m.claim_original_work_id is not null
+     then 'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION'
+    when m.approved_employee_list_id is not null
+     then 'INDEPENDENTLY_QUALIFY_APPROVED_TASK_LIST_AS_ACTUAL_ORIGINALS'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'VERIFY_AUTHENTICATED_MESSAGE_GOAL_SOURCE_AND_CONSEQUENCE'
+    when m.source_ref is null or m.source_ref=''
+     then 'FIND_EXACT_SOURCE_BEFORE_OWNER_PROPOSAL'
+    else 'INDEPENDENTLY_VERIFY_CURRENT_SOURCE_AND_OWNER_BUSINESS_OBLIGATION'
+   end as route_action
+  from matching m
+ ),
+ saved as(
+  insert into reality_internal.owner_continuity_qualification_routes_v1(
+   owner_id,intake_family,intake_key,continuity_ref,source_ref,
+   original_work_id,qualified_capability_trigger_id,source_epoch_fingerprint,
+   route_state,governed_next_action,existing_approval_adapter,last_checked_at
+  )
+  select owner_id,intake_family,intake_key,
+   'reality:qualification:'||pg_catalog.encode(pg_catalog.sha256(
+    pg_catalog.convert_to(owner_id::text||'|'||intake_family||'|'||intake_key,'UTF8')),'hex'),
+   source_ref,coalesce(claim_original_work_id,qualified_original_work_id,
+     exact_chat_original_work_id,
+     case when existing_chat_original_work_id~'^work:[a-f0-9]{32}$'
+      then existing_chat_original_work_id else null end),
+   qualified_trigger_id,evidence_fingerprint,next_route,route_action,
+   case when qualified_trigger_id is not null then 'EXISTING_QUALIFIED_CAPABILITY_CHAT'
+   else null end,
+   v_now
+  from classified
+  on conflict(owner_id,intake_family,intake_key) do update set
+   source_ref=excluded.source_ref,
+   original_work_id=excluded.original_work_id,
+   qualified_capability_trigger_id=excluded.qualified_capability_trigger_id,
+   source_epoch_fingerprint=excluded.source_epoch_fingerprint,
+   route_state=excluded.route_state,
+   governed_next_action=excluded.governed_next_action,
+   existing_approval_adapter=excluded.existing_approval_adapter,
+   last_checked_at=excluded.last_checked_at
+  returning owner_id,original_work_id,route_state
+ )
+ select count(*),count(*) filter(where original_work_id is not null),
+  count(distinct owner_id),
+  count(*) filter(where route_state='EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER')
+ into v_count,v_matched,v_owner,v_review from saved;
+
+ return pg_catalog.jsonb_build_object(
+  'status','CONTINUITY_QUALIFICATION_ROUTES_RECONCILED',
+  'worker_run_id',p_worker_run_id,'owner_count',v_owner,
+  'routed_source_count',v_count,'existing_original_matches',v_matched,
+  'existing_qualified_capability_adapter_checks',v_review,
+  'model_execution_authorized',false,'owner_approval_granted',false,
+  'new_original_admitted',false,'new_shift_started',false,
+  'installation_authorized',false,'production_changed',false);
+end $function$
+
+     then 'RECONCILE_EXISTING_SIGNED_CHAT_ORIGINAL_WITH_EXECUTOR_NO_REPLAY'
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'PRESENT_EXISTING_EXACT_OWNER_ADMISSION_CARD_IN_REALITY_CHAT'
+    when m.qualified_trigger_id is not null
+     then 'READ_EXISTING_QUALIFIED_CAPABILITY_PREFLIGHT_IN_REALITY_CHAT'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'GOVERNED_TRIGGER_MUST_RECHECK_SOURCE_GOAL_AND_EXACT_AUTHORITY'
+    when m.claim_original_work_id is not null
+     then 'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION'
+    when m.approved_employee_list_id is not null
+     then 'INDEPENDENTLY_QUALIFY_APPROVED_TASK_LIST_AS_ACTUAL_ORIGINALS'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'VERIFY_AUTHENTICATED_MESSAGE_GOAL_SOURCE_AND_CONSEQUENCE'
+    when m.source_ref is null or m.source_ref=''
+     then 'FIND_EXACT_SOURCE_BEFORE_OWNER_PROPOSAL'
+    else 'INDEPENDENTLY_VERIFY_CURRENT_SOURCE_AND_OWNER_BUSINESS_OBLIGATION'
+   end as route_action
+  from matching m
+ ),
+ saved as(
+  insert into reality_internal.owner_continuity_qualification_routes_v1(
+   owner_id,intake_family,intake_key,continuity_ref,source_ref,
+   original_work_id,qualified_capability_trigger_id,source_epoch_fingerprint,
+   route_state,governed_next_action,existing_approval_adapter,last_checked_at
+  )
+  select owner_id,intake_family,intake_key,
+   'reality:qualification:'||pg_catalog.encode(pg_catalog.sha256(
+    pg_catalog.convert_to(owner_id::text||'|'||intake_family||'|'||intake_key,'UTF8')),'hex'),
+   source_ref,coalesce(claim_original_work_id,qualified_original_work_id,
+     exact_chat_original_work_id,
+     case when existing_chat_original_work_id~'^work:[a-f0-9]{32}$'
+      then existing_chat_original_work_id else null end),
+   qualified_trigger_id,evidence_fingerprint,next_route,route_action,
+   case when qualified_trigger_id is not null then 'EXISTING_QUALIFIED_CAPABILITY_CHAT'
+   else null end,
+   v_now
+  from classified
+  on conflict(owner_id,intake_family,intake_key) do update set
+   source_ref=excluded.source_ref,
+   original_work_id=excluded.original_work_id,
+   qualified_capability_trigger_id=excluded.qualified_capability_trigger_id,
+   source_epoch_fingerprint=excluded.source_epoch_fingerprint,
+   route_state=excluded.route_state,
+   governed_next_action=excluded.governed_next_action,
+   existing_approval_adapter=excluded.existing_approval_adapter,
+   last_checked_at=excluded.last_checked_at
+  returning owner_id,original_work_id,route_state
+ )
+ select count(*),count(*) filter(where original_work_id is not null),
+  count(distinct owner_id),
+  count(*) filter(where route_state='EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER')
+ into v_count,v_matched,v_owner,v_review from saved;
+
+ return pg_catalog.jsonb_build_object(
+  'status','CONTINUITY_QUALIFICATION_ROUTES_RECONCILED',
+  'worker_run_id',p_worker_run_id,'owner_count',v_owner,
+  'routed_source_count',v_count,'existing_original_matches',v_matched,
+  'existing_qualified_capability_adapter_checks',v_review,
+  'model_execution_authorized',false,'owner_approval_granted',false,
+  'new_original_admitted',false,'new_shift_started',false,
+  'installation_authorized',false,'production_changed',false);
+end $function$
+
+     then 'EXISTING_SIGNED_CHAT_ORIGINAL_RECONCILE_WORKER'
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'QUALIFIED_CHAT_ORIGINAL_AWAITING_EXACT_OWNER_APPROVAL'
+    when m.qualified_trigger_id is not null
+     then 'EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'EXISTING_ORIGINAL_RECHECK_GOVERNED_TRIGGER'
+    when m.claim_original_work_id is not null
+     then 'EXISTING_ORIGINAL_AUTHORITY_SCOPE_RECHECK_REQUIRED'
+    when m.approved_employee_list_id is not null
+     then 'APPROVED_JOB_LIST_NEEDS_INDEPENDENT_ORIGINAL_QUALIFICATION'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'SAVED_CHAT_INTENT_NEEDS_GOVERNED_CLASSIFICATION'
+    when m.source_ref is null or m.source_ref=''
+     then 'MISSING_EXACT_SOURCE_LINEAGE_RECHECK'
+    when m.qualification_state like '%PROVIDER%'
+     or m.qualification_state like '%EPOCH%'
+     then 'SOURCE_EPOCH_REVALIDATION_REQUIRED'
+    else 'OWNER_GOAL_ORIGINAL_AND_INDEPENDENT_SOURCE_QUALIFICATION_REQUIRED'
+   end as next_route,
+   case
+    when m.terminal_observation or m.independently_settled
+     then 'RECONCILE_VERIFIED_RECEIPT_IN_UNIVERSE_WITHOUT_REPLAY'
+    when m.exact_chat_review_state='ORIGINAL_ADMITTED_IN_EXISTING_CHAT_WORK_ADAPTER'
+     then 'EXISTING_SIGNED_CHAT_WORKER_RECHECK_ORIGINAL_SOURCE_SCOPE_AND_ACCEPTANCE'
+    when m.existing_chat_original_work_id~'^work:[a-f0-9]{32}$'
+     then 'RECONCILE_EXISTING_SIGNED_CHAT_ORIGINAL_WITH_EXECUTOR_NO_REPLAY'
+    when m.exact_chat_review_state='AWAITING_OWNER_EXACT_APPROVAL'
+     then 'PRESENT_EXISTING_EXACT_OWNER_ADMISSION_CARD_IN_REALITY_CHAT'
+    when m.qualified_trigger_id is not null
+     then 'READ_EXISTING_QUALIFIED_CAPABILITY_PREFLIGHT_IN_REALITY_CHAT'
+    when m.claim_original_work_id is not null
+     and m.claim_shift_status in('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+     and m.claim_warrant_state='ACTIVE'
+     and m.claim_warrant_mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+     then 'GOVERNED_TRIGGER_MUST_RECHECK_SOURCE_GOAL_AND_EXACT_AUTHORITY'
+    when m.claim_original_work_id is not null
+     then 'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION'
+    when m.approved_employee_list_id is not null
+     then 'INDEPENDENTLY_QUALIFY_APPROVED_TASK_LIST_AS_ACTUAL_ORIGINALS'
+    when m.intake_family='AUTHENTICATED_CHAT'
+     then 'VERIFY_AUTHENTICATED_MESSAGE_GOAL_SOURCE_AND_CONSEQUENCE'
+    when m.source_ref is null or m.source_ref=''
+     then 'FIND_EXACT_SOURCE_BEFORE_OWNER_PROPOSAL'
+    else 'INDEPENDENTLY_VERIFY_CURRENT_SOURCE_AND_OWNER_BUSINESS_OBLIGATION'
+   end as route_action
+  from matching m
+ ),
+ saved as(
+  insert into reality_internal.owner_continuity_qualification_routes_v1(
+   owner_id,intake_family,intake_key,continuity_ref,source_ref,
+   original_work_id,qualified_capability_trigger_id,source_epoch_fingerprint,
+   route_state,governed_next_action,existing_approval_adapter,last_checked_at
+  )
+  select owner_id,intake_family,intake_key,
+   'reality:qualification:'||pg_catalog.encode(pg_catalog.sha256(
+    pg_catalog.convert_to(owner_id::text||'|'||intake_family||'|'||intake_key,'UTF8')),'hex'),
+   source_ref,coalesce(claim_original_work_id,qualified_original_work_id,
+     exact_chat_original_work_id,
+     case when existing_chat_original_work_id~'^work:[a-f0-9]{32}$'
+      then existing_chat_original_work_id else null end),
+   qualified_trigger_id,evidence_fingerprint,next_route,route_action,
+   case when qualified_trigger_id is not null then 'EXISTING_QUALIFIED_CAPABILITY_CHAT'
+   else null end,
+   v_now
+  from classified
+  on conflict(owner_id,intake_family,intake_key) do update set
+   source_ref=excluded.source_ref,
+   original_work_id=excluded.original_work_id,
+   qualified_capability_trigger_id=excluded.qualified_capability_trigger_id,
+   source_epoch_fingerprint=excluded.source_epoch_fingerprint,
+   route_state=excluded.route_state,
+   governed_next_action=excluded.governed_next_action,
+   existing_approval_adapter=excluded.existing_approval_adapter,
+   last_checked_at=excluded.last_checked_at
+  returning owner_id,original_work_id,route_state
+ )
+ select count(*),count(*) filter(where original_work_id is not null),
+  count(distinct owner_id),
+  count(*) filter(where route_state='EXISTING_QUALIFIED_ARTIFACT_CHECK_OWNER_APPROVAL_ADAPTER')
+ into v_count,v_matched,v_owner,v_review from saved;
+
+ return pg_catalog.jsonb_build_object(
+  'status','CONTINUITY_QUALIFICATION_ROUTES_RECONCILED',
+  'worker_run_id',p_worker_run_id,'owner_count',v_owner,
+  'routed_source_count',v_count,'existing_original_matches',v_matched,
+  'existing_qualified_capability_adapter_checks',v_review,
+  'model_execution_authorized',false,'owner_approval_granted',false,
+  'new_original_admitted',false,'new_shift_started',false,
+  'installation_authorized',false,'production_changed',false);
+end $function$
+;
+CREATE OR REPLACE FUNCTION public.reality_read_owner_chat_development_completion_preflight_v1(p_owner_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare v_count int;v_items jsonb;
+begin
+ if current_user<>'service_role' or p_owner_id is null then
+  raise exception 'CHAT_COMPLETION_PREFLIGHT_OWNER_SERVICE_REQUIRED';
+ end if;
+ select count(*) into v_count
+ from reality_internal.chat_work_handoffs_v1 h
+ where h.owner_id=p_owner_id and h.development->>'version'='reality-chat-new-development-v1';
+ select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'message_id',x.message_id,'original_work_id',x.original_work_id,
+  'conversation_id',x.conversation_id,'source_ref',x.source_ref,
+  'original_goal',x.original_goal,'phase',x.phase,
+  'signed_source_current',x.signed_source_current,
+  'syntax_ci_independently_recorded',x.syntax_ci,
+  'syntax_ci_run_id',x.syntax_ci_run_id,
+  'candidate_pr_url',x.candidate_pr_url,
+  'candidate_commit_sha',x.candidate_commit_sha,
+  'feature_acceptance_independently_verified',coalesce(x.signed_adapter->>'original_job_completed'='true',false),
+  'preinstall_functional_acceptance_verified',x.signed_adapter is not null,
+  'signed_chat_install_adapter_phase',x.signed_adapter->>'phase',
+  'universe_outcome_event_id',x.signed_adapter->>'final_receipt_id',
+  'feature_acceptance_requires_full_original_goal',true,
+  'prior_unrelated_install_does_not_authorize_this_original',true,
+  'existing_general_install_lineage_compatible',x.general_install_lineage_compatible or x.signed_adapter is not null,
+  'same_original_install_review_bound',x.install_review_bound or x.signed_adapter is not null,
+  'exact_owner_install_approval_recorded',x.exact_owner_approval or coalesce(x.signed_adapter->>'installation_authorized'='true',false),
+  'independent_final_receipt_recorded',x.final_receipt_recorded or coalesce(x.signed_adapter->>'original_job_completed'='true',false),
+  'next_gate',case
+   when not x.signed_source_current then 'REQUALIFY_EXACT_SIGNED_CHAT_ORIGINAL_SOURCE'
+   when x.signed_adapter->>'phase'='ORIGINAL_SETTLED' then 'VERIFIED_ISOLATED_ORIGINAL_UNIVERSE_RECEIPT_NO_REPLAY'
+   when x.signed_adapter->>'phase'='READY_FOR_EXACT_OWNER_APPROVAL' then 'PRESENT_EXISTING_EXACT_OWNER_INSTALL_APPROVAL'
+   when x.signed_adapter->>'phase' in ('OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED') then 'CONTINUE_EXACT_APPROVED_INSTALL_AND_INDEPENDENT_FINAL_RECEIPT'
+   when not x.syntax_ci then 'RECONCILE_EXACT_ORIGINAL_GITHUB_CI_BEFORE_FEATURE_TEST'
+   -- Current Chat-development evidence contains source/syntax CI but no
+   -- independently provider-verified original-goal feature acceptance.
+   when not x.general_install_lineage_compatible then
+    'RUN_FULL_GOAL_FEATURE_ACCEPTANCE_AND_CONNECT_COMPATIBLE_ORIGINAL_INSTALL_ADAPTER'
+   else 'RUN_INDEPENDENT_FULL_GOAL_FEATURE_ACCEPTANCE_BEFORE_INSTALL'
+   end,
+  'owner_install_approval_ready',coalesce(x.signed_adapter->>'owner_approval_ready'='true',false),
+  'execution_authorized',false,'installation_authorized',false,
+  'original_job_completed_by_read',false,'production_changed',false
+ ) order by x.created_at desc), '[]'::jsonb) into v_items
+ from (
+  select h.message_id,h.conversation_id,h.created_at,
+   h.development->>'original_work_id' as original_work_id,
+   h.development->>'phase' as phase,
+   pg_catalog.left(coalesce(h.development->>'objective',''),600) as original_goal,
+   'supabase:reality_chat_messages:'||h.message_id::text as source_ref,
+   (m.id is not null and m.role='user' and
+    m.user_id=h.owner_id and m.conversation_id=h.conversation_id and
+    m.request_id=h.request_id and
+    h.development->>'source_sha256'=h.message_sha256 and
+    h.development->>'original_work_id' ~ '^work:[a-f0-9]{32}$') as signed_source_current,
+   (h.development->>'phase'='CI_VERIFIED' and
+    h.development->>'independent_ci_verified'='true' and
+    h.development->'evidence'->>'ci_scope'='SYNTAX_AND_SOURCE_IDENTITY_ONLY' and
+    h.development->'evidence'->>'independent_ci_run_id' ~ '^[1-9][0-9]{4,}$' and
+    h.development->'evidence'->>'artifact_commit_sha' ~ '^[a-f0-9]{40}$') as syntax_ci,
+   case when h.development->'evidence'->>'independent_ci_run_id' ~ '^[1-9][0-9]{4,}$'
+    then (h.development->'evidence'->>'independent_ci_run_id')::bigint
+    else null end as syntax_ci_run_id,
+   h.development->'evidence'->>'pr_url' as candidate_pr_url,
+   h.development->'evidence'->>'artifact_commit_sha' as candidate_commit_sha,
+   exists(select 1 from reality_internal.riley_unattended_repair_originals_v1 r
+    where r.original_work_id=h.development->>'original_work_id'
+    and r.owner_id=h.owner_id) as general_install_lineage_compatible,
+   exists(select 1 from reality_internal.governed_original_install_reviews_v1 i
+    where i.original_work_id=h.development->>'original_work_id'
+    and i.owner_id=h.owner_id
+    and i.candidate_commit_sha=h.development->'evidence'->>'artifact_commit_sha') as install_review_bound,
+   exists(select 1 from reality_internal.governed_original_install_reviews_v1 i
+    where i.original_work_id=h.development->>'original_work_id'
+    and i.owner_id=h.owner_id and i.approval_receipt_id is not null) as exact_owner_approval,
+   exists(select 1 from reality_internal.governed_original_independent_final_receipts_v1 f
+    where f.original_work_id=h.development->>'original_work_id' and
+    f.owner_id=h.owner_id and f.outcome='SUCCEEDED') as final_receipt_recorded,
+   (select reality_internal.signed_chat_install_scope_v1(q.trigger_id) from reality_internal.genuine_capability_queue_v1 q
+    where q.owner_id=h.owner_id and q.source_message_id=h.message_id and q.original_work_id=h.development->>'original_work_id'
+    and q.source_kind='SIGNED_CHAT_DEVELOPMENT_RECOVERY' order by q.updated_at desc limit 1) as signed_adapter
+  from reality_internal.chat_work_handoffs_v1 h
+  left join public.reality_chat_messages m on m.id=h.message_id
+  where h.owner_id=p_owner_id and
+    h.development->>'version'='reality-chat-new-development-v1'
+  order by h.created_at desc
+  limit 10
+ ) x;
+ return pg_catalog.jsonb_build_object(
+  'status','OWNER_CHAT_DEVELOPMENT_FULL_GOAL_COMPLETION_PREFLIGHT_READ_ONLY',
+  'owner_id',p_owner_id,'items',v_items,'total',coalesce(v_count,0),
+  'read_only',true,'new_original_created',false,'new_shift_started',false,
+  'owner_approval_granted',false,'execution_authorized',false,
+  'installation_authorized',false,'original_job_completed_by_read',false,
+  'production_changed',false);
+end; $function$
+;
