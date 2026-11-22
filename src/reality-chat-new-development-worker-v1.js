@@ -10,7 +10,7 @@ import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {readPinnedSignedRecoverySourceGraph}
  from './reality-signed-chat-recovery-target-review-v1.js';
 import {outputText} from './reality-riley-native-model-draft-v1.js';
-import {reproduceFrozenBoundaryFailure,parseOnlyModule} from './reality-signed-chat-recovery-syntax-verifier-v1.js';
+import {reproduceFrozenBoundaryFailure,parseOnlyModule,parseOnlyModuleFailureCategory} from './reality-signed-chat-recovery-syntax-verifier-v1.js';
 import {reproduceFrozenStructuralSpanFailure} from './reality-recovery-structural-splice-v1.js';
 const BASE='https://api.github.com/repos/maloney2323/Reality';
 const SHA=/^[a-f0-9]{40}$/;
@@ -521,9 +521,54 @@ export async function generateNextSignedChatDevelopmentDraft({
     const corrected= fixed?deriveExactPatchFromFrozenLineSpan(text,{
      ...retry.choice,end_line:retry.choice.end_line+fixed.additional_source_lines
     },frozenExcerpt.ranges):candidate;
-    if(!corrected.ok||parseOnlyModule(corrected.proposed)!=='VALID_SYNTAX')
-     fail('MODEL_COMPLETE_MODULE_SYNTAX_NOT_VERIFIED');
-    raw=retry;derived=corrected;syntaxVerdict='VALID_SYNTAX';
+    let admitted=corrected,admittedResponse=retry;
+    const parseVerdict=corrected.ok?
+     parseOnlyModule(corrected.proposed):'INVALID_SYNTAX';
+    if(parseVerdict!=='VALID_SYNTAX'){
+     // A distinct model may propose another visible frozen line span.
+     // The independent FULL module parser, not the model, decides validity.
+     // Never execute the generated JS, mutate replacement bytes or retry
+     // a previously rejected proposal. This is the final bounded attempt.
+     if(parseVerdict==='PARSE_PROVIDER_UNAVAILABLE')
+      fail('MODEL_COMPLETE_MODULE_SYNTAX_PROVIDER_UNVERIFIED');
+     const diagnostic=corrected.ok?
+      parseOnlyModuleFailureCategory(corrected.proposed):
+      {verdict:'INVALID_SYNTAX',category:'INVALID_FROZEN_SPAN',line:null};
+     if(diagnostic.verdict!=='INVALID_SYNTAX')
+      fail('MODEL_COMPLETE_MODULE_SYNTAX_PROVIDER_UNVERIFIED');
+     const previousFingerprint=createHash('sha256')
+      .update(JSON.stringify(retry.choice)).digest('hex');
+     const alternate=await askModel({apiKey,model,fetchImpl,claim,
+      role:'patch_line_correction',maxTokens:4400,
+      input:'An independent parse-only FULL JavaScript module verifier '+
+       'rejected the previous corrected candidate. Diagnostic category: '+
+       diagnostic.category+'. Bounded module line: '+
+       (diagnostic.line??'unknown')+'. Your previous candidate was '+
+       previousFingerprint+'. This is the final distinct correction, '+
+       'not permission to run code or install. Select a DIFFERENT complete '+
+       'existing statement, using only a source-visible 1-81 line span. '+
+       'Keep surrounding statements and braces valid and do not repeat '+
+       'that fingerprint. Return JSON start_line,end_line,replace,reason.\n'+
+       instruction});
+     if(createHash('sha256').update(JSON.stringify(alternate.choice))
+      .digest('hex')===previousFingerprint)
+      fail('MODEL_REPEATED_INVALID_LINE_SPAN');
+     const nextDraft=deriveExactPatchFromFrozenLineSpan(
+      text,alternate.choice,frozenExcerpt.ranges);
+     if(!nextDraft.ok)fail('MODEL_REVIEWED_STRUCTURAL_SPAN_INVALID');
+     const additional=reproduceFrozenStructuralSpanFailure(
+      text,nextDraft.find,nextDraft.replace,{
+       visibleRanges:frozenExcerpt.ranges});
+     const bounded=additional?
+      deriveExactPatchFromFrozenLineSpan(text,{
+       ...alternate.choice,
+       end_line:alternate.choice.end_line+additional.additional_source_lines
+      },frozenExcerpt.ranges):nextDraft;
+     if(!bounded.ok||parseOnlyModule(bounded.proposed)!=='VALID_SYNTAX')
+      fail('MODEL_COMPLETE_MODULE_SYNTAX_NOT_VERIFIED');
+     admitted=bounded;admittedResponse=alternate;
+    }
+    raw=admittedResponse;derived=admitted;syntaxVerdict='VALID_SYNTAX';
    }
    if(syntaxVerdict!=='VALID_SYNTAX')
     fail('MODEL_COMPLETE_MODULE_SYNTAX_PROVIDER_UNVERIFIED');
