@@ -5,6 +5,8 @@ import {projectRealityFinalLoopTimeHorizon}
  from './reality-final-loop-time-horizon-v1.js';
 import {projectRealityFinalLoopExecutiveBrief}
  from './reality-final-loop-executive-brief-v1.js';
+import {verifyFinalLoopCanonicalContinuityHandoff}
+ from './reality-final-loop-canonical-handoff-v1.js';
 export const FINAL_LOOP_OWNER_TIME_BRIDGE_VERSION=
  'reality-final-loop-owner-time-bridge-v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -19,9 +21,12 @@ const blocked=(status)=>Object.freeze({
  original_job_completed:false,production_changed:false
 });
 export function projectOwnerFinalLoopTimeReadback({
- ownerId,shiftId,proof,independentHistory=null,now=Date.now()
+ ownerId,shiftId,expectedPlanFingerprint,proof,
+ independentHistory=null,now=Date.now()
 }={}){
  if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+  !HASH.test(expectedPlanFingerprint||'')||
+  proof?.plan_fingerprint!==expectedPlanFingerprint||
   !Number.isFinite(now)||proof?.status!==
    'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'||
   proof.schema!=='reality-final-loop-canonical-proof-readback-v1'||
@@ -75,7 +80,11 @@ export function projectOwnerFinalLoopTimeReadback({
    schema:'reality-final-loop-owner-readback-v1',
    status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',
    owner_id:ownerId,shift_id:shiftId,
+   plan_fingerprint:proof.plan_fingerprint,
+   frozen_shift_scope_sha256:proof.frozen_shift_scope_sha256,
+   continuity_root_id:proof.continuity_root_id,
    continuity_head_sha256:proof.continuity_head_sha256,
+   revision:proof.revision,missing_proofs:proof.missing_proofs,
    original_job_completed:false,shift_completed:false,
    installation_authorized:false,production_changed:false,
    decisions
@@ -84,6 +93,12 @@ export function projectOwnerFinalLoopTimeReadback({
  const executive=projectRealityFinalLoopExecutiveBrief({
   timeHorizon
  });
+ const handoff=verifyFinalLoopCanonicalContinuityHandoff({
+  proof,expectedOwnerId:ownerId,expectedShiftId:shiftId,
+  expectedPlanFingerprint,timeHorizon,executive,now
+ });
+ if(handoff.canonical_handoff_verified!==true)
+  return blocked('FINAL_LOOP_OWNER_CONTINUITY_HANDOFF_REJECTED');
  if(timeHorizon.status!=='FINAL_LOOP_TIME_HORIZONS_PROJECTED_READ_ONLY'||
   executive.status!=='EXECUTIVE_SIGNED_SHIFT_PRIORITIES_READY')
   return blocked('FINAL_LOOP_OWNER_EXECUTIVE_TIME_RECONCILIATION_REJECTED');
@@ -95,6 +110,7 @@ export function projectOwnerFinalLoopTimeReadback({
   source:'SAME_CANONICAL_SIGNED_SHIFT_SCOPE_NO_SECOND_LEDGER',
   continuity_head_sha256:proof.continuity_head_sha256,
   time_horizon:timeHorizon,executive,
+  canonical_continuity_handoff:handoff,
   independent_settlement_claimed:false,
   new_job_authorized:false,external_execution_authorized:false,
   original_job_completed:false,production_changed:false
