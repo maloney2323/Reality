@@ -1367,6 +1367,17 @@ export default async function handler(req,res){
     original_job_completed:false,production_changed:false,
     new_shift_started:false
    }));
+  // Independent off-target source evidence becomes a SINGLE new frozen
+  // strategy on the SAME original; do not retry the same bad candidate.
+  workerStage='SIGNED_CHAT_RECOVERY_OFFTARGET_SOURCE_RECOMPILATION';
+  const signedRecoveryOfftarget=await shiftRpc(db,
+   'reality_recompile_signed_chat_recovery_offtarget_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_OFFTARGET_COMPILER_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
   const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
    db,env:process.env,fetchImpl:fetch
@@ -1463,7 +1474,14 @@ export default async function handler(req,res){
      signedRecoveryTargetReview.review_receipt_sha256||'')&&
    signedRecoveryTargetReview.installation_authorized===false&&
    signedRecoveryTargetReview.original_job_completed===false;
-  const newDevelopmentAdvanced=recoverySourceProgress||
+  const recoveryOfftargetProgress=
+   signedRecoveryOfftarget.status===
+    'SIGNED_CHAT_RECOVERY_OFFTARGET_SOURCE_STRATEGY_RECOMPILED'&&
+   /^work:[a-f0-9]{32}$/.test(signedRecoveryOfftarget.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(signedRecoveryOfftarget.new_spec_sha256||'')&&
+   signedRecoveryOfftarget.installation_authorized===false&&
+   signedRecoveryOfftarget.original_job_completed===false;
+  const newDevelopmentAdvanced=recoveryOfftargetProgress||recoverySourceProgress||
    recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
    recoveryStrategyProgress||recoveryReviewProgress||goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
@@ -1475,6 +1493,7 @@ export default async function handler(req,res){
    chatNewDevelopmentCheckpoint={
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
     development_result:recoverySourceProgress?signedRecoveryQuarantine:
+     recoveryOfftargetProgress?signedRecoveryOfftarget:
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
        recoveryRevisionProgress?signedRecoveryRevision:
