@@ -5,6 +5,7 @@ const sql=readFileSync(new URL(
  '../supabase/migrations/20261122170000_fix_signed_fenced_provider_pgnet_alias_v1.sql',
  import.meta.url),'utf8');
 test('live observed pg_net ambiguity fixed without weakening the same-original signed fence',()=>{
+ assert.match(sql,/end \$function\$;\s*revoke all on function/);
  assert.match(sql,/from net\._http_response response_row/);
  assert.match(sql,/count\(distinct response_row\.content::jsonb/);
  assert.match(sql,/response_row\.created>q\.updated_at/);
