@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {parseOnlyModule,compareFrozenCandidateSyntax,independentlyVerifySignedRecoverySyntax}
+import {parseOnlyModule,compareFrozenCandidateSyntax,reproduceFrozenBoundaryFailure,independentlyVerifySignedRecoverySyntax}
  from '../src/reality-signed-chat-recovery-syntax-verifier-v1.js';
 const uuid=n=>'11111111-2222-4333-8444-'+String(n).padStart(12,'0');
 const hash='sha256:'+'a'.repeat(64), sha='b'.repeat(40);
@@ -61,8 +61,42 @@ test('broker and ledger keep the old fenced candidate immutable and use a distin
   'syntax_revision_epoch','-syntax-r1','security invoker','w.state=\'ACTIVE\'','p_worker_run_id','target_review_receipt_sha256'])
   assert.ok(sql.includes(token),token);
  assert.ok(broker.includes("s.phase==='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'||s.syntax_verified===true"));
- assert.ok(broker.includes("s.quarantine_epoch===1?'-syntax-r1':''"));
+ assert.ok(broker.includes("s.quarantine_epoch>0?'-syntax-r'+s.quarantine_epoch:''"));
  assert.ok(broker.includes('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY'));
  assert.ok(worker.indexOf('await independentlyVerifySignedRecoverySyntax')<worker.indexOf('await stageNextSignedChatRecoveryQuarantine'));
  assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/);
+});
+
+test('exact splice-boundary reproduction changes only the independently proven anchor, not model replacement',()=>{
+ const proof=reproduceFrozenBoundaryFailure(baseline,find,bad);
+ assert.equal(proof.classification,'DUPLICATED_FROZEN_CLOSING_DELIMITER');
+ assert.equal(proof.boundary_line,'}\n');
+ assert.equal(proof.additional_source_lines,1);
+ assert.equal(proof.candidate_executed,false);assert.equal(proof.functional_acceptance_verified,false);
+ assert.notEqual(proof.original_candidate_sha256,proof.corrected_candidate_sha256);
+ assert.equal(proof.unchanged_replacement_sha256,'sha256:'+createHash('sha256').update(bad).digest('hex'));
+ assert.equal(reproduceFrozenBoundaryFailure(baseline,find,' return false;\n'),null);
+ assert.equal(reproduceFrozenBoundaryFailure(baseline+baseline,find,bad),null);
+ assert.equal(reproduceFrozenBoundaryFailure(baseline,find,' const x = ;\n}\n'),null);
+ assert.equal(reproduceFrozenBoundaryFailure(baseline,find,' return true;\n }\n'),null);
+ assert.equal(reproduceFrozenBoundaryFailure(baseline,find,bad,()=> 'PARSE_PROVIDER_UNAVAILABLE'),null);
+});
+test('exhausted same-original recovery becomes an evidence-bound incident, then distinct independent reproduction and recompile',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261122032000_signed_chat_exhausted_syntax_investigation_v1.sql',import.meta.url),'utf8');
+ const investigator=readFileSync(new URL('../src/reality-shift-continuity-auto-investigation-v1.js',import.meta.url),'utf8');
+ const compiler=readFileSync(new URL('../src/reality-chat-new-development-worker-v1.js',import.meta.url),'utf8');
+ for(const term of ['signed_chat_syntax_exhaustion_evidence_v1','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED',
+  'source_evidence=reality_internal.signed_chat_syntax_exhaustion_evidence_v1',
+  'prior_provider_effect_not_replayed','j.investigated_at<sh.started_at',
+  'prior_proof->>\'proposed_sha256\'=proof->>\'proposed_sha256\'',
+  'independent_boundary_reproduction','syntax_investigation_receipt_sha256',
+  'SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL','-syntax-r','rev+1',
+  'candidate_executed','new_original_admitted', 'FOR UPDATE'.toLowerCase()])assert.ok(sql.includes(term),term);
+ assert.match(investigator,/SIGNED_CHAT_RECOVERY_SYNTAX_STALLED/);
+ assert.match(investigator,/Two independently parsed candidates failed/);
+ assert.match(compiler,/syntax_investigation_receipt_sha256/);
+ assert.match(compiler,/raw.choice.end_line\+1<=b/);
+ assert.match(compiler,/expanded.replace===derived.replace/);
+ assert.match(compiler,/parseOnlyModule\(expanded.proposed\)==='VALID_SYNTAX'/);
+ assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/i);
 });
