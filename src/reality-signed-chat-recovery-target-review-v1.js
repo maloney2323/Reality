@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import {posix as path} from 'node:path';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 const GH='https://api.github.com/repos/maloney2323/Reality';
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
