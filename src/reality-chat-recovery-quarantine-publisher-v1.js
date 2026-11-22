@@ -97,11 +97,38 @@ export async function stageNextSignedChatRecoveryQuarantine({
      (Number.isInteger(result.provider_write_http_status)&&
       result.provider_write_http_status>=100&&result.provider_write_http_status<=599))&&
    result.provider_effect_settled===false&&result.write_replay_authorized===false){
+   const evidence=result.broker_credential_readback;
+   const verifiedEvidence=evidence&&
+    result.status==='RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY'&&
+    evidence.schema==='reality-broker-read-only-credential-provenance-v1'&&
+    evidence.repository==='maloney2323/Reality'&&
+    ['USER_ACCESS_TOKEN','GITHUB_APP_INSTALLATION_TOKEN',
+      'TOKEN_ACTOR_NOT_INDEPENDENTLY_RESOLVED'].includes(evidence.credential_kind)&&
+    (evidence.github_actor_login===null||
+      (typeof evidence.github_actor_login==='string'&&
+      /^[A-Za-z0-9-]{1,39}$/.test(evidence.github_actor_login)))&&
+    (evidence.github_actor_user_http_status===null||
+      Number.isInteger(evidence.github_actor_user_http_status))&&
+    (evidence.installation_repository_http_status===null||
+      Number.isInteger(evidence.installation_repository_http_status))&&
+    typeof evidence.installation_repository_access_verified==='boolean'&&
+    typeof evidence.classic_repo_scope_observed==='boolean'&&
+    typeof evidence.oauth_scopes_header_available==='boolean'&&
+    (evidence.rulesets_read_http_status===null||
+      Number.isInteger(evidence.rulesets_read_http_status))&&
+    (evidence.ruleset_count===null||
+      (Number.isInteger(evidence.ruleset_count)&&
+       evidence.ruleset_count>=0&&evidence.ruleset_count<=1000))&&
+    evidence.contents_write_effectively_tested===false&&
+    evidence.exact_ref_write_authorized===false&&
+    evidence.provider_effect_replayed===false&&
+    evidence.action==='VERIFY_EXACT_BROKER_CONTENTS_WRITE_OR_REQUEST_OWNER_PROVIDER_CORRECTION';
    return safe(result.status,{
     broker_read_only_diagnosis:diagnostic,
     provider_ref_http_status:result.provider_ref_http_status??null,
     provider_write_http_status:result.provider_write_http_status??null,
     broker_push_permission_verified:result.broker_push_permission_verified??null,
+    broker_credential_readback:verifiedEvidence?evidence:null,
     provider_effect_settled:false,write_replay_authorized:false
    });
   }
