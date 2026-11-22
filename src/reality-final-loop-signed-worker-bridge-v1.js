@@ -5,6 +5,8 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {projectRealityFinalLoopTimeHorizon}
  from './reality-final-loop-time-horizon-v1.js';
+import {verifyFinalLoopCanonicalContinuityHandoff}
+ from './reality-final-loop-canonical-handoff-v1.js';
 import {
  assertRealityUnifiedShiftGraph,evaluateRealityFinalLoopEngine
 } from './reality-shift-unified-execution-controller-v1.js';
@@ -124,7 +126,11 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    schema:'reality-final-loop-signed-worker-bridge-v1',
    status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',
    owner_id:graph.owner_id,shift_id:wake.shift_id,
+   plan_fingerprint:p.plan_fingerprint,
+   frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
+   continuity_root_id:p.continuity_root_id,
    continuity_head_sha256:p.continuity_head_sha256,
+   revision:p.revision,missing_proofs:p.missing_proofs,
    original_job_completed:false,shift_completed:false,
    installation_authorized:false,production_changed:false,
    decisions:p.jobs.map(item=>({
@@ -136,8 +142,21 @@ export async function inspectFinalLoopOnExistingSignedWorker({
     transition_committed:false
    }))
   }});
+  const handoff=verifyFinalLoopCanonicalContinuityHandoff({
+   proof:p,expectedOwnerId:graph.owner_id,
+   expectedShiftId:wake.shift_id,
+   expectedPlanFingerprint:graph.plan_fingerprint,
+   sourceGraph:refreshed,timeHorizon:temporal,
+   now:Date.parse(now)
+  });
+  if(handoff.canonical_handoff_verified!==true)
+   return safe('FINAL_LOOP_SIGNED_CONTINUITY_HANDOFF_REJECTED',{
+    owner_id:graph.owner_id,shift_id:wake.shift_id,
+    continuity_handoff_status:handoff.status
+   });
   return safe('FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',{
    owner_id:graph.owner_id,shift_id:wake.shift_id,
+   canonical_continuity_handoff:handoff,
    time_horizon:temporal,
    frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
    continuity_head_sha256:p.continuity_head_sha256,
