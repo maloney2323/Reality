@@ -400,6 +400,26 @@ export default async function handler(req,res){
   // A detected stall is not a model guess or a reason to start another shift.
   // It is a durable independently observed incident; investigate it on THIS
   // signed wake before normal employee discovery, preserving exact authority.
+  workerStage='SIGNED_CHAT_RECOVERY_REVIEW_INCIDENT_OBSERVATION';
+  const signedChatReviewIncidentObservation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_observe_signed_chat_review_incident_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    }).then(r=>{
+     if(r?.status!=='SIGNED_CHAT_REVIEW_INCIDENTS_OBSERVED'||
+      r.worker_run_id!==actualWorkerRunId||
+      !Number.isInteger(r.new_incident_count)||r.new_incident_count<0||
+      r.new_original_admitted!==false||r.new_shift_started!==false||
+      r.execution_authorized!==false||r.installation_authorized!==false||
+      r.original_job_completed!==false||r.production_changed!==false)
+      throw Error('SIGNED_CHAT_REVIEW_INCIDENT_RECEIPT_UNVERIFIED');
+     return r;
+    }).catch(()=>({status:'SIGNED_CHAT_REVIEW_INCIDENT_OBSERVATION_UNVERIFIED',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_CURRENT_SIGNED_CHAT_REVIEW_INCIDENT_SCOPE',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
   workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
   const shiftContinuityInvestigation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
@@ -2979,6 +2999,7 @@ export default async function handler(req,res){
     employee_time_inquiry_receipt:employeeTemporalInquiry,
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
+    signed_chat_review_incident_observation:signedChatReviewIncidentObservation,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_continuity_recovery_action:signedContinuityRecoveryAction,
     signed_continuity_recovery_verification:signedContinuityRecoveryVerification,
