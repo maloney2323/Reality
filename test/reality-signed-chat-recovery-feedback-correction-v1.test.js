@@ -62,6 +62,8 @@ test('prior failure memory cannot requeue the same source release or replay arbi
  ]) assert.ok(sql.includes(x),x);
  assert.match(sql,/revoke all on function public\.reality_requeue_signed_chat_recovery_after_upgrade_v1/);
  assert.match(sql,/grant execute on function public\.reality_requeue_signed_chat_recovery_after_upgrade_v1/);
+ assert.ok(sql.includes("qualification_receipt=coalesce(qualification_receipt,'{}'::jsonb)||pg_catalog.jsonb_build_object("),
+  'corrective claim MUST preserve prior anti-thrashing memory and retry count');
  assert.doesNotMatch(sql,/INSERT INTO reality_internal\.genuine_capability_queue_v1|INSERT INTO public\.reality_chat_messages|new_shift_started',true/i);
 });
 test('same existing signed worker uses one changed source revision and existing model executor',()=>{
