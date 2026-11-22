@@ -181,6 +181,9 @@ begin
   or q.qualification_receipt->>'target_review_receipt_sha256' !~ '^sha256:[a-f0-9]{64}$'
   or q.qualification_receipt->'target_review'->>'target_in_graph' is distinct from 'true'
   or q.qualified_candidate->>'candidate_sha256' is distinct from p_candidate_sha256
+  or q.qualification_receipt->'syntax_proof'->>'candidate' is distinct from 'VALID_SYNTAX'
+  or q.qualification_receipt->'syntax_proof'->>'candidate_sha256' is distinct from p_candidate_sha256
+  or q.qualification_receipt->>'syntax_receipt_sha256' is distinct from 'sha256:'||pg_catalog.encode(extensions.digest((q.qualification_receipt->'syntax_proof')::text,'sha256'),'hex')
   or p_commit_sha !~ '^[a-f0-9]{40}$'
   or p_source_commit_sha !~ '^[a-f0-9]{40}$'
   or p_source_blob_sha !~ '^[a-f0-9]{40}$'
@@ -234,3 +237,40 @@ revoke all on function public.reality_read_next_signed_chat_recovery_publish_v1(
 grant execute on function public.reality_read_next_signed_chat_recovery_publish_v1() to service_role;
 revoke all on function public.reality_record_signed_chat_recovery_quarantine_v1(uuid,text,text,text,text,bigint,text,text) from public,anon,authenticated;
 grant execute on function public.reality_record_signed_chat_recovery_quarantine_v1(uuid,text,text,text,text,bigint,text,text) to service_role;
+
+CREATE OR REPLACE FUNCTION public.reality_fence_signed_chat_recovery_publish_v1(p_trigger_id uuid, p_candidate_sha256 text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare q reality_internal.genuine_capability_queue_v1%rowtype;
+begin
+ if current_user<>'service_role' then raise exception 'SIGNED_CHAT_RECOVERY_SERVICE_ONLY';end if;
+ update reality_internal.genuine_capability_queue_v1
+ set phase='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED',
+  qualification_receipt=coalesce(qualification_receipt,'{}'::jsonb)||
+   pg_catalog.jsonb_build_object('publish_fenced_at',clock_timestamp(),
+    'publish_candidate_sha256',p_candidate_sha256),
+  updated_at=clock_timestamp()
+ where trigger_id=p_trigger_id and source_kind='SIGNED_CHAT_DEVELOPMENT_RECOVERY'
+ and phase='SIGNED_CHAT_RECOVERY_TARGET_REVIEWED'
+ and qualification_receipt->>'target_review_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$'
+ and qualification_receipt->'target_review'->>'target_in_graph'='true'
+ and qualification_receipt->'target_review'->>'candidate_sha256'=p_candidate_sha256
+ and qualified_candidate->>'candidate_sha256'=p_candidate_sha256
+ and qualification_receipt->'syntax_proof'->>'candidate'='VALID_SYNTAX'
+ and qualification_receipt->'syntax_proof'->>'candidate_sha256'=p_candidate_sha256
+ and qualification_receipt->>'syntax_receipt_sha256'='sha256:'||pg_catalog.encode(extensions.digest((qualification_receipt->'syntax_proof')::text,'sha256'),'hex')
+ and recovery_spec_sha256=qualified_candidate->>'spec_sha256'
+ returning * into q;
+ if q.trigger_id is null then raise exception 'SIGNED_CHAT_RECOVERY_FENCE_REPLAY_OR_SOURCE_DRIFT';end if;
+ return pg_catalog.jsonb_build_object(
+  'status','SIGNED_CHAT_RECOVERY_QUARANTINE_EFFECT_FENCED',
+  'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
+  'candidate_sha256',p_candidate_sha256,
+  'installation_authorized',false,'original_job_completed',false,
+  'production_changed',false,'new_shift_started',false);
+end $function$
+;
+revoke all on function public.reality_fence_signed_chat_recovery_publish_v1(uuid,text) from public,anon,authenticated;
+grant execute on function public.reality_fence_signed_chat_recovery_publish_v1(uuid,text) to service_role;
