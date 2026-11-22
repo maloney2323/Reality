@@ -157,10 +157,20 @@ const pendingEnvelope={
  status:'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING',
  owner_id:owner,shift_id:shift,plan_fingerprint:sha('c'),
  read_only:true,independent_owner_scope_verified:true,
- owner_acceptance_verified:false,acceptance_contract_sha256:null,
+ owner_acceptance_verified:false,acceptance_frozen:false,
+ acceptance_contract_sha256:null,
+ missing_proofs:[
+  'FROZEN_CUSTOMER_ORIGINAL_ACCEPTANCE',
+  'EXACT_ORIGINAL_EFFECT_AUTHORITY',
+  'SCHEDULED_WORKER_CAPACITY_ATTESTATION',
+  'INDEPENDENT_ORIGINAL_OUTCOME_AND_UNIVERSE_RECONCILIATION'
+ ],
  execution_authorized:false,installation_authorized:false,
  original_job_completed:false,production_changed:false,
- frozen_shift_scope_sha256:sha('2'),continuity_head_sha256:sha('e'),
+ frozen_shift_scope_sha256:sha('2'),
+ continuity_root_id:'cccccccc-cccc-4ccc-cccc-cccccccccccc',
+ continuity_head_sha256:sha('e'),
+ observed_at:'2026-11-22T22:00:00Z',
  revision:1,jobs:[{
   source_ref:source,original_work_id:work,
   original_kind:'REAL_ENGINEERING_REPAIR_ORIGINAL',
