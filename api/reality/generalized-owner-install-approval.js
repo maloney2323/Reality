@@ -40,9 +40,12 @@ export default async function handler(req,res){
      db.url!==session.config.url||
      typeof db.secretKey!=='string'||db.secretKey.length<25)
    throw Error('EXACT_ISOLATED_SERVICE_WARRANT_REQUIRED');
-  const card=await shiftRpc(db,
-   'reality_read_generalized_original_install_review_v1',{
-    p_owner_id:session.user_id});
+  const body=req.body;
+  const signedChat=await shiftRpc(db,'reality_read_signed_chat_general_install_card_v1',{p_owner_id:session.user_id});
+  const card=signedChat?.status==='GENERALIZED_VERIFIED_ORIGINAL_INSTALL_REVIEW'&&
+   signedChat.original_work_id===body?.original_work_id&&signedChat.attempt_id===body?.attempt_id?
+   signedChat:await shiftRpc(db,'reality_read_generalized_original_install_review_v1',{p_owner_id:session.user_id});
+  const isChat=card?.source_family==='SIGNED_CHAT_DEVELOPMENT_RECOVERY';
   if(card?.status!=='GENERALIZED_VERIFIED_ORIGINAL_INSTALL_REVIEW'||
     card.owner_id!==session.user_id||
     !WORK.test(card.original_work_id||'')||
@@ -52,7 +55,6 @@ export default async function handler(req,res){
     !UUID.test(card.shift_id||'')||
     card.production_changed!==false)
    return response(res,'GENERAL_ORIGINAL_OWNER_SCOPE_OR_REVIEW_UNVERIFIED',409);
-  const body=req.body;
   if(!body||typeof body!=='object'||Array.isArray(body)||
     Object.getPrototypeOf(body)!==Object.prototype||
     Object.keys(body).sort().join(',')!==
@@ -73,7 +75,20 @@ export default async function handler(req,res){
     card.original_job_completed!==false)
    return response(res,'GENERAL_ORIGINAL_FINAL_RELEASE_CONTINUATION_NOT_READY',409,{
      owner_approval_ready:false});
-  const r=await fetch(db.url+
+  // Signed Chat original consent binds to the current isolated preview's
+  // exact base SHA and current authenticated owner; no generic Chat message
+  // or permission expansion can supply the installation decision.
+  if(isChat&&(process.env.VERCEL_ENV!=='preview'||process.env.VERCEL_GIT_COMMIT_REF!==card.target_branch||
+   process.env.VERCEL_GIT_COMMIT_SHA!==card.target_base_sha))
+   return response(res,'SIGNED_CHAT_EXACT_PREVIEW_RELEASE_CHANGED',409,{owner_approval_ready:false});
+  if(isChat){
+   const ref=await fetch('https://api.github.com/repos/maloney2323/Reality/git/ref/heads/'+card.target_branch,{
+    method:'GET',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(6000),headers:{accept:'application/vnd.github+json','user-agent':'Reality-exact-owner-approval'}});
+   const b=await ref.json().catch(()=>null);
+   if(!ref.ok||b?.ref!=='refs/heads/'+card.target_branch||b.object?.sha!==card.target_base_sha)
+    return response(res,'SIGNED_CHAT_EXACT_PREVIEW_RELEASE_CHANGED',409,{owner_approval_ready:false});
+  }
+  const r=isChat?null:await fetch(db.url+
    '/rest/v1/rpc/reality_owner_approve_general_original_install_v1',{
    method:'POST',cache:'no-store',redirect:'error',
    signal:AbortSignal.timeout(15000),
@@ -87,10 +102,13 @@ export default async function handler(req,res){
     p_artifact_sha256:card.candidate_artifact_sha256,
     p_intent:INTENT,p_request_id:body.request_id
    })});
-  if(!r.ok)return response(res,
+  if(r&&!r.ok)return response(res,
    'GENERAL_ORIGINAL_APPROVAL_PROVIDER_OUTCOME_UNCERTAIN_CHECK_READBACK',409,
    {retry_owner_approval:false});
-  const receipt=await r.json().catch(()=>null);
+  const receipt=isChat?await shiftRpc(db,'reality_owner_approve_signed_chat_general_install_v1',{
+   p_owner_id:session.user_id,p_original_work_id:card.original_work_id,p_attempt_id:card.attempt_id,
+   p_candidate_commit_sha:card.candidate_commit_sha,p_artifact_sha256:card.candidate_artifact_sha256,
+   p_intent:INTENT,p_request_id:body.request_id}):await r.json().catch(()=>null);
   if(receipt?.status!=='GENERAL_ORIGINAL_OWNER_APPROVED_AUTO_CONTINUATION'||
     receipt.original_work_id!==card.original_work_id||
     receipt.shift_id!==card.shift_id||
