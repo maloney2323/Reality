@@ -49,6 +49,8 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {inspectFinalLoopOnExistingSignedWorker}
+ from '../../src/reality-final-loop-signed-worker-bridge-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
  reconcileVerifiedCurrentShiftCommitTriage}
  from '../../src/reality-shift-commit-triage-handoff-v1.js';
@@ -2065,6 +2067,12 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // Existing worker + existing exact shift; never a second orchestrator.
+  // Shadow diagnostics only until independently bound canonical acceptance,
+  // one-use transition CAS and final settlement writers are deployed.
+  const finalLoopEngineShadow=await inspectFinalLoopOnExistingSignedWorker({
+   db,wake:wakeReceipt,graph:unifiedGraph,env:process.env,fetchImpl:fetch
+  });
   // The EXISTING categorizer reads the durable investigation/action/review
   // receipts, not the model's description or this wake's success status.
   // Source-bound next actions remain advisory until an installed governed
@@ -3211,6 +3219,7 @@ export default async function handler(req,res){
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
+    final_loop_engine_shadow:finalLoopEngineShadow,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
      next_action:unifiedGraph.next_action,
