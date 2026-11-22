@@ -7,6 +7,8 @@
 // a new Chat job that it cannot safely read or process.
 import {createHash} from 'node:crypto';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {readPinnedSignedRecoverySourceGraph}
+ from './reality-signed-chat-recovery-target-review-v1.js';
 import {outputText} from './reality-riley-native-model-draft-v1.js';
 const BASE='https://api.github.com/repos/maloney2323/Reality';
 const SHA=/^[a-f0-9]{40}$/;
@@ -122,7 +124,20 @@ export function verifyFrozenRecoveryCapabilityClaim(c){
      spec.source_size_max_bytes<1000||spec.source_size_max_bytes>210000||
      spec.line_span_max_lines!==81))
    return false;
+ if(spec.target_selection_policy!==undefined&&
+   (spec.target_selection_policy!=='CURRENT_PINNED_ENTRYPOINT_GRAPH_ONLY'||
+    spec.schema!=='reality-recovery-compiler-capability-spec-v2'||
+    !/^sha256:[a-f0-9]{64}$/.test(spec.prior_target_rejection_receipt_sha256||'')||
+    !allowPath(spec.rejected_target_path)))return false;
  return true;
+}
+export function restrictRecoveryTargetsToVerifiedGraph(candidates,proof,spec){
+ if(proof?.verified!==true||!Array.isArray(proof.source_paths)||
+  !SHA.test(proof.tree_sha||'')||!Array.isArray(candidates)||
+  spec?.target_selection_policy!=='CURRENT_PINNED_ENTRYPOINT_GRAPH_ONLY'||
+  !allowPath(spec.rejected_target_path))return [];
+ const paths=new Set(proof.source_paths);
+ return candidates.filter(f=>paths.has(f.path)&&f.path!==spec.rejected_target_path);
 }
 function checkClaim(c,db,env,recoveryMode=false){
  if(c?.status==='NO_PENDING_SIGNED_NEW_DEVELOPMENT'||
@@ -328,9 +343,16 @@ export async function generateNextSignedChatDevelopmentDraft({
    fail('SOURCE_TREE_INCOMPLETE');
   const limit=recoveryMode?
     Number(claim.recovery_spec?.source_size_max_bytes||210000):250000;
-  const candidates=tree.tree.filter(f=>f.type==='blob'&&allowPath(f.path)&&
+  let candidates=tree.tree.filter(f=>f.type==='blob'&&allowPath(f.path)&&
     SHA.test(f.sha||'')&&Number.isSafeInteger(f.size)&&
     f.size>=100&&f.size<=limit);
+  if(recoveryMode&&claim.recovery_spec.target_selection_policy==='CURRENT_PINNED_ENTRYPOINT_GRAPH_ONLY'){
+   const graph=await readPinnedSignedRecoverySourceGraph({baseSha:claim.release_sha,
+    target:claim.recovery_spec.source_relevance_roots[0],expectedRoots:claim.recovery_spec.source_relevance_roots,
+    token:githubToken,fetchImpl});
+   if(graph.tree_sha!==sourceCommit.tree.sha)fail('REVISED_TARGET_SOURCE_TREE_DRIFT');
+   candidates=restrictRecoveryTargetsToVerifiedGraph(candidates,graph,claim.recovery_spec);
+  }
   if(!candidates.length)fail('NO_ELIGIBLE_SOURCE_FILE');
   const recoverySpecText=recoveryMode?JSON.stringify({
    original_goal:claim.recovery_spec.original_goal,
@@ -339,6 +361,10 @@ export async function generateNextSignedChatDevelopmentDraft({
    source_relevance_roots:claim.recovery_spec.source_relevance_roots,
    original_checkpoint:claim.recovery_spec.checkpoint,
    quarantine_policy:claim.recovery_spec.quarantine_policy,
+   ...(claim.recovery_spec.target_selection_policy?{
+    target_selection_policy:claim.recovery_spec.target_selection_policy,
+    rejected_target_path:claim.recovery_spec.rejected_target_path,
+    prior_target_rejection_receipt_sha256:claim.recovery_spec.prior_target_rejection_receipt_sha256}:{}),
    permitted_patch_strategy:claim.recovery_spec.patch_strategy||'EXACT_FROZEN_SOURCE'
   }):'';
   const w=words(claim.original_instruction+' '+claim.objective+
