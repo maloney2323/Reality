@@ -29,8 +29,9 @@ test('existing signed worker automatically invokes guarded gap transition once p
  assert.match(worker,/workerStage='CHAT_DEVELOPMENT_FULL_GOAL_ACCEPTANCE_GAP'/);
  assert.match(worker,/reality_record_next_chat_development_goal_gap_v1/);
  assert.match(worker,/goalGapRecorded=\s*chatFeatureGap\?\.status===/);
- assert.match(worker,/const newDevelopmentAdvanced=goalGapRecorded\|\|/);
- assert.match(worker,/development_result:goalGapRecorded\?chatFeatureGap:/);
+ assert.match(worker,/const newDevelopmentAdvanced=recoverySourceProgress\|\|/);
+ assert.match(worker,/recoveryDraftProgress\|\|recoverySpecProgress\|\|goalGapRecorded\|\|/);
+ assert.match(worker,/goalGapRecorded\?chatFeatureGap:/);
  assert.match(boundary,/record_next_chat_development_goal_gap_v1/);
  assert.doesNotMatch(sql,/reality_owner_approve_general_original_install_v1/);
 });

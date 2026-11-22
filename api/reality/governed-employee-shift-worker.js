@@ -105,6 +105,8 @@ import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
+import {stageNextSignedChatRecoveryQuarantine}
+ from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
 import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
 import {runOneStandingEmployeeDiscovery}
@@ -1344,7 +1346,60 @@ export default async function handler(req,res){
    chatFeatureGap.installation_authorized===false&&
    chatFeatureGap.production_changed===false&&
    chatFeatureGap.new_shift_started===false;
-  const newDevelopmentAdvanced=goalGapRecorded||
+  // Signed recovery compiler consumes a proven CI_VERIFIED blocker from the
+  // SAME owner original. The existing capability queue stores the frozen
+  // contract; the existing Chat development worker generates a bounded source
+  // draft. The protected broker stages it into quarantine on a later wake.
+  // Neither the model nor the broker may grant installation authority.
+  workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
+  const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_UNVERIFIED_NO_REPLAY',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  workerStage='SIGNED_CHAT_RECOVERY_SPEC_COMPILATION';
+  const signedRecoverySpec=await shiftRpc(db,
+   'reality_admit_next_signed_chat_recovery_spec_v1',{}
+  ).catch(()=>({
+   status:'SIGNED_CHAT_RECOVERY_SPEC_COMPILER_UNVERIFIED',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  workerStage='SIGNED_CHAT_RECOVERY_EXISTING_MODEL_GENERATOR';
+  const signedRecoveryDraft=await generateNextSignedChatDevelopmentDraft({
+   db,env:process.env,fetchImpl:fetch,recoveryMode:true
+  }).catch(()=>({
+   status:'SIGNED_CHAT_RECOVERY_MODEL_DRAFT_UNVERIFIED',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  const recoverySourceProgress=
+   signedRecoveryQuarantine.status===
+    'SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_RECEIPTED'&&
+   /^work:[a-f0-9]{32}$/.test(
+     signedRecoveryQuarantine.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     signedRecoveryQuarantine.quarantine_receipt_sha256||'')&&
+   signedRecoveryQuarantine.source_installed===false&&
+   signedRecoveryQuarantine.installation_authorized===false&&
+   signedRecoveryQuarantine.original_job_completed===false;
+  const recoverySpecProgress=
+   signedRecoverySpec.status==='SIGNED_CHAT_RECOVERY_SPEC_ATOMICALLY_FROZEN'&&
+   /^work:[a-f0-9]{32}$/.test(signedRecoverySpec.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(signedRecoverySpec.spec_sha256||'')&&
+   signedRecoverySpec.installation_authorized===false&&
+   signedRecoverySpec.original_job_completed===false;
+  const recoveryDraftProgress=
+   signedRecoveryDraft.status==='SIGNED_CHAT_RECOVERY_CODE_DRAFT_GENERATED'&&
+   /^work:[a-f0-9]{32}$/.test(signedRecoveryDraft.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     signedRecoveryDraft.candidate_sha256||'')&&
+   signedRecoveryDraft.installation_authorized===false&&
+   signedRecoveryDraft.original_job_completed===false;
+  const newDevelopmentAdvanced=recoverySourceProgress||
+   recoveryDraftProgress||recoverySpecProgress||goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
   // This lane already owns its signed ledger. A successful or blocked feature
@@ -1353,9 +1408,12 @@ export default async function handler(req,res){
   if(newDevelopmentAdvanced){
    chatNewDevelopmentCheckpoint={
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
-    development_result:goalGapRecorded?chatFeatureGap:
-     publisherProgress.has(chatNewPublished.status)?
-      chatNewPublished:chatNewBuild,
+    development_result:recoverySourceProgress?signedRecoveryQuarantine:
+     recoveryDraftProgress?signedRecoveryDraft:
+      recoverySpecProgress?signedRecoverySpec:
+       goalGapRecorded?chatFeatureGap:
+        publisherProgress.has(chatNewPublished.status)?
+         chatNewPublished:chatNewBuild,
     original_job_completed:false,installation_authorized:false,
     production_changed:false,new_shift_started:false
    };

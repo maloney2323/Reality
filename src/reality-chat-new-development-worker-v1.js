@@ -84,9 +84,17 @@ async function askModel({apiKey,model,fetchImpl,claim,role,input,maxTokens}){
   fail('OPENAI_TYPED_DRAFT_UNVERIFIED');
  return {reply:v,choice:out};
 }
-function checkClaim(c,db,env){
- if(c?.status==='NO_PENDING_SIGNED_NEW_DEVELOPMENT')return false;
- if(c?.status!=='SIGNED_NEW_DEVELOPMENT_SOURCE_LEASED'||
+function checkClaim(c,db,env,recoveryMode=false){
+ if(c?.status==='NO_PENDING_SIGNED_NEW_DEVELOPMENT'||
+    c?.status==='NO_PENDING_SIGNED_CHAT_RECOVERY')return false;
+ if(c?.status!==(recoveryMode?
+     'SIGNED_CHAT_RECOVERY_SOURCE_LEASED':
+     'SIGNED_NEW_DEVELOPMENT_SOURCE_LEASED')||
+   recoveryMode&&(!UUID.test(c.trigger_id||'')||
+    !/^sha256:[a-f0-9]{64}$/.test(c.recovery_spec_sha256||'')||
+    !/^sha256:[a-f0-9]{64}$/.test(c.recovery_blocker_receipt_sha256||'')||
+    c.recovery_mode!==true)||
+
    !UUID.test(c.message_id||'')||!UUID.test(c.request_id||'')||
    !UUID.test(c.owner_id||'')||!UUID.test(c.conversation_id||'')||
    !UUID.test(c.claim_id||'')||!WORK.test(c.original_work_id||'')||
@@ -122,9 +130,12 @@ function excerpt(src,instruction){
  }
  return segments.join('\n/* SOURCE EXCERPT BOUNDARY - DO NOT COPY */\n').slice(0,36000);
 }
+// Reuse the EXISTING signed Chat code-generation worker, never a second model
+// subsystem. The recovery claimant is a source-bound row in the existing
+// genuine capability queue; its model output remains untrusted and uninstalled.
 export async function generateNextSignedChatDevelopmentDraft({
  db,env=process.env,fetchImpl=fetch,callRpc=shiftRpc,
- ownerScope=null
+ ownerScope=null,recoveryMode=false
 }={}){
  if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||
     db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
@@ -144,7 +155,10 @@ export async function generateNextSignedChatDevelopmentDraft({
     !UUID.test(ownerScope.request_id||'')))
   return hold('CHAT_NEW_DEVELOPMENT_OWNER_SOURCE_SCOPE_REQUIRED');
  const scoped=ownerScope!==null;
- const claim=await callRpc(db,scoped?
+ if(recoveryMode&&scoped)
+  return hold('SIGNED_CHAT_RECOVERY_SERVICE_ONLY_NO_OWNER_OVERRIDE');
+ const claim=await callRpc(db,recoveryMode?
+   'reality_claim_next_signed_chat_recovery_candidate_v1':scoped?
    'reality_claim_chat_new_development_signed_v3':
    'reality_claim_chat_new_development_release_v2',
    {p_release_sha:env.VERCEL_GIT_COMMIT_SHA,
@@ -157,9 +171,15 @@ export async function generateNextSignedChatDevelopmentDraft({
      claim.conversation_id!==ownerScope.conversation_id||
      claim.request_id!==ownerScope.request_id))
   return hold('CHAT_NEW_DEVELOPMENT_CLAIM_IDENTITY_UNVERIFIED');
- if(!checkClaim(claim,db,env))
-  return hold('NO_PENDING_SIGNED_NEW_DEVELOPMENT');
+ if(!checkClaim(claim,db,env,recoveryMode))
+  return hold(recoveryMode?
+   'NO_PENDING_SIGNED_CHAT_RECOVERY':'NO_PENDING_SIGNED_NEW_DEVELOPMENT');
  const note=async(code,phase='PROVIDER_UNVERIFIED')=>{
+  if(recoveryMode){
+   return callRpc(db,'reality_mark_signed_chat_recovery_unverified_v1',{
+    p_trigger_id:claim.trigger_id,p_claim_id:claim.claim_id,
+    p_reason:code},{fetchImpl});
+  }
   await callRpc(db,'reality_mark_chat_new_development_unverified_v1',{
    p_message_id:claim.message_id,p_claim_id:claim.claim_id,
    p_reason:code,p_phase:phase},{fetchImpl});
@@ -233,26 +253,36 @@ export async function generateNextSignedChatDevelopmentDraft({
    fail('MODEL_PROPOSED_CODE_INVALID');
   failure='MODEL_DRAFT_PERSISTENCE_UNVERIFIED';
   const recorded=await callRpc(db,
-   'reality_record_chat_new_development_draft_v1',{
-    p_message_id:claim.message_id,p_claim_id:claim.claim_id,
-    p_original_work_id:claim.original_work_id,
+   recoveryMode?'reality_record_signed_chat_recovery_draft_v1':
+    'reality_record_chat_new_development_draft_v1',{
+    ...(recoveryMode?{p_trigger_id:claim.trigger_id}:{
+     p_message_id:claim.message_id,p_original_work_id:claim.original_work_id}),
+    p_claim_id:claim.claim_id,
     p_base_sha:claim.release_sha,p_target_path:path,
     p_source_blob_sha:source.sha,
     p_find:find,p_replace:replace,p_reason:reason,
     p_model_response_id:patch.reply.id
    },{fetchImpl});
-  if(recorded?.status!=='SIGNED_NEW_DEVELOPMENT_MODEL_DRAFT_RECORDED'||
+  if(recorded?.status!==(recoveryMode?
+     'SIGNED_CHAT_RECOVERY_QUARANTINED_DRAFT_GENERATED':
+     'SIGNED_NEW_DEVELOPMENT_MODEL_DRAFT_RECORDED')||
      recorded.original_work_id!==claim.original_work_id||
-     recorded.message_id!==claim.message_id||
+     (recoveryMode?
+      recorded.trigger_id!==claim.trigger_id||
+       recorded.recovery_spec_sha256!==claim.recovery_spec_sha256:
+      recorded.message_id!==claim.message_id||
+       recorded.independent_ci_verified!==false)||
      recorded.model_generated!==true||
-     recorded.independent_ci_verified!==false||
      recorded.installation_authorized!==false||
      recorded.original_job_completed!==false||
      recorded.production_changed!==false||
      recorded.new_shift_started!==false)
    fail('DURABLE_DRAFT_RECEIPT_UNVERIFIED');
-  return hold('CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED',{
+  return hold(recoveryMode?'SIGNED_CHAT_RECOVERY_CODE_DRAFT_GENERATED':
+    'CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED',{
    original_work_id:claim.original_work_id,
+   ...(recoveryMode?{trigger_id:claim.trigger_id,
+    recovery_spec_sha256:claim.recovery_spec_sha256}:{}),
    model_generated:true,source_path:path,
    candidate_sha256:recorded.candidate_sha256,
    independent_ci_verified:false});
