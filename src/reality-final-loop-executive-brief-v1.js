@@ -54,6 +54,9 @@ export function projectRealityFinalLoopExecutiveBrief({
      typeof item?.source_ref!=='string'||sources.has(item.source_ref)||
      item.action_executed!==false||
      item.settlement_committed!==false||
+     (item.native_next_governed_action!==null&&
+      item.native_next_governed_action!==undefined&&
+      !/^[A-Z][A-Z0-9_]{6,130}$/.test(item.native_next_governed_action))||
      typeof item?.next_governed_action!=='string'||
      item.next_governed_action.length>140)
    return wrap('EXECUTIVE_FINAL_LOOP_OBLIGATION_UNVERIFIED');
@@ -68,6 +71,9 @@ export function projectRealityFinalLoopExecutiveBrief({
    return wrap('EXECUTIVE_SUPERVISOR_SOURCE_MISMATCH');
   items.push(Object.freeze({
    source_ref:item.source_ref,original_work_id:item.original_work_id,
+   source_phase:item.source_phase??null,
+   native_next_governed_action:item.native_next_governed_action??null,
+   native_next_action_is_diagnostic_only:true,
    priority_band:priority[item.decision],
    engine_decision:item.decision,
    original_admission_pending:item.source_admission_verified===false,
@@ -105,6 +111,8 @@ export function projectRealityFinalLoopExecutiveBrief({
   historical_receipt_proof_available:
    past?.status==='INDEPENDENT_PAST_VERIFIED',
   future_preparation_count:timeHorizon.future.preparations.length,
+  priority_native_diagnostic:primary?.native_next_governed_action||null,
+  priority_native_diagnostic_authorizes_nothing:true,
   existing_supervisor_cross_checked:supervisor!==null,
   next_executive_message:primary===null?
    'No independently eligible active original in this readback.':
