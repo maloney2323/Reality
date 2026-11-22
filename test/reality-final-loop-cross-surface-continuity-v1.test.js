@@ -151,6 +151,15 @@ test('mixed live-shaped shift: admitted blocked original vs selected unadmitted 
   'QUALIFY_DISTINCT_SOURCE_TO_ORIGINAL_BEFORE_ACCEPTANCE');
  assert.equal(bySource.get(sourceGraph.jobs[0].source_ref).decision,'REFRESH');
  assert.equal(bySource.get(sourceGraph.jobs[0].source_ref).source_admission_verified,true);
+ assert.equal(bySource.get(sourceGraph.jobs[0].source_ref).source_phase,'BLOCKED');
+ assert.equal(bySource.get(sourceGraph.jobs[0].source_ref).native_next_governed_action,
+  'RECONCILE_UNFINISHED_ORIGINAL');
+ assert.equal(bySource.get(unadmitted.source_ref).source_phase,'NOT_ADMITTED');
+ assert.equal(bySource.get(unadmitted.source_ref).native_next_governed_action,
+  'ADMIT_ONE_VERIFIED_PR_REVIEW');
+ assert.equal(ownerView.executive.primary_attention.native_next_governed_action,
+  'ADMIT_ONE_VERIFIED_PR_REVIEW');
+ assert.equal(ownerView.executive.priority_native_diagnostic_authorizes_nothing,true);
  assert.equal(ownerView.executive.primary_attention.original_admission_pending,true);
  assert.match(ownerView.executive.next_executive_message,/independent original-job admission/);
  assert.deepEqual(signed.checkpoint_candidates,[{
@@ -160,4 +169,14 @@ test('mixed live-shaped shift: admitted blocked original vs selected unadmitted 
   ownerView.canonical_continuity_handoff.read_model_digest_sha256);
  assert.equal(ownerView.external_execution_authorized,false);
  assert.equal(ownerView.original_job_completed,false);
+});
+
+test('native blocker action drift between signed graph and proof rejects worker handoff without replay',async()=>{
+ const changed={...proof,jobs:[{
+  ...proof.jobs[0],native_next_governed_action:'AUTO_INSTALL_AND_SETTLE'
+ }]};
+ const r=await inspection(changed);
+ assert.equal(r.status,'FINAL_LOOP_SIGNED_CONTINUITY_HANDOFF_REJECTED');
+ assert.equal(r.executor_invoked,false);
+ assert.equal(r.original_job_completed,false);
 });
