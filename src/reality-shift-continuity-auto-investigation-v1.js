@@ -173,7 +173,7 @@ export async function investigateOneSignedShiftContinuityIncident({
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
     'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED',
-    'SIGNED_CHAT_RECOVERY_MODEL_REJECTED'].includes(claim.kind)||
+    'SIGNED_CHAT_RECOVERY_MODEL_REJECTED','SIGNED_GOVERNED_TRANSITION_STALLED'].includes(claim.kind)||
   (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
    (!UUID.test(claim.source_claim_id||'')||
     !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
@@ -219,6 +219,35 @@ export async function investigateOneSignedShiftContinuityIncident({
    claim.source_evidence.investigation_only!==true||
    claim.source_evidence.root_cause_verified!==false||
    claim.source_evidence.source_candidate_executed!==false||
+   claim.source_evidence.original_job_completed!==false||
+   claim.source_evidence.installation_authorized!==false||
+   claim.source_evidence.production_changed!==false))||
+  (claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED'&&(
+   claim.source_evidence?.schema!=='reality-source-bound-unsettled-transition-v1'||
+   claim.source_evidence.transition_family!=='SIGNED_CHAT_DEVELOPMENT_RECOVERY'||
+   claim.source_evidence.expected_transition!=='QUARANTINE_PROVIDER_RECEIPTED'||
+   claim.source_evidence.observed_phase!=='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'||
+   !/^work:[a-f0-9]{32}$/.test(claim.source_evidence.original_work_id||'')||
+   !UUID.test(claim.source_evidence.trigger_id||'')||
+   !UUID.test(claim.source_evidence.source_claim_id||'')||
+   claim.source_evidence.source_claim_id!==claim.source_claim_id||
+   !HASH.test(claim.source_evidence.spec_sha256||'')||
+   !HASH.test(claim.source_evidence.candidate_sha256||'')||
+   !HASH.test(claim.source_evidence.syntax_receipt_sha256||'')||
+   !HASH.test(claim.source_evidence.target_review_receipt_sha256||'')||
+   !HASH.test(claim.source_evidence.blocker_receipt_sha256||'')||
+   !/^[a-f0-9]{40}$/.test(claim.source_evidence.candidate_base_sha||'')||
+   claim.source_evidence.expected_quarantine_branch!==
+     'reality/chat-recovery/'+claim.source_evidence.trigger_id+
+      (claim.source_evidence.expected_quarantine_branch.includes('-feature-r')?
+       claim.source_evidence.expected_quarantine_branch.match(/-feature-r[1-4]/)?.[0]||'':'')+
+      (claim.source_evidence.expected_quarantine_branch.includes('-syntax-r')?
+       claim.source_evidence.expected_quarantine_branch.match(/-syntax-r[1-9]/)?.[0]||'':'')||
+   !Number.isFinite(Date.parse(claim.source_evidence.fenced_at||''))||
+   claim.source_evidence.investigation_only!==true||
+   claim.source_evidence.provider_effect_known!==false||
+   claim.source_evidence.provider_effect_replayed!==false||
+   claim.source_evidence.root_cause_verified!==false||
    claim.source_evidence.original_job_completed!==false||
    claim.source_evidence.installation_authorized!==false||
    claim.source_evidence.production_changed!==false))||
@@ -273,7 +302,8 @@ export async function investigateOneSignedShiftContinuityIncident({
   }
   const syntaxIncident=claim.kind==='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED';
   const modelRejectionIncident=claim.kind==='SIGNED_CHAT_RECOVERY_MODEL_REJECTED';
-  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident||modelRejectionIncident;
+  const fencedTransitionIncident=claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED';
+  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident||modelRejectionIncident||fencedTransitionIncident;
   const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident;
   // Real repeated wake receipts prove no progress, not a root cause.
   // The existing owner-scoped original preflight provides current admission
@@ -304,6 +334,28 @@ export async function investigateOneSignedShiftContinuityIncident({
      };
     }
    }catch{/* Unavailable readback cannot become positive source proof. */}
+  }
+  // Independent GET-only ref observation. A 404 is NOT proof no provider
+  // operation was attempted or that replay is authorized. Never use the
+  // assistant's GitHub credentials or infer broker-token permissions here.
+  let unsettledTransitionReadback={status:'NO_FENCED_PROVIDER_TRANSITION_SCOPE'};
+  if(fencedTransitionIncident){
+   const branch=claim.source_evidence.expected_quarantine_branch;
+   try{
+    const r=await fetchImpl('https://api.github.com/repos/maloney2323/Reality/git/ref/heads/'+branch,{
+     method:'GET',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(5500),
+     headers:{accept:'application/vnd.github+json',
+      'x-github-api-version':'2022-11-28',
+      'user-agent':'Reality-continuity-independent-provider-observer'}});
+    unsettledTransitionReadback={
+     status:r?.status===404?'QUARANTINE_BRANCH_NOT_OBSERVED':
+      r?.ok?'QUARANTINE_BRANCH_PRESENT_UNVERIFIED_ARTIFACT':
+      'PROVIDER_READBACK_UNAVAILABLE',
+     checked_at:new Date().toISOString(),read_only:true,
+     effect_settled:false,replay_authorized:false,
+     provider_status:Number.isInteger(r?.status)?r.status:null};
+   }catch{unsettledTransitionReadback={status:'PROVIDER_READBACK_UNAVAILABLE',
+    read_only:true,effect_settled:false,replay_authorized:false}}
   }
   const payload={
    model,store:false,tool_choice:'none',max_output_tokens:1500,
@@ -352,7 +404,16 @@ export async function investigateOneSignedShiftContinuityIncident({
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
      'Return only the specified fields.'+
-     (modelRejectionIncident?
+     (fencedTransitionIncident?
+      ' The signed original is stuck behind a previously fenced GITHUB provider transition. ' +
+      'A timeout or provider write response cannot be treated as no effect. ' +
+      'Use the independent current GitHub readback and pinned branch identity. ' +
+      'Determine whether the branch currently exists and which credential or provider proof is missing. ' +
+      'Do not retry POST, mutate ref, claim provider push access, unfreeze the fence, ' +
+      'or mark the original complete. If credential authorization is missing, require explicit ' +
+      'owner/provider correction. Any proposed resumption must preserve the fenced attempt and ' +
+      'be independently qualified against actual provider effect. ':
+      modelRejectionIncident?
       ' This is an exact signed Chat recovery candidate MODEL_REJECTED, not a completed job or permission to retry. '+
       'Read the typed rejection_reason, immutable rejection_evidence, original ID and frozen spec. '+
       'Diagnose the specific model/compiler source-span or validation gap, decide a smallest safe correction and '+
@@ -398,6 +459,7 @@ export async function investigateOneSignedShiftContinuityIncident({
       phase:claim.failed_job_phase||null,
       blocker:claim.failed_job_blocker||null},
      independent_current_source_readback:sourceReadback,
+     independent_unsettled_transition_readback:unsettledTransitionReadback,
      owner_signed_current_original_preflight:liveWorkPreflight,
      self_inquiry_questions:CONTINUITY_SELF_INQUIRY_QUESTIONS,
      known_evidence_is_not_independent_root_cause_proof:true,
