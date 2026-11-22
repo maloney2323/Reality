@@ -182,11 +182,15 @@ export function classifyRealityContinuityRecoveryHandoff({
  const actions=new Map();
  for(const a of actionsReadback.items){
   if(!UUID.test(a?.incident_id||'')||
-    !UUID.test(a?.shift_id||'')||a.shift_id!==shiftId||
-    actions.has(a.incident_id)||
+    !UUID.test(a?.shift_id||'')||
     a.original_job_completed!==false||
     a.installation_authorized!==false||
     a.production_changed!==false)
+   return finish('GOVERNED_RECOVERY_ACTION_LINEAGE_UNVERIFIED');
+  // An owner can have historical shifts; their independently scoped receipts
+  // are not foreign authorization and cannot drive this particular shift.
+  if(a.shift_id!==shiftId)continue;
+  if(actions.has(a.incident_id))
    return finish('GOVERNED_RECOVERY_ACTION_LINEAGE_UNVERIFIED');
   actions.set(a.incident_id,a);
  }
