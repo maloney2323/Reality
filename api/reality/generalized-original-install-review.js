@@ -33,8 +33,12 @@ export default async function handler(req,res){
      db.url!==session.config.url)
    throw Error('GENERALIZED_REVIEW_EXACT_ISOLATED_SERVICE_REQUIRED');
   stage='BASELINE_ORIGINAL_PROOF';
-  const r=await shiftRpc(db,'reality_read_generalized_original_install_review_v1',
-   {p_owner_id:session.user_id});
+  const [signedChat,legacy]=await Promise.all([
+   shiftRpc(db,'reality_read_signed_chat_general_install_card_v1',{p_owner_id:session.user_id}),
+   shiftRpc(db,'reality_read_generalized_original_install_review_v1',{p_owner_id:session.user_id})]);
+  const r=signedChat?.status==='GENERALIZED_VERIFIED_ORIGINAL_INSTALL_REVIEW'&&
+   (signedChat.phase!=='ORIGINAL_SETTLED'||legacy?.status==='NO_CURRENT_VERIFIED_ORIGINAL_INSTALL_REVIEW'||legacy?.phase==='ORIGINAL_SETTLED')?signedChat:legacy;
+  const isChat=r?.source_family==='SIGNED_CHAT_DEVELOPMENT_RECOVERY';
   if(r?.status==='NO_CURRENT_VERIFIED_ORIGINAL_INSTALL_REVIEW')
    return res.status(200).json({
     ok:true,status:r.status,owner_approval_ready:false,
@@ -49,8 +53,9 @@ export default async function handler(req,res){
      !RUN.test(String(r.independent_frozen_run_id||''))||
      !RUN.test(String(r.integrated_test_run_id||''))||
      typeof r.source_ref!=='string'||
-     !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(r.source_ref)||
-     !/^reality\/[a-zA-Z0-9/_-]{10,135}$/.test(r.exact_install_target_branch||'')||
+     !(isChat?r.source_ref==='supabase:reality_chat_messages:'+r.source_message_id&&UUID.test(r.source_message_id||''):
+       /^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9][0-9]*$/.test(r.source_ref))||
+     !(isChat?/^(repair|reality)\/[a-zA-Z0-9/_-]{10,135}$/:/^reality\/[a-zA-Z0-9/_-]{10,135}$/).test(r.exact_install_target_branch||'')||
      r.production_changed!==false||
      !['REVIEW_STAGED_NOT_INSTALL_READY','PREINSTALL_TRANSPORT_VERIFIED',
        'READY_FOR_EXACT_OWNER_APPROVAL','OWNER_APPROVED',
@@ -67,7 +72,7 @@ export default async function handler(req,res){
   // Both auxiliary readbacks are owner-scoped and read-only. Run them in
   // parallel so mobile's bounded signed-owner request does not time out
   // after making three sequential Supabase RPC calls under heavy fan-out.
-  const [diagnosis,rawPub]=await Promise.all([
+  const [diagnosis,rawPub]=isChat?[null,null]:await Promise.all([
    shiftRpc(db,'reality_read_general_original_fenced_investigation_state_v1',{})
     .catch(()=>null),
    shiftRpc(db,'reality_read_general_original_recovery_review_v1',{
@@ -106,7 +111,7 @@ export default async function handler(req,res){
    r.phase==='INSTALL_INTENT_FENCED'&&
    r.installation_authorized===true&&r.original_job_completed===false;
   return res.status(200).json({
-   ok:true,...r,recovery_diagnosis:recovery,
+   ok:true,...r,...(isChat?{roi_status:'NOT_MEASURED',production_installation_authorized:false}:{}),recovery_diagnosis:recovery,
    recovery_publication:pub,
    recovery_approval_action_available:recoveryApprovalAvailable===true,
    recovery_approval_action_endpoint:'/api/reality/general-original-recovery-approval',

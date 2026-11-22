@@ -10,6 +10,12 @@ const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const SOURCE=/^src\/[a-zA-Z0-9/_-]+\.js$/;
 const BRANCH=/^reality\/[a-zA-Z0-9/_-]{10,135}$/;
+const CHAT_BRANCH=/^(repair|reality)\/[a-zA-Z0-9/_-]{10,135}$/;
+const CHAT_SOURCE=/^(src\/|api\/reality\/)[a-zA-Z0-9_/-]+\.js$/;
+const CHAT_WORKFLOW='.github/workflows/reality-signed-chat-full-goal-acceptance-v1.yml';
+const CHAT_SUITE='test/reality-signed-chat-full-goal-functional-v1.test.js';
+const CHAT_CI_NAME='Reality signed Chat original full-goal functional acceptance';
+const chatScope=s=>s?.source_family==='SIGNED_CHAT_DEVELOPMENT_RECOVERY';
 const CI_NAME='Reality independently accepted governed original post-install';
 const CI_WORKFLOW='.github/workflows/reality-governed-general-postinstall-original-acceptance-v1.yml';
 const INTEGRATION_NAME='Reality — Isolated governed OpenAI gateway proof';
@@ -22,7 +28,8 @@ const safe=(status,more={},http=200)=>new Response(JSON.stringify({
  'cache-control':'no-store','x-content-type-options':'nosniff'}});
 async function rpc(base,key,name,input={}){
  if(!['reality_read_general_original_postinstall_scope_v1',
-      'reality_record_general_original_independent_settlement_v1'].includes(name))
+      'reality_record_general_original_independent_settlement_v1',
+      'reality_read_signed_chat_install_scope_v1','reality_record_signed_chat_goal_settlement_v1'].includes(name))
   bad('RPC_NOT_ALLOWLISTED');
  const r=await fetch(base+'/rest/v1/rpc/'+name,{method:'POST',
   cache:'no-store',redirect:'error',signal:AbortSignal.timeout(16000),
@@ -52,7 +59,7 @@ async function sha(kind,b){
  return [...new Uint8Array(x)].map(z=>z.toString(16).padStart(2,'0')).join('');
 }
 async function source(token,path,ref){
- if(!SOURCE.test(path)||!SHA.test(ref))bad('ORIGINAL_SOURCE_REF_INVALID');
+ if(!(CHAT_SOURCE.test(path)||path===CHAT_WORKFLOW||path===CHAT_SUITE)||path.includes('..')||path.includes('//')||!SHA.test(ref))bad('ORIGINAL_SOURCE_REF_INVALID');
  const d=await gh(token,'/contents/'+path+'?ref='+ref);
  if(d.path!==path||d.encoding!=='base64'||!SHA.test(d.sha||'')||
   !Number.isSafeInteger(d.size)||d.size<100||d.size>250000||
@@ -67,25 +74,28 @@ async function source(token,path,ref){
 }
 async function verifyRun(token,id,shaCommit,branch,kind){
  const run=await gh(token,'/actions/runs/'+id);
- const name=kind==='original'?CI_NAME:INTEGRATION_NAME;
- const path=kind==='original'?CI_WORKFLOW:INTEGRATION_WORKFLOW;
- const event=kind==='original'?'push':'pull_request';
+ const signedChat=kind==='chat-original'||kind==='chat-integration'||kind==='chat-frozen';
+ const name=signedChat?CHAT_CI_NAME:kind==='original'?CI_NAME:INTEGRATION_NAME;
+ const path=signedChat?CHAT_WORKFLOW:kind==='original'?CI_WORKFLOW:INTEGRATION_WORKFLOW;
+ const event=kind==='original'||kind==='chat-original'||kind==='chat-frozen'?'push':'pull_request';
  if(run.id!==id||run.name!==name||
   run.path?.split('@')[0]!==path||
   run.head_sha!==shaCommit||run.event!==event||
-  (kind==='original'&&run.head_branch!==branch)||
+  ((kind==='original'||signedChat)&&run.head_branch!==branch)||
   run.status!=='completed'||run.conclusion!=='success'||
   run.html_url!=='https://github.com/maloney2323/Reality/actions/runs/'+id)
   bad('INDEPENDENT_'+kind.toUpperCase()+'_RUN_IDENTITY_NOT_PROVEN');
  const jobs=await gh(token,'/actions/runs/'+id+'/jobs?per_page=80');
  if(!Array.isArray(jobs.jobs))bad('ORIGINAL_JOB_EXECUTION_STEP_PROVIDER_MISSING');
- const required=kind==='original'?
+ const required=signedChat?['Checkout exact candidate or installed commit','Verify exact source identity','Prepare isolated Node runtime',
+  'Independently execute full-goal functional contract without secrets or network','Confirm acceptance grants no installation or completion authority']:
+  kind==='original'?
   ['Verify isolated preview commit and source tree identity',
    'Independently accept original-job runtime and governed handoff',
    'Independently verify same-original frozen-CI and recovery safeguards',
    'Confirm no upgrade installation or customer settlement from CI']:
   ['Verify Reality model boundary and original tool-continuation regressions'];
- const nameOfJob=kind==='original'?'independent-original-acceptance':'boundary-tests';
+ const nameOfJob=signedChat?'independent-chat-full-goal':kind==='original'?'independent-original-acceptance':'boundary-tests';
  const candidates=jobs.jobs.filter(j=>j.run_id===id&&j.name===nameOfJob&&
   j.status==='completed'&&j.conclusion==='success'&&Array.isArray(j.steps));
  if(candidates.length!==1||required.some(step=>
@@ -111,7 +121,10 @@ Deno.serve(async req=>{
    return safe('GENERAL_POSTINSTALL_ISOLATED_PROJECT_UNVERIFIED',{},503);
   if(action==='{"version":1,"action":"verify_and_reconcile_owner_approved_maintenance_install"}')
    return await independentlyAcceptInstalledMaintenance(url.origin,key);
-  const context=await rpc(url.origin,key,'reality_read_general_original_postinstall_scope_v1');
+  const signedChat=await rpc(url.origin,key,'reality_read_signed_chat_install_scope_v1',{p_postinstall:true});
+  const context=signedChat.status==='GENERAL_POSTINSTALL_EXACT_ORIGINAL_PROVIDER_VERIFICATION_ELIGIBLE'?
+   signedChat:await rpc(url.origin,key,'reality_read_general_original_postinstall_scope_v1');
+  const isChat=chatScope(context);
   if(context.status==='GENERAL_POSTINSTALL_NO_INSTALLED_ORIGINAL'||
      context.status==='GENERAL_POSTINSTALL_OWNER_SHIFT_NOT_CURRENT')
    return safe(context.status);
@@ -125,9 +138,11 @@ Deno.serve(async req=>{
    !UUID.test(context.attempt_id||'')||
    !UUID.test(context.approval_receipt_id||'')||
    !UUID.test(context.shift_id||'')||
-   !BRANCH.test(context.target_branch||'')||
+   !(isChat?CHAT_BRANCH:BRANCH).test(context.target_branch||'')||
+   context.target_branch.includes('..')||context.target_branch.includes('//')||
    context.target_branch.startsWith('reality/riley/')||
-   !SOURCE.test(context.target_path||'')||
+   (isChat&&/^reality\/(chat-recovery|chat-development)\//.test(context.target_branch))||
+   !(isChat?CHAT_SOURCE:SOURCE).test(context.target_path||'')||
    !SHA.test(context.installed_commit_sha||'')||
    !SHA.test(context.installed_source_blob_sha||'')||
    !SHA.test(context.candidate_commit_sha||'')||
@@ -179,17 +194,24 @@ Deno.serve(async req=>{
   if(!Array.isArray(runList.workflow_runs))
    bad('EXACT_POSTINSTALL_ORIGINAL_CI_RUNS_UNAVAILABLE');
   const runs=runList.workflow_runs.filter(r=>
-   r.name===CI_NAME&&r.head_sha===installed&&
+   r.name===(isChat?CHAT_CI_NAME:CI_NAME)&&r.head_sha===installed&&
    r.head_branch===context.target_branch&&r.event==='push'&&
-   r.path?.split('@')[0]===CI_WORKFLOW&&
+   r.path?.split('@')[0]===(isChat?CHAT_WORKFLOW:CI_WORKFLOW)&&
    r.status==='completed'&&r.conclusion==='success');
   if(runs.length!==1||!Number.isSafeInteger(runs[0].id)||runs[0].id<=10000)
    return safe('GENERAL_POSTINSTALL_WAITING_INDEPENDENT_ORIGINAL_ACCEPTANCE',{
     original_work_id:context.original_work_id,
     installation_authorized:true,source_installed:true});
-  const original=await verifyRun(token,runs[0].id,installed,context.target_branch,'original');
+  const original=await verifyRun(token,runs[0].id,installed,context.target_branch,isChat?'chat-original':'original');
   const integrated=await verifyRun(token,context.integrated_test_run_id,
-    context.integrated_test_commit_sha,context.target_branch,'integration');
+    context.integrated_test_commit_sha,isChat?context.candidate_branch:context.target_branch,isChat?'chat-integration':'integration');
+  if(isChat){
+   const [workflow,suite,frozen]=await Promise.all([
+    source(token,CHAT_WORKFLOW,installed),source(token,CHAT_SUITE,installed),
+    verifyRun(token,context.frozen_candidate_run_id,context.candidate_commit_sha,context.candidate_branch,'chat-frozen')]);
+   if(workflow.blob!==context.workflow_blob_sha||suite.blob!==context.functional_suite_blob_sha||frozen.id===original.id||frozen.id===integrated.id)
+    bad('SIGNED_CHAT_FROZEN_GOAL_CONTRACT_OR_DISTINCT_PROVIDER_RUN_DRIFT');
+  }
   if(original.id===integrated.id||
      original.id===context.frozen_candidate_run_id||
      integrated.id===context.frozen_candidate_run_id)
@@ -206,10 +228,12 @@ Deno.serve(async req=>{
    vercel_status_id:matchingStatus[0].id,
    vercel_app_check_run_id:matchingCheck[0].id,
    vercel_app_id:matchingCheck[0].app.id,
-   production_changed:false};
+   production_changed:false,...(isChat?{workflow_blob_sha:context.workflow_blob_sha,
+    functional_suite_blob_sha:context.functional_suite_blob_sha,independent_functional_postinstall_verified:true}:{})};
   const digest='sha256:'+await sha('SHA-256',new TextEncoder().encode(
    JSON.stringify(evidence)));
-  const saved=await rpc(url.origin,key,'reality_record_general_original_independent_settlement_v1',{
+  const saved=isChat?await rpc(url.origin,key,'reality_record_signed_chat_goal_settlement_v1',{
+   p_attempt_id:context.attempt_id,p_proof:evidence}):await rpc(url.origin,key,'reality_record_general_original_independent_settlement_v1',{
     p_attempt_id:context.attempt_id,p_installed_commit_sha:installed,
     p_source_blob_sha:file.blob,p_original_acceptance_run_id:original.id,
     p_gateway_run_id:integrated.id,
@@ -225,7 +249,7 @@ Deno.serve(async req=>{
    saved.installed_commit_sha!==installed||
    saved.original_acceptance_run_id!==original.id||
    saved.vercel_deployment_status_id!==matchingStatus[0].id||
-   saved.final_receipt_sha256!==digest||
+   (isChat?!HASH.test(saved.final_receipt_sha256||''):saved.final_receipt_sha256!==digest)||
    !UUID.test(saved.final_receipt_id||'')||
    saved.original_job_completed!==true||
    saved.production_changed!==false||saved.roi_verified!==false||
@@ -238,6 +262,7 @@ Deno.serve(async req=>{
    original_acceptance_run_id:original.id,
    original_job_completed:true,
    roi_status:'NOT_MEASURED',
+   ...(isChat?{universe_outcome_event_id:saved.universe_outcome_event_id}:{}),
    no_third_confirmation:true});
  }catch(e){
   const raw=e instanceof Error?e.message:'';

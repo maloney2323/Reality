@@ -10,6 +10,13 @@ const WORK=/^work:[a-f0-9]{32}$/;
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const BRANCH=/^reality\/[a-zA-Z0-9/_-]{10,135}$/;
 const SOURCE=/^src\/[a-zA-Z0-9/_-]+\.js$/;
+const CHAT_SOURCE=/^(src\/|api\/reality\/)[a-zA-Z0-9/_-]+\.js$/;
+const CHAT_BRANCH=/^(repair|reality)\/[a-zA-Z0-9/_-]{10,135}$/;
+const chatScope=s=>s?.source_family==='SIGNED_CHAT_DEVELOPMENT_RECOVERY';
+function validTargetBranch(branch,signedChat=false){
+ return (signedChat?CHAT_BRANCH:BRANCH).test(branch||'')&&!branch.includes('..')&&!branch.includes('//')&&
+  !branch.startsWith('reality/riley/')&&(!signedChat||!/^reality\/(chat-recovery|chat-development)\//.test(branch));
+}
 const fail=s=>{throw Error('GENERAL_ORIGINAL_INSTALL_'+s)};
 // Diagnosable worker outcomes must never expose source bodies, credentials,
 // owner identity or arbitrary provider responses. All dispositions are finite
@@ -28,7 +35,9 @@ async function rpc(base,key,name,args={}){
  if(!['reality_read_general_original_install_scope_v1',
        'reality_claim_general_original_install_v1',
        'reality_record_general_original_installed_source_v1',
-       'reality_record_general_original_fenced_recovery_v1'].includes(name))
+       'reality_record_general_original_fenced_recovery_v1',
+       'reality_read_signed_chat_install_scope_v1','reality_claim_signed_chat_install_v1',
+       'reality_record_signed_chat_installed_source_v1','reality_record_signed_chat_install_fence_observation_v1'].includes(name))
   fail('RPC_NOT_ALLOWED');
  const r=await fetch(base+'/rest/v1/rpc/'+name,{
   method:'POST',cache:'no-store',redirect:'error',
@@ -74,7 +83,7 @@ function encode(bytes){
  return btoa(text);
 }
 async function checkedSource(token,path,ref){
- if(!SOURCE.test(path)||!SHA.test(ref))fail('SOURCE_PATH_OR_COMMIT_UNSAFE');
+ if(!CHAT_SOURCE.test(path)||path.includes('..')||path.includes('//')||!SHA.test(ref))fail('SOURCE_PATH_OR_COMMIT_UNSAFE');
  const r=await gh(token,'/contents/'+path+'?ref='+ref);
  const v=r.data;
  if(!r.ok||v?.path!==path||v?.encoding!=='base64'||
@@ -86,9 +95,8 @@ async function checkedSource(token,path,ref){
   fail('GITHUB_SOURCE_HASH_READBACK_MISMATCH');
  return {bytes,blob:v.sha,digest:'sha256:'+await digest('SHA-256',bytes)};
 }
-async function branchHead(token,branch){
- if(!BRANCH.test(branch)||branch.startsWith('reality/riley/')||
-  branch.includes('..')||branch.includes('//'))
+async function branchHead(token,branch,signedChat=false){
+ if(!validTargetBranch(branch,signedChat))
   fail('TARGET_NOT_CURRENT_ISOLATED_PREVIEW_BRANCH');
  const r=await gh(token,'/git/ref/heads/'+branch);
  if(!r.ok||r.data?.ref!=='refs/heads/'+branch||
@@ -101,9 +109,9 @@ function validScope(x){
   WORK.test(x.original_work_id||'')&&UUID.test(x.attempt_id||'')&&
   UUID.test(x.shift_id||'')&&UUID.test(x.owner_id||'')&&
   UUID.test(x.approval_receipt_id||'')&&
-  BRANCH.test(x.target_branch||'')&&
-  !x.target_branch.startsWith('reality/riley/')&&
-  SOURCE.test(x.target_path||'')&&SHA.test(x.candidate_commit_sha||'')&&
+  validTargetBranch(x.target_branch,chatScope(x))&&
+  (chatScope(x)?CHAT_SOURCE:SOURCE).test(x.target_path||'')&&SHA.test(x.candidate_commit_sha||'')&&
+  (!chatScope(x)||SHA.test(x.target_base_sha||''))&&
   SHA.test(x.expected_preinstall_blob_sha||'')&&
   SHA.test(x.expected_installed_blob_sha||'')&&
   HASH.test(x.candidate_artifact_sha256||'')&&
@@ -169,7 +177,7 @@ async function reconcile(token,base,key,scope,head){
     const evidenceSHA=await digest('SHA-256',
      new TextEncoder().encode(attested));
     const stored=await rpc(base,key,
-     'reality_record_general_original_fenced_recovery_v1',{
+     chatScope(scope)?'reality_record_signed_chat_install_fence_observation_v1':'reality_record_general_original_fenced_recovery_v1',{
       p_attempt_id:scope.attempt_id,p_observed_branch_head:head,
       p_evidence_sha256:evidenceSHA,p_finding:finding
      });
@@ -206,7 +214,7 @@ async function reconcile(token,base,key,scope,head){
   return safe('GENERAL_INSTALL_FENCED_EFFECT_UNCERTAIN_NO_SECOND_WRITE',{
    original_work_id:scope.original_work_id,installation_authorized:true,
    expected_parent_commit_sha:expected});
- const durable=await rpc(base,key,'reality_record_general_original_installed_source_v1',{
+ const durable=await rpc(base,key,chatScope(scope)?'reality_record_signed_chat_installed_source_v1':'reality_record_general_original_installed_source_v1',{
   p_attempt_id:scope.attempt_id,p_installed_commit_sha:head,
   p_source_blob_sha:source.blob});
  if(durable.status!=='GENERAL_ORIGINAL_EXACT_SOURCE_INSTALLED_AWAITING_INDEPENDENT_SETTLEMENT'||
@@ -242,7 +250,11 @@ Deno.serve(async req=>{
   const base=parsed.origin;
   if(action==='{"version":1,"action":"execute_previously_owner_approved_maintenance_install"}')
    return await installApprovedMaintenance(base,key);
-  const scope=await rpc(base,key,'reality_read_general_original_install_scope_v1');
+  // Same exact transport, typed source-family selector. A signed Chat
+  // original must not be manufactured as a legacy GitHub issue repair.
+  const signedChat=await rpc(base,key,'reality_read_signed_chat_install_scope_v1',{p_postinstall:false});
+  const scope=signedChat.status==='GENERAL_INSTALL_OWNER_APPROVED_SOURCE_SCOPE'?
+   signedChat:await rpc(base,key,'reality_read_general_original_install_scope_v1');
   if(scope.status==='GENERAL_INSTALL_AWAITING_EXACT_OWNER_APPROVAL'||
      scope.status==='GENERAL_INSTALL_AUTHORIZED_SHIFT_NOT_CURRENT')
    return safe(scope.status,{installation_authorized:false});
@@ -251,7 +263,7 @@ Deno.serve(async req=>{
   if(token.length<25)
    return safe('GENERAL_INSTALL_REAL_GITHUB_CREDENTIAL_NOT_VERIFIED',{
      original_work_id:scope.original_work_id,installation_authorized:true});
-  const head=await branchHead(token,scope.target_branch);
+  const head=await branchHead(token,scope.target_branch,chatScope(scope));
   if(scope.phase==='SOURCE_INSTALLED'||scope.phase==='DEPLOYMENT_VERIFIED')
    return safe('GENERAL_INSTALL_SOURCE_ALREADY_INSTALLED_POSTINSTALL_MONITORING',{
     original_work_id:scope.original_work_id,source_installed:true,
@@ -269,8 +281,8 @@ Deno.serve(async req=>{
     candidate.digest!==scope.candidate_artifact_sha256)
    return safe('GENERAL_INSTALL_CURRENT_SOURCE_OR_FROZEN_CANDIDATE_DRIFT',{
     original_work_id:scope.original_work_id,installation_authorized:true});
-  const claimed=await rpc(base,key,'reality_claim_general_original_install_v1',{
-   p_expected_head_sha:head});
+  const claimed=await rpc(base,key,chatScope(scope)?'reality_claim_signed_chat_install_v1':'reality_claim_general_original_install_v1',{
+   p_expected_head_sha:head,...(chatScope(scope)?{p_attempt_id:scope.attempt_id}:{})});
   if(claimed.status==='GENERAL_INSTALL_INTENT_ALREADY_FENCED_READBACK_ONLY')
    return safe(claimed.status,{original_work_id:scope.original_work_id,
     installation_authorized:true});
@@ -294,7 +306,7 @@ Deno.serve(async req=>{
   // Non-forced Git reference update is a provider-level CAS: if another
   // commit advances the branch, the prepared sibling source commit will NOT
   // replace it. There is no retry after any ambiguous provider effect.
-  if(await branchHead(token,scope.target_branch)!==head)
+  if(await branchHead(token,scope.target_branch,chatScope(scope))!==head)
    return safe('GENERAL_INSTALL_FENCED_PARENT_COMMIT_DRIFT_NO_WRITE',{
     original_work_id:scope.original_work_id,installation_authorized:true});
   const existingCommit=await gh(token,'/git/commits/'+head);
@@ -329,7 +341,7 @@ Deno.serve(async req=>{
   if(!published?.ok||published.data?.object?.sha!==commit.data.sha)
    return safe('GENERAL_INSTALL_FENCED_REF_UPDATE_NOT_VERIFIED_NO_RETRY',{
     original_work_id:scope.original_work_id,installation_authorized:true});
-  const finalHead=await branchHead(token,scope.target_branch);
+  const finalHead=await branchHead(token,scope.target_branch,chatScope(scope));
   if(finalHead!==commit.data.sha)
    return safe('GENERAL_INSTALL_FENCED_POSTWRITE_BRANCH_DRIFT_GET_ONLY',{
     original_work_id:scope.original_work_id,installation_authorized:true});
