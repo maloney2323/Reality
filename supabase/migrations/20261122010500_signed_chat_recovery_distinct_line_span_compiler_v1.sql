@@ -57,7 +57,12 @@ begin
   'rejection_receipt_sha256',rejection_sha,
   'bounded_model_corrections',1,
   'line_span_max_lines',81,
-  'source_size_max_bytes',26000,
+  'source_size_max_bytes',210000,
+  'source_excerpt_max_chars',36000,
+  'source_relevance_roots',pg_catalog.jsonb_build_array(
+   'api/reality/governed-employee-shift-worker.js',
+   'api/reality/generalized-original-install-review.js',
+   'api/reality/generalized-owner-install-approval.js'),
   'source_execution_authorized',false,
   'full_goal_accepted',false,
   'installation_authorized',false,
