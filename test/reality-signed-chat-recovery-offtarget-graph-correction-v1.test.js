@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {inspectPinnedSignedRecoverySourceRoots}
+import {inspectPinnedSignedRecoverySourceRoots,
+ independentlyReviewOneSignedChatRecoveryTarget}
  from '../src/reality-signed-chat-recovery-target-review-v1.js';
 import {verifyFrozenRecoveryCapabilityClaim}
  from '../src/reality-chat-new-development-worker-v1.js';
@@ -100,4 +101,26 @@ test('service-only guard and no publisher bypass',()=>{
  assert.match(broker,/s\.independent_target_review_verified===true/);
  assert.match(broker,/SIGNED_CHAT_RECOVERY_TARGET_REVIEWED/);
  assert.doesNotMatch(broker,/SIGNED_CHAT_RECOVERY_DRAFT_GENERATED/);
+});
+
+test('separate signed-review worker actually calls existing service RPC under valid preview boundary',async()=>{
+ const project='a'.repeat(20),runId='11111111-1111-4111-8111-111111111111';
+ const invoked=[];
+ const result=await independentlyReviewOneSignedChatRecoveryTarget({
+  db:{strictSecrets:true,project},
+  env:{VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project},
+  workerRunId:runId,
+  fetchImpl:async()=>{throw Error('No external network call needed for empty claim')},
+  callRpc:async(_db,name,payload)=>{
+   invoked.push({name,payload});
+   return {status:'NO_SIGNED_CHAT_RECOVERY_CANDIDATE_TARGET_REVIEW_READY',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false};
+  }
+ });
+ assert.deepEqual(invoked,[{
+  name:'reality_claim_next_signed_chat_recovery_target_review_v1',
+  payload:{p_worker_run_id:runId}
+ }]);
+ assert.equal(result.status,'NO_SIGNED_CHAT_RECOVERY_CANDIDATE_TARGET_REVIEW_READY');
 });
