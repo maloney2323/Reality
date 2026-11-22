@@ -59,6 +59,8 @@ import {reconcileRealityMixedShiftReceipts}
  from '../../src/reality-mixed-shift-receipts-v1.js';
 import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
+import {projectRealityFinalLoopExecutiveBrief}
+ from '../../src/reality-final-loop-executive-brief-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
 import {automaticallyQualifyVerifiedRepairOpportunity,
@@ -3100,6 +3102,15 @@ export default async function handler(req,res){
     };
    }
   }
+  // A single CEO-style overview of the same governed signed shift.
+  // It reads both the existing automatic supervisor and Final Loop
+  // temporal projection. No separate agent, job, warrant, or action.
+  const finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({
+   timeHorizon:finalLoopEngineShadow?.time_horizon||null,
+   supervisor:automaticWorkSupervisor?.status===
+    'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
+    automaticWorkSupervisor:null
+  });
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -3228,6 +3239,7 @@ export default async function handler(req,res){
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
     final_loop_engine_shadow:finalLoopEngineShadow,
+    final_loop_executive_brief:finalLoopExecutiveBrief,
     final_loop_evidence_checkpoint:finalLoopEvidenceCheckpoint,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
