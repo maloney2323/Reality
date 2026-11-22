@@ -9,6 +9,7 @@ on:
       - 'src/reality-final-loop-canonical-handoff-v1.js'
       - 'api/reality/personal-time-horizon.js'
       - 'reality-past-present-future-v1.js'
+      - 'src/reality-riley-authorized-pr-review-job-v1.js'
       - 'src/reality-final-loop-signed-worker-bridge-v1.js'
       - 'src/reality-governed-shift-boundary-v1.js'
       - 'api/reality/governed-employee-shift-worker.js'
@@ -18,6 +19,7 @@ on:
       - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
       - 'test/reality-final-loop-canonical-handoff-v1.test.js'
       - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
+      - 'test/reality-pr-source-readiness-final-loop-v1.test.js'
       - 'test/reality-final-loop-signed-worker-bridge-v1.test.js'
       - 'test/reality-final-loop-db-contract-v1.test.js'
       - 'sql/reality-final-loop-canonical-continuity-v1.sql'
@@ -32,6 +34,7 @@ on:
       - 'src/reality-final-loop-canonical-handoff-v1.js'
       - 'api/reality/personal-time-horizon.js'
       - 'reality-past-present-future-v1.js'
+      - 'src/reality-riley-authorized-pr-review-job-v1.js'
       - 'src/reality-final-loop-signed-worker-bridge-v1.js'
       - 'src/reality-governed-shift-boundary-v1.js'
       - 'api/reality/governed-employee-shift-worker.js'
@@ -41,6 +44,7 @@ on:
       - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
       - 'test/reality-final-loop-canonical-handoff-v1.test.js'
       - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
+      - 'test/reality-pr-source-readiness-final-loop-v1.test.js'
       - 'test/reality-final-loop-signed-worker-bridge-v1.test.js'
       - 'test/reality-final-loop-db-contract-v1.test.js'
       - 'sql/reality-final-loop-canonical-continuity-v1.sql'
@@ -66,6 +70,7 @@ jobs:
           node --check src/reality-final-loop-canonical-handoff-v1.js
           node --check api/reality/personal-time-horizon.js
           node --check reality-past-present-future-v1.js
+          node --check src/reality-riley-authorized-pr-review-job-v1.js
           node --check src/reality-final-loop-signed-worker-bridge-v1.js
           node --check src/reality-governed-shift-boundary-v1.js
           node --check api/reality/governed-employee-shift-worker.js
@@ -83,6 +88,7 @@ jobs:
           node --test test/reality-final-loop-owner-time-endpoint-v1.test.js
           node --test test/reality-final-loop-canonical-handoff-v1.test.js
           node --test test/reality-final-loop-cross-surface-continuity-v1.test.js
+          node --test test/reality-pr-source-readiness-final-loop-v1.test.js
           node --test test/reality-past-present-future-time-map-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-final-loop-db-contract-v1.test.js
