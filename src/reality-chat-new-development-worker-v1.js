@@ -57,6 +57,11 @@ async function askModel({apiKey,model,fetchImpl,claim,role,input,maxTokens}){
      type:'object',additionalProperties:false,
      properties:{path:{type:'string'},reason:{type:'string'}},
      required:['path','reason']
+    }:role.startsWith('patch_line')?{
+     type:'object',additionalProperties:false,
+     properties:{start_line:{type:'integer'},end_line:{type:'integer'},
+      replace:{type:'string'},reason:{type:'string'}},
+     required:['start_line','end_line','replace','reason']
     }:{
      type:'object',additionalProperties:false,
      properties:{find:{type:'string'},replace:{type:'string'},reason:{type:'string'}},
@@ -131,6 +136,27 @@ export function validateExactUniqueDevelopmentPatch(source,choice){
   return Object.freeze({ok:false,reason:'PROPOSED_SOURCE_BOUNDS_INVALID'});
  return Object.freeze({ok:true,reason:'EXACT_UNIQUE_FROZEN_PATCH_VERIFIED',
   proposed});
+}
+// A model can select a line span but NEVER supply the authoritative FIND.
+// Reality derives the actual bytes from a pinned GitHub source snapshot.
+export function deriveExactPatchFromFrozenLineSpan(source,choice){
+ if(typeof source!=='string'||!choice||Array.isArray(choice)||
+    typeof choice!=='object')
+  return Object.freeze({ok:false,reason:'FROZEN_LINE_SPAN_TYPED_SOURCE_REQUIRED'});
+ const lines=source.match(/[^\n]*\n|[^\n]+$/g)||[];
+ if(!Number.isSafeInteger(choice.start_line)||
+    !Number.isSafeInteger(choice.end_line)||
+    choice.start_line<1||choice.end_line<choice.start_line||
+    choice.end_line>lines.length||
+    choice.end_line-choice.start_line>80)
+  return Object.freeze({ok:false,reason:'FROZEN_LINE_SPAN_RANGE_INVALID'});
+ const find=lines.slice(choice.start_line-1,choice.end_line).join('');
+ const proposed={find,replace:choice.replace,reason:choice.reason};
+ const checked=validateExactUniqueDevelopmentPatch(source,proposed);
+ if(!checked.ok)return Object.freeze({ok:false,reason:checked.reason});
+ return Object.freeze({ok:true,reason:'FROZEN_LINE_SPAN_DETERMINISTICALLY_BOUND',
+  find,replace:choice.replace,source_reason:choice.reason,
+  proposed:checked.proposed});
 }
 function excerpt(src,instruction){
  if(src.length<=33000)return src;
@@ -217,7 +243,8 @@ export async function generateNextSignedChatDevelopmentDraft({
      tree.tree.length>20000)
    fail('SOURCE_TREE_INCOMPLETE');
   const candidates=tree.tree.filter(f=>f.type==='blob'&&allowPath(f.path)&&
-    SHA.test(f.sha||'')&&Number.isSafeInteger(f.size)&&f.size<=250000);
+    SHA.test(f.sha||'')&&Number.isSafeInteger(f.size)&&
+    f.size<=(recoveryMode?26000:250000));
   if(!candidates.length)fail('NO_ELIGIBLE_SOURCE_FILE');
   const w=words(claim.original_instruction+' '+claim.objective);
   const score=x=>[...w].reduce((n,a)=>n+(x.path.toLowerCase().includes(a)?4:0),0)+
@@ -250,7 +277,55 @@ export async function generateNextSignedChatDevelopmentDraft({
   if(Buffer.from(text,'utf8').length!==bytes.length||text.includes('\0'))
    fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');
   failure='MODEL_GENERATION_UNVERIFIED';
-  const instruction='One signed owner development request: '+claim.original_instruction+
+  let patch,checked;
+  if(recoveryMode){
+   // Different synthesis contract after two source-text rejections:
+   // only independently derived exact anchors, never free-form find text.
+   const lines=text.match(/[^\n]*\n|[^\n]+$/g)||[];
+   const numbered=lines.map((line,i)=>String(i+1).padStart(4,'0')+'| '+line).join('');
+   if(lines.length<5||numbered.length>41000)
+    fail('MODEL_FROZEN_LINE_NUMBERED_SOURCE_BOUNDS_INVALID');
+   const instruction='Signed original recovery capability: '+claim.objective+
+     '\nExact source file: '+path+'\nFrozen commit: '+claim.release_sha+
+     '\nChoose a coherent, source-backed contiguous range of 1 to 81 '+
+     'line-numbered source lines to REPLACE with a bounded implementation. '+
+     'The output START_LINE and END_LINE must be exact integer line numbers '+
+     'from the labelled provider source below. NEVER output a copied find '+
+     'string; Reality independently derives the find bytes. '+
+     'Return JSON {start_line,end_line,replace,reason} only; '+
+     'no tool invocation, install, approval or completion claim. '+
+     'Existing source follows:\n'+numbered;
+   let raw=await askModel({
+    apiKey,model,fetchImpl,claim,role:'patch_line',maxTokens:4400,
+    input:instruction
+   });
+   let derived=deriveExactPatchFromFrozenLineSpan(text,raw.choice);
+   if(!derived.ok){
+    const badFingerprint=createHash('sha256').update(
+     JSON.stringify(raw.choice)).digest('hex');
+    const revised=await askModel({
+     apiKey,model,fetchImpl,claim,role:'patch_line_correction',maxTokens:4400,
+     input:'The independent frozen-line verifier rejected your first proposal: '+
+      derived.reason+'. This is the ONE permitted correction. Choose a NEW '+
+      'existing unique line span. Do not repeat prior attempt fingerprint '+
+      badFingerprint+'. Preserve original, commit, source bytes and authority.\n'+
+      instruction
+    });
+    if(createHash('sha256').update(JSON.stringify(revised.choice))
+       .digest('hex')===badFingerprint)
+     fail('MODEL_REPEATED_INVALID_LINE_SPAN');
+    raw=revised;
+    derived=deriveExactPatchFromFrozenLineSpan(text,raw.choice);
+   }
+   if(!derived.ok)
+    fail('MODEL_FROZEN_LINE_SPAN_INVALID');
+   patch={reply:raw.reply,choice:{
+    find:derived.find,replace:derived.replace,
+    reason:derived.source_reason}};
+   checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
+  }else{
+   const instruction='One signed owner development request: '+
+    claim.original_instruction+
     '\nObjective: '+claim.objective+
     '\nExact source path: '+path+
     '\nBase commit: '+claim.release_sha+
@@ -259,33 +334,10 @@ export async function generateNextSignedChatDevelopmentDraft({
     'safe code. The find block must appear exactly once in the original. '+
     'Do not claim tests passed. No installation.\n'+
     excerpt(text,claim.original_instruction);
-  let patch=await askModel({
-   apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
-   input:instruction
-  });
-  let checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
-  if(!checked.ok&&recoveryMode){
-   // ONE bounded corrective synthesis using deterministic source feedback.
-   // Never fuzzily apply the failed find, silently relax invariants or
-   // allow the model to approve its own output.
-   const rejectedHash=createHash('sha256').update(
-    JSON.stringify(patch.choice)).digest('hex');
-   const repaired=await askModel({
-    apiKey,model,fetchImpl,claim,role:'patch_correction',maxTokens:4400,
-    input:'Independent source verifier rejected the previous model patch: '+
-      checked.reason+'. Preserve the SAME job, file and base commit. '+
-      'Generate a NEW bounded patch whose FIND text is copied exactly, '+
-      'byte-for-byte, from the frozen source; never paraphrase, truncate '+
-      'or match more than one occurrence. Return changed code only as JSON '+
-      'find/replace/reason; no installs or authority. '+
-      'Rejected candidate fingerprint (DO NOT repeat): '+rejectedHash+
-      '\n'+instruction
+   patch=await askModel({
+    apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
+    input:instruction
    });
-   const repairedHash=createHash('sha256').update(
-    JSON.stringify(repaired.choice)).digest('hex');
-   if(repairedHash===rejectedHash)
-    fail('MODEL_REPEATED_INVALID_PATCH');
-   patch=repaired;
    checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
   }
   if(!checked.ok)
