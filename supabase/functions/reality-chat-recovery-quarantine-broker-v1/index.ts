@@ -66,8 +66,10 @@ function valid(s){
   HASH.test(s.spec_sha256||'')&&
   /^[a-f0-9]{64}$/.test(s.source_sha256||'')&&
   s.source_ref==='supabase:reality_chat_messages:'+s.message_id&&
-  ['SIGNED_CHAT_RECOVERY_DRAFT_GENERATED',
+  ['SIGNED_CHAT_RECOVERY_TARGET_REVIEWED',
    'SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'].includes(s.phase)&&
+  HASH.test(s.target_review_receipt_sha256||'')&&
+  s.independent_target_review_verified===true&&
   SHA.test(s.release_sha||'')&&
   s.installation_authorized===false&&s.original_job_completed===false&&
   s.production_changed===false&&s.new_shift_started===false&&
@@ -99,6 +101,8 @@ const evidence=s=>JSON.stringify({
  signed_source_ref:s.source_ref,source_sha256:s.source_sha256,
  blocker_receipt_sha256:s.blocker_receipt_sha256,
  recovery_spec_sha256:s.spec_sha256,
+ independent_target_review_verified:true,
+ target_review_receipt_sha256:s.target_review_receipt_sha256,
  candidate_sha256:s.candidate.candidate_sha256,
  source_base_commit_sha:s.release_sha,
  candidate:s.candidate,source_installed:false,
