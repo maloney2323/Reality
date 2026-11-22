@@ -113,6 +113,25 @@ function checkClaim(c,db,env,recoveryMode=false){
   fail('SIGNED_ORIGINAL_SOURCE_IDENTITY_UNVERIFIED');
  return true;
 }
+export function validateExactUniqueDevelopmentPatch(source,choice){
+ if(typeof source!=='string'||!choice||Array.isArray(choice)||
+  typeof choice!=='object')return Object.freeze({ok:false,reason:'PATCH_TYPED_SOURCE_INVALID'});
+ const {find,replace,reason}=choice;
+ if(typeof find!=='string'||find.length<20||find.length>12000||
+    typeof replace!=='string'||replace.length<20||replace.length>16000||
+    typeof reason!=='string'||reason.length<10||reason.length>1800||
+    find===replace||find.includes('\0')||replace.includes('\0'))
+  return Object.freeze({ok:false,reason:'PATCH_SHAPE_OR_BOUNDS_INVALID'});
+ const at=source.indexOf(find);
+ if(at<0)return Object.freeze({ok:false,reason:'FIND_NOT_EXACT_IN_FROZEN_SOURCE'});
+ if(source.indexOf(find,at+1)!==-1)
+  return Object.freeze({ok:false,reason:'FIND_NOT_UNIQUE_IN_FROZEN_SOURCE'});
+ const proposed=source.slice(0,at)+replace+source.slice(at+find.length);
+ if(proposed===source||Buffer.byteLength(proposed)>280000)
+  return Object.freeze({ok:false,reason:'PROPOSED_SOURCE_BOUNDS_INVALID'});
+ return Object.freeze({ok:true,reason:'EXACT_UNIQUE_FROZEN_PATCH_VERIFIED',
+  proposed});
+}
 function excerpt(src,instruction){
  if(src.length<=33000)return src;
  const w=words(instruction);
@@ -228,29 +247,51 @@ export async function generateNextSignedChatDevelopmentDraft({
   if(bytes.length!==source.size||blobSHA(bytes)!==source.sha)
    fail('MODEL_SOURCE_GIT_BLOB_BYTES_INVALID');
   const text=bytes.toString('utf8');
+  if(Buffer.from(text,'utf8').length!==bytes.length||text.includes('\0'))
+   fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');
   failure='MODEL_GENERATION_UNVERIFIED';
-  const patch=await askModel({
-   apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
-   input:'One signed owner development request: '+claim.original_instruction+
+  const instruction='One signed owner development request: '+claim.original_instruction+
     '\nObjective: '+claim.objective+
     '\nExact source path: '+path+
     '\nBase commit: '+claim.release_sha+
     '\nRepository source below (may be excerpted). '+
     'Copy ONE exact, unique, contiguous find block and replace it with '+
-    'safe code. The find block must appear once in the original. '+
+    'safe code. The find block must appear exactly once in the original. '+
     'Do not claim tests passed. No installation.\n'+
-    excerpt(text,claim.original_instruction)
+    excerpt(text,claim.original_instruction);
+  let patch=await askModel({
+   apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
+   input:instruction
   });
-  const {find,replace,reason}=patch.choice;
-  if(typeof find!=='string'||find.length<20||find.length>12000||
-     typeof replace!=='string'||replace.length<20||replace.length>16000||
-     typeof reason!=='string'||reason.length<10||reason.length>1800||
-     find===replace||text.indexOf(find)<0||
-     text.indexOf(find)!==text.lastIndexOf(find))
+  let checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
+  if(!checked.ok&&recoveryMode){
+   // ONE bounded corrective synthesis using deterministic source feedback.
+   // Never fuzzily apply the failed find, silently relax invariants or
+   // allow the model to approve its own output.
+   const rejectedHash=createHash('sha256').update(
+    JSON.stringify(patch.choice)).digest('hex');
+   const repaired=await askModel({
+    apiKey,model,fetchImpl,claim,role:'patch_correction',maxTokens:4400,
+    input:'Independent source verifier rejected the previous model patch: '+
+      checked.reason+'. Preserve the SAME job, file and base commit. '+
+      'Generate a NEW bounded patch whose FIND text is copied exactly, '+
+      'byte-for-byte, from the frozen source; never paraphrase, truncate '+
+      'or match more than one occurrence. Return changed code only as JSON '+
+      'find/replace/reason; no installs or authority. '+
+      'Rejected candidate fingerprint (DO NOT repeat): '+rejectedHash+
+      '\n'+instruction
+   });
+   const repairedHash=createHash('sha256').update(
+    JSON.stringify(repaired.choice)).digest('hex');
+   if(repairedHash===rejectedHash)
+    fail('MODEL_REPEATED_INVALID_PATCH');
+   patch=repaired;
+   checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
+  }
+  if(!checked.ok)
    fail('MODEL_BOUNDED_UNIQUE_CODE_CHANGE_NOT_VERIFIED');
-  const proposed=text.replace(find,replace);
-  if(proposed===text||Buffer.byteLength(proposed)>280000)
-   fail('MODEL_PROPOSED_CODE_INVALID');
+  const {find,replace,reason}=patch.choice;
+  const proposed=checked.proposed;
   failure='MODEL_DRAFT_PERSISTENCE_UNVERIFIED';
   const recorded=await callRpc(db,
    recoveryMode?'reality_record_signed_chat_recovery_draft_v1':
