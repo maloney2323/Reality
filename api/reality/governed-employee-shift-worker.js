@@ -121,6 +121,8 @@ import {advanceOneScheduledCapabilityInquiry}
  from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
 import {investigateOneSignedShiftContinuityIncident,classifySignedContinuityClaimTransportError}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
+import {qualifyVerifiedInvestigationRemediation}
+ from '../../src/reality-shift-investigation-remediation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
 import {admitOneSignedScheduledEvidenceJob}
@@ -418,6 +420,19 @@ export default async function handler(req,res){
      execution_authorized:false,installation_authorized:false,
      original_job_completed:false,production_changed:false})):
     {status:'NO_CURRENT_SIGNED_CHAT_REVIEW_INCIDENT_SCOPE',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
+  // An exhausted investigation is not restarted. A distinct signed wake may
+  // qualify only an independently tested, current-release correction.
+  workerStage='SIGNED_SHIFT_INVESTIGATION_REMEDIATION_QUALIFICATION';
+  const shiftInvestigationRemediation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await qualifyVerifiedInvestigationRemediation({db,env:process.env,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_SHIFT_INVESTIGATION_REMEDIATION_UNVERIFIED',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_CURRENT_SIGNED_SHIFT_REMEDIATION_SCOPE',
      execution_authorized:false,installation_authorized:false,
      original_job_completed:false,production_changed:false};
   workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
@@ -3000,6 +3015,7 @@ export default async function handler(req,res){
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
     signed_chat_review_incident_observation:signedChatReviewIncidentObservation,
+    shift_investigation_remediation:shiftInvestigationRemediation,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_continuity_recovery_action:signedContinuityRecoveryAction,
     signed_continuity_recovery_verification:signedContinuityRecoveryVerification,
