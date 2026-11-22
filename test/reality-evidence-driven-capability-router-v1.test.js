@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {planGovernedCapabilitiesFromOwnerReceipts,
- invokeOneRegisteredSignedCapability}
+ planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability}
  from '../src/reality-evidence-driven-capability-router-v1.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const shift='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
@@ -211,4 +211,113 @@ test('worker binds registered CI dispatch to independently re-read signed graph 
  assert.doesNotMatch(ci,/graph:\s*unifiedGraph\b/);
  assert.ok(source.indexOf('const unifiedGraph=')>end,
   'later broad employee execution graph must not be used during CI dispatch');
+});
+
+
+test('existing categorized incident routes to registered action type without granting execution',()=>{
+ const i='cccccccc-cccc-4ccc-cccc-cccccccccccc';
+ const item={
+  incident_id:i,shift_id:shift,kind:'SIGNED_SHIFT_REPEATED_NO_PROGRESS',
+  incident_phase:'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
+  continuity_state:'DIAGNOSIS_RECORDED_CORRECTIVE_ACTION_UNVERIFIED',
+  investigation_receipt_sha256:HASH,
+  proposed_action:'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
+  blocker_class:'MISSING_SOURCE_EVIDENCE',
+  governed_action_receipt_sha256:null,
+  original_job_completed:false,execution_permitted_by_classification:false,
+  owner_approval_granted_by_classification:false,
+  repair_verified_by_classification:false
+ };
+ const classified={
+  schema:'reality-governed-continuity-recovery-handoff-v1',
+  owner_id:owner,shift_id:shift,
+  status:'GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED',
+  read_only:true,classification_only:true,action_dispatched:false,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,items:[item],count:1
+ };
+ const plan=planCategorizedContinuityRecovery({
+  classification:classified,ownerId:owner,shiftId:shift,
+  registeredActionKeys:['REQUALIFY_EXISTING_CONTINUITY_SOURCE']});
+ assert.equal(plan.status,'CONTINUITY_REGISTERED_ACTION_ROUTES_CLASSIFIED');
+ assert.equal(plan.ready_for_registered_handler_count,1);
+ assert.equal(plan.items[0].route,'REGISTERED_HANDLER_REQUIRES_SIGNED_CLAIM');
+ assert.equal(plan.items[0].next_governed_action,
+  'RECHECK_OWNER_SHIFT_WARRANT_AND_CLAIM_EXACT_INCIDENT');
+ assert.equal(plan.action_dispatched,false);
+ assert.equal(plan.original_job_completed,false);
+ const missing=planCategorizedContinuityRecovery({
+  classification:classified,ownerId:owner,shiftId:shift,
+  registeredActionKeys:[]});
+ assert.equal(missing.items[0].route,'REGISTERED_HANDLER_MISSING');
+ assert.equal(missing.missing_registered_handler_count,1);
+});
+
+test('provider authority deficit must be independently proved, not executed by categorizer',()=>{
+ const i='cccccccc-cccc-4ccc-cccc-cccccccccccc';
+ const item={
+  incident_id:i,shift_id:shift,kind:'SIGNED_GOVERNED_TRANSITION_STALLED',
+  incident_phase:'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
+  continuity_state:'DIAGNOSIS_RECORDED_CORRECTIVE_ACTION_UNVERIFIED',
+  investigation_receipt_sha256:HASH,
+  proposed_action:'REQUEST_EXACT_OWNER_APPROVAL',
+  blocker_class:'MISSING_OWNER_AUTHORITY',
+  governed_action_receipt_sha256:null,
+  original_job_completed:false,execution_permitted_by_classification:false,
+  owner_approval_granted_by_classification:false,
+  repair_verified_by_classification:false
+ };
+ const classified={
+  schema:'reality-governed-continuity-recovery-handoff-v1',
+  owner_id:owner,shift_id:shift,
+  status:'GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED',
+  read_only:true,classification_only:true,action_dispatched:false,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,items:[item],count:1
+ };
+ const plan=planCategorizedContinuityRecovery({
+  classification:classified,ownerId:owner,shiftId:shift,
+  registeredActionKeys:['REQUEST_EXACT_OWNER_APPROVAL']});
+ assert.equal(plan.items[0].route,'INDEPENDENT_PROVIDER_AUTHORITY_PROOF_REQUIRED');
+ assert.equal(plan.provider_authority_proof_count,1);
+ assert.equal(plan.ready_for_registered_handler_count,0);
+ assert.equal(plan.owner_approval_granted,false);
+ assert.equal(plan.action_dispatched,false);
+ const forged=planCategorizedContinuityRecovery({
+  classification:{...classified,installation_authorized:true},
+  ownerId:owner,shiftId:shift,
+  registeredActionKeys:['REQUEST_EXACT_OWNER_APPROVAL']});
+ assert.equal(forged.status,
+  'CONTINUITY_REGISTERED_ROUTE_INDEPENDENT_READBACK_REQUIRED');
+});
+
+test('registered route never double executes reviewed or settled original work',()=>{
+ const i='cccccccc-cccc-4ccc-cccc-cccccccccccc';
+ const state={
+  incident_id:i,shift_id:shift,kind:'DURABLE_PROVIDER_FAILURE',
+  incident_phase:'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
+  continuity_state:'GOVERNED_ACTION_INDEPENDENTLY_REVIEWED_ORIGINAL_UNSETTLED',
+  investigation_receipt_sha256:HASH,
+  proposed_action:'RECONCILE_PROVIDER_EFFECT_WITHOUT_REPLAY',
+  blocker_class:'PROVIDER_EFFECT_UNKNOWN',
+  governed_action_receipt_sha256:HASH,
+  independent_action_review_receipt_sha256:HASH,
+  original_job_completed:false,execution_permitted_by_classification:false,
+  owner_approval_granted_by_classification:false,
+  repair_verified_by_classification:false
+ };
+ const classified={
+  schema:'reality-governed-continuity-recovery-handoff-v1',
+  owner_id:owner,shift_id:shift,
+  status:'GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED',
+  read_only:true,classification_only:true,action_dispatched:false,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,items:[state],count:1
+ };
+ const plan=planCategorizedContinuityRecovery({
+  classification:classified,ownerId:owner,shiftId:shift,
+  registeredActionKeys:['RECONCILE_PROVIDER_EFFECT_WITHOUT_REPLAY']});
+ assert.equal(plan.items[0].route,'EXACT_ORIGINAL_REENTRY_GATE_REQUIRED');
+ assert.equal(plan.ready_for_registered_handler_count,0);
+ assert.equal(plan.action_dispatched,false);
 });
