@@ -10,6 +10,8 @@ import {independentlyReviewOneStagedMaintenanceRegression,
  from '../../src/reality-signed-maintenance-external-review-v1.js';
 import {attestOneSignedMaintenanceCiSourceEpoch}
  from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
+import {advanceInvestigatedSignedModelRejection}
+ from '../../src/reality-signed-model-rejection-reentry-v1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback,
  isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
@@ -453,6 +455,15 @@ export default async function handler(req,res){
     {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
      new_original_jobs_created:0,execution_authorized:false,
      installation_authorized:false,production_changed:false};
+  // An independently investigated rejected model proposal is unfinished work,
+  // not a terminal state. Preserve its original and all negative receipts;
+  // only current-source CI after the failure may re-enter the same spec.
+  workerStage='SIGNED_MODEL_REJECTION_CONTINUITY_REENTRY';
+  const signedModelRejectionReentry=wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await advanceInvestigatedSignedModelRejection({db,env:process.env,
+    shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+   }):{status:'NO_CURRENT_SIGNED_MODEL_REJECTION_REENTRY_SCOPE',
+    installation_authorized:false,original_job_completed:false,production_changed:false};
   // An exact signed model decision invokes ONLY an installed governed route.
   // A different signed worker later independently rechecks its actual effect.
   workerStage='SIGNED_CONTINUITY_RECOVERY_INDEPENDENT_RECHECK';
@@ -1552,7 +1563,13 @@ export default async function handler(req,res){
     signedRecoveryReviewRecovery.failure_receipt_sha256||'')&&
    signedRecoveryReviewRecovery.installation_authorized===false&&
    signedRecoveryReviewRecovery.original_job_completed===false;
-  const newDevelopmentAdvanced=recoveryReviewRetryProgress||
+  const signedModelRejectionReentryProgress=
+   signedModelRejectionReentry.status==='SIGNED_MODEL_REJECTION_INDEPENDENTLY_QUALIFIED_SAME_ORIGINAL_REENTERED'&&
+   /^work:[a-f0-9]{32}$/.test(signedModelRejectionReentry.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(signedModelRejectionReentry.ci_receipt_sha256||'')&&
+   signedModelRejectionReentry.installation_authorized===false&&
+   signedModelRejectionReentry.original_job_completed===false;
+  const newDevelopmentAdvanced=signedModelRejectionReentryProgress||recoveryReviewRetryProgress||
    recoverySourceProgress||
    recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
    recoveryStrategyProgress||recoveryReviewProgress||goalGapRecorded||
@@ -1564,7 +1581,8 @@ export default async function handler(req,res){
   if(newDevelopmentAdvanced){
    chatNewDevelopmentCheckpoint={
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
-    development_result:recoverySourceProgress?signedRecoveryQuarantine:
+    development_result:signedModelRejectionReentryProgress?signedModelRejectionReentry:
+     recoverySourceProgress?signedRecoveryQuarantine:
      recoveryReviewRetryProgress?signedRecoveryReviewRecovery:
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
@@ -3051,6 +3069,7 @@ export default async function handler(req,res){
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
     signed_chat_review_incident_observation:signedChatReviewIncidentObservation,
+    signed_chat_model_rejection_reentry:signedModelRejectionReentry,
     shift_investigation_remediation:shiftInvestigationRemediation,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_continuity_recovery_action:signedContinuityRecoveryAction,
