@@ -29,6 +29,44 @@ const stable=x=>Array.isArray(x)?x.map(stable):
    .map(([k,v])=>[k,stable(v)])):x;
 const seal=x=>'sha256:'+createHash('sha256')
  .update(JSON.stringify(stable(x))).digest('hex');
+// The SAME missing-acceptance policy is used by the signed worker and owner
+// view. Unadmitted sources cannot be mistaken for executable originals.
+export function derivePendingFinalLoopSourceDecisions(proof){
+ if(proof?.status!==
+     'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'||
+    !Array.isArray(proof.jobs)||proof.jobs.length<1||
+    proof.jobs.length>4)
+  return null;
+ const sources=new Set(),works=new Set(),decisions=[];
+ for(const item of proof.jobs){
+  if(!REF.test(item?.source_ref||'')||sources.has(item.source_ref)||
+     (item.original_work_id!==null&&
+      (!WORK.test(item.original_work_id||'')||
+       works.has(item.original_work_id)))||
+     !HASH.test(item.source_proof_sha256||'')||
+     item.original_acceptance_verified!==false||
+     item.authority_proof_verified!==false||
+     item.capacity_proof_verified!==false||
+     item.final_outcome_verified!==false||
+     item.settlement_eligible!==false)
+   return null;
+  sources.add(item.source_ref);
+  if(item.original_work_id!==null)works.add(item.original_work_id);
+  const notAdmitted=item.original_work_id===null;
+  decisions.push(Object.freeze({
+   original_work_id:item.original_work_id,
+   source_ref:item.source_ref,
+   decision:notAdmitted?'SUSPEND':'REFRESH',
+   next_governed_action:notAdmitted?
+    'QUALIFY_DISTINCT_SOURCE_TO_ORIGINAL_BEFORE_ACCEPTANCE':
+    'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS',
+   reason:notAdmitted?'SOURCE_NOT_ADMITTED_AS_ORIGINAL_WORK':
+    'CUSTOMER_ORIGINAL_ACCEPTANCE_NOT_INDEPENDENTLY_PROVEN',
+   transition_committed:false
+  }));
+ }
+ return Object.freeze(decisions);
+}
 export function verifyFinalLoopCanonicalContinuityHandoff({
  proof,expectedOwnerId,expectedShiftId,expectedPlanFingerprint,
  sourceGraph=null,timeHorizon=null,executive=null,
@@ -65,6 +103,10 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
     Date.parse(proof.observed_at)>now+300000||
     now-Date.parse(proof.observed_at)>300000)
   return fail('CANONICAL_HANDOFF_SCOPE_OR_REQUIRED_PROOFS_MISSING');
+ const canonicalDecisions=derivePendingFinalLoopSourceDecisions(proof);
+ if(canonicalDecisions===null)
+  return fail('CANONICAL_HANDOFF_MISSING_ORIGINAL_ADMISSION_POLICY');
+ const decisionBySource=new Map(canonicalDecisions.map(d=>[d.source_ref,d]));
  const bySource=new Map(),usedWork=new Set();
  for(const j of proof.jobs){
   if(!REF.test(j?.source_ref||'')||
@@ -126,13 +168,17 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
    const j=bySource.get(o?.source_ref);
    const f=timeHorizon.future.preparations.find(x=>
     x.source_ref===o?.source_ref);
-   if(!j||!f||o.original_work_id!==j.original_work_id||
-      o.decision!=='REFRESH'||
+   const expected=decisionBySource.get(o?.source_ref);
+   if(!j||!f||!expected||
+      o.original_work_id!==j.original_work_id||
+      o.decision!==expected.decision||
+      o.reason!==expected.reason||
+      o.next_governed_action!==expected.next_governed_action||
       o.settlement_committed!==false||
       o.action_executed!==false||
       f.original_work_id!==j.original_work_id||
-      f.basis_decision!=='REFRESH'||
-      f.proposed_next_action!==o.next_governed_action||
+      f.basis_decision!==expected.decision||
+      f.proposed_next_action!==expected.next_governed_action||
       f.automatically_executable!==false||
       f.expected_outcome_verified!==false)
     return fail('CANONICAL_HANDOFF_FUTURE_OR_ORIGINAL_DECISION_DRIFT');
@@ -150,8 +196,11 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
      executive.priority_items.length!==bySource.size||
      executive.priority_items.some(p=>{
       const j=bySource.get(p.source_ref);
-      return !j||p.original_work_id!==j.original_work_id||
-       p.engine_decision!=='REFRESH'||
+      const expected=decisionBySource.get(p.source_ref);
+      return !j||!expected||
+       p.original_work_id!==j.original_work_id||
+       p.engine_decision!==expected.decision||
+       p.required_next_evidence_action!==expected.next_governed_action||
        p.execution_authorized!==false||
        p.approval_granted!==false;
      }))
