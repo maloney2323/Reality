@@ -250,6 +250,28 @@ export function evaluateRealityFinalLoopEngine({
   // never an independently completed customer original.
   const o=p.outcome;
   if(o?.status==='INDEPENDENT_FINAL_VERIFIED'){
+   // A final verifier receipt cannot launder a missing authority or
+   // capacity proof into a settled original. All four gates must be true
+   // against the SAME frozen acceptance even on a reconciliation wake.
+   const a=p.authority,c=p.capacity;
+   if(a?.status!=='EXACT_WARRANT_VERIFIED'||
+      a.owner_id!==view.owner_id||
+      a.original_work_id!==item.original_work_id||
+      a.acceptance_contract_sha256!==ledger.acceptance_contract_sha256||
+      a.independently_verified!==true||!digest(a.receipt_sha256)||
+      !uniqueEffects(a.permitted_effects)||
+      !uniqueEffects(a.requested_effects)||
+      a.requested_effects.some(x=>!a.permitted_effects.includes(x)))
+    return makeLoopDecision(item,'SUSPEND',
+     'RECHECK_FROZEN_ORIGINAL_AUTHORITY_BEFORE_SETTLEMENT',
+     'FINAL_RECEIPT_CANNOT_SUBSTITUTE_FOR_AUTHORITY_PROOF');
+   if(c?.status!=='SIGNED_WORKER_HANDLER_ATTESTED'||
+      c.independently_attested!==true||
+      !digest(c.receipt_sha256)||
+      c.scheduled_worker_observed!==true)
+    return makeLoopDecision(item,'SUSPEND',
+     'RECHECK_INDEPENDENT_EXECUTION_CAPACITY_BEFORE_SETTLEMENT',
+     'FINAL_RECEIPT_CANNOT_SUBSTITUTE_FOR_CAPACITY_PROOF');
    if(o.verifier_independent!==true||
     o.original_work_id!==item.original_work_id||
     o.acceptance_contract_sha256!==ledger.acceptance_contract_sha256||
