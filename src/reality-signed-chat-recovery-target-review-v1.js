@@ -179,11 +179,32 @@ export async function independentlyReviewOneSignedChatRecoveryTarget({
    dependency_only:true
   });
  }catch(e){
-  // This reviewer runs on a different signed wake than source generation.
-  // Unknown read effects never grant source publication or authority.
+  // Source may be unreachable or the protected DB receipt may be uncertain.
+  // Record the exact class under this leased signed worker rather than
+  // abandoning the original in an invisible CLAIMED state. The database
+  // independently fences retries to at most one additional signed wake.
+  const raw=String(e?.message||'');
+  const normalized=raw.startsWith('SIGNED_CHAT_RECOVERY_TARGET_')?
+   raw.slice('SIGNED_CHAT_RECOVERY_TARGET_'.length):'PROVIDER_OR_SOURCE_READ_UNVERIFIED';
+  const failureCode=/^[A-Z][A-Z0-9_]{5,95}$/.test(normalized)?
+   normalized:'PROVIDER_OR_SOURCE_READ_UNVERIFIED';
+  let observed=null;
+  try{
+   observed=await callRpc(db,
+    'reality_record_signed_chat_recovery_target_review_failure_v1',{
+     p_trigger_id:scope.trigger_id,p_review_id:scope.review_id,
+     p_worker_run_id:workerRunId,p_failure_code:failureCode
+    },{fetchImpl});
+  }catch{
+   // Unknown database writes stay unreplayed. The next signed worker only
+   // reconciles AFTER the current lease expires, with source proof.
+  }
   return safe('SIGNED_CHAT_RECOVERY_TARGET_PROVIDER_READBACK_UNVERIFIED',{
    original_work_id:scope.original_work_id,
-   blocker_code:String(e?.message||'').slice(0,120)
+   blocker_code:failureCode,
+   ...(observed&&/^sha256:[a-f0-9]{64}$/.test(
+    observed.failure_receipt_sha256||'')?{
+     durable_failure_receipt_sha256:observed.failure_receipt_sha256}: {})
   });
  }
 }
