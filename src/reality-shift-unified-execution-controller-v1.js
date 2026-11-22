@@ -134,3 +134,188 @@ export function assertRealityUnifiedShiftGraph(graph,{expectedShiftId=null}={}){
   installation_authorized:false,
   production_changed:false});
 }
+
+// Final Loop Engine v1: authoritative *decision policy* attached to the
+// EXISTING unified shift controller. The service-role Continuity ledger must
+// still atomically reserve/commit each proposed transition. This policy is
+// never itself an execution warrant, persistence adapter, or final verifier.
+export const REALITY_FINAL_LOOP_ENGINE_VERSION='reality-final-loop-engine-v1';
+const LOOP_CHOICES=Object.freeze(['ADVANCE','RECOVER','REFRESH','SUSPEND','SETTLE']);
+const LOOP_EFFECTS=new Set(['READ','PREPARE','WRITE_ISOLATED','EXTERNAL_EFFECT','INSTALL_PREVIEW']);
+const asTime=x=>typeof x==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(x)?
+ Date.parse(x):NaN;
+const digest=x=>SHA.test(x||'');
+const uniqueEffects=xs=>Array.isArray(xs)&&xs.length<=LOOP_EFFECTS.size&&
+ xs.every(x=>LOOP_EFFECTS.has(x))&&new Set(xs).size===xs.length;
+const makeLoopDecision=(item,choice,next,reason,detail={})=>Object.freeze({
+ original_work_id:item.original_work_id||null,source_ref:item.source_ref,
+ decision:choice,next_governed_action:next,reason,...detail,
+ // No status or model output can grant these effects.
+ transition_committed:false,atomic_service_transition_required:true,
+ executor_invoked:false,execution_authorized_by_engine:false,
+ new_authority_granted:false,retry_external_effects_authorized:false,
+ installation_authorized:false,independent_settlement_committed:false,
+ original_job_completed:false,production_changed:false
+});
+const loopEnvelope=(view,ledger,decisions,status)=>Object.freeze({
+ schema:REALITY_FINAL_LOOP_ENGINE_VERSION,status,
+ owner_id:view.owner_id,shift_id:view.shift_id,
+ plan_fingerprint:view.plan_fingerprint,
+ continuity_root_id:ledger?.continuity_root_id||null,
+ continuity_head_sha256:ledger?.head_sha256||null,
+ decisions:Object.freeze(decisions),decision_count:decisions.length,
+ available_decisions:LOOP_CHOICES,
+ all_originals_independently_settlement_eligible:
+  decisions.length>0&&decisions.every(d=>d.decision==='SETTLE'),
+ all_selected_settled:false,shift_completed:false,
+ canonical_ledger_mutated:false,universe_mutated:false,
+ installation_authorized:false,production_changed:false
+});
+
+// One logical evaluation for an entire shift. A signed worker must obtain
+// 'ledger' from an authenticated, independent service-only readback; no model,
+// browser payload, PR or CI result may be passed as an authority source.
+// The transition writer (not this method) must CAS the ledger revision/head
+// and use a DB-atomic single-use claim before calling any existing executor.
+export function evaluateRealityFinalLoopEngine({
+ graph,ledger,now=new Date().toISOString(),previousCheckpoint=null,
+ maxSnapshotAgeMs=300000
+}={}){
+ const view=assertRealityUnifiedShiftGraph(graph);
+ if(view.status==='NO_CURRENT_AUTHORIZED_WORK')
+  return loopEnvelope(view,null,[],'NO_AUTHORIZED_SHIFT');
+ if(!Number.isSafeInteger(maxSnapshotAgeMs)||maxSnapshotAgeMs<1000||
+    maxSnapshotAgeMs>900000||!Number.isFinite(asTime(now)))
+  throw Error('REALITY_FINAL_LOOP_INVALID_CLOCK_POLICY');
+ const stop=(code)=>loopEnvelope(view,ledger,view.jobs.map(item=>
+  makeLoopDecision(item,'SUSPEND','RECHECK_AUTHENTICATED_CONTINUITY_LEDGER',code)
+ ),'CANONICAL_LEDGER_UNVERIFIED');
+ if(ledger?.status!=='OWNER_SHIFT_FINAL_LOOP_LEDGER_INDEPENDENT_READ'||
+  ledger.read_only!==true||ledger.independent_owner_scope_verified!==true||
+  ledger.owner_id!==view.owner_id||ledger.shift_id!==view.shift_id||
+  ledger.plan_fingerprint!==view.plan_fingerprint||
+  !UUID.test(ledger.continuity_root_id||'')||
+  !digest(ledger.head_sha256)||!digest(ledger.acceptance_contract_sha256)||
+  ledger.acceptance_frozen!==true||ledger.owner_acceptance_verified!==true||
+  !Number.isSafeInteger(ledger.revision)||ledger.revision<1||
+  !Array.isArray(ledger.jobs)||ledger.jobs.length>view.jobs.length||
+  ledger.installation_authorized!==false||
+  ledger.production_changed!==false)
+  return stop('CANONICAL_OWNER_SCOPE_OR_FROZEN_ACCEPTANCE_MISSING');
+ const time=asTime(now),readTime=asTime(ledger.observed_at);
+ const current=Number.isFinite(readTime)&&readTime<=time&&
+  time-readTime<=maxSnapshotAgeMs;
+ const duplicate=new Set(),seenSource=new Set();
+ const proofByWork=new Map();
+ for(const proof of ledger.jobs){
+  if(!proof||!WORK.test(proof.original_work_id||'')||
+   !digest(proof.acceptance_contract_sha256)||
+   proof.acceptance_contract_sha256!==ledger.acceptance_contract_sha256||
+   proof.continuity_head_sha256!==ledger.head_sha256||
+   proof.ledger_revision!==ledger.revision||
+   typeof proof.source_ref!=='string'||
+   duplicate.has(proof.original_work_id)||seenSource.has(proof.source_ref)||
+   !view.jobs.some(item=>item.original_work_id===proof.original_work_id&&
+    item.source_ref===proof.source_ref))
+   return stop('PROOF_ORIGINAL_ACCEPTANCE_OR_LINEAGE_MISMATCH');
+  duplicate.add(proof.original_work_id);
+  seenSource.add(proof.source_ref);
+  proofByWork.set(proof.original_work_id,proof);
+ }
+ const changed=previousCheckpoint!==null&&(
+  previousCheckpoint.shift_id!==view.shift_id||
+  previousCheckpoint.acceptance_contract_sha256!==ledger.acceptance_contract_sha256||
+  previousCheckpoint.head_sha256!==ledger.head_sha256||
+  previousCheckpoint.revision!==ledger.revision);
+ const decisions=view.jobs.map(item=>{
+  if(!WORK.test(item.original_work_id||''))
+   return makeLoopDecision(item,'SUSPEND','QUALIFY_CANONICAL_ORIGINAL_WORK',
+    'ORIGINAL_NOT_INDEPENDENTLY_ADMITTED');
+  const p=proofByWork.get(item.original_work_id);
+  if(!p)return makeLoopDecision(item,'REFRESH','READ_SAME_ORIGINAL_PROOF_GATES',
+   'SIGNED_ORIGINAL_PROOF_NOT_IN_LEDGER_SNAPSHOT');
+  if(!current||changed)
+   return makeLoopDecision(item,'REFRESH','REQUALIFY_CURRENT_CONTINUITY_HEAD',
+    current?'CAUSAL_CHECKPOINT_OR_PROOF_DIFF_CHANGED':'LEDGER_EVIDENCE_STALE');
+  if(item.independent_source_proof_verified!==true||
+   p.evidence?.independently_verified!==true||
+   !digest(p.evidence.receipt_sha256)||
+   !Number.isFinite(asTime(p.evidence.observed_at))||
+   asTime(p.evidence.observed_at)>time||
+   time-asTime(p.evidence.observed_at)>maxSnapshotAgeMs)
+   return makeLoopDecision(item,'REFRESH','REOBSERVE_SOURCE_AND_FOUR_PROOF_GATES',
+    'EPISTEMIC_PROOF_MISSING_OR_STALE');
+  // Independent outcome plus Universe reconciliation are required before
+  // *requesting* settlement. A model, install, diagnosis or source check is
+  // never an independently completed customer original.
+  const o=p.outcome;
+  if(o?.status==='INDEPENDENT_FINAL_VERIFIED'){
+   if(o.verifier_independent!==true||
+    o.original_work_id!==item.original_work_id||
+    o.acceptance_contract_sha256!==ledger.acceptance_contract_sha256||
+    !digest(o.receipt_sha256))
+    return makeLoopDecision(item,'SUSPEND','INDEPENDENTLY_RECHECK_FINAL_RECEIPT',
+     'OUTCOME_PROOF_CONTRADICTS_ORIGINAL_ACCEPTANCE');
+   if(p.universe?.independently_reconciled!==true||
+    !digest(p.universe.receipt_sha256))
+    return makeLoopDecision(item,'ADVANCE',
+     'RECONCILE_INDEPENDENT_ORIGINAL_RECEIPT_TO_UNIVERSE',
+     'OUTCOME_VERIFIED_UNIVERSE_RETURN_PENDING');
+   return makeLoopDecision(item,'SETTLE',
+    'REQUEST_ATOMIC_ORIGINAL_SETTLEMENT_AND_INDEPENDENT_READBACK',
+    'FOUR_PROOFS_AND_UNIVERSE_OUTCOME_REQUIRE_DURABLE_CLOSURE',
+    {independent_final_receipt_sha256:o.receipt_sha256,
+     universe_reconciliation_sha256:p.universe.receipt_sha256});
+  }
+  if(o?.status!=='NOT_VERIFIED'||p.original_settled===true)
+   return makeLoopDecision(item,'SUSPEND','INDEPENDENTLY_RECHECK_ORIGINAL_OUTCOME',
+    'INCONSISTENT_OR_UNVERIFIED_SETTLEMENT');
+  const blocker=p.blocker;
+  if(blocker!=null&&blocker.status!=='NONE'){
+   if(blocker.independently_attested!==true||
+    !digest(blocker.receipt_sha256))
+    return makeLoopDecision(item,'REFRESH','OBTAIN_INDEPENDENT_BLOCKER_ATTESTATION',
+     'BLOCKER_NOT_INDEPENDENTLY_ATTESTED');
+   if(blocker.provider_effect_uncertain===true)
+    return makeLoopDecision(item,'SUSPEND','RECONCILE_PROVIDER_EFFECT_WITHOUT_REPLAY',
+     'PROVIDER_EFFECT_UNCERTAIN_SINGLE_USE_FENCE');
+   if(blocker.recovery_permitted_without_new_authority!==true)
+    return makeLoopDecision(item,'SUSPEND','REQUEST_EXACT_GOVERNED_RECOVERY_AUTHORITY',
+     'RECOVERY_SCOPE_EXCEEDS_EXISTING_WARRANT');
+   return makeLoopDecision(item,'RECOVER',
+    'ROUTE_ATTESTED_BLOCKER_TO_EXISTING_CAPABILITY_RECOVERY',
+    'INDEPENDENT_RECOVERY_CANDIDATE_REQUIRED');
+  }
+  if(p.authority?.status!=='EXACT_WARRANT_VERIFIED'||
+   p.authority.owner_id!==view.owner_id||
+   p.authority.original_work_id!==item.original_work_id||
+   p.authority.acceptance_contract_sha256!==ledger.acceptance_contract_sha256||
+   p.authority.independently_verified!==true||
+   !digest(p.authority.receipt_sha256)||
+   p.authority.claim_consumed!==false||
+   !uniqueEffects(p.authority.permitted_effects)||
+   !uniqueEffects(p.authority.requested_effects)||
+   p.authority.requested_effects.some(x=>!p.authority.permitted_effects.includes(x)))
+   return makeLoopDecision(item,'SUSPEND','GET_EXACT_OWNER_AUTHORITY_AND_NARROW_EFFECT_SCOPE',
+    'AUTHORITY_PROOF_NOT_VERIFIED_OR_NARROWED');
+  if(p.capacity?.status==='INDEPENDENT_CAPABILITY_MISSING'&&
+   p.capacity.independently_attested===true&&
+   digest(p.capacity.receipt_sha256))
+   return makeLoopDecision(item,'RECOVER',
+    'QUALIFY_MISSING_CAPABILITY_WITH_EXISTING_GOVERNED_ENGINE',
+    'CAPACITY_GAP_INDEPENDENTLY_PROVEN');
+  if(p.capacity?.status!=='SIGNED_WORKER_HANDLER_ATTESTED'||
+   p.capacity.independently_attested!==true||
+   !digest(p.capacity.receipt_sha256)||
+   p.capacity.scheduled_worker_observed!==true)
+   return makeLoopDecision(item,'REFRESH',
+    'ATTEST_ACTUAL_SCHEDULED_WORKER_HANDLER',
+    'CAPACITY_NOT_INDEPENDENTLY_VERIFIED');
+  return makeLoopDecision(item,'ADVANCE',
+   'CLAIM_ONE_USE_GOVERNED_EXECUTION_FOR_SAME_ORIGINAL',
+   'EPISTEMIC_AUTHORITY_CAPACITY_PROOFS_VERIFIED_OUTCOME_PENDING');
+ });
+ return loopEnvelope(view,ledger,decisions,
+  decisions.some(x=>x.decision==='SUSPEND')?'ACTIVE_WITH_FENCED_OBLIGATIONS':
+  'CANONICAL_FINAL_LOOP_DECISIONS_READY');
+}
