@@ -304,7 +304,7 @@ export async function investigateOneSignedShiftContinuityIncident({
   let sourceReadback={status:'NO_SOURCE_REF_FOR_CURRENT_INCIDENT'};
   if(claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED'&&
    /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(sourceRef)&&
-   HASH.test(claim.source_evidence?.source_sha256||'')){
+   /^[a-f0-9]{64}$/.test(claim.source_evidence?.source_sha256||'')){
    sourceReadback={status:'FROZEN_SIGNED_CHAT_LEDGER_REFERENCE_ONLY',
     source_ref:sourceRef,source_sha256:claim.source_evidence.source_sha256,
     independently_refreshed:false,github_provider_effect_verified:false,
