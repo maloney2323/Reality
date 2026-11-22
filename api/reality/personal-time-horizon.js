@@ -155,6 +155,7 @@ export async function readOwnerTimeHorizonEvidence({
       {p_shift_id:active[0].shift_id},{timeoutMs:6000});
      finalLoopOwner=projectOwnerFinalLoopTimeReadback({
       ownerId,shiftId:active[0].shift_id,
+      expectedPlanFingerprint:active[0].plan_fingerprint,
       proof,independentHistory:past,now
      });
     }
