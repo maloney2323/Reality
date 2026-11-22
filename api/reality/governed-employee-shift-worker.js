@@ -1362,6 +1362,15 @@ export default async function handler(req,res){
   // A rejected exact-source model patch can be re-claimed ONLY after a
   // changed verified preview release, once, while retaining its rejection
   // memory. The owner original, diagnosis and checkpoint are unchanged.
+  workerStage='SIGNED_CHAT_RECOVERY_DISTINCT_STRATEGY_COMPILATION';
+  const signedRecoveryStrategy=await shiftRpc(db,
+   'reality_recompile_signed_chat_recovery_line_span_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_DISTINCT_COMPILER_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_REJECTED_PATCH_RECONCILIATION';
   const signedRecoveryRevision=await shiftRpc(db,
    'reality_requeue_signed_chat_recovery_after_upgrade_v1',{
@@ -1419,9 +1428,18 @@ export default async function handler(req,res){
     signedRecoveryRevision.negative_memory_receipt_sha256||'')&&
    signedRecoveryRevision.installation_authorized===false&&
    signedRecoveryRevision.original_job_completed===false;
+  const recoveryStrategyProgress=
+   signedRecoveryStrategy.status===
+    'SIGNED_CHAT_RECOVERY_DISTINCT_LINE_SPAN_STRATEGY_FROZEN'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryStrategy.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryStrategy.recompiled_spec_sha256||'')&&
+   signedRecoveryStrategy.installation_authorized===false&&
+   signedRecoveryStrategy.original_job_completed===false;
   const newDevelopmentAdvanced=recoverySourceProgress||
    recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
-   goalGapRecorded||
+   recoveryStrategyProgress||goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
   // This lane already owns its signed ledger. A successful or blocked feature
@@ -1434,7 +1452,8 @@ export default async function handler(req,res){
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
        recoveryRevisionProgress?signedRecoveryRevision:
-        goalGapRecorded?chatFeatureGap:
+        recoveryStrategyProgress?signedRecoveryStrategy:
+         goalGapRecorded?chatFeatureGap:
         publisherProgress.has(chatNewPublished.status)?
          chatNewPublished:chatNewBuild,
     original_job_completed:false,installation_authorized:false,
