@@ -3,7 +3,6 @@
 // is ever imported, evaluated, or executed. All source bytes are pinned and
 // both the initial and corrected complete JS modules must be parse-checked.
 import {createHash} from 'node:crypto';
-import {parseOnlyModule,compareFrozenCandidateSyntax} from './reality-signed-chat-recovery-syntax-verifier-v1.js';
 
 const hash=x=>'sha256:'+createHash('sha256').update(x).digest('hex');
 const lines=x=>x.match(/[^\n]*\n|[^\n]+$/g)||[];
@@ -19,15 +18,19 @@ const unrelated=/^(?:export|import|const|let|var|async|function|class|return|thr
  * Syntax-only qualification is NOT functional acceptance.
  */
 export function reproduceFrozenStructuralSpanFailure(original,find,replace,{
- parse=parseOnlyModule,visibleRanges=null,maxAdditionalLines=80
+ parse,visibleRanges=null,maxAdditionalLines=80
 }={}){
- if(typeof original!=='string'||typeof find!=='string'||typeof replace!=='string'||
+ if(typeof parse!=='function'||typeof original!=='string'||typeof find!=='string'||typeof replace!=='string'||
   !find.endsWith('\n')||!replace.endsWith('\n')||
   !Number.isSafeInteger(maxAdditionalLines)||maxAdditionalLines<1||maxAdditionalLines>80||
   (visibleRanges!==null&&(!Array.isArray(visibleRanges)||!visibleRanges.length)))
   return null;
- const initial=compareFrozenCandidateSyntax(original,find,replace,parse);
- if(initial?.candidate!=='INVALID_SYNTAX')return null;
+ if(original.indexOf(find)<0||original.indexOf(find,original.indexOf(find)+1)>=0||find===replace||
+  parse(original)!=='VALID_SYNTAX')return null;
+ const at0=original.indexOf(find);
+ const attempted=original.slice(0,at0)+replace+original.slice(at0+find.length);
+ if(attempted===original||attempted.includes('\\0')||parse(attempted)!=='INVALID_SYNTAX')return null;
+ const initial={baseline_sha256:hash(original),proposed_sha256:hash(attempted)};
  const at=original.indexOf(find);
  if(at<0||original.indexOf(find,at+1)>=0)return null;
  const preceding=original.slice(0,at);
