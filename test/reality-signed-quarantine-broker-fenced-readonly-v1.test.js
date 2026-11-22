@@ -118,8 +118,8 @@ test('the credential probe is GET-only and never touches pending reference mutat
  assert.ok(begin>0&&end>begin);
  const path=broker.slice(begin,end);
  assert.match(path,/method:'GET'/);
- assert.match(path,/get\\('user'\\)/);
- assert.match(path,/get\\('installation\\/repositories'\\)/);
+ assert.ok(path.includes("get('user')"));
+ assert.ok(path.includes("get('installation/repositories')"));
  assert.match(path,/provider_effect_replayed:false/);
  assert.doesNotMatch(path,/method:'POST'|method:'PUT'|method:'PATCH'|method:'DELETE'/);
 });
