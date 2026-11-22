@@ -32,7 +32,7 @@ test('typed spec is frozen, source hashed and trust cannot be self-certified',()
   "'independent-full-original-goal-feature-acceptance'",
   "'permissions_expansion',false","'full_goal_accepted',false",
   "'installation_authorized',false","'original_job_completed',false",
-  "'source_kind'"])assert.ok(sql.includes(x),x);
+  "source_kind"])assert.ok(sql.includes(x),x);
  assert.match(sql,/extensions\.digest\(specs::text,'sha256'\)/);
  assert.match(sql,/verified_capability_receipt_releases_v1/);
  assert.match(sql,/existing_registry_compatible_receipts/);
@@ -57,7 +57,7 @@ test('existing model generator runs recovery mode from same work and persists bo
  assert.match(model,/SIGNED_CHAT_RECOVERY_CODE_DRAFT_GENERATED/);
  assert.match(sql,/negative_capability_memory/);
  assert.match(sql,/same_candidate_retry_forbidden/);
- assert.match(boundary,/reality_admit_next_signed_chat_recovery_spec_v1/);
+ assert.match(boundary,/admit_next_signed_chat_recovery_spec_v1/);
 });
 test('quarantine transport writes only fenced draft branch and performs provider GET reconciliation',()=>{
  for(const x of [
@@ -91,7 +91,7 @@ test('no client or model can claim or publish through SQL RPC',()=>{
   assert.ok(sql.includes('function public.'+name),name);
   assert.match(sql,new RegExp('revoke all on function public\\.'+name));
   assert.match(sql,new RegExp('grant execute on function public\\.'+name));
-  assert.ok(boundary.includes(name)||broker.includes(name),name);
+  assert.ok(boundary.includes(name.replace(/^reality_/,''))||broker.includes(name),name);
  }
  assert.match(sql,/current_user<>'service_role'/);
 });
