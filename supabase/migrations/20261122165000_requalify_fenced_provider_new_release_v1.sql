@@ -178,7 +178,7 @@ begin
   'syntax_revision_epoch',v_epoch+1,
   'provider_requalification_epoch',1,
   'prior_fenced_provider_requalification_receipt_sha256',v_receipt,
-  'previous_spec_sha256',q.recovery_spec_sha256,
+  'prior_fenced_spec_sha256',q.recovery_spec_sha256,
   'previous_fenced_candidate_sha256',p_candidate_sha256,
   'new_preview_release_sha',p_current_release_sha,
   'prior_fenced_branch',previous_branch,
