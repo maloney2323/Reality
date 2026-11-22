@@ -157,3 +157,81 @@ export async function inspectFinalLoopOnExistingSignedWorker({
   transition_requires_atomic_service_claim:true
  });
 }
+
+
+// Single-use evidence-only checkpoint on the EXISTING signed worker.
+// The real service-only DB rechecks original/shift/lineage and CAS revision.
+// Nothing here executes work, authorizes repair, installs, or settles.
+export async function recordOneFinalLoopEvidenceCheckpoint({
+ db,wake,workerRunId,inspection,env=process.env,
+ call=shiftRpc,fetchImpl=fetch
+}={}){
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
+    env.REALITY_FINAL_LOOP_EVIDENCE_CHECKPOINT_ENABLED!=='true')
+  return safe('FINAL_LOOP_DURABLE_CHECKPOINT_DISABLED');
+ if(db?.strictSecrets!==true||
+    db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+    wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    inspection?.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+    inspection.shift_id!==wake.shift_id||
+    !UUID.test(wake.shift_id||'')||!UUID.test(workerRunId||'')||
+    !HASH.test(inspection.frozen_shift_scope_sha256||'')||
+    !HASH.test(inspection.continuity_head_sha256||'')||
+    !Number.isSafeInteger(inspection.revision)||inspection.revision<1||
+    !Array.isArray(inspection.checkpoint_candidates)||
+    typeof call!=='function')
+  return safe('FINAL_LOOP_EVIDENCE_CHECKPOINT_SCOPE_UNVERIFIED');
+ if(inspection.checkpoint_candidates.length===0)
+  return safe('FINAL_LOOP_PENDING_ACCEPTANCE_ALREADY_CHECKPOINTED');
+ const original=inspection.checkpoint_candidates[0];
+ if(!/^work:[a-f0-9]{32}$/.test(original?.original_work_id||'')||
+    typeof original.source_ref!=='string')
+  return safe('FINAL_LOOP_PENDING_ORIGINAL_IDENTITY_UNVERIFIED');
+ let receipt;
+ try{
+  receipt=await call(db,
+   'reality_record_final_loop_evidence_checkpoint_v1',{
+    p_shift_id:wake.shift_id,
+    p_original_work_id:original.original_work_id,
+    p_worker_run_id:workerRunId,
+    p_expected_revision:inspection.revision,
+    p_expected_scope_sha256:inspection.frozen_shift_scope_sha256,
+    p_expected_head_sha256:inspection.continuity_head_sha256,
+    p_decision:'REFRESH',
+    p_reason_code:'CANONICAL_ACCEPTANCE_PENDING'
+   },{fetchImpl,timeoutMs:6000});
+ }catch{
+  // A timed-out RPC write may have committed. Never auto-replay it.
+  return safe('FINAL_LOOP_EVIDENCE_CHECKPOINT_EFFECT_UNCERTAIN_NO_RETRY',{
+   shift_id:wake.shift_id,original_work_id:original.original_work_id
+  });
+ }
+ if(['FINAL_LOOP_EXISTING_CHECKPOINT_NO_REPLAY',
+     'FINAL_LOOP_CAUSAL_HEAD_OR_SCOPE_DRIFT_NO_REPLAY'].includes(receipt?.status))
+  return safe(receipt.status,{
+   shift_id:wake.shift_id,original_work_id:original.original_work_id
+  });
+ if(receipt?.status!=='FINAL_LOOP_EVIDENCE_ONLY_CHECKPOINT_DURABLY_RECORDED'||
+    receipt.shift_id!==wake.shift_id||
+    receipt.original_work_id!==original.original_work_id||
+    receipt.decision!=='REFRESH'||
+    receipt.reason_code!=='CANONICAL_ACCEPTANCE_PENDING'||
+    receipt.evidence_only!==true||
+    receipt.transition_committed!==true||
+    !UUID.test(receipt.receipt_id||'')||
+    !HASH.test(receipt.receipt_sha256||'')||
+    receipt.execution_authorized!==false||
+    receipt.installation_authorized!==false||
+    receipt.original_job_completed!==false||
+    receipt.production_changed!==false)
+  return safe('FINAL_LOOP_DB_CHECKPOINT_RECEIPT_UNVERIFIED_NO_REPLAY',{
+   shift_id:wake.shift_id,original_work_id:original.original_work_id
+  });
+ return safe('FINAL_LOOP_EVIDENCE_ONLY_CHECKPOINT_INDEPENDENTLY_ACKNOWLEDGED',{
+  shift_id:wake.shift_id,original_work_id:original.original_work_id,
+  checkpoint_receipt_id:receipt.receipt_id,
+  checkpoint_receipt_sha256:receipt.receipt_sha256,
+  evidence_checkpoint_acknowledged:true
+ });
+}
