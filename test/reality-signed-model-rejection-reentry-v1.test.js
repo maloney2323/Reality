@@ -130,7 +130,7 @@ test('actual observer, investigator, CI verifier and generator preserve immutabl
  }
  assert.match(investigator,/SIGNED_CHAT_RECOVERY_MODEL_REJECTED/);
  assert.match(investigator,/source_candidate_executed/);
- assert.match(investigator,/An exact signed Chat recovery candidate MODEL_REJECTED/);
+ assert.match(investigator,/This is an exact signed Chat recovery candidate MODEL_REJECTED/);
  assert.match(generator,/model_rejection_investigation_diagnosis/);
  assert.match(worker,/advanceInvestigatedSignedModelRejection/);
  assert.match(worker,/signed_chat_model_rejection_reentry/);
