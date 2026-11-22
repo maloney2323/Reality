@@ -370,6 +370,12 @@ export async function generateNextSignedChatDevelopmentDraft({
     prior_syntax_target_path:claim.recovery_spec.prior_syntax_target_path,
     prior_syntax_failed_candidate_sha256:claim.recovery_spec.prior_syntax_failed_candidate_sha256,
     prior_syntax_reason:claim.recovery_spec.prior_syntax_reason}:{}),
+   ...(claim.recovery_spec.prior_feature_failure_receipt_sha256?{
+    prior_feature_failure_receipt_sha256:claim.recovery_spec.prior_feature_failure_receipt_sha256,
+    prior_feature_failed_candidate_sha256:claim.recovery_spec.prior_feature_failed_candidate_sha256,
+    prior_feature_failed_run_id:claim.recovery_spec.prior_feature_failed_run_id,
+    prior_feature_failed_target_path:claim.recovery_spec.prior_feature_failed_target_path,
+    prior_feature_test_contract:claim.recovery_spec.prior_feature_test_contract}:{}),
    permitted_patch_strategy:claim.recovery_spec.patch_strategy||'EXACT_FROZEN_SOURCE'
   }):'';
   const w=words(claim.original_instruction+' '+claim.objective+
