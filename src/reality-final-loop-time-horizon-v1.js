@@ -92,6 +92,16 @@ export function projectRealityFinalLoopTimeHorizon({
     'CURRENT_VERIFIED_SHIFT_DECISION_PROJECTION':
    'CURRENT_SHIFT_HAS_NO_ADMITTED_ORIGINAL_DECISIONS',
   owner_id:engine.owner_id,shift_id:engine.shift_id,
+  continuity_root_id:/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+   engine.continuity_root_id||'')?engine.continuity_root_id:null,
+  plan_fingerprint:hash.test(engine.plan_fingerprint||'')?
+   engine.plan_fingerprint:null,
+  frozen_shift_scope_sha256:hash.test(engine.frozen_shift_scope_sha256||'')?
+   engine.frozen_shift_scope_sha256:null,
+  revision:Number.isSafeInteger(engine.revision)&&engine.revision>0?
+   engine.revision:null,
+  missing_proofs:Array.isArray(engine.missing_proofs)?
+   Object.freeze([...engine.missing_proofs]):null,
   continuity_head_sha256:hash.test(engine.continuity_head_sha256||'')?
    engine.continuity_head_sha256:null,
   obligations:frozen(obligations),
