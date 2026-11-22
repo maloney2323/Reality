@@ -76,6 +76,57 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    next_governed_action:'CONNECT_SERVICE_ONLY_CANONICAL_ACCEPTANCE_AND_PROOF_READBACK'
   });
  }
+ // Read the canonical shift's real frozen scope, but never confuse the
+ // shift warrant with independent acceptance of every customer original.
+ if(proofEnvelope?.status===
+    'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'){
+  const p=proofEnvelope;
+  if(p.schema!=='reality-final-loop-canonical-proof-readback-v1'||
+    p.owner_id!==graph.owner_id||p.shift_id!==wake.shift_id||
+    p.plan_fingerprint!==graph.plan_fingerprint||
+    p.read_only!==true||p.independent_owner_scope_verified!==true||
+    p.owner_acceptance_verified!==false||
+    p.acceptance_contract_sha256!==null||
+    p.execution_authorized!==false||
+    p.installation_authorized!==false||
+    p.original_job_completed!==false||
+    p.production_changed!==false||
+    !HASH.test(p.frozen_shift_scope_sha256||'')||
+    !HASH.test(p.continuity_head_sha256||'')||
+    !Number.isSafeInteger(p.revision)||p.revision<1||
+    !Array.isArray(p.jobs)||p.jobs.length!==refreshed.jobs.length)
+   return safe('FINAL_LOOP_CANONICAL_PENDING_PROOF_READBACK_INVALID');
+  const pending=[];
+  for(const item of p.jobs){
+   const exact=refreshed.jobs.filter(j=>
+    j.source_ref===item?.source_ref&&
+    j.original_work_id===item?.original_work_id&&
+    j.source_proof_sha256===item?.source_proof_sha256);
+   if(exact.length!==1||
+      item.original_acceptance_verified!==false||
+      item.authority_proof_verified!==false||
+      item.capacity_proof_verified!==false||
+      item.final_outcome_verified!==false||
+      item.settlement_eligible!==false||
+      typeof item.evidence_checkpoint_recorded_on_head!=='boolean')
+    return safe('FINAL_LOOP_CANONICAL_PENDING_ORIGINAL_LINEAGE_INVALID');
+   if(/^work:[a-f0-9]{32}$/.test(item.original_work_id||'')&&
+      item.independent_source_proof_verified===true&&
+      item.evidence_checkpoint_recorded_on_head===false)
+    pending.push(Object.freeze({
+     original_work_id:item.original_work_id,
+     source_ref:item.source_ref
+    }));
+  }
+  return safe('FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',{
+   owner_id:graph.owner_id,shift_id:wake.shift_id,
+   frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
+   continuity_head_sha256:p.continuity_head_sha256,
+   revision:p.revision,checkpoint_candidates:Object.freeze(pending),
+   next_governed_action:
+    'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS'
+  });
+ }
  let evaluation;
  try{
   // The engine revalidates the EXACT DB source graph itself. Never
