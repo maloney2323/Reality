@@ -434,28 +434,10 @@ begin
  if h.message_id is null or
    q.recovery_spec_sha256 is distinct from
     'sha256:'||pg_catalog.encode(extensions.digest(q.recovery_spec::text,'sha256'),'hex')
-   or q.qualification_receipt->>'target_review_receipt_sha256' !~ '^sha256:[a-f0-9]{64}
-    'sha256:'||pg_catalog.encode(extensions.digest(
-     (q.qualified_candidate-'candidate_sha256')::text,'sha256'),'hex')
- then raise exception 'SIGNED_CHAT_RECOVERY_PREPUBLISH_SOURCE_OR_DIGEST_DRIFT';end if;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_CHAT_RECOVERY_QUARANTINE_CANDIDATE_READ',
-  'trigger_id',q.trigger_id,'owner_id',q.owner_id,'message_id',q.source_message_id,
-  'original_work_id',q.original_work_id,'source_ref',q.source_ref,
-  'source_sha256',q.source_sha256,'blocker_receipt_sha256',q.blocker_receipt_sha256,
-  'spec_sha256',q.recovery_spec_sha256,
-  'target_review_receipt_sha256',
-    q.qualification_receipt->>'target_review_receipt_sha256',
-  'independent_target_review_verified',true,
-  'phase',q.phase,'candidate',q.qualified_candidate,
-  'release_sha',q.qualified_candidate->>'base_sha',
-  'installation_authorized',false,'original_job_completed',false,
-  'production_changed',false,'new_shift_started',false);
-end $function$
-
+   or q.qualification_receipt->>'target_review_receipt_sha256' !~ '^sha256:[a-f0-9]{64}$'
    or q.qualification_receipt->'target_review'->>'target_in_graph' is distinct from 'true'
    or q.qualification_receipt->'target_review'->>'candidate_sha256'
-      is distinct from q.qualified_candidate->>'candidate_sha256'
+     is distinct from q.qualified_candidate->>'candidate_sha256'
    or q.qualified_candidate->>'candidate_sha256' is distinct from
     'sha256:'||pg_catalog.encode(extensions.digest(
      (q.qualified_candidate-'candidate_sha256')::text,'sha256'),'hex')
@@ -466,12 +448,15 @@ end $function$
   'original_work_id',q.original_work_id,'source_ref',q.source_ref,
   'source_sha256',q.source_sha256,'blocker_receipt_sha256',q.blocker_receipt_sha256,
   'spec_sha256',q.recovery_spec_sha256,
+  'target_review_receipt_sha256',q.qualification_receipt->>'target_review_receipt_sha256',
+  'independent_target_review_verified',true,
   'phase',q.phase,'candidate',q.qualified_candidate,
   'release_sha',q.qualified_candidate->>'base_sha',
   'installation_authorized',false,'original_job_completed',false,
   'production_changed',false,'new_shift_started',false);
 end $function$
 ;
+
 CREATE OR REPLACE FUNCTION public.reality_fence_signed_chat_recovery_publish_v1(p_trigger_id uuid, p_candidate_sha256 text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -488,19 +473,7 @@ begin
   updated_at=clock_timestamp()
  where trigger_id=p_trigger_id and source_kind='SIGNED_CHAT_DEVELOPMENT_RECOVERY'
  and phase='SIGNED_CHAT_RECOVERY_TARGET_REVIEWED'
- and qualification_receipt->>'target_review_receipt_sha256' ~ '^sha256:[a-f0-9]{64}
- and qualified_candidate->>'candidate_sha256'=p_candidate_sha256
- and recovery_spec_sha256=qualified_candidate->>'spec_sha256'
- returning * into q;
- if q.trigger_id is null then raise exception 'SIGNED_CHAT_RECOVERY_FENCE_REPLAY_OR_SOURCE_DRIFT';end if;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_CHAT_RECOVERY_QUARANTINE_EFFECT_FENCED',
-  'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'candidate_sha256',p_candidate_sha256,
-  'installation_authorized',false,'original_job_completed',false,
-  'production_changed',false,'new_shift_started',false);
-end $function$
-
+ and qualification_receipt->>'target_review_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$'
  and qualification_receipt->'target_review'->>'target_in_graph'='true'
  and qualification_receipt->'target_review'->>'candidate_sha256'=p_candidate_sha256
  and qualified_candidate->>'candidate_sha256'=p_candidate_sha256
@@ -515,6 +488,7 @@ end $function$
   'production_changed',false,'new_shift_started',false);
 end $function$
 ;
+
 CREATE OR REPLACE FUNCTION public.reality_record_signed_chat_recovery_quarantine_v1(p_trigger_id uuid, p_candidate_sha256 text, p_commit_sha text, p_source_commit_sha text, p_branch text, p_pr_number bigint, p_artifact_blob_sha text, p_source_blob_sha text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -527,8 +501,8 @@ begin
   where trigger_id=p_trigger_id for update;
  if q.trigger_id is null or q.source_kind<>'SIGNED_CHAT_DEVELOPMENT_RECOVERY'
   or q.phase<>'SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'
-  or q.qualification_receipt->>'target_review_receipt_sha256'
-     !~ '^sha256:[a-f0-9]{64}
+  or q.qualification_receipt->>'target_review_receipt_sha256' !~ '^sha256:[a-f0-9]{64}$'
+  or q.qualification_receipt->'target_review'->>'target_in_graph' is distinct from 'true'
   or q.qualified_candidate->>'candidate_sha256' is distinct from p_candidate_sha256
   or p_commit_sha !~ '^[a-f0-9]{40}$'
   or p_source_commit_sha !~ '^[a-f0-9]{40}$'
@@ -548,55 +522,6 @@ begin
   'candidate_sha256',p_candidate_sha256,
   'target_review_receipt_sha256',q.qualification_receipt->>'target_review_receipt_sha256',
   'independent_target_review_verified',true,
-  'github_commit_sha',p_commit_sha,
-  'source_commit_sha',p_source_commit_sha,
-  'artifact_blob_sha',p_artifact_blob_sha,
-  'source_blob_sha',p_source_blob_sha,
-  'branch',p_branch,'pr_number',p_pr_number,
-  'pr_url','https://github.com/maloney2323/Reality/pull/'||p_pr_number,
-  'verification_state','PROVIDER_READBACK_NO_INDEPENDENT_CI_YET',
-  'source_installed',false,
-  'feature_acceptance_verified',false,
-  'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false);
- receipt:='sha256:'||pg_catalog.encode(extensions.digest(proof::text,'sha256'),'hex');
- update reality_internal.genuine_capability_queue_v1
- set phase='SIGNED_CHAT_RECOVERY_CANDIDATE_QUARANTINED',
-  quarantine_receipt_sha256=receipt,
-  qualified_candidate=qualified_candidate||
-   pg_catalog.jsonb_build_object('provider_proof',proof,'quarantine_receipt_sha256',receipt),
-  updated_at=clock_timestamp()
- where trigger_id=q.trigger_id;
- return pg_catalog.jsonb_build_object(
-  'status','SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_RECEIPTED',
-  'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'receipt_sha256',receipt,'source_commit_sha',p_source_commit_sha,
-  'artifact_commit_sha',p_commit_sha,
-  'pr_url','https://github.com/maloney2323/Reality/pull/'||p_pr_number,
-  'source_installed',false,'independent_ci_verified',false,
-  'installation_authorized',false,'original_job_completed',false,
-  'production_changed',false,'new_shift_started',false);
-end $function$
-
-  or q.qualification_receipt->'target_review'->>'target_in_graph'
-     is distinct from 'true'
-  or q.qualified_candidate->>'candidate_sha256' is distinct from p_candidate_sha256
-  or p_commit_sha !~ '^[a-f0-9]{40}$'
-  or p_source_commit_sha !~ '^[a-f0-9]{40}$'
-  or p_source_blob_sha !~ '^[a-f0-9]{40}$'
-  or p_source_blob_sha = q.qualified_candidate->>'source_blob_sha'
-  or p_artifact_blob_sha !~ '^[a-f0-9]{40}$'
-  or p_branch is distinct from 'reality/chat-recovery/'||q.trigger_id::text
-  or p_pr_number is null or p_pr_number<1
- then raise exception 'SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_RECEIPT_INVALID';end if;
- proof:=pg_catalog.jsonb_build_object(
-  'schema','reality-signed-chat-recovery-quarantine-receipt-v1',
-  'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'source_message_id',q.source_message_id,
-  'source_sha256',q.source_sha256,
-  'spec_sha256',q.recovery_spec_sha256,
-  'blocker_receipt_sha256',q.blocker_receipt_sha256,
-  'candidate_sha256',p_candidate_sha256,
   'github_commit_sha',p_commit_sha,
   'source_commit_sha',p_source_commit_sha,
   'artifact_blob_sha',p_artifact_blob_sha,
