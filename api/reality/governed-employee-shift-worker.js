@@ -107,7 +107,7 @@ import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
 import {stageNextSignedChatRecoveryQuarantine}
  from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
-import {independentlyReviewOneSignedChatRecoveryTarget}
+import {independentlyReviewOneSignedChatRecoveryTarget,independentlyReobserveStalledRecoveryReview}
  from '../../src/reality-signed-chat-recovery-target-review-v1.js';
 import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
@@ -121,6 +121,8 @@ import {advanceOneScheduledCapabilityInquiry}
  from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
 import {investigateOneSignedShiftContinuityIncident,classifySignedContinuityClaimTransportError}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
+import {qualifyVerifiedInvestigationRemediation}
+ from '../../src/reality-shift-investigation-remediation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
 import {admitOneSignedScheduledEvidenceJob}
@@ -418,6 +420,19 @@ export default async function handler(req,res){
      execution_authorized:false,installation_authorized:false,
      original_job_completed:false,production_changed:false})):
     {status:'NO_CURRENT_SIGNED_CHAT_REVIEW_INCIDENT_SCOPE',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
+  // An exhausted investigation is not restarted. A distinct signed wake may
+  // qualify only an independently tested, current-release correction.
+  workerStage='SIGNED_SHIFT_INVESTIGATION_REMEDIATION_QUALIFICATION';
+  const shiftInvestigationRemediation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await qualifyVerifiedInvestigationRemediation({db,env:process.env,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_SHIFT_INVESTIGATION_REMEDIATION_UNVERIFIED',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_CURRENT_SIGNED_SHIFT_REMEDIATION_SCOPE',
      execution_authorized:false,installation_authorized:false,
      original_job_completed:false,production_changed:false};
   workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
@@ -1389,8 +1404,19 @@ export default async function handler(req,res){
     installation_authorized:false,original_job_completed:false,
     production_changed:false,new_shift_started:false
    }));
+  workerStage='SIGNED_CHAT_RECOVERY_CONTINUITY_SOURCE_PROBE';
+  const signedRecoveryContinuityProbe=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReobserveStalledRecoveryReview({db,env:process.env,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_CHAT_RECOVERY_CONTINUITY_SOURCE_PROBE_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_CONTINUITY_SOURCE_PROBE_SCOPE',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
   workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW';
   const signedRecoveryTargetReview=
+   signedRecoveryContinuityProbe.continuity_source_probe_verified===true?
+    signedRecoveryContinuityProbe:
    await independentlyReviewOneSignedChatRecoveryTarget({
     db,env:process.env,workerRunId:actualWorkerRunId,
     fetchImpl:fetch
@@ -1411,6 +1437,18 @@ export default async function handler(req,res){
   // A rejected exact-source model patch can be re-claimed ONLY after a
   // changed verified preview release, once, while retaining its rejection
   // memory. The owner original, diagnosis and checkpoint are unchanged.
+  // A true independent rejection can qualify a distinct, graph-constrained
+  // candidate, on the same original. Preserve the old draft/review epoch.
+  workerStage='SIGNED_CHAT_RECOVERY_REJECTED_TARGET_COMPILATION';
+  const signedRecoveryTargetRevision=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_recompile_signed_rejected_chat_target_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
+     p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+    }).catch(()=>({status:'SIGNED_CHAT_RECOVERY_TARGET_COMPILATION_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_TARGET_COMPILATION_SCOPE',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
   workerStage='SIGNED_CHAT_RECOVERY_DISTINCT_STRATEGY_COMPILATION';
   const signedRecoveryStrategy=await shiftRpc(db,
    'reality_recompile_signed_chat_recovery_line_span_v1',{
@@ -3000,6 +3038,7 @@ export default async function handler(req,res){
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
     signed_chat_review_incident_observation:signedChatReviewIncidentObservation,
+    shift_investigation_remediation:shiftInvestigationRemediation,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_continuity_recovery_action:signedContinuityRecoveryAction,
     signed_continuity_recovery_verification:signedContinuityRecoveryVerification,

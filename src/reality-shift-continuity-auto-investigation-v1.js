@@ -93,6 +93,14 @@ export function continuityTextContract(guidedRecovery=false){
   ...(guidedRecovery?[['resume_acceptance_condition',30,300]]:[])
  ].map(([field,min,max])=>({field,min,max}));
 }
+// The provider schema has the same bounded fields as the local validator.
+// This is a representation constraint, never a relaxation of acceptance.
+export function continuityProviderTextSchema(guidedRecovery=false){
+ return Object.fromEntries(continuityTextContract(guidedRecovery).map(({field,min,max})=>[
+  field,{type:'string',pattern:'^[\\s\\S]{'+min+','+max+'}$',
+   description:'Complete evidence-grounded text, '+min+' to '+max+' characters. No outer whitespace.'}
+ ]));
+}
 function textContractViolations(value,guidedRecovery){
  return continuityTextContract(guidedRecovery).flatMap(({field,min,max})=>{
   const text=value[field];
@@ -275,12 +283,10 @@ export async function investigateOneSignedShiftContinuityIncident({
      properties:{
       employee_function_id:{type:'string',enum:roles.map(x=>x.function_id)},
       reviewer_function_id:{type:'string',enum:roles.map(x=>x.function_id)},
-      diagnosis:{type:'string'},proposed_upgrade:{type:'string'},
-      independent_test_requirement:{type:'string'},limitations:{type:'string'},
+      ...continuityProviderTextSchema(guidedRecovery),
       ...(guidedRecovery?{
        blocker_class:{type:'string',enum:GOVERNED_RECOVERY_CLASSES},
-       next_governed_action:{type:'string',enum:GOVERNED_RECOVERY_ACTIONS},
-       resume_acceptance_condition:{type:'string'}
+       next_governed_action:{type:'string',enum:GOVERNED_RECOVERY_ACTIONS}
       }:{})
      },required:['employee_function_id','reviewer_function_id',
        'diagnosis','proposed_upgrade','independent_test_requirement','limitations',

@@ -1,0 +1,21 @@
+name: Reality independent Continuity format remediation
+on:
+  pull_request:
+  push:
+    branches:
+      - repair/maintenance-artifact-to-same-shift-review-20261120
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: verify-format-contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify bounds and unchanged authority
+        run: node --test test/reality-shift-investigation-remediation-v1.test.js test/reality-signed-chat-review-incident-observation-v1.test.js
