@@ -22,6 +22,8 @@ begin
  if current_user<>'service_role' then raise exception 'SIGNED_CHAT_GOAL_SERVICE_ONLY';end if;
  select * into q from reality_internal.genuine_capability_queue_v1
  where trigger_id=p_trigger and source_kind='SIGNED_CHAT_DEVELOPMENT_RECOVERY'
+ and capability_id='reality.chat-original.full-goal-installer-adapter-v1'
+ and recovery_spec->'required_interfaces' @> '["existing-chat-source-to-governed-development","independent-full-original-goal-feature-acceptance","compatible-same-original-preview-installer","separate-exact-owner-install-authorization","independent-provider-effect-and-final-universe-reconciliation"]'::jsonb
  and phase='SIGNED_CHAT_RECOVERY_CANDIDATE_QUARANTINED';
  if not found then return null;end if;
  select w.*,m.content into h from reality_internal.chat_work_handoffs_v1 w
@@ -263,6 +265,10 @@ begin
  or a->'approval'->>'candidate_sha256' is distinct from c->>'candidate_sha256'
  or a->'approval'->>'proof_sha256' is distinct from a->>'proof_sha256'
  or a->'approval'->>'target_base_sha' is distinct from p->>'target_base_sha'
+ or a->'approval'->>'target_branch' is distinct from p->>'target_branch'
+ or a->'approval'->>'candidate_commit_sha' is distinct from c->>'candidate_commit_sha'
+ or a->'approval'->>'artifact_sha256' is distinct from c->>'candidate_artifact_sha256'
+ or a->>'approval_sha256' is distinct from 'sha256:'||pg_catalog.encode(extensions.digest((a->'approval')::text,'sha256'),'hex')
  or a->'approval'->>'approval_receipt_id' is distinct from a->>'approval_receipt_id'
  or a->'approval'->>'origin' is distinct from 'AUTHENTICATED_OWNER_EXPLICIT_ACTION'
  or a->'approval'->>'production_changed' is distinct from 'false')
@@ -281,6 +287,7 @@ begin
   'owner_approval_ready',ph='READY_FOR_EXACT_OWNER_APPROVAL',
   'installation_authorized',ph in ('OWNER_APPROVED','INSTALL_INTENT_FENCED','SOURCE_INSTALLED','ORIGINAL_SETTLED'),
   'original_job_completed',ph='ORIGINAL_SETTLED','final_receipt_id',a->>'final_receipt_id',
+  'roi_status','NOT_MEASURED','production_installation_authorized',false,'fenced_recovery_observation',a->'fenced_recovery_observation',
   'final_receipt_sha256',a->>'final_receipt_sha256','production_changed',false);
 end $$;
 revoke all on function reality_internal.signed_chat_install_scope_v1(uuid) from public,anon,authenticated;
@@ -323,6 +330,7 @@ begin
   'approval',pg_catalog.jsonb_build_object('origin','AUTHENTICATED_OWNER_EXPLICIT_ACTION','owner_id',p_owner_id,'request_id',p_request_id,
    'approval_receipt_id',ap,'original_work_id',p_original_work_id,'candidate_sha256',c->>'candidate_sha256','candidate_commit_sha',p_candidate_commit_sha,
    'artifact_sha256',p_artifact_sha256,'proof_sha256',c->>'proof_sha256','target_base_sha',c->>'target_base_sha','target_branch',c->>'target_branch','production_changed',false));
+ a:=a||pg_catalog.jsonb_build_object('approval_sha256','sha256:'||pg_catalog.encode(extensions.digest((a->'approval')::text,'sha256'),'hex'));
  update reality_internal.genuine_capability_queue_v1 set qualification_receipt=pg_catalog.jsonb_set(qualification_receipt,'{goal_install}',a),updated_at=clock_timestamp()
  where trigger_id=p_attempt_id;
  return pg_catalog.jsonb_build_object('status','GENERAL_ORIGINAL_OWNER_APPROVED_AUTO_CONTINUATION','original_work_id',p_original_work_id,'shift_id',c->>'shift_id',
@@ -401,6 +409,7 @@ begin
  or c->>'installation_authorized' is distinct from 'true' or c->>'original_job_completed' is distinct from 'false'
  or p_proof->>'original_work_id' is distinct from c->>'original_work_id' or p_proof->>'attempt_id' is distinct from p_attempt_id::text
  or p_proof->>'approval_receipt_id' is distinct from c->>'approval_receipt_id'
+ or p_proof->>'shift_id' is distinct from c->>'shift_id'
  or p_proof->>'installed_commit_sha' is distinct from c->>'installed_commit_sha'
  or p_proof->>'installed_source_blob_sha' is distinct from c->>'installed_source_blob_sha'
  or p_proof->>'workflow_blob_sha' is distinct from c->>'workflow_blob_sha'
@@ -679,3 +688,31 @@ begin
   'original_job_completed',false,'production_changed',false,'new_shift_started',false);
 end $function$
 ;
+
+create or replace function public.reality_record_signed_chat_install_fence_observation_v1(
+ p_attempt_id uuid,p_observed_branch_head text,p_evidence_sha256 text,p_finding text)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+declare q reality_internal.genuine_capability_queue_v1%rowtype;c jsonb;a jsonb;v jsonb;
+begin
+ if current_user<>'service_role' then raise exception 'SIGNED_GOAL_INSTALL_SERVICE_ONLY';end if;
+ select * into q from reality_internal.genuine_capability_queue_v1 where trigger_id=p_attempt_id for update;
+ c:=reality_internal.signed_chat_install_scope_v1(p_attempt_id);a:=q.qualification_receipt->'goal_install';
+ if c is null or c->>'phase' is distinct from 'INSTALL_INTENT_FENCED'
+ or c->>'expected_parent_commit_sha' is distinct from p_observed_branch_head
+ or coalesce(p_evidence_sha256,'') !~ '^[a-f0-9]{64}$'
+ or p_finding is distinct from 'FENCED_BASELINE_AND_APPROVED_GIT_OBJECTS_STILL_READABLE'
+ then raise exception 'SIGNED_GOAL_FENCE_READ_ONLY_SCOPE_UNVERIFIED';end if;
+ v:=pg_catalog.jsonb_build_object('finding',p_finding,'evidence_sha256',p_evidence_sha256,
+  'original_work_id',q.original_work_id,'candidate_sha256',c->>'candidate_sha256',
+  'approval_receipt_id',c->>'approval_receipt_id','observed_branch_head',p_observed_branch_head,
+  'next_governed_action','INVESTIGATE_REGISTERED_CAPABILITY_PROVIDER_FAILURE_WITHOUT_REPLAY',
+  'provider_effect_may_have_occurred',true,'installation_retried',false,'original_job_completed',false,'production_changed',false);
+ if a->'fenced_recovery_observation' is null then
+  a:=a||pg_catalog.jsonb_build_object('fenced_recovery_observation',v,'fenced_recovery_observation_sha256','sha256:'||pg_catalog.encode(extensions.digest(v::text,'sha256'),'hex'));
+  update reality_internal.genuine_capability_queue_v1 set qualification_receipt=pg_catalog.jsonb_set(qualification_receipt,'{goal_install}',a),updated_at=clock_timestamp() where trigger_id=p_attempt_id;
+ end if;
+ return pg_catalog.jsonb_build_object('status','GENERAL_ORIGINAL_FENCED_RECOVERY_OBSERVATION_DURABLE','original_work_id',q.original_work_id,
+  'shift_id',c->>'shift_id','phase','READ_ONLY_DIAGNOSIS_RECORDED','installation_retried',false,'original_job_completed',false,'production_changed',false);
+end $$;
+revoke all on function public.reality_record_signed_chat_install_fence_observation_v1(uuid,text,text,text) from public,anon,authenticated;
+grant execute on function public.reality_record_signed_chat_install_fence_observation_v1(uuid,text,text,text) to service_role;
