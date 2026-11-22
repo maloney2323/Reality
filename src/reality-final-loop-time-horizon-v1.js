@@ -69,12 +69,24 @@ export function projectRealityFinalLoopTimeHorizon({
    typeof item?.source_ref!=='string'||
    !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/.test(item.source_ref)||
    !/^[A-Z][A-Z0-9_]{6,130}$/.test(item.next_governed_action||'')||
+   (item.source_step_index!==undefined&&
+    (!Number.isInteger(item.source_step_index)||
+     item.source_step_index<2||item.source_step_index>5))||
+   (item.source_phase!==undefined&&
+    !/^[A-Z][A-Z0-9_]{3,70}$/.test(item.source_phase||''))||
+   (item.native_next_governed_action!==undefined&&
+    !/^[A-Z][A-Z0-9_]{6,130}$/.test(
+     item.native_next_governed_action||''))||
    typeof item.reason!=='string'||
    item.transition_committed!==false)
     return safeUnbound(past);
   seen.add(identity);
   obligations.push(frozen({
    original_work_id:id,source_ref:item.source_ref,
+   source_step_index:item.source_step_index??null,
+   source_phase:item.source_phase??null,
+   native_next_governed_action:item.native_next_governed_action??null,
+   native_next_action_is_diagnostic_only:true,
    source_admission_verified:!sourceOnly,
    decision:item.decision,
    next_governed_action:item.next_governed_action,
