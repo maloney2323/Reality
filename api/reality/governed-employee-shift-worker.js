@@ -105,6 +105,8 @@ import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
+import {advanceSignedChatFullGoalAcceptance}
+ from '../../src/reality-signed-chat-full-goal-acceptance-v1.js';
 import {independentlyVerifySignedRecoverySyntax}
  from '../../src/reality-signed-chat-recovery-syntax-verifier-v1.js';
 import {stageNextSignedChatRecoveryQuarantine}
@@ -1703,6 +1705,10 @@ export default async function handler(req,res){
   // Evidence-backed transition from verified corrective CI into the same
   // original's eventual owner install decision. This READS provider evidence
   // and stages a service-only review. It never installs or creates consent.
+  workerStage='SIGNED_CHAT_FULL_GOAL_INDEPENDENT_QUALIFICATION';
+  const signedChatFullGoalAcceptance=wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await advanceSignedChatFullGoalAcceptance({db,env:process.env,shiftId:wakeReceipt.shift_id,
+    workerRunId:actualWorkerRunId,fetchImpl:fetch}):{status:'NO_CURRENT_SIGNED_GOAL_ACCEPTANCE_SCOPE'};
   workerStage='GENERALIZED_ORIGINAL_INSTALL_REVIEW_PREFLIGHT';
   const generalizedInstallReview=
    await stageGeneralizedVerifiedOriginalInstallReview({
@@ -3093,6 +3099,7 @@ export default async function handler(req,res){
     same_original_recovery_ci_checkpoint:sameOriginalRecoveryCiCheckpoint,
     chat_new_development_checkpoint:chatNewDevelopmentCheckpoint,
     signed_chat_recovery_syntax:signedRecoverySyntax,
+    signed_chat_full_goal_acceptance:signedChatFullGoalAcceptance,
     signed_chat_recovery_quarantine:signedRecoveryQuarantine,
     corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
     generalized_original_install_review:generalizedInstallReview,
