@@ -377,6 +377,13 @@ export async function generateNextSignedChatDevelopmentDraft({
     syntax_compiler_reproduction:claim.recovery_spec.syntax_compiler_reproduction,
     syntax_investigation_diagnosis:claim.recovery_spec.syntax_investigation_diagnosis,
     syntax_investigation_test_requirement:claim.recovery_spec.syntax_investigation_test_requirement}:{}),
+   ...(claim.recovery_spec.model_rejection_investigation_receipt_sha256?{
+    model_rejection_reason:claim.recovery_spec.model_rejection_reason,
+    prior_model_rejection_receipt_sha256:claim.recovery_spec.prior_model_rejection_receipt_sha256,
+    model_rejection_investigation_receipt_sha256:claim.recovery_spec.model_rejection_investigation_receipt_sha256,
+    model_rejection_investigation_diagnosis:claim.recovery_spec.model_rejection_investigation_diagnosis,
+    model_rejection_test_requirement:claim.recovery_spec.model_rejection_test_requirement,
+    candidate_generation_policy:claim.recovery_spec.candidate_generation_policy}:{}),
    ...(claim.recovery_spec.prior_feature_failure_receipt_sha256?{
     prior_feature_failure_receipt_sha256:claim.recovery_spec.prior_feature_failure_receipt_sha256,
     prior_feature_failed_candidate_sha256:claim.recovery_spec.prior_feature_failed_candidate_sha256,
