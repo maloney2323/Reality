@@ -214,7 +214,7 @@ begin
   'full_goal_feature_accepted',false,'new_shift_started',false,
   'installation_authorized',false,'original_job_completed',false,
   'production_changed',false);
-end $function$
+end $function$;
 
 revoke all on function public.reality_requalify_fenced_signed_chat_provider_v1(uuid,uuid,uuid,text,text,text,text,integer,integer,boolean) from public,anon,authenticated;
 grant execute on function public.reality_requalify_fenced_signed_chat_provider_v1(uuid,uuid,uuid,text,text,text,text,integer,integer,boolean) to service_role;
