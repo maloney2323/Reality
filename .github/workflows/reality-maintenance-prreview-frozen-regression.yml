@@ -1,0 +1,48 @@
+name: Reality frozen PR-review authority defect RED / GREEN
+run-name: Reality owner-maintenance PR307 frozen regression
+on:
+  pull_request:
+    paths:
+      - 'test/reality-maintenance-prreview-executable-regression.test.js'
+      - '.github/workflows/reality-maintenance-prreview-frozen-regression.yml'
+permissions:
+  contents: read
+jobs:
+  historical-independent-red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact frozen test (untrusted PR, no credentials)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Checkout independently pinned historical unrepaired source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: 5b704437e1527673deae0484f67be5c7afe36563
+          path: frozen-historical
+      - name: Historical code fails frozen owner-warrant and draft-source regression
+        env:
+          REALITY_REGRESSION_ROOT: frozen-historical
+        run: node --test test/reality-maintenance-prreview-executable-regression.test.js
+  repaired-independent-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact same frozen test (untrusted PR, no credentials)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Checkout independently pinned corrected source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: 2b10a5a943bfdf250b6838a3f4c03f40191e7de8
+          path: frozen-repaired
+      - name: Repaired code passes exact same frozen regression
+        env:
+          REALITY_REGRESSION_ROOT: frozen-repaired
+        run: node --test test/reality-maintenance-prreview-executable-regression.test.js
