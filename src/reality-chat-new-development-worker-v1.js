@@ -10,6 +10,7 @@ import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {readPinnedSignedRecoverySourceGraph}
  from './reality-signed-chat-recovery-target-review-v1.js';
 import {outputText} from './reality-riley-native-model-draft-v1.js';
+import {reproduceFrozenBoundaryFailure,parseOnlyModule} from './reality-signed-chat-recovery-syntax-verifier-v1.js';
 const BASE='https://api.github.com/repos/maloney2323/Reality';
 const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -370,6 +371,11 @@ export async function generateNextSignedChatDevelopmentDraft({
     prior_syntax_target_path:claim.recovery_spec.prior_syntax_target_path,
     prior_syntax_failed_candidate_sha256:claim.recovery_spec.prior_syntax_failed_candidate_sha256,
     prior_syntax_reason:claim.recovery_spec.prior_syntax_reason}:{}),
+   ...(claim.recovery_spec.syntax_investigation_receipt_sha256?{
+    syntax_investigation_receipt_sha256:claim.recovery_spec.syntax_investigation_receipt_sha256,
+    syntax_compiler_reproduction:claim.recovery_spec.syntax_compiler_reproduction,
+    syntax_investigation_diagnosis:claim.recovery_spec.syntax_investigation_diagnosis,
+    syntax_investigation_test_requirement:claim.recovery_spec.syntax_investigation_test_requirement}:{}),
    ...(claim.recovery_spec.prior_feature_failure_receipt_sha256?{
     prior_feature_failure_receipt_sha256:claim.recovery_spec.prior_feature_failure_receipt_sha256,
     prior_feature_failed_candidate_sha256:claim.recovery_spec.prior_feature_failed_candidate_sha256,
@@ -465,6 +471,20 @@ export async function generateNextSignedChatDevelopmentDraft({
    }
    if(!derived.ok)
     fail('MODEL_FROZEN_LINE_SPAN_INVALID');
+   // The independent incident reobservation proved a source-span compiler
+   // defect. Only apply the same general compiler rule when its exact
+   // reproduction is unique against THIS pinned blob and visible range.
+   if(claim.recovery_spec.syntax_investigation_receipt_sha256&&
+      claim.recovery_spec.syntax_compiler_reproduction?.classification==='DUPLICATED_FROZEN_CLOSING_DELIMITER'&&
+      parseOnlyModule(derived.proposed)==='INVALID_SYNTAX'){
+    const boundary=reproduceFrozenBoundaryFailure(text,derived.find,derived.replace);
+    if(boundary&&raw.choice.end_line-raw.choice.start_line<80&&
+       frozenExcerpt.ranges.some(([a,b])=>raw.choice.start_line>=a&&raw.choice.end_line+1<=b)){
+     const expanded=deriveExactPatchFromFrozenLineSpan(text,{...raw.choice,end_line:raw.choice.end_line+1},frozenExcerpt.ranges);
+     if(expanded.ok&&expanded.replace===derived.replace&&
+        parseOnlyModule(expanded.proposed)==='VALID_SYNTAX')derived=expanded;
+    }
+   }
    patch={reply:raw.reply,choice:{
     find:derived.find,replace:derived.replace,
     reason:derived.source_reason}};
