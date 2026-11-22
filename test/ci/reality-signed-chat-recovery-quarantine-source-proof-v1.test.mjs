@@ -26,6 +26,9 @@ test('independent quarantine source matches only signed original and precise fro
  assert.match(proof.recovery_spec_sha256,hash);
  assert.match(proof.blocker_receipt_sha256,hash);
  assert.match(proof.candidate_sha256,hash);
+ assert.equal(proof.independent_target_review_verified,true);
+ assert.match(proof.target_review_receipt_sha256,hash);
+ assert.equal(proof.source_installed,false);
  assert.equal(proof.source_installed,false);
  assert.equal(proof.independent_ci_verified,false);
  assert.equal(proof.feature_acceptance_verified,false);

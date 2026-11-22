@@ -107,6 +107,8 @@ import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
 import {stageNextSignedChatRecoveryQuarantine}
  from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
+import {independentlyReviewOneSignedChatRecoveryTarget}
+ from '../../src/reality-signed-chat-recovery-target-review-v1.js';
 import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
 import {runOneStandingEmployeeDiscovery}
@@ -1351,6 +1353,20 @@ export default async function handler(req,res){
   // contract; the existing Chat development worker generates a bounded source
   // draft. The protected broker stages it into quarantine on a later wake.
   // Neither the model nor the broker may grant installation authority.
+  // Different signed worker invocation performs independently sourced
+  // dependency review AFTER the model draft, BEFORE the protected broker.
+  // A graph hit is not feature acceptance or owner installation authority.
+  workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW';
+  const signedRecoveryTargetReview=
+   await independentlyReviewOneSignedChatRecoveryTarget({
+    db,env:process.env,workerRunId:actualWorkerRunId,
+    fetchImpl:fetch
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW_UNVERIFIED',
+    target_in_graph:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false,
+    new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
   const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
    db,env:process.env,fetchImpl:fetch
@@ -1362,6 +1378,15 @@ export default async function handler(req,res){
   // A rejected exact-source model patch can be re-claimed ONLY after a
   // changed verified preview release, once, while retaining its rejection
   // memory. The owner original, diagnosis and checkpoint are unchanged.
+  workerStage='SIGNED_CHAT_RECOVERY_DISTINCT_STRATEGY_COMPILATION';
+  const signedRecoveryStrategy=await shiftRpc(db,
+   'reality_recompile_signed_chat_recovery_line_span_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_DISTINCT_COMPILER_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_REJECTED_PATCH_RECONCILIATION';
   const signedRecoveryRevision=await shiftRpc(db,
    'reality_requeue_signed_chat_recovery_after_upgrade_v1',{
@@ -1419,9 +1444,28 @@ export default async function handler(req,res){
     signedRecoveryRevision.negative_memory_receipt_sha256||'')&&
    signedRecoveryRevision.installation_authorized===false&&
    signedRecoveryRevision.original_job_completed===false;
+  const recoveryStrategyProgress=
+   signedRecoveryStrategy.status===
+    'SIGNED_CHAT_RECOVERY_DISTINCT_LINE_SPAN_STRATEGY_FROZEN'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryStrategy.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryStrategy.recompiled_spec_sha256||'')&&
+   signedRecoveryStrategy.installation_authorized===false&&
+   signedRecoveryStrategy.original_job_completed===false;
+  const recoveryReviewProgress=
+   ['SIGNED_CHAT_RECOVERY_INDEPENDENT_DEPENDENCY_TARGET_VERIFIED',
+    'SIGNED_CHAT_RECOVERY_OFF_TARGET_REJECTED_WITH_RECEIPT'].includes(
+      signedRecoveryTargetReview.status)&&
+   /^work:[a-f0-9]{32}$/.test(
+     signedRecoveryTargetReview.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     signedRecoveryTargetReview.review_receipt_sha256||'')&&
+   signedRecoveryTargetReview.installation_authorized===false&&
+   signedRecoveryTargetReview.original_job_completed===false;
   const newDevelopmentAdvanced=recoverySourceProgress||
    recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
-   goalGapRecorded||
+   recoveryStrategyProgress||recoveryReviewProgress||goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
   // This lane already owns its signed ledger. A successful or blocked feature
@@ -1434,7 +1478,9 @@ export default async function handler(req,res){
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
        recoveryRevisionProgress?signedRecoveryRevision:
-        goalGapRecorded?chatFeatureGap:
+        recoveryStrategyProgress?signedRecoveryStrategy:
+         recoveryReviewProgress?signedRecoveryTargetReview:
+          goalGapRecorded?chatFeatureGap:
         publisherProgress.has(chatNewPublished.status)?
          chatNewPublished:chatNewBuild,
     original_job_completed:false,installation_authorized:false,

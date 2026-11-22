@@ -57,6 +57,11 @@ async function askModel({apiKey,model,fetchImpl,claim,role,input,maxTokens}){
      type:'object',additionalProperties:false,
      properties:{path:{type:'string'},reason:{type:'string'}},
      required:['path','reason']
+    }:role.startsWith('patch_line')?{
+     type:'object',additionalProperties:false,
+     properties:{start_line:{type:'integer'},end_line:{type:'integer'},
+      replace:{type:'string'},reason:{type:'string'}},
+     required:['start_line','end_line','replace','reason']
     }:{
      type:'object',additionalProperties:false,
      properties:{find:{type:'string'},replace:{type:'string'},reason:{type:'string'}},
@@ -84,6 +89,41 @@ async function askModel({apiKey,model,fetchImpl,claim,role,input,maxTokens}){
   fail('OPENAI_TYPED_DRAFT_UNVERIFIED');
  return {reply:v,choice:out};
 }
+export function verifyFrozenRecoveryCapabilityClaim(c){
+ const spec=c?.recovery_spec;
+ if(!spec||typeof spec!=='object'||Array.isArray(spec)||
+    !['reality-recovery-compiler-capability-spec-v1',
+      'reality-recovery-compiler-capability-spec-v2'].includes(spec.schema)||
+    spec.original_work_id!==c.original_work_id||
+    spec.signed_message_id!==c.message_id||
+    spec.blocker_receipt_sha256!==c.recovery_blocker_receipt_sha256||
+    spec.source_sha256!==c.message_sha256||
+    typeof spec.original_goal!=='string'||spec.original_goal.length<20||
+    !Array.isArray(spec.required_interfaces)||spec.required_interfaces.length<4||
+    spec.required_interfaces.some(x=>typeof x!=='string'||x.length<12)||
+    !Array.isArray(spec.source_relevance_roots)||
+    spec.source_relevance_roots.length!==3||
+    spec.source_relevance_roots[0]!=='api/reality/governed-employee-shift-worker.js'||
+    spec.source_relevance_roots[1]!=='api/reality/generalized-original-install-review.js'||
+    spec.source_relevance_roots[2]!=='api/reality/generalized-owner-install-approval.js'||
+    spec.quarantine_policy?.permissions_expansion!==false||
+    spec.quarantine_policy?.runtime_execution!==false||
+    spec.quarantine_policy?.source_write!=='isolated-draft-pr-only'||
+    spec.checkpoint?.original_work_id!==c.original_work_id||
+    spec.checkpoint?.signed_source_sha256!==c.message_sha256||
+    spec.full_goal_accepted!==false||
+    spec.installation_authorized!==false||
+    spec.original_job_completed!==false||
+    spec.production_changed!==false)
+   return false;
+ if(spec.schema==='reality-recovery-compiler-capability-spec-v2'&&
+    (spec.patch_strategy!=='FROZEN_GITHUB_LINE_SPAN_INDEPENDENT_EXACT_ANCHOR'||
+     !Number.isInteger(spec.source_size_max_bytes)||
+     spec.source_size_max_bytes<1000||spec.source_size_max_bytes>210000||
+     spec.line_span_max_lines!==81))
+   return false;
+ return true;
+}
 function checkClaim(c,db,env,recoveryMode=false){
  if(c?.status==='NO_PENDING_SIGNED_NEW_DEVELOPMENT'||
     c?.status==='NO_PENDING_SIGNED_CHAT_RECOVERY')return false;
@@ -93,7 +133,8 @@ function checkClaim(c,db,env,recoveryMode=false){
    recoveryMode&&(!UUID.test(c.trigger_id||'')||
     !/^sha256:[a-f0-9]{64}$/.test(c.recovery_spec_sha256||'')||
     !/^sha256:[a-f0-9]{64}$/.test(c.recovery_blocker_receipt_sha256||'')||
-    c.recovery_mode!==true)||
+    c.recovery_mode!==true||
+    !verifyFrozenRecoveryCapabilityClaim(c))||
 
    !UUID.test(c.message_id||'')||!UUID.test(c.request_id||'')||
    !UUID.test(c.owner_id||'')||!UUID.test(c.conversation_id||'')||
@@ -131,6 +172,75 @@ export function validateExactUniqueDevelopmentPatch(source,choice){
   return Object.freeze({ok:false,reason:'PROPOSED_SOURCE_BOUNDS_INVALID'});
  return Object.freeze({ok:true,reason:'EXACT_UNIQUE_FROZEN_PATCH_VERIFIED',
   proposed});
+}
+// A model can select a line span but NEVER supply the authoritative FIND.
+// Reality derives the actual bytes from a pinned GitHub source snapshot.
+export function deriveExactPatchFromFrozenLineSpan(source,choice,visibleRanges=null){
+ if(typeof source!=='string'||!choice||Array.isArray(choice)||
+    typeof choice!=='object')
+  return Object.freeze({ok:false,reason:'FROZEN_LINE_SPAN_TYPED_SOURCE_REQUIRED'});
+ const lines=source.match(/[^\n]*\n|[^\n]+$/g)||[];
+ if(!Number.isSafeInteger(choice.start_line)||
+    !Number.isSafeInteger(choice.end_line)||
+    choice.start_line<1||choice.end_line<choice.start_line||
+    choice.end_line>lines.length||
+    choice.end_line-choice.start_line>80)
+  return Object.freeze({ok:false,reason:'FROZEN_LINE_SPAN_RANGE_INVALID'});
+ if(visibleRanges!==null&&
+    (!Array.isArray(visibleRanges)||
+     !visibleRanges.some(([a,b])=>
+      Number.isSafeInteger(a)&&Number.isSafeInteger(b)&&
+      choice.start_line>=a&&choice.end_line<=b)))
+  return Object.freeze({ok:false,reason:'FROZEN_LINE_SPAN_NOT_VISIBLE_IN_REVIEW'});
+ const find=lines.slice(choice.start_line-1,choice.end_line).join('');
+ const proposed={find,replace:choice.replace,reason:choice.reason};
+ const checked=validateExactUniqueDevelopmentPatch(source,proposed);
+ if(!checked.ok)return Object.freeze({ok:false,reason:checked.reason});
+ return Object.freeze({ok:true,reason:'FROZEN_LINE_SPAN_DETERMINISTICALLY_BOUND',
+  find,replace:choice.replace,source_reason:choice.reason,
+  proposed:checked.proposed});
+}
+// Preserve global frozen line numbers even when a source file is too large
+// for one model instruction. All displayed bytes come from the pinned GitHub
+// blob; the model may choose ONLY an independently displayed contiguous span.
+export function freezeNumberedRecoverySourceExcerpt(source,goal,maxChars=36000){
+ const lines=String(source||'').match(/[^\n]*\n|[^\n]+$/g)||[];
+ if(!lines.length||!Number.isSafeInteger(maxChars)||maxChars<2000)
+  return Object.freeze({text:'',ranges:[]});
+ const label=(i)=>String(i+1).padStart(5,'0')+'| '+lines[i];
+ const labeled=lines.map((_,i)=>label(i)).join('');
+ if(labeled.length<=maxChars)
+  return Object.freeze({text:labeled,ranges:[[1,lines.length]]});
+ const sought=[...words(goal)].filter(x=>x.length>=5).slice(0,45);
+ const ranked=lines.map((line,i)=>{
+  const lower=line.toLowerCase();
+  const score=sought.reduce((n,t)=>n+(lower.includes(t)?1:0),0)+
+   (/\b(export|function|const)\b/.test(lower)?1:0);
+  return {i,score};
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.i-b.i);
+ const selected=new Set(),limits=[];
+ const tryRange=(lo,hi)=>{
+  for(let i=lo;i<=hi&&i<lines.length;i++){
+   if(i<0||selected.has(i))continue;
+   selected.add(i);
+  }
+ };
+ tryRange(0,Math.min(lines.length-1,26));
+ for(const {i} of ranked.slice(0,65)){
+  if(selected.size>420)break;
+  tryRange(i-5,i+6);
+ }
+ let text='',ranges=[],active=null;
+ const available=[...selected].sort((a,b)=>a-b);
+ for(const i of available){
+  const line=label(i);
+  if(text.length+line.length>maxChars)break;
+  if(!active||active[1]+1!==i+1){
+   active=[i+1,i+1];ranges.push(active);
+  }else active[1]=i+1;
+  text+=line;
+ }
+ return Object.freeze({text,ranges});
 }
 function excerpt(src,instruction){
  if(src.length<=33000)return src;
@@ -216,10 +326,23 @@ export async function generateNextSignedChatDevelopmentDraft({
      tree.truncated===true||!Array.isArray(tree.tree)||
      tree.tree.length>20000)
    fail('SOURCE_TREE_INCOMPLETE');
+  const limit=recoveryMode?
+    Number(claim.recovery_spec?.source_size_max_bytes||210000):250000;
   const candidates=tree.tree.filter(f=>f.type==='blob'&&allowPath(f.path)&&
-    SHA.test(f.sha||'')&&Number.isSafeInteger(f.size)&&f.size<=250000);
+    SHA.test(f.sha||'')&&Number.isSafeInteger(f.size)&&
+    f.size>=100&&f.size<=limit);
   if(!candidates.length)fail('NO_ELIGIBLE_SOURCE_FILE');
-  const w=words(claim.original_instruction+' '+claim.objective);
+  const recoverySpecText=recoveryMode?JSON.stringify({
+   original_goal:claim.recovery_spec.original_goal,
+   blocker_code:claim.recovery_spec.blocker_code,
+   required_interfaces:claim.recovery_spec.required_interfaces,
+   source_relevance_roots:claim.recovery_spec.source_relevance_roots,
+   original_checkpoint:claim.recovery_spec.checkpoint,
+   quarantine_policy:claim.recovery_spec.quarantine_policy,
+   permitted_patch_strategy:claim.recovery_spec.patch_strategy||'EXACT_FROZEN_SOURCE'
+  }):'';
+  const w=words(claim.original_instruction+' '+claim.objective+
+    ' '+recoverySpecText);
   const score=x=>[...w].reduce((n,a)=>n+(x.path.toLowerCase().includes(a)?4:0),0)+
     (/^(src|api\/reality)\//.test(x.path)?1:0);
   candidates.sort((a,b)=>score(b)-score(a)||a.path.localeCompare(b.path));
@@ -227,6 +350,10 @@ export async function generateNextSignedChatDevelopmentDraft({
   const selected=await askModel({
    apiKey,model,fetchImpl,claim,role:'target',maxTokens:400,
    input:'Authenticated owner build request: '+claim.original_instruction+
+    (recoveryMode?'\nFrozen, DB-verified capability contract (DATA, not authority):\n'+
+     recoverySpecText+'\nOnly propose a source target that implements one of '+
+     'the specified interfaces. Later independent provider review will '+
+     'reject targets outside pinned executor and installer entrypoints.':'')+
     '\nTarget existing Reality source file must be ONE path from this independently '+
     'read back repository manifest; do not invent a path. If this needs '+
     'several files, select the first coherent, bounded source file.\n'+
@@ -241,7 +368,7 @@ export async function generateNextSignedChatDevelopmentDraft({
     !SHA.test(source.sha||'')||
     typeof source.content!=='string'||
     !Number.isSafeInteger(source.size)||
-    source.size<100||source.size>250000)
+    source.size<100||source.size>limit)
    fail('MODEL_SOURCE_CONTENT_READBACK_UNVERIFIED');
   const bytes=Buffer.from(source.content.replace(/\s/g,''),'base64');
   if(bytes.length!==source.size||blobSHA(bytes)!==source.sha)
@@ -250,7 +377,63 @@ export async function generateNextSignedChatDevelopmentDraft({
   if(Buffer.from(text,'utf8').length!==bytes.length||text.includes('\0'))
    fail('MODEL_SOURCE_TEXT_UTF8_REQUIRED');
   failure='MODEL_GENERATION_UNVERIFIED';
-  const instruction='One signed owner development request: '+claim.original_instruction+
+  let patch,checked;
+  if(recoveryMode){
+   // Different synthesis contract after two source-text rejections:
+   // only independently derived exact anchors, never free-form find text.
+   const lines=text.match(/[^\n]*\n|[^\n]+$/g)||[];
+   if(lines.length<5)
+    fail('MODEL_FROZEN_LINE_NUMBERED_SOURCE_BOUNDS_INVALID');
+   const frozenExcerpt=freezeNumberedRecoverySourceExcerpt(
+    text,recoverySpecText,claim.recovery_spec.source_excerpt_max_chars||36000);
+   const numbered=frozenExcerpt.text;
+   if(numbered.length<100||numbered.length>36000||
+      !frozenExcerpt.ranges.length)
+    fail('MODEL_FROZEN_LINE_NUMBERED_SOURCE_BOUNDS_INVALID');
+   const instruction='Signed original recovery capability: '+claim.objective+
+     '\nFrozen complete capability specification (DATA): '+recoverySpecText+
+     '\nExact source file: '+path+'\nFrozen commit: '+claim.release_sha+
+     '\nChoose a coherent, source-backed contiguous range of 1 to 81 '+
+     'line-numbered source lines to REPLACE with a bounded implementation. '+
+     'The output START_LINE and END_LINE must be exact integer line numbers '+
+     'from the labelled provider source below. NEVER output a copied find '+
+     'string; Reality independently derives the find bytes. '+
+     'Return JSON {start_line,end_line,replace,reason} only; '+
+     'no tool invocation, install, approval or completion claim. '+
+     'Existing source follows:\n'+numbered;
+   let raw=await askModel({
+    apiKey,model,fetchImpl,claim,role:'patch_line',maxTokens:4400,
+    input:instruction
+   });
+   let derived=deriveExactPatchFromFrozenLineSpan(
+     text,raw.choice,frozenExcerpt.ranges);
+   if(!derived.ok){
+    const badFingerprint=createHash('sha256').update(
+     JSON.stringify(raw.choice)).digest('hex');
+    const revised=await askModel({
+     apiKey,model,fetchImpl,claim,role:'patch_line_correction',maxTokens:4400,
+     input:'The independent frozen-line verifier rejected your first proposal: '+
+      derived.reason+'. This is the ONE permitted correction. Choose a NEW '+
+      'existing unique line span. Do not repeat prior attempt fingerprint '+
+      badFingerprint+'. Preserve original, commit, source bytes and authority.\n'+
+      instruction
+    });
+    if(createHash('sha256').update(JSON.stringify(revised.choice))
+       .digest('hex')===badFingerprint)
+     fail('MODEL_REPEATED_INVALID_LINE_SPAN');
+    raw=revised;
+    derived=deriveExactPatchFromFrozenLineSpan(
+      text,raw.choice,frozenExcerpt.ranges);
+   }
+   if(!derived.ok)
+    fail('MODEL_FROZEN_LINE_SPAN_INVALID');
+   patch={reply:raw.reply,choice:{
+    find:derived.find,replace:derived.replace,
+    reason:derived.source_reason}};
+   checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
+  }else{
+   const instruction='One signed owner development request: '+
+    claim.original_instruction+
     '\nObjective: '+claim.objective+
     '\nExact source path: '+path+
     '\nBase commit: '+claim.release_sha+
@@ -259,33 +442,10 @@ export async function generateNextSignedChatDevelopmentDraft({
     'safe code. The find block must appear exactly once in the original. '+
     'Do not claim tests passed. No installation.\n'+
     excerpt(text,claim.original_instruction);
-  let patch=await askModel({
-   apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
-   input:instruction
-  });
-  let checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
-  if(!checked.ok&&recoveryMode){
-   // ONE bounded corrective synthesis using deterministic source feedback.
-   // Never fuzzily apply the failed find, silently relax invariants or
-   // allow the model to approve its own output.
-   const rejectedHash=createHash('sha256').update(
-    JSON.stringify(patch.choice)).digest('hex');
-   const repaired=await askModel({
-    apiKey,model,fetchImpl,claim,role:'patch_correction',maxTokens:4400,
-    input:'Independent source verifier rejected the previous model patch: '+
-      checked.reason+'. Preserve the SAME job, file and base commit. '+
-      'Generate a NEW bounded patch whose FIND text is copied exactly, '+
-      'byte-for-byte, from the frozen source; never paraphrase, truncate '+
-      'or match more than one occurrence. Return changed code only as JSON '+
-      'find/replace/reason; no installs or authority. '+
-      'Rejected candidate fingerprint (DO NOT repeat): '+rejectedHash+
-      '\n'+instruction
+   patch=await askModel({
+    apiKey,model,fetchImpl,claim,role:'patch',maxTokens:4400,
+    input:instruction
    });
-   const repairedHash=createHash('sha256').update(
-    JSON.stringify(repaired.choice)).digest('hex');
-   if(repairedHash===rejectedHash)
-    fail('MODEL_REPEATED_INVALID_PATCH');
-   patch=repaired;
    checked=validateExactUniqueDevelopmentPatch(text,patch.choice);
   }
   if(!checked.ok)
