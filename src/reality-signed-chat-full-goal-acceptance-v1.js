@@ -62,7 +62,7 @@ function valid(c){
   SHA.test(c.base_sha||'')&&SHA.test(c.candidate_commit_sha||'')&&SHA.test(c.source_commit_sha||'')&&
   SHA.test(c.expected_preinstall_blob_sha||'')&&SHA.test(c.expected_installed_blob_sha||'')&&c.expected_preinstall_blob_sha!==c.expected_installed_blob_sha&&
   HASH.test(c.candidate_sha256||'')&&HASH.test(c.candidate_artifact_sha256||'')&&HASH.test(c.quarantine_receipt_sha256||'')&&
-  targetPath(c.target_path)&&/^reality\/chat-recovery\/[a-f0-9-]{36}(-feature-r[1-9][0-9]*)?(-syntax-r1)?$/.test(c.candidate_branch||'')&&
+  targetPath(c.target_path)&&/^reality\/chat-recovery\/[a-f0-9-]{36}(-feature-r[1-9][0-9]*)?(-syntax-r[1-9])?$/.test(c.candidate_branch||'')&&
   Number.isSafeInteger(c.candidate_pr_number)&&c.candidate_pr_number>0&&
   c.installation_authorized===false&&c.original_job_completed===false&&c.production_changed===false;
 }
