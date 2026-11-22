@@ -150,6 +150,8 @@ import {executeOneRegisteredMaintenanceCiWake}
 import {planGovernedCapabilitiesFromOwnerReceipts,
  planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability}
  from '../../src/reality-evidence-driven-capability-router-v1.js';
+import {attestSignedWorkerLoadedCapabilities}
+ from '../../src/reality-signed-worker-capability-delivery-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 import {reconcileSignedVerifiedMaintenanceArtifact,
@@ -2099,10 +2101,21 @@ export default async function handler(req,res){
   // classification does not independently authorize or replay that effect.
   // Missing provider authority is a proof/owner boundary, NOT an excuse
   // to synthesize a successful repair or restart the fenced GitHub write.
+  const registeredRecoveryActionKeys=Object.freeze([
+   'REQUALIFY_EXISTING_CONTINUITY_SOURCE'
+  ]);
   const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
    classification:continuityRecoveryHandoffClassification,
    ownerId:unifiedGraph.owner_id,shiftId:wakeReceipt.shift_id,
-   registeredActionKeys:['REQUALIFY_EXISTING_CONTINUITY_SOURCE']
+   registeredActionKeys:registeredRecoveryActionKeys
+  });
+  // The signed worker now reveals the capability release actually loaded
+  // on THIS wake. A different PR's READY preview is not an active install.
+  // The independent release/alias reviewer must separately compare this
+  // immutable runtime identity with an exact approved release and CI proof.
+  const signedWorkerCapabilityDelivery=attestSignedWorkerLoadedCapabilities({
+   wake:wakeReceipt,graph:unifiedGraph,env:process.env,
+   registeredActionKeys:registeredRecoveryActionKeys
   });
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
@@ -3166,6 +3179,7 @@ export default async function handler(req,res){
     governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     governed_continuity_recovery_handoff:continuityRecoveryHandoffClassification,
     governed_continuity_registered_recovery_route:continuityRecoveryRegisteredRouting,
+    signed_worker_capability_delivery:signedWorkerCapabilityDelivery,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
