@@ -128,7 +128,16 @@ export function parseContinuityModelInvestigation(response,roles,{guidedRecovery
  const reviewer=functions.get(value.reviewer_function_id);
  if(!worker||!reviewer||worker.function_id===reviewer.function_id)
   fail('INDEPENDENT_EMPLOYEE_REVIEWER_REQUIRED');
- const violations=textContractViolations(value,guidedRecovery);
+ // Treat purely presentational outer whitespace as a reversible, bounded
+ // normalization, not a failed source investigation. Never repair schema,
+ // unknown fields, enum choices, too-short content, or overlong prose.
+ // This acts ONLY on exact narrative fields already admitted by the schema.
+ const normalized={...value};
+ for(const {field} of continuityTextContract(guidedRecovery)){
+  if(typeof normalized[field]==='string')
+   normalized[field]=normalized[field].trim();
+ }
+ const violations=textContractViolations(normalized,guidedRecovery);
  if(violations.length){
   const error=Error('SHIFT_CONTINUITY_DIAGNOSIS_AND_TEST_SPEC_UNVERIFIED');
   error.validationEvidence={schema:'reality-continuity-text-validation-v1',violations};
@@ -139,7 +148,7 @@ export function parseContinuityModelInvestigation(response,roles,{guidedRecovery
   !GOVERNED_RECOVERY_ACTIONS.includes(value.next_governed_action)))
   fail('GOVERNED_RECOVERY_ROUTE_UNVERIFIED');
  return Object.freeze({
-  ...value,assigned_employee:worker.employee_name,
+  ...normalized,assigned_employee:worker.employee_name,
   independent_reviewer:reviewer.employee_name,
   model_response_id:response.id
  });
@@ -233,7 +242,8 @@ export async function investigateOneSignedShiftContinuityIncident({
    claim.source_evidence.source_claim_id!==claim.source_claim_id||
    !HASH.test(claim.source_evidence.spec_sha256||'')||
    !HASH.test(claim.source_evidence.candidate_sha256||'')||
-   !HASH.test(claim.source_evidence.syntax_receipt_sha256||'')||
+   !(claim.source_evidence.syntax_verified===true||
+    HASH.test(claim.source_evidence.syntax_receipt_sha256||''))||
    !HASH.test(claim.source_evidence.target_review_receipt_sha256||'')||
    !HASH.test(claim.source_evidence.blocker_receipt_sha256||'')||
    !/^[a-f0-9]{40}$/.test(claim.source_evidence.candidate_base_sha||'')||
@@ -285,8 +295,21 @@ export async function investigateOneSignedShiftContinuityIncident({
    fail('MODEL_PROVIDER_UNVERIFIED');
   // Independently refresh a supported owner-scoped GitHub source when possible.
   // Unavailability becomes evidence of a gap, never invented provider proof.
-  const sourceRef=String(claim.failed_source_ref||'');
+  // A signed Chat original already carries an authenticated, immutable ledger
+  // source reference. Do not misleadingly tell the investigator there is NO
+  // source simply because this is not a GitHub issue or pull request.
+  const sourceRef=String(claim.failed_source_ref||
+   (claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED'?
+    claim.source_evidence?.source_ref:'')||'');
   let sourceReadback={status:'NO_SOURCE_REF_FOR_CURRENT_INCIDENT'};
+  if(claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED'&&
+   /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(sourceRef)&&
+   HASH.test(claim.source_evidence?.source_sha256||'')){
+   sourceReadback={status:'FROZEN_SIGNED_CHAT_LEDGER_REFERENCE_ONLY',
+    source_ref:sourceRef,source_sha256:claim.source_evidence.source_sha256,
+    independently_refreshed:false,github_provider_effect_verified:false,
+    owner_permission_verified:false};
+  }
   if(/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(sourceRef)){
    try{
     const observed=await readSource(sourceRef,{fetchImpl,
@@ -310,7 +333,9 @@ export async function investigateOneSignedShiftContinuityIncident({
   // The existing owner-scoped original preflight provides current admission
   // gates and exact Continuity routes to the LLM without granting authority.
   let liveWorkPreflight={status:'CURRENT_OWNER_WORK_PREFLIGHT_UNAVAILABLE'};
-  if(guidedRecovery&&!chatReviewIncident){
+  if(guidedRecovery&&(!chatReviewIncident||fencedTransitionIncident)){
+   // Fenced-provider incidents also require owner-scoped read-only preflight;
+   // never turn the result into authority for another provider write.
    try{
     const observed=await call(db,'reality_read_owner_multi_original_shift_preflight_v1',{
      p_owner_id:claim.owner_id,p_target_original_count:2
