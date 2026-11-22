@@ -30,6 +30,7 @@ test('existing signed worker automatically invokes guarded gap transition once p
  assert.match(worker,/reality_record_next_chat_development_goal_gap_v1/);
  assert.match(worker,/goalGapRecorded=\s*chatFeatureGap\?\.status===/);
  assert.match(worker,/const newDevelopmentAdvanced=recoveryReviewRetryProgress\|\|/);
+ assert.match(worker,/recoveryOfftargetProgress\|\|recoverySourceProgress\|\|/);
  assert.match(worker,/recoveryDraftProgress\|\|recoverySpecProgress\|\|recoveryRevisionProgress\|\|/);
  assert.match(worker,/goalGapRecorded\|\|/);
  assert.match(worker,/goalGapRecorded\?chatFeatureGap:/);
