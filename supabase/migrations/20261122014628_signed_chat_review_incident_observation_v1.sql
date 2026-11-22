@@ -182,6 +182,20 @@ begin
    and remediation_release_commit~'^[a-f0-9]{40}$'
    and remediation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    and remediation_ci_run_id is not null))
+  and (kind<>'SIGNED_CHAT_RECOVERY_REVIEW_STALLED' or (
+   source_evidence->>'investigation_only'='true'
+   and evidence_sha256='sha256:'||pg_catalog.encode(
+       extensions.digest(source_evidence::text,'sha256'),'hex')
+   and exists(select 1 from reality_internal.genuine_capability_queue_v1 g
+     where g.owner_id=owner_shift_continuity_incidents_v1.owner_id
+      and g.trigger_id::text=source_evidence->>'trigger_id'
+      and g.claim_id=owner_shift_continuity_incidents_v1.source_claim_id
+      and g.original_work_id=source_evidence->>'original_work_id'
+      and g.qualified_candidate->>'candidate_sha256'=source_evidence->>'candidate_sha256'
+      and g.qualification_receipt->>'target_review_failure_receipt_sha256'=
+       source_evidence->>'failure_receipt_sha256'
+      and g.phase='SIGNED_CHAT_RECOVERY_TARGET_REVIEW_UNVERIFIED'
+      and g.quarantine_receipt_sha256 is null)))
   and (next_investigation_at is null or next_investigation_at<=clock_timestamp())
  order by first_detected_at limit 1 for update skip locked;
  if not found then return pg_catalog.jsonb_build_object(
@@ -225,5 +239,4 @@ begin
   'model_inquiry_authorized',true,'new_original_jobs_created',0,
   'execution_authorized',false,'installation_authorized',false,
   'production_changed',false);
-end $function$
-
+end $function$;
