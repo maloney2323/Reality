@@ -365,6 +365,11 @@ export async function generateNextSignedChatDevelopmentDraft({
     target_selection_policy:claim.recovery_spec.target_selection_policy,
     rejected_target_path:claim.recovery_spec.rejected_target_path,
     prior_target_rejection_receipt_sha256:claim.recovery_spec.prior_target_rejection_receipt_sha256}:{}),
+   ...(claim.recovery_spec.prior_syntax_rejection_receipt_sha256?{
+    prior_syntax_rejection_receipt_sha256:claim.recovery_spec.prior_syntax_rejection_receipt_sha256,
+    prior_syntax_target_path:claim.recovery_spec.prior_syntax_target_path,
+    prior_syntax_failed_candidate_sha256:claim.recovery_spec.prior_syntax_failed_candidate_sha256,
+    prior_syntax_reason:claim.recovery_spec.prior_syntax_reason}:{}),
    permitted_patch_strategy:claim.recovery_spec.patch_strategy||'EXACT_FROZEN_SOURCE'
   }):'';
   const w=words(claim.original_instruction+' '+claim.objective+
@@ -421,6 +426,7 @@ export async function generateNextSignedChatDevelopmentDraft({
      '\nExact source file: '+path+'\nFrozen commit: '+claim.release_sha+
      '\nChoose a coherent, source-backed contiguous range of 1 to 81 '+
      'line-numbered source lines to REPLACE with a bounded implementation. '+
+     'The replacement is spliced before the next untouched line. Include exactly the braces and final newline required by your selected inclusive span, without duplicating adjacent braces. '+
      'The output START_LINE and END_LINE must be exact integer line numbers '+
      'from the labelled provider source below. NEVER output a copied find '+
      'string; Reality independently derives the find bytes. '+

@@ -105,6 +105,8 @@ import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
+import {independentlyVerifySignedRecoverySyntax}
+ from '../../src/reality-signed-chat-recovery-syntax-verifier-v1.js';
 import {stageNextSignedChatRecoveryQuarantine}
  from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
 import {independentlyReviewOneSignedChatRecoveryTarget,independentlyReobserveStalledRecoveryReview}
@@ -1426,6 +1428,11 @@ export default async function handler(req,res){
     original_job_completed:false,production_changed:false,
     new_shift_started:false
    }));
+  workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_PARSE_ONLY';
+  const signedRecoverySyntax= wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await independentlyVerifySignedRecoverySyntax({db,env:process.env,shiftId:wakeReceipt.shift_id,
+    workerRunId:actualWorkerRunId,fetchImpl:fetch}).catch(()=>({status:'SIGNED_RECOVERY_PARSE_PROOF_UNVERIFIED'})):
+   {status:'NO_CURRENT_SIGNED_RECOVERY_PARSE_SCOPE'};
   workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
   const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
    db,env:process.env,fetchImpl:fetch
@@ -3085,6 +3092,8 @@ export default async function handler(req,res){
     same_original_recovery_checkpoint:sameOriginalRecoveryCheckpoint,
     same_original_recovery_ci_checkpoint:sameOriginalRecoveryCiCheckpoint,
     chat_new_development_checkpoint:chatNewDevelopmentCheckpoint,
+    signed_chat_recovery_syntax:signedRecoverySyntax,
+    signed_chat_recovery_quarantine:signedRecoveryQuarantine,
     corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
