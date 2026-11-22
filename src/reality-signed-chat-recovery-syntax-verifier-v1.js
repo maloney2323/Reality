@@ -37,7 +37,7 @@ export function parseOnlyModuleFailureCategory(source,spawn=spawnSync){
  if(result.status!==1||typeof result.stderr!=='string'||
   !/SyntaxError:/.test(result.stderr))
   return Object.freeze({verdict:'PARSE_PROVIDER_UNAVAILABLE'});
- const diagnostic=result.stderr.match(/SyntaxError:\\s*([^\\r\\n]{1,140})/);
+ const diagnostic=result.stderr.match(/SyntaxError:\s*([^\r\n]{1,140})/);
  const message=diagnostic?.[1]||'';
  const category=/Unexpected end of input|Unexpected end of file/i.test(message)?
   'UNEXPECTED_END_OF_MODULE':
@@ -46,7 +46,7 @@ export function parseOnlyModuleFailureCategory(source,spawn=spawnSync){
   /Identifier .* has already been declared/i.test(message)?'DUPLICATE_DECLARATION':
   /Invalid or unexpected token/i.test(message)?'INVALID_TOKEN':
   'OTHER_SYNTAX_ERROR';
- const match=result.stderr.match(/\\[stdin\\]:(\\d{1,6})/);
+ const match=result.stderr.match(/\[stdin\]:(\d{1,6})/);
  const position=match?Number(match[1]):null;
  return Object.freeze({
   verdict:'INVALID_SYNTAX',category,
