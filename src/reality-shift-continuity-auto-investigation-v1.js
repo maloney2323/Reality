@@ -172,7 +172,7 @@ export async function investigateOneSignedShiftContinuityIncident({
   !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
-    'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED'].includes(claim.kind)||
+    'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'].includes(claim.kind)||
   (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
    (!UUID.test(claim.source_claim_id||'')||
     !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
@@ -191,6 +191,16 @@ export async function investigateOneSignedShiftContinuityIncident({
     claim.source_evidence.original_job_completed!==false||
     claim.source_evidence.installation_authorized!==false||
     claim.source_evidence.production_changed!==false))||
+  (claim.kind==='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'&&(
+   claim.source_evidence?.schema!=='reality-signed-chat-syntax-incident-source-v1'||
+   !/^work:[a-f0-9]{32}$/.test(claim.source_evidence.original_work_id||'')||
+   !UUID.test(claim.source_evidence.trigger_id||'')||claim.source_evidence.source_claim_id!==claim.source_claim_id||
+   !HASH.test(claim.source_evidence.candidate_sha256||'')||!HASH.test(claim.source_evidence.failure_receipt_sha256||'')||
+   !HASH.test(claim.source_evidence.prior_failure_receipt_sha256||'')||
+   !Array.isArray(claim.source_evidence.failure_history)||claim.source_evidence.failure_history.length!==2||
+   claim.source_evidence.failure_history.some(x=>x?.candidate!=='INVALID_SYNTAX'||x.baseline!=='VALID_SYNTAX'||x.parse_only!==true||x.candidate_executed!==false)||
+   claim.source_evidence.investigation_only!==true||claim.source_evidence.root_cause_verified!==false||
+   claim.source_evidence.original_job_completed!==false||claim.source_evidence.installation_authorized!==false||claim.source_evidence.production_changed!==false))||
   claim.scope!=='SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY'||
   claim.model_inquiry_authorized!==true||
   claim.new_original_jobs_created!==0||
@@ -240,7 +250,8 @@ export async function investigateOneSignedShiftContinuityIncident({
      source_body_untrusted:String(observed.source_body||'').slice(0,4500)};
    }catch{sourceReadback={status:'CURRENT_SOURCE_READBACK_UNVERIFIED',source_ref:sourceRef}}
   }
-  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED';
+  const syntaxIncident=claim.kind==='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED';
+  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident;
   const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident;
   // Real repeated wake receipts prove no progress, not a root cause.
   // The existing owner-scoped original preflight provides current admission
@@ -319,7 +330,9 @@ export async function investigateOneSignedShiftContinuityIncident({
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
      'Return only the specified fields.'+
-     (chatReviewIncident?
+     (syntaxIncident?
+      ' Two independently parsed candidates failed while their frozen baselines parsed. Investigate the exact model/compiler splice boundary and preserved distinct failure receipts. Prefer RUN_INDEPENDENT_FROZEN_TEST or INVESTIGATE_EXISTING_HANDOFF for the compiler defect. Require read-only reproduction against pinned source bytes: original splice invalid, uniquely corrected span valid, replacement bytes unchanged. No candidate execution, testing claim, installation, policy weakening, or bypass. ':
+      chatReviewIncident?
       ' The incident is a signed Chat original reviewer infrastructure failure. '+
       'Use the exact original, candidate and failed review receipts in source_evidence. '+
       'The active shift is investigation scope only; do not transfer authority or confuse '+
