@@ -158,3 +158,164 @@ export function assessSignedWorkerCapabilityActivation({
    capability_usable_by_llm:false
   });
 }
+
+
+// Independent service-only install adapter for the next signed worker release.
+// The caller MUST provide trusted implementations of claimApprovedRelease,
+// observeAlias, and assignAlias; no LLM-generated callback or dynamic endpoint
+// may be registered here. A one-use service claim, pinned CI and known old
+// alias are prerequisites to a single provider assignment.
+// This function does not grant a job warrant or certify the resumed original.
+export async function deliverOnceApprovedSignedWorkerCapability({
+ env=process.env,ownerId,shiftId,targetReleaseSha,targetReleaseRef,
+ capabilityKey,scheduledAlias,releaseCandidate,ci,
+ claimApprovedRelease,observeAlias,assignAlias
+}={}){
+ const base=(status,detail={})=>Object.freeze({
+  schema:'reality-signed-worker-delivery-executor-v1',
+  status,...detail,
+  original_job_completed:false,production_changed:false,
+  model_tool_permission_granted:false,new_shift_started:false,
+  signed_worker_new_release_observed:false,
+  independent_original_settlement_verified:false
+ });
+ if(env.VERCEL_ENV!=='preview'||
+  env.REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED!=='true'||
+  !UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+  !SHA.test(targetReleaseSha||'')||!REF.test(targetReleaseRef||'')||
+  !KEY.test(capabilityKey||'')||
+  typeof scheduledAlias!=='string'||
+  !/^[a-z0-9-]{6,145}\\.vercel\\.app$/.test(scheduledAlias)||
+  typeof claimApprovedRelease!=='function'||
+  typeof observeAlias!=='function'||
+  typeof assignAlias!=='function')
+  return base('SIGNED_CAPABILITY_DELIVERY_SERVICE_BOUNDARY_UNVERIFIED',{
+   provider_assignment_attempted:false
+  });
+ if(releaseCandidate?.sha!==targetReleaseSha||
+  releaseCandidate.branch!==targetReleaseRef||
+  releaseCandidate.shift_id!==shiftId||
+  releaseCandidate.capability_key!==capabilityKey||
+  releaseCandidate.preview_only!==true||
+  releaseCandidate.provider_deployment_ready!==true||
+  releaseCandidate.environment!=='ISOLATED_PREVIEW'||
+  releaseCandidate.production_changed!==false||
+  ci?.status!=='INDEPENDENT_FROZEN_CI_PASSED'||
+  ci.release_sha!==targetReleaseSha||
+  ci.independently_verified!==true||
+  ci.test_source_pinned!==true||
+  !Number.isSafeInteger(ci.run_id)||ci.run_id<=0)
+  return base('SIGNED_CAPABILITY_DELIVERY_PINNED_CI_OR_RELEASE_UNVERIFIED',{
+   provider_assignment_attempted:false
+  });
+ // A provider-created READY preview is not the scheduled alias.
+ let oldAlias;
+ try{oldAlias=await observeAlias(scheduledAlias)}
+ catch{return base('SIGNED_CAPABILITY_DELIVERY_PROVIDER_READ_UNAVAILABLE',{
+  provider_assignment_attempted:false
+ })}
+ if(oldAlias?.provider!=='VERCEL'||
+  oldAlias.independently_observed!==true||
+  oldAlias.preview_only!==true||
+  oldAlias.project_verified!==true||
+  !SHA.test(oldAlias.resolved_release_sha||'')||
+  !REF.test(oldAlias.resolved_branch||''))
+  return base('SIGNED_CAPABILITY_DELIVERY_OLD_ALIAS_UNVERIFIED',{
+   provider_assignment_attempted:false
+  });
+ if(oldAlias.resolved_release_sha===targetReleaseSha&&
+   oldAlias.resolved_branch===targetReleaseRef)
+  return base('SIGNED_CAPABILITY_DELIVERY_ALIAS_ALREADY_TARGET_NO_REPLAY',{
+   provider_assignment_attempted:false,
+   next_governed_action:'OBSERVE_ACTUAL_SIGNED_WORKER_WAKE_ON_SAME_SHIFT'
+  });
+ // This must be a database-backed atomic one-use installer authorization,
+ // not a classifier/PR/CI model claim. The exact old alias commit acts as
+ // an optimistic-concurrency fence. A failed claim NEVER calls Vercel.
+ let claim;
+ try{claim=await claimApprovedRelease({
+  owner_id:ownerId,shift_id:shiftId,
+  release_sha:targetReleaseSha,release_ref:targetReleaseRef,
+  capability_key:capabilityKey,scheduled_alias:scheduledAlias,
+  previous_release_sha:oldAlias.resolved_release_sha,
+  previous_release_ref:oldAlias.resolved_branch,
+  independent_ci_run_id:ci.run_id
+ })}catch{return base('SIGNED_CAPABILITY_DELIVERY_OWNER_CLAIM_UNAVAILABLE',{
+  provider_assignment_attempted:false
+ })}
+ if(claim?.status!=='EXACT_SIGNED_CAPABILITY_DELIVERY_CLAIMED'||
+  claim.owner_id!==ownerId||claim.shift_id!==shiftId||
+  claim.release_sha!==targetReleaseSha||
+  claim.release_ref!==targetReleaseRef||
+  claim.capability_key!==capabilityKey||
+  claim.scheduled_alias!==scheduledAlias||
+  claim.previous_release_sha!==oldAlias.resolved_release_sha||
+  claim.previous_release_ref!==oldAlias.resolved_branch||
+  claim.independent_ci_run_id!==ci.run_id||
+  claim.target_environment!=='ISOLATED_PREVIEW'||
+  claim.one_use_service_claim!==true||
+  claim.owner_approved_exact_release!==true||
+  !UUID.test(claim.claim_id||'')||
+  !HASH.test(claim.approval_receipt_sha256||'')||
+  claim.production_change_permitted!==false)
+  return base('SIGNED_CAPABILITY_DELIVERY_EXACT_OWNER_AUTHORITY_MISSING',{
+   provider_assignment_attempted:false,
+   next_governed_action:'PRESENT_PINNED_RELEASE_IN_REALITY_CHAT_FOR_EXACT_APPROVAL'
+  });
+ // A final independent alias re-read prevents an obsolete approved claim
+ // from overwriting a new worker release if another actor raced us.
+ let before;
+ try{before=await observeAlias(scheduledAlias)}
+ catch{return base('SIGNED_CAPABILITY_DELIVERY_PREWRITE_ALIAS_UNVERIFIED',{
+  provider_assignment_attempted:false
+ })}
+ if(before?.independently_observed!==true||
+  before.provider!=='VERCEL'||
+  before.resolved_release_sha!==oldAlias.resolved_release_sha||
+  before.resolved_branch!==oldAlias.resolved_branch)
+  return base('SIGNED_CAPABILITY_DELIVERY_OLD_ALIAS_DRIFT_NO_WRITE',{
+   provider_assignment_attempted:false
+  });
+ let attempt;
+ try{
+  attempt=await assignAlias({
+   alias:scheduledAlias,release_sha:targetReleaseSha,
+   release_ref:targetReleaseRef,
+   owner_id:ownerId,shift_id:shiftId,
+   capability_key:capabilityKey,claim_id:claim.claim_id
+  })
+ }catch{
+  // Never replay a potentially successful write. Independent GET only.
+  return base('SIGNED_CAPABILITY_DELIVERY_PROVIDER_EFFECT_UNKNOWN_NO_REPLAY',{
+   provider_assignment_attempted:true,
+   next_governed_action:'INDEPENDENTLY_READ_SCHEDULED_ALIAS_WITHOUT_RETRY'
+  });
+ }
+ // Do not equate HTTP 200 or alias API ack with actual worker activation.
+ if(attempt?.provider!=='VERCEL'||attempt.alias!==scheduledAlias||
+  attempt.release_sha!==targetReleaseSha||
+  attempt.claim_id!==claim.claim_id)
+  return base('SIGNED_CAPABILITY_DELIVERY_PROVIDER_RESULT_UNVERIFIED_NO_REPLAY',{
+   provider_assignment_attempted:true
+  });
+ let after;
+ try{after=await observeAlias(scheduledAlias)}
+ catch{return base('SIGNED_CAPABILITY_DELIVERY_POSTWRITE_READ_UNAVAILABLE_NO_REPLAY',{
+  provider_assignment_attempted:true
+ })}
+ if(after?.provider!=='VERCEL'||after.independently_observed!==true||
+  after.preview_only!==true||after.project_verified!==true||
+  after.resolved_release_sha!==targetReleaseSha||
+  after.resolved_branch!==targetReleaseRef)
+  return base('SIGNED_CAPABILITY_DELIVERY_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',{
+   provider_assignment_attempted:true,
+   next_governed_action:'RECONCILE_PROVIDER_ALIAS_EFFECT_WITHOUT_REPLAY'
+  });
+ return base('SIGNED_CAPABILITY_DELIVERY_ALIAS_VERIFIED_AWAITING_WORKER_WAKE',{
+  provider_assignment_attempted:true,
+  independent_alias_verified:true,
+  approved_release_sha:targetReleaseSha,
+  claim_id:claim.claim_id,
+  next_governed_action:'OBSERVE_SAME_SIGNED_SHIFT_RELEASE_AND_HANDLER'
+ });
+}
