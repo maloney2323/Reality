@@ -59,6 +59,93 @@ async function github(relative,{fetchImpl,token,method='GET',body}={}){
  if(!response?.ok)deny(safeFailure(method,response?.status||0));
  return response.json();
 }
+// Read-only source compatibility diagnostic for the EXISTING signed PR-review
+// lane. The executor still owns claiming, writing and independent settlement.
+// This does not claim a PR is acceptable customer work merely because GitHub
+// says it is open. In particular a GitHub draft PR is not eligible for the
+// current native executor's sourceDetails() preflight.
+export async function inspectCurrentRileyPrReviewSourceReadiness({
+ graph,env=process.env,fetchImpl=fetch,
+ githubToken=env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN
+}={}){
+ const safe=(status,more={})=>Object.freeze({
+  version:'reality-riley-current-pr-source-readiness-v1',status,
+  read_only:true,source_metadata_is_not_customer_goal_acceptance:true,
+  worker_claim_consumed:false,review_generated:false,
+  github_comment_published:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false,...more
+ });
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
+    graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+    !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
+    !Array.isArray(graph.jobs)||graph.jobs.length>4||
+    typeof fetchImpl!=='function')
+  return safe('SIGNED_PR_SOURCE_PREVIEW_OR_SCOPE_UNVERIFIED');
+ const jobs=graph.jobs.filter(j=>
+  j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+  j.independent_source_proof_verified===true&&
+  j.phase!=='SETTLED');
+ if(!jobs.length)
+  return safe('NO_UNSETTLED_SIGNED_PR_REVIEW_SOURCE',{
+   owner_id:graph.owner_id,shift_id:graph.shift_id,
+   source_count:0,source_diagnostics:Object.freeze([])
+  });
+ const seen=new Set(),diagnostics=[];
+ for(const item of jobs){
+  const match=SOURCE.exec(item.source_ref||'');
+  if(!match||seen.has(item.source_ref)||
+     (item.original_work_id!=null&&!WORK.test(item.original_work_id))||
+     !HASH.test(item.source_proof_sha256||'')||
+     !/^[A-Z][A-Z0-9_]{6,130}$/.test(item.next_governed_action||''))
+   return safe('SIGNED_PR_SOURCE_NATIVE_IDENTITY_INVALID');
+  seen.add(item.source_ref);
+  let status='GITHUB_PR_CURRENT_METADATA_UNVERIFIED',headSha=null;
+  try{
+   const current=await github('/pulls/'+Number(match[1]),{
+    fetchImpl,token:githubToken,method:'GET'
+   });
+   if(current?.number===Number(match[1])&&
+      current.html_url===item.source_ref&&
+      SHA.test(current.head?.sha||'')&&
+      typeof current.draft==='boolean'&&
+      ['open','closed'].includes(current.state)){
+    headSha=current.head.sha;
+    status=current.state!=='open'?
+     'SOURCE_PR_CLOSED_REQUIRES_REQUALIFICATION':
+     current.draft?
+      'SOURCE_PR_DRAFT_INCOMPATIBLE_WITH_EXISTING_REVIEW_EXECUTOR':
+      'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED';
+   }
+  }catch{
+   // Failure is unknown eligibility, not a declaration that the PR is
+   // missing, complete, approved, or safe to retry.
+  }
+  diagnostics.push(Object.freeze({
+   source_ref:item.source_ref,original_work_id:item.original_work_id??null,
+   native_phase:item.phase,
+   native_next_governed_action:item.next_governed_action,
+   github_source_head_sha:headSha,
+   eligibility_status:status,
+   current_provider_metadata_read:headSha!==null,
+   existing_executor_can_start_from_this_observation:false,
+   owner_approval_granted:false,original_job_completed:false
+  }));
+ }
+ return safe('SIGNED_PR_SOURCE_COMPATIBILITY_OBSERVED_READ_ONLY',{
+  owner_id:graph.owner_id,shift_id:graph.shift_id,
+  source_count:diagnostics.length,
+  draft_incompatible_count:diagnostics.filter(d=>
+   d.eligibility_status===
+    'SOURCE_PR_DRAFT_INCOMPATIBLE_WITH_EXISTING_REVIEW_EXECUTOR').length,
+  source_diagnostics:Object.freeze(diagnostics),
+  next_read_only_governed_step:diagnostics.some(d=>
+   d.eligibility_status!==
+    'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED')?
+   'REQUALIFY_EXACT_SOURCE_ELIGIBILITY_WITHOUT_REPLAY':
+   'USE_EXISTING_EXACT_CLAIM_AND_FULL_PATCH_PREFLIGHT_ONLY_AFTER_OWNER_PROOF'
+ });
+}
 async function sourceDetails(c,{fetchImpl,token}){
  const id=Number(SOURCE.exec(c.source_ref)[1]);
  const [pr,files]=await Promise.all([
