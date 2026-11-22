@@ -44,6 +44,12 @@ const proof={
  plan_fingerprint:sha('e'),frozen_shift_scope_sha256:sha('f'),
  continuity_head_sha256:sha('a'),continuity_root_id:root,
  revision:1,observed_at:'2026-11-22T22:00:00Z',
+ missing_proofs:[
+  'FROZEN_CUSTOMER_ORIGINAL_ACCEPTANCE',
+  'EXACT_ORIGINAL_EFFECT_AUTHORITY',
+  'SCHEDULED_WORKER_CAPACITY_ATTESTATION',
+  'INDEPENDENT_ORIGINAL_OUTCOME_AND_UNIVERSE_RECONCILIATION'
+ ],
  jobs:[{
   original_work_id:work,source_ref:source,
   source_proof_sha256:sha('b'),
@@ -83,7 +89,8 @@ test('mismatched supervisor and model-invented completed work cannot become CEO 
   'EXECUTIVE_FINAL_LOOP_EVIDENCE_NOT_CONNECTED');
 });
 test('owner time view projects canonical missing acceptance without claiming a CEO agent',()=>{
- const r=ownerBridge({ownerId:owner,shiftId:shift,proof,now,
+ const r=ownerBridge({ownerId:owner,shiftId:shift,
+ expectedPlanFingerprint:proof.plan_fingerprint,proof,now,
   independentHistory:past});
  assert.equal(r.status,'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY');
  assert.equal(r.executive.status,'EXECUTIVE_SIGNED_SHIFT_PRIORITIES_READY');
@@ -106,7 +113,9 @@ test('foreign owner, stale snapshot, fake proof or modified acceptance fails clo
   {ownerId:owner,shiftId:shift,proof,now:now+3600000}
  ];
  for(const data of changes){
-  const r=ownerBridge(data);
+  const r=ownerBridge({
+   expectedPlanFingerprint:proof.plan_fingerprint,...data
+  });
   assert.equal(r.owner_scope_verified,false);
   assert.equal(r.executive,null);
   assert.equal(r.external_execution_authorized,false);
