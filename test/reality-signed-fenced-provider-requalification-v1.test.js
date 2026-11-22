@@ -100,7 +100,7 @@ test('provider requalification has exact original and signed active shift gates'
   "current_user<>'service_role'",
   "run.run_id=p_worker_run_id and run.status='STARTED'",
   "warrant.state='ACTIVE'",
-  "w.shift_id=p_shift_id",
+  "signed_chat_goal_shift_lineage_v1",
   "w.message_sha256=q.source_sha256",
   "w.development->>'original_work_id'=q.original_work_id",
   "and phase='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'",
