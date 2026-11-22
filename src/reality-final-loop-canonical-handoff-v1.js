@@ -9,6 +9,8 @@ export const FINAL_LOOP_CANONICAL_HANDOFF_VERSION=
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
+const NATIVE_ACTION=/^[A-Z][A-Z0-9_]{6,130}$/;
+const PHASE=/^[A-Z][A-Z0-9_]{3,70}$/;
 const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/;
 const missing=Object.freeze([
  'FROZEN_CUSTOMER_ORIGINAL_ACCEPTANCE',
@@ -44,6 +46,10 @@ export function derivePendingFinalLoopSourceDecisions(proof){
       (!WORK.test(item.original_work_id||'')||
        works.has(item.original_work_id)))||
      !HASH.test(item.source_proof_sha256||'')||
+     !Number.isInteger(item.source_step_index)||
+     item.source_step_index<2||item.source_step_index>5||
+     !PHASE.test(item.source_phase||'')||
+     !NATIVE_ACTION.test(item.native_next_governed_action||'')||
      item.original_acceptance_verified!==false||
      item.authority_proof_verified!==false||
      item.capacity_proof_verified!==false||
@@ -56,6 +62,10 @@ export function derivePendingFinalLoopSourceDecisions(proof){
   decisions.push(Object.freeze({
    original_work_id:item.original_work_id,
    source_ref:item.source_ref,
+   source_step_index:item.source_step_index,
+   source_phase:item.source_phase,
+   native_next_governed_action:item.native_next_governed_action,
+   // Native graph recommendations are diagnostics, never permission.
    decision:notAdmitted?'SUSPEND':'REFRESH',
    next_governed_action:notAdmitted?
     'QUALIFY_DISTINCT_SOURCE_TO_ORIGINAL_BEFORE_ACCEPTANCE':
@@ -137,6 +147,9 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
      sourceGraph.jobs.some(j=>{
       const p=bySource.get(j.source_ref);
       return !p||p.original_work_id!==(j.original_work_id??null)||
+       p.source_step_index!==j.source_step_index||
+       p.source_phase!==j.phase||
+       p.native_next_governed_action!==j.next_governed_action||
        p.source_proof_sha256!==j.source_proof_sha256||
        p.independent_source_proof_verified!==
         j.independent_source_proof_verified;
@@ -171,6 +184,9 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
    const expected=decisionBySource.get(o?.source_ref);
    if(!j||!f||!expected||
       o.original_work_id!==j.original_work_id||
+      o.source_step_index!==j.source_step_index||
+      o.source_phase!==j.source_phase||
+      o.native_next_governed_action!==j.native_next_governed_action||
       o.decision!==expected.decision||
       o.reason!==expected.reason||
       o.next_governed_action!==expected.next_governed_action||
@@ -199,6 +215,8 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
       const expected=decisionBySource.get(p.source_ref);
       return !j||!expected||
        p.original_work_id!==j.original_work_id||
+       p.source_phase!==j.source_phase||
+       p.native_next_governed_action!==j.native_next_governed_action||
        p.engine_decision!==expected.decision||
        p.required_next_evidence_action!==expected.next_governed_action||
        p.execution_authorized!==false||
@@ -219,6 +237,8 @@ export function verifyFinalLoopCanonicalContinuityHandoff({
   missing_proofs:Object.freeze([...proof.missing_proofs]),
   original_sources:Object.freeze([...bySource.values()].map(j=>Object.freeze({
    source_ref:j.source_ref,original_work_id:j.original_work_id,
+   source_step_index:j.source_step_index,source_phase:j.source_phase,
+   native_next_governed_action:j.native_next_governed_action,
    source_proof_sha256:j.source_proof_sha256,
    independent_source_proof_verified:j.independent_source_proof_verified,
    original_acceptance_verified:false,authority_proof_verified:false,
