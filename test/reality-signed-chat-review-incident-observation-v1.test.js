@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {investigateOneSignedShiftContinuityIncident}
+import {investigateOneSignedShiftContinuityIncident,parseContinuityModelInvestigation,continuityTextContract}
  from '../src/reality-shift-continuity-auto-investigation-v1.js';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
@@ -116,4 +116,61 @@ test('existing signed RPC transport allows only the observed-incident method',as
    assert.deepEqual(JSON.parse(options.body),args);return {ok:true,json:async()=>({status:'FIXTURE'})};
   }});
  assert.equal(called,1);
+});
+
+const responseFor=p=>({...response,output:[{type:'message',content:[
+ {type:'output_text',text:JSON.stringify(p)}]}]});
+test('all text violations are reported as metadata only; no raw rejected text escapes',()=>{
+ const rejected={...plan,diagnosis:'short',limitations:' private ',resume_acceptance_condition:'x'.repeat(301)};
+ assert.throws(()=>parseContinuityModelInvestigation(responseFor(rejected),roles,{guidedRecovery:true}),e=>{
+  assert.equal(e.message,'SHIFT_CONTINUITY_DIAGNOSIS_AND_TEST_SPEC_UNVERIFIED');
+  assert.deepEqual(e.validationEvidence.violations,[
+   {field:'diagnosis',min:30,max:1500,length:5,reason:'BELOW_MIN'},
+   {field:'limitations',min:20,max:1200,length:9,reason:'OUTER_WHITESPACE'},
+   {field:'resume_acceptance_condition',min:30,max:300,length:301,reason:'ABOVE_MAX'}]);
+  assert.doesNotMatch(JSON.stringify(e.validationEvidence),/private|short|xxx/);return true;
+ });
+ assert.equal(parseContinuityModelInvestigation(response,roles,{guidedRecovery:true}).model_response_id,response.id);
+});
+test('failed investigation sends exact lease-bound evidence; next attempt receives same field contract',async()=>{
+ const methods=[];
+ const rejected=await investigateOneSignedShiftContinuityIncident({db,env,shiftId:claim.shift_id,
+  rolesBuilder:()=>({roles}),call:async(_db,method,args)=>{
+   methods.push(method);
+   if(method==='reality_claim_next_shift_continuity_investigation_v1')return claim;
+   assert.equal(method,'reality_block_shift_continuity_investigation_evidenced_v1');
+   assert.equal(args.p_lease_id,claim.lease_id);assert.equal(args.p_incident_id,claim.incident_id);
+   assert.deepEqual(args.p_validation_evidence.violations,[{field:'resume_acceptance_condition',min:30,max:300,length:301,reason:'ABOVE_MAX'}]);
+   return {status:'CONTINUITY_INVESTIGATION_BLOCKED_NEEDS_PROOF',validation_evidence_recorded:true,
+    automatic_reinvestigation_eligible:true};
+  },invokeModel:async()=>responseFor({...plan,resume_acceptance_condition:'x'.repeat(301)})});
+ assert.equal(rejected.failure_receipt_recorded,true);
+ assert.equal(rejected.execution_authorized,false);
+ assert.deepEqual(methods,['reality_claim_next_shift_continuity_investigation_v1','reality_block_shift_continuity_investigation_evidenced_v1']);
+ const history=[{attempt:1,failure_reason:rejected.failure_reason,validation_evidence:rejected.validation_evidence}];
+ let nextPayload;
+ const retry=await investigateOneSignedShiftContinuityIncident({db,env,shiftId:claim.shift_id,
+  rolesBuilder:()=>({roles}),call:async(_db,method,args)=>{
+   if(method==='reality_claim_next_shift_continuity_investigation_v1')return {...claim,investigation_attempt:2,failure_history:history,previous_failure_reason:rejected.failure_reason};
+   assert.equal(method,'reality_record_shift_continuity_investigation_v1');
+   return {status:'SHIFT_CONTINUITY_INVESTIGATION_RECORDED',owner_id:claim.owner_id,
+    shift_id:claim.shift_id,incident_id:claim.incident_id,assigned_employee:roles[0].employee_name,
+    independent_reviewer:roles[1].employee_name,investigation_receipt_sha256:hash('d'),
+    independent_repair_verified:false,new_original_jobs_created:0,...flags};
+  },invokeModel:async payload=>{nextPayload=JSON.parse(payload.input[1].content[0].text);return response;}});
+ assert.deepEqual(nextPayload.prior_failure_history,history);
+ assert.deepEqual(nextPayload.text_contract.map(({field,min,max})=>({field,min,max})),continuityTextContract(true));
+ assert.equal(nextPayload.text_contract.find(x=>x.field==='resume_acceptance_condition').preferred_max,280);
+ assert.equal(retry.status,'SHIFT_CONTINUITY_INVESTIGATION_RECORDED');
+ assert.equal(retry.original_work_resumed,false);
+});
+test('evidenced RPC is allowlisted and migration uses existing exact lease and retry ceiling',async()=>{
+ const method='reality_block_shift_continuity_investigation_evidenced_v1';
+ const migration=read('../supabase/migrations/20261122020400_continuity_investigation_validation_evidence_v1.sql');
+ assert.match(migration,/investigation_lease_id=p_lease_id/);
+ assert.match(migration,/public\.reality_block_shift_continuity_investigation_v1\(p_owner_id,p_incident_id,p_lease_id,p_reason\)/);
+ assert.match(migration,/validation_evidence.*?recorded/s);
+ assert.doesNotMatch(migration,/security definer|installation_authorized',true/i);
+ await shiftRpc({...db,url:'https://fixture.supabase.co'},method,{},{
+  fetchImpl:async url=>{assert.ok(url.endsWith('/rpc/'+method));return {ok:true,json:async()=>({status:'FIXTURE'})};}});
 });
