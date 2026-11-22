@@ -178,7 +178,31 @@ async function stage(s,db,key,token,base){
   // Unknown provider effects must never be retried. Only independent GET
   // reconstruction can settle an existing fenced write.
   const read=await existing(s,token,base,prepared);
-  if(!read)return safe('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY');
+  if(!read){
+   // GET-only observation with the exact broker credential. A missing ref
+   // never settles an earlier ambiguous provider write or grants a replay.
+   const observed=await Promise.all([
+    gh(token,'/git/ref/heads/'+branch),
+    gh(token,'')
+   ]).catch(()=>null);
+   const refStatus=observed?.[0]?.status;
+   const permission=observed?.[1]?.ok===true?
+    observed[1].data?.permissions?.push:null;
+   const exactPermission=typeof permission==='boolean'?permission:null;
+   const diagnosis=refStatus===404?
+    (exactPermission===false?'GITHUB_BROKER_PUSH_PERMISSION_MISSING':
+     exactPermission===true?'GITHUB_REF_NOT_OBSERVED_PUSH_PERMISSION_PRESENT':
+      'GITHUB_REF_NOT_OBSERVED_PERMISSION_UNKNOWN'):
+    refStatus===200?'GITHUB_REF_PRESENT_ARTIFACT_NOT_VERIFIED':
+    'GITHUB_READBACK_NOT_VERIFIED';
+   return safe('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',{
+    broker_read_only_diagnosis:diagnosis,
+    provider_ref_http_status:Number.isInteger(refStatus)?refStatus:null,
+    broker_push_permission_verified:exactPermission,
+    read_only_observation:true,provider_effect_settled:false,
+    write_replay_authorized:false
+   });
+  }
   return record(s,db,key,read);
  }
  const before=await gh(token,'/git/ref/heads/'+branch);
@@ -195,7 +219,14 @@ async function stage(s,db,key,token,base){
   ref:'refs/heads/'+branch,sha:s.release_sha
  });
  if(b.status!==201||b.data?.object?.sha!==s.release_sha)
-  return safe('RECOVERY_GITHUB_BRANCH_EFFECT_UNKNOWN_NO_REPLAY');
+  return safe('RECOVERY_GITHUB_BRANCH_EFFECT_UNKNOWN_NO_REPLAY',{
+   broker_read_only_diagnosis:b.status===401||b.status===403?
+    'GITHUB_BRANCH_CREATE_PROVIDER_AUTH_REJECTED':
+    b.status===422?'GITHUB_BRANCH_CREATE_REF_CONFLICT_UNVERIFIED':
+    'GITHUB_BRANCH_CREATE_EFFECT_UNKNOWN',
+   provider_write_http_status:Number.isInteger(b.status)?b.status:null,
+   provider_effect_settled:false,write_replay_authorized:false
+  });
  const code=await gh(token,'/contents/'+s.candidate.target_path,'PUT',{
   message:'Reality quarantined capability code '+s.trigger_id,
   branch,sha:s.candidate.source_blob_sha,content:b64(prepared.code)
