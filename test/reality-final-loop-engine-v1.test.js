@@ -165,6 +165,28 @@ test('independent final receipt from another original or acceptance contract can
  assert.equal(run(ledger(p)).decisions[0].decision,'SUSPEND');
 });
 
+test('independent outcome alone does not bypass authority and capacity proofs',()=>{
+ const p=jobs.map(proof);
+ p[0].outcome={status:'INDEPENDENT_FINAL_VERIFIED',
+  verifier_independent:true,original_work_id:work1,
+  acceptance_contract_sha256:hash('d'),receipt_sha256:hash('a')};
+ p[0].universe={independently_reconciled:true,receipt_sha256:hash('b'),
+  original_work_id:work1,outcome_receipt_sha256:hash('a')};
+ p[0].authority.independently_verified=false;
+ let r=run(ledger(p));
+ assert.equal(r.decisions[0].decision,'SUSPEND');
+ assert.equal(r.decisions[0].next_governed_action,
+  'RECHECK_FROZEN_ORIGINAL_AUTHORITY_BEFORE_SETTLEMENT');
+ assert.equal(r.decisions[1].decision,'ADVANCE');
+ p[0].authority.independently_verified=true;
+ p[0].capacity.scheduled_worker_observed=false;
+ r=run(ledger(p));
+ assert.equal(r.decisions[0].decision,'SUSPEND');
+ assert.equal(r.decisions[0].next_governed_action,
+  'RECHECK_INDEPENDENT_EXECUTION_CAPACITY_BEFORE_SETTLEMENT');
+ assert.equal(r.all_originals_independently_settlement_eligible,false);
+});
+
 test('foreign Universe return cannot settle and already settled original is never re-issued',()=>{
  const p=jobs.map(proof);
  p[0].outcome={status:'INDEPENDENT_FINAL_VERIFIED',
