@@ -98,8 +98,8 @@ test('exhausted same-original recovery becomes an evidence-bound incident, then 
  assert.match(investigator,/SIGNED_CHAT_RECOVERY_SYNTAX_STALLED/);
  assert.match(investigator,/Two independently parsed candidates failed/);
  assert.match(compiler,/syntax_investigation_receipt_sha256/);
- assert.match(compiler,/raw.choice.end_line\+1<=b/);
- assert.match(compiler,/expanded.replace===derived.replace/);
- assert.match(compiler,/parseOnlyModule\(expanded.proposed\)==='VALID_SYNTAX'/);
+ assert.match(compiler,/visibleRanges:frozenExcerpt\.ranges/);
+ assert.match(compiler,/next\.replace===derived\.replace/);
+ assert.match(compiler,/parseOnlyModule\(next\.proposed\)==='VALID_SYNTAX'/);
  assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/i);
 });
