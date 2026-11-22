@@ -30,6 +30,12 @@ const proof={
  owner_acceptance_verified:false,acceptance_frozen:false,
  acceptance_contract_sha256:null,revision:1,
  observed_at:'2026-11-22T22:00:00Z',
+ missing_proofs:[
+  'FROZEN_CUSTOMER_ORIGINAL_ACCEPTANCE',
+  'EXACT_ORIGINAL_EFFECT_AUTHORITY',
+  'SCHEDULED_WORKER_CAPACITY_ATTESTATION',
+  'INDEPENDENT_ORIGINAL_OUTCOME_AND_UNIVERSE_RECONCILIATION'
+ ],
  original_job_completed:false,execution_authorized:false,
  installation_authorized:false,production_changed:false,
  jobs:[{source_ref:source,source_proof_sha256:sha('6'),
