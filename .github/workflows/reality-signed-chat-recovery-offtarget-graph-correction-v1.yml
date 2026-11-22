@@ -1,0 +1,28 @@
+name: Reality signed recovery verified off-target source graph correction
+on:
+  pull_request:
+    paths:
+      - 'src/reality-chat-new-development-worker-v1.js'
+      - 'src/reality-signed-chat-recovery-target-review-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'supabase/migrations/*signed_chat_recovery_offtarget*'
+      - 'test/reality-signed-chat-recovery-offtarget-graph-correction-v1.test.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-original-offtarget-correction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: node --check src/reality-chat-new-development-worker-v1.js
+      - run: node --check src/reality-signed-chat-recovery-target-review-v1.js
+      - run: node --check api/reality/governed-employee-shift-worker.js
+      - run: node --test test/reality-signed-chat-recovery-offtarget-graph-correction-v1.test.js test/reality-signed-chat-recovery-spec-target-review-v1.test.js test/reality-signed-chat-original-goal-gap-continuation-v1.test.js
