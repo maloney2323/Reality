@@ -88,7 +88,9 @@ export function inspectPinnedSignedRecoverySourceRoots(
   reason:candidateEntries.has(target)?
    'DIRECT_PINNED_EXECUTOR_DEPENDENCY_FULL_GOAL_STILL_REQUIRED':
    'CANDIDATE_OUTSIDE_PINNED_EXECUTOR_AND_INSTALL_ENTRYPOINT_GRAPH',
-  entrypoint_evidence:evidence,source_scope_count:candidateEntries.size});
+  entrypoint_evidence:evidence,
+  source_scope_count:candidateEntries.size,
+  source_scope_paths:Object.freeze([...candidateEntries].sort())});
 }
 export async function independentlyReviewOneSignedChatRecoveryTarget({
  db,env=process.env,workerRunId,fetchImpl=fetch,
