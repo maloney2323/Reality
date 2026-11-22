@@ -40,15 +40,18 @@ export async function inspectFinalLoopOnExistingSignedWorker({
   return safe('FINAL_LOOP_SHADOW_NOT_ENABLED',{
    owner_id:graph.owner_id,shift_id:graph.shift_id
   });
- let refreshed,proofEnvelope;
+ let refreshed,refreshedRaw,proofEnvelope;
  try{
   // The shared controller's current native shift + original-job source
   // graph must be reread from the same service-only database. A UI request
   // or an LLM-proposed graph is not authoritative.
-  refreshed=assertRealityUnifiedShiftGraph(await read(db,
+  refreshedRaw=await read(db,
    'reality_read_current_shift_execution_graph_v1',{},{
     fetchImpl,timeoutMs:6000
-   }),{expectedShiftId:wake.shift_id});
+   });
+  refreshed=assertRealityUnifiedShiftGraph(refreshedRaw,{
+   expectedShiftId:wake.shift_id
+  });
  }catch{
   return safe('FINAL_LOOP_SAME_SHIFT_PROVIDER_GRAPH_UNVERIFIED');
  }
@@ -75,8 +78,10 @@ export async function inspectFinalLoopOnExistingSignedWorker({
  }
  let evaluation;
  try{
+  // The engine revalidates the EXACT DB source graph itself. Never
+  // re-wrap an already normalized view as a new source of authority.
   evaluation=evaluateRealityFinalLoopEngine({
-   graph:refreshed,ledger:proofEnvelope,now
+   graph:refreshedRaw,ledger:proofEnvelope,now
   });
  }catch{
   return safe('FINAL_LOOP_FROZEN_ACCEPTANCE_OR_PROOF_EVALUATION_REJECTED',{
