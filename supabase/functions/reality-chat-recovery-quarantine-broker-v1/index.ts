@@ -3,7 +3,7 @@
 // No new owner Chat instruction, new shift, running install, or final receipt.
 const REPO='maloney2323/Reality';
 const BASE='https://api.github.com/repos/'+REPO;
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
