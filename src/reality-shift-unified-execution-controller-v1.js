@@ -257,10 +257,18 @@ export function evaluateRealityFinalLoopEngine({
     return makeLoopDecision(item,'SUSPEND','INDEPENDENTLY_RECHECK_FINAL_RECEIPT',
      'OUTCOME_PROOF_CONTRADICTS_ORIGINAL_ACCEPTANCE');
    if(p.universe?.independently_reconciled!==true||
+    p.universe.original_work_id!==item.original_work_id||
+    p.universe.outcome_receipt_sha256!==o.receipt_sha256||
     !digest(p.universe.receipt_sha256))
     return makeLoopDecision(item,'ADVANCE',
      'RECONCILE_INDEPENDENT_ORIGINAL_RECEIPT_TO_UNIVERSE',
      'OUTCOME_VERIFIED_UNIVERSE_RETURN_PENDING');
+   // Even a previously settled original needs independent current
+   // settlement readback; never try to write the terminal effect twice.
+   if(p.original_settled===true)
+    return makeLoopDecision(item,'SUSPEND',
+     'INDEPENDENTLY_READ_PREVIOUS_ATOMIC_SETTLEMENT_NO_REPLAY',
+     'PREVIOUS_SETTLEMENT_CLAIM_REQUIRES_DURABLE_RECEIPT');
    return makeLoopDecision(item,'SETTLE',
     'REQUEST_ATOMIC_ORIGINAL_SETTLEMENT_AND_INDEPENDENT_READBACK',
     'FOUR_PROOFS_AND_UNIVERSE_OUTCOME_REQUIRE_DURABLE_CLOSURE',
