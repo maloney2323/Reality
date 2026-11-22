@@ -81,3 +81,45 @@ test('same ledger, signed wake, immutable attempts and no authority grants',()=>
  assert.doesNotMatch(sql,/security definer|set investigation_attempts\s*=|installation_authorized',true|insert into reality_internal\.governed_employee_original_claims/);
  assert.ok(worker.indexOf('await qualifyVerifiedInvestigationRemediation')<worker.indexOf('await investigateOneSignedShiftContinuityIncident'));
 });
+
+test('independent observation routes the frozen original through existing target review only',async()=>{
+ const {independentlyReobserveStalledRecoveryReview}=await import('../src/reality-signed-chat-recovery-target-review-v1.js');
+ const roots=['api/reality/governed-employee-shift-worker.js',
+  'api/reality/generalized-original-install-review.js','api/reality/generalized-owner-install-approval.js'];
+ const source={status:'SIGNED_CONTINUITY_SOURCE_PROBE_CLAIMED',...flags,
+  owner_id:id(1),shift_id:id(2),incident_id:id(3),worker_run_id:id(4),probe_id:id(5),
+  trigger_id:id(6),source_message_id:id(7),source_ref:'supabase:reality_chat_messages:'+id(7),
+  original_work_id:'work:'+'f'.repeat(32),candidate_sha256:hash,base_sha:sha,
+  target_path:'src/fixture.js',source_entrypoints:roots,investigation_receipt_sha256:hash,new_shift_started:false};
+ for(const hit of [true,false,null]){
+  const methods=[];
+  const result=await independentlyReobserveStalledRecoveryReview({db,env,shiftId:id(2),workerRunId:id(4),
+   callRpc:async(_db,method,args)=>{
+    methods.push(method);if(method.includes('claim_'))return source;
+    assert.equal(method,'reality_record_signed_continuity_review_probe_v1');
+    assert.equal(args.p_trigger_id,id(6));assert.equal(args.p_worker_run_id,id(4));
+    assert.equal(args.p_target_in_graph,hit);
+    if(hit===null){assert.equal(args.p_tree_sha,null);assert.ok(args.p_failure_code);}
+    return {status:hit===null?'SIGNED_CONTINUITY_SOURCE_PROBE_BLOCKED':hit?
+     'SIGNED_CHAT_RECOVERY_INDEPENDENT_DEPENDENCY_TARGET_VERIFIED':
+     'SIGNED_CHAT_RECOVERY_OFF_TARGET_REJECTED_WITH_RECEIPT',
+     trigger_id:source.trigger_id,original_work_id:source.original_work_id,
+     candidate_sha256:hash,target_review_receipt_sha256:hash,target_in_graph:hit,
+     continuity_source_probe_verified:hit!==null,root_cause_verified:false,
+     ...flags,new_shift_started:false};
+   },readGraph:async()=>{if(hit===null)throw Error('PROVIDER_UNAVAILABLE');
+    return {verified:true,tree_sha:sha,target_in_graph:hit,
+     entrypoint_evidence:roots.map(path=>({path,blob_sha:sha}))};}});
+  assert.equal(result.original_job_completed,false);
+  assert.equal(result.installation_authorized,false);
+  assert.equal(result.continuity_source_probe_verified===true,hit!==null);
+  assert.equal(methods.length,2);
+ }
+ const sql=readFileSync(new URL('../supabase/migrations/20261122021230_signed_continuity_review_source_probe_v1.sql',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ for(const v of ['inc.investigated_at<r.started_at','inc.assigned_function_id<>inc.reviewer_function_id',
+  'target_review_retry_count','reality_record_signed_chat_recovery_target_review_v1',
+  'CONTINUITY_SOURCE_PROBE_ORIGINAL_SCOPE_CHANGED','SOURCE_PROBE_BLOCKED'])assert.ok(sql.includes(v),v);
+ assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/);
+ assert.ok(worker.indexOf('await independentlyReobserveStalledRecoveryReview')<worker.indexOf('await stageNextSignedChatRecoveryQuarantine'));
+});
