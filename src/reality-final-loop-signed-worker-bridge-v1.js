@@ -3,6 +3,8 @@
 // proof-envelope RPC and atomic transition writer are independently installed.
 // Nothing here invokes a model, claims work, writes to the ledger, or settles.
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {projectRealityFinalLoopTimeHorizon}
+ from './reality-final-loop-time-horizon-v1.js';
 import {
  assertRealityUnifiedShiftGraph,evaluateRealityFinalLoopEngine
 } from './reality-shift-unified-execution-controller-v1.js';
@@ -118,8 +120,25 @@ export async function inspectFinalLoopOnExistingSignedWorker({
      source_ref:item.source_ref
     }));
   }
+  const temporal=projectRealityFinalLoopTimeHorizon({engine:{
+   schema:'reality-final-loop-signed-worker-bridge-v1',
+   status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',
+   owner_id:graph.owner_id,shift_id:wake.shift_id,
+   continuity_head_sha256:p.continuity_head_sha256,
+   original_job_completed:false,shift_completed:false,
+   installation_authorized:false,production_changed:false,
+   decisions:p.jobs.map(item=>({
+    original_work_id:item.original_work_id||null,source_ref:item.source_ref,
+    decision:'REFRESH',
+    next_governed_action:
+     'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS',
+    reason:'CUSTOMER_ORIGINAL_ACCEPTANCE_NOT_INDEPENDENTLY_PROVEN',
+    transition_committed:false
+   }))
+  }});
   return safe('FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',{
    owner_id:graph.owner_id,shift_id:wake.shift_id,
+   time_horizon:temporal,
    frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
    continuity_head_sha256:p.continuity_head_sha256,
    revision:p.revision,checkpoint_candidates:Object.freeze(pending),
@@ -147,6 +166,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
   continuity_root_id:evaluation.continuity_root_id,
   continuity_head_sha256:evaluation.continuity_head_sha256,
   decision_count:evaluation.decision_count,
+  time_horizon:evaluation.time_horizon,
   decisions:evaluation.decisions.map(d=>({
    original_work_id:d.original_work_id,source_ref:d.source_ref,
    decision:d.decision,next_governed_action:d.next_governed_action,
