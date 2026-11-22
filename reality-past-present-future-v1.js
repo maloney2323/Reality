@@ -56,9 +56,14 @@
  status.setAttribute('aria-live','polite');
  const refresh=make('button','rx-time-refresh','Refresh reality');
  refresh.type='button';
- foot.append(status,refresh);matrix.append(foot);
+ const executive=make('p','rx-time-executive',
+  'Executive priorities await independently verified Final Loop evidence.');
+ executive.setAttribute('aria-label','Reality executive operational briefing');
+ foot.append(status,refresh);matrix.append(foot,executive);
  let generation=0,busy=false;
  function unknown(message){
+  executive.textContent=
+   'Executive priorities unavailable until the owner evidence is verified.';
   generation++;
   for(const id of countIds)get(id).textContent='—';
   for(const card of cards){
@@ -152,6 +157,33 @@
    'All three time horizons checked against Reality’s actual owner records. '+
    'A discovery observation is not an authorized job or measured savings.':
    verified+' of 3 time horizons verified. Missing or stale evidence is not inferred to be work.';
+  // The new CEO-style executive brief uses the same owner-authorized
+  // read-only source projection. It never changes the original three
+  // counts, promotes a prediction, or approves executable work.
+  const time=data.final_loop_owner;
+  const brief=time?.executive;
+  if(time?.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     time.owner_scope_verified===true&&time.read_only===true&&
+     time.original_job_completed===false&&
+     time.external_execution_authorized===false&&
+     brief?.status==='EXECUTIVE_SIGNED_SHIFT_PRIORITIES_READY'&&
+     brief.read_only===true&&brief.decision_support_only===true&&
+     brief.execution_authorized===false&&
+     brief.original_job_completed===false&&
+     Number.isSafeInteger(brief.priority_count)&&
+     brief.priority_count>=0&&brief.priority_count<=4&&
+     brief.priority_count===time.time_horizon?.present?.obligations?.length){
+   const needsAcceptance=brief.priority_items?.some(x=>
+    x.independent_original_acceptance_pending===true);
+   executive.textContent='Executive briefing · '+brief.priority_count+
+    ' current obligation(s). '+
+    (needsAcceptance?
+     'Customer-goal acceptance still needs independent proof.':
+     'Inspect the governed next step before authorizing any effect.');
+  }else{
+   executive.textContent=
+    'Executive briefing · Final Loop owner proof view not yet verified. Existing Past, Present and Future remain read-only.';
+  }
   return true;
  }
  async function load(){
