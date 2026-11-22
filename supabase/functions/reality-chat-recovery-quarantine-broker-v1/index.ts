@@ -45,6 +45,53 @@ async function gh(token,path,method='GET',obj=null){
   ...(obj==null?{}:{body:JSON.stringify(obj)})});
  return {ok:r.ok,status:r.status,data:await r.json().catch(()=>null)};
 }
+// The broker (not a standalone model or worker) alone can identify its
+// installed GitHub credential. GET only; never attempt to prove write authority
+// by issuing another POST to an unsettled provider.
+async function githubCredentialReadback(token){
+ const headers={authorization:'Bearer '+token,
+  accept:'application/vnd.github+json','x-github-api-version':'2022-11-28',
+  'user-agent':'Reality-fenced-provider-credential-readback'};
+ async function get(path){
+  try{
+   const r=await fetch('https://api.github.com/'+path,{
+    method:'GET',cache:'no-store',redirect:'error',
+    signal:AbortSignal.timeout(9000),headers});
+   return {status:r.status,data:r.ok?await r.json().catch(()=>null):null,
+    scopes:r.headers.get('x-oauth-scopes')||''};
+  }catch{return {status:null,data:null,scopes:''}}
+ }
+ const [user,installation,rules]=await Promise.all([
+  get('user'),get('installation/repositories'),
+  get('repos/'+REPO+'/rulesets?includes_parents=true')
+ ]);
+ const installationHasRepo=installation.status===200&&
+  Array.isArray(installation.data?.repositories)&&
+  installation.data.repositories.some(x=>x?.full_name===REPO);
+ const login=user.status===200&&typeof user.data?.login==='string'&&
+  /^[A-Za-z0-9-]{1,39}$/.test(user.data.login)?user.data.login:null;
+ const actorKind=login?'USER_ACCESS_TOKEN':
+   installationHasRepo?'GITHUB_APP_INSTALLATION_TOKEN':
+   'TOKEN_ACTOR_NOT_INDEPENDENTLY_RESOLVED';
+ const repoScope=user.status===200&&
+  user.scopes.split(',').map(x=>x.trim()).some(x=>x==='repo'||x==='public_repo');
+ return {
+  schema:'reality-broker-read-only-credential-provenance-v1',
+  repository:REPO,credential_kind:actorKind,
+  github_actor_login:login,
+  github_actor_user_http_status:user.status,
+  installation_repository_access_verified:installationHasRepo,
+  installation_repository_http_status:installation.status,
+  classic_repo_scope_observed:repoScope,
+  oauth_scopes_header_available:!!user.scopes,
+  rulesets_read_http_status:rules.status,
+  ruleset_count:rules.status===200&&Array.isArray(rules.data)?
+   rules.data.length:null,
+  contents_write_effectively_tested:false,
+  exact_ref_write_authorized:false,provider_effect_replayed:false,
+  action:'VERIFY_EXACT_BROKER_CONTENTS_WRITE_OR_REQUEST_OWNER_PROVIDER_CORRECTION'
+ };
+}
 const bytes=x=>new TextEncoder().encode(x);
 const b64=x=>btoa(Array.from(x,(b)=>String.fromCharCode(b)).join(''));
 const un64=s=>{
@@ -195,10 +242,12 @@ async function stage(s,db,key,token,base){
       'GITHUB_REF_NOT_OBSERVED_PERMISSION_UNKNOWN'):
     refStatus===200?'GITHUB_REF_PRESENT_ARTIFACT_NOT_VERIFIED':
     'GITHUB_READBACK_NOT_VERIFIED';
+   const credential=await githubCredentialReadback(token);
    return safe('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',{
     broker_read_only_diagnosis:diagnosis,
     provider_ref_http_status:Number.isInteger(refStatus)?refStatus:null,
     broker_push_permission_verified:exactPermission,
+    broker_credential_readback:credential,
     read_only_observation:true,provider_effect_settled:false,
     write_replay_authorized:false
    });
