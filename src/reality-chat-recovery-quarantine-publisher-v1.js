@@ -72,5 +72,36 @@ export async function stageNextSignedChatRecoveryQuarantine({
    pr_url:result.pr_url,provider_readback_verified:true
   });
  }
+ if(['RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',
+     'RECOVERY_GITHUB_BRANCH_EFFECT_UNKNOWN_NO_REPLAY'].includes(result.status)){
+  const diagnostic=result.broker_read_only_diagnosis;
+  const allowed=[
+   'GITHUB_BROKER_PUSH_PERMISSION_MISSING',
+   'GITHUB_REF_NOT_OBSERVED_PUSH_PERMISSION_PRESENT',
+   'GITHUB_REF_NOT_OBSERVED_PERMISSION_UNKNOWN',
+   'GITHUB_REF_PRESENT_ARTIFACT_NOT_VERIFIED',
+   'GITHUB_READBACK_NOT_VERIFIED',
+   'GITHUB_BRANCH_CREATE_PROVIDER_AUTH_REJECTED',
+   'GITHUB_BRANCH_CREATE_REF_CONFLICT_UNVERIFIED',
+   'GITHUB_BRANCH_CREATE_EFFECT_UNKNOWN'
+  ];
+  if(allowed.includes(diagnostic)&&
+   (result.provider_ref_http_status===null||
+    (Number.isInteger(result.provider_ref_http_status)&&
+     result.provider_ref_http_status>=100&&result.provider_ref_http_status<=599))&&
+   (result.provider_write_http_status===undefined||result.provider_write_http_status===null||
+    (Number.isInteger(result.provider_write_http_status)&&
+     result.provider_write_http_status>=100&&result.provider_write_http_status<=599))&&
+   [true,false,null,undefined].includes(result.broker_push_permission_verified)&&
+   result.provider_effect_settled===false&&result.write_replay_authorized===false){
+   return safe(result.status,{
+    broker_read_only_diagnosis:diagnostic,
+    provider_ref_http_status:result.provider_ref_http_status??null,
+    provider_write_http_status:result.provider_write_http_status??null,
+    broker_push_permission_verified:result.broker_push_permission_verified??null,
+    provider_effect_settled:false,write_replay_authorized:false
+   });
+  }
+ }
  return safe(result.status);
 }
