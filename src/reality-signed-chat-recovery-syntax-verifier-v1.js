@@ -34,6 +34,29 @@ export function compareFrozenCandidateSyntax(original,find,replace,parse=parseOn
  return {baseline:'VALID_SYNTAX',candidate:verdict,baseline_sha256:digest(original),
   proposed_sha256:digest(next),candidate_executed:false,parse_only:true};
 }
+// Independently reproduce the specific compiler class: an unconsumed
+// source closing-delimiter line already present at the replacement boundary.
+// Only one unique exact anchored span is admissible. Never execute a draft,
+// infer functional correctness, or modify its proposed replacement bytes.
+export function reproduceFrozenBoundaryFailure(original,find,replace,parse=parseOnlyModule){
+ const p=compareFrozenCandidateSyntax(original,find,replace,parse);
+ if(p?.candidate!=='INVALID_SYNTAX'||!find.endsWith('\n')||!replace.endsWith('\n'))return null;
+ const at=original.indexOf(find);
+ const after=original.slice(at+find.length);
+ const next=after.match(/^[ \t]*[}\])]+;?[ \t]*\n/)?.[0];
+ const last=replace.match(/(?:^|\n)([ \t]*[}\])]+;?[ \t]*\n)$/)?.[1];
+ if(!next||!last||next!==last)return null;
+ const expanded=find+next;
+ if(expanded.length>16000||original.indexOf(expanded,at+1)>=0)return null;
+ const fixed=compareFrozenCandidateSyntax(original,expanded,replace,parse);
+ if(fixed?.candidate!=='VALID_SYNTAX')return null;
+ return Object.freeze({schema:'reality-exact-splice-boundary-reproduction-v1',
+  classification:'DUPLICATED_FROZEN_CLOSING_DELIMITER',
+  original_candidate_sha256:p.proposed_sha256,corrected_candidate_sha256:fixed.proposed_sha256,
+  expanded_find_sha256:digest(expanded),unchanged_replacement_sha256:digest(replace),
+  boundary_line:next,additional_source_lines:1,parse_only:true,candidate_executed:false,
+  functional_acceptance_verified:false});
+}
 export async function independentlyVerifySignedRecoverySyntax({
  db,env=process.env,shiftId,workerRunId,fetchImpl=fetch,call=shiftRpc,parse=parseOnlyModule
 }={}){
@@ -69,15 +92,16 @@ export async function independentlyVerifySignedRecoverySyntax({
    return safe('SIGNED_RECOVERY_SYNTAX_SOURCE_BYTES_UNVERIFIED');
   const proof=compareFrozenCandidateSyntax(source,c.find,c.replace,parse);
   if(!proof)return safe('SIGNED_RECOVERY_SYNTAX_PROOF_UNAVAILABLE');
+  const boundary=proof.candidate==='INVALID_SYNTAX'?reproduceFrozenBoundaryFailure(source,c.find,c.replace,parse):null;
   const recorded=await call(db,'reality_record_signed_chat_recovery_syntax_v1',{
    p_shift_id:shiftId,p_worker_run_id:workerRunId,p_trigger_id:q.trigger_id,
    p_candidate_sha256:c.candidate_sha256,p_base_sha:c.base_sha,p_source_blob_sha:c.source_blob_sha,
-   p_release_sha:env.VERCEL_GIT_COMMIT_SHA,p_proof:proof},{fetchImpl});
+   p_release_sha:env.VERCEL_GIT_COMMIT_SHA,p_proof:{...proof,...(boundary?{boundary_reproduction:boundary}:{})}},{fetchImpl});
   if(recorded?.original_work_id!==q.original_work_id||recorded.trigger_id!==q.trigger_id||
    !HASH.test(recorded.syntax_receipt_sha256||'')||
    recorded.installation_authorized!==false||recorded.original_job_completed!==false||recorded.production_changed!==false)
    return safe('SIGNED_RECOVERY_SYNTAX_DURABLE_RECEIPT_UNVERIFIED');
-  if(!['SIGNED_RECOVERY_PARSE_ONLY_VERIFIED','SIGNED_RECOVERY_INVALID_SYNTAX_SAME_ORIGINAL_RECOMPILED','SIGNED_RECOVERY_SYNTAX_REVISION_EXHAUSTED_NEEDS_INVESTIGATION'].includes(recorded.status))
+  if(!['SIGNED_RECOVERY_PARSE_ONLY_VERIFIED','SIGNED_RECOVERY_INVALID_SYNTAX_SAME_ORIGINAL_RECOMPILED','SIGNED_RECOVERY_SYNTAX_REVISION_EXHAUSTED_NEEDS_INVESTIGATION','SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL'].includes(recorded.status))
    return safe('SIGNED_RECOVERY_SYNTAX_DURABLE_RECEIPT_UNVERIFIED');
   return safe(recorded.status,{original_work_id:q.original_work_id,trigger_id:q.trigger_id,
     candidate_sha256:c.candidate_sha256,syntax_receipt_sha256:recorded.syntax_receipt_sha256,
