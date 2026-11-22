@@ -70,7 +70,7 @@ function valid(s){
    'SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'].includes(s.phase)&&
   HASH.test(s.target_review_receipt_sha256||'')&&
   s.independent_target_review_verified===true&&
-  Number.isSafeInteger(s.quarantine_epoch)&&[0,1].includes(s.quarantine_epoch)&&
+  Number.isSafeInteger(s.quarantine_epoch)&&s.quarantine_epoch>=0&&s.quarantine_epoch<=9&&
   Number.isSafeInteger(s.feature_epoch)&&s.feature_epoch>=0&&s.feature_epoch<=4&&
   (s.phase==='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'||s.syntax_verified===true)&&
   SHA.test(s.release_sha||'')&&
@@ -95,7 +95,7 @@ function valid(s){
   c.production_changed===false;
 }
 const loc=s=>({
- branch:'reality/chat-recovery/'+s.trigger_id+(s.feature_epoch>0?'-feature-r'+s.feature_epoch:'')+(s.quarantine_epoch===1?'-syntax-r1':''),
+ branch:'reality/chat-recovery/'+s.trigger_id+(s.feature_epoch>0?'-feature-r'+s.feature_epoch:'')+(s.quarantine_epoch>0?'-syntax-r'+s.quarantine_epoch:''),
  artifact:'evidence/reality-chat-recovery/'+s.trigger_id+'.json'
 });
 const evidence=s=>JSON.stringify({
