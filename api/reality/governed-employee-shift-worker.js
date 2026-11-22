@@ -107,7 +107,7 @@ import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
 import {stageNextSignedChatRecoveryQuarantine}
  from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
-import {independentlyReviewOneSignedChatRecoveryTarget}
+import {independentlyReviewOneSignedChatRecoveryTarget,independentlyReobserveStalledRecoveryReview}
  from '../../src/reality-signed-chat-recovery-target-review-v1.js';
 import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
@@ -1404,8 +1404,19 @@ export default async function handler(req,res){
     installation_authorized:false,original_job_completed:false,
     production_changed:false,new_shift_started:false
    }));
+  workerStage='SIGNED_CHAT_RECOVERY_CONTINUITY_SOURCE_PROBE';
+  const signedRecoveryContinuityProbe=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReobserveStalledRecoveryReview({db,env:process.env,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_CHAT_RECOVERY_CONTINUITY_SOURCE_PROBE_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_CONTINUITY_SOURCE_PROBE_SCOPE',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
   workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW';
   const signedRecoveryTargetReview=
+   signedRecoveryContinuityProbe.continuity_source_probe_verified===true?
+    signedRecoveryContinuityProbe:
    await independentlyReviewOneSignedChatRecoveryTarget({
     db,env:process.env,workerRunId:actualWorkerRunId,
     fetchImpl:fetch
