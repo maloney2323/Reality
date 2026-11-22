@@ -52,6 +52,8 @@ const proof={
  ],
  jobs:[{
   original_work_id:work,source_ref:source,
+  source_step_index:2,source_phase:'SOURCE_ADMITTED',
+  native_next_governed_action:'GENERATE_AND_TEST_ORIGINAL',
   source_proof_sha256:sha('b'),
   independent_source_proof_verified:true,
   original_acceptance_verified:false,
