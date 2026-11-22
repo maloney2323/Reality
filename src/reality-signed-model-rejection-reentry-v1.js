@@ -38,7 +38,7 @@ export function independentlyVerifiedSignedRejectionCi(scope,env,runs,jobs,head,
  const filtered=runs.filter(x=>x.head_sha===scope.release_sha&&
   x.head_branch===env.VERCEL_GIT_COMMIT_REF&&
   x.event==='push'&&x.status==='completed'&&x.conclusion==='success'&&
-  x.path===workflow&&x.repository?.full_name===repo&&
+  x.path?.split('@')[0]===workflow&&x.repository?.full_name===repo&&
   Number.isSafeInteger(x.id)&&x.id>10000&&
   x.html_url==='https://github.com/'+repo+'/actions/runs/'+x.id&&
   Date.parse(x.run_started_at)>Date.parse(scope.rejected_at)&&

@@ -77,6 +77,16 @@ test('signed current failure and distinct CI-successful preview reenters SAME or
  assert.equal(r.installation_authorized,false);assert.equal(r.original_job_completed,false);
  assert.equal(f.write.length,1);assert.equal(f.requests.length,4);
 });
+test('GitHub Actions refs-suffixed workflow metadata is verified against the exact frozen workflow file',async()=>{
+ const f=setup({runs:[{...run,path:workflow+'@refs/heads/'+branch}]});
+ const result=await advanceInvestigatedSignedModelRejection(f);
+ assert.equal(result.status,'SIGNED_MODEL_REJECTION_INDEPENDENTLY_QUALIFIED_SAME_ORIGINAL_REENTERED');
+ assert.equal(f.write.length,1);
+ const wrong=setup({runs:[{...run,path:'.github/workflows/other.yml@refs/heads/'+branch}]});
+ const blocked=await advanceInvestigatedSignedModelRejection(wrong);
+ assert.equal(wrong.write.length,0);
+ assert.notEqual(blocked.status,'SIGNED_MODEL_REJECTION_INDEPENDENTLY_QUALIFIED_SAME_ORIGINAL_REENTERED');
+});
 test('reject stale releases, absent signed authority, changed head, CI failures, nonunique CI, insecure preview',async()=>{
  for(const variant of [
   {env:{VERCEL_ENV:'production'}},{env:{VERCEL_GIT_COMMIT_REF:'main'}},
