@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   independent-chat-full-goal:
-    if: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'reality/chat-recovery/')) }}
+    if: ${{ (github.event_name == 'push' && (startsWith(github.ref_name, 'reality/chat-recovery/') || startsWith(github.event.head_commit.message, 'reality: exact owner-approved isolated original work:'))) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'reality/chat-recovery/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
