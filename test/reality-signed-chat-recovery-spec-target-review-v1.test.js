@@ -103,7 +103,7 @@ test('independent pinned entrypoint graph accepts an actual direct importer only
   'src/reality-unrelated-marketing-service.js',ROOTS);
  assert.equal(off.verified,true);assert.equal(off.target_in_graph,false);
  assert.equal(inspectPinnedSignedRecoverySourceRoots(roots,
-  'src/reality-chat-new-development-worker-v1.js',['../untrusted',...ROOTS.slice(1)]).verified,false);
+  'src/reality-chat-new-development-worker-v1.js',['untrusted',...ROOTS.slice(1)]).verified,false);
  assert.equal(inspectPinnedSignedRecoverySourceRoots(roots,
   'src/../../.env',ROOTS).verified,false);
 });
