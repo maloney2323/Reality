@@ -17,6 +17,7 @@ on:
       - 'test/reality-final-loop-executive-brief-v1.test.js'
       - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
       - 'test/reality-final-loop-canonical-handoff-v1.test.js'
+      - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
       - 'test/reality-final-loop-signed-worker-bridge-v1.test.js'
       - 'test/reality-final-loop-db-contract-v1.test.js'
       - 'sql/reality-final-loop-canonical-continuity-v1.sql'
@@ -39,6 +40,7 @@ on:
       - 'test/reality-final-loop-executive-brief-v1.test.js'
       - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
       - 'test/reality-final-loop-canonical-handoff-v1.test.js'
+      - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
       - 'test/reality-final-loop-signed-worker-bridge-v1.test.js'
       - 'test/reality-final-loop-db-contract-v1.test.js'
       - 'sql/reality-final-loop-canonical-continuity-v1.sql'
@@ -80,6 +82,7 @@ jobs:
           node --test test/reality-final-loop-executive-brief-v1.test.js
           node --test test/reality-final-loop-owner-time-endpoint-v1.test.js
           node --test test/reality-final-loop-canonical-handoff-v1.test.js
+          node --test test/reality-final-loop-cross-surface-continuity-v1.test.js
           node --test test/reality-past-present-future-time-map-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-final-loop-db-contract-v1.test.js
