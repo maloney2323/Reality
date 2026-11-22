@@ -68,13 +68,16 @@ test('broker and ledger keep the old fenced candidate immutable and use a distin
 });
 
 test('exact splice-boundary reproduction changes only the independently proven anchor, not model replacement',()=>{
- const proof=reproduceFrozenBoundaryFailure(baseline,find,bad);
+ const substantive=' return false;\n}\n';
+ const proof=reproduceFrozenBoundaryFailure(baseline,find,substantive);
+ // A duplicated brace around an otherwise identical source is a no-op, not a repair.
+ assert.equal(reproduceFrozenBoundaryFailure(baseline,find,bad),null);
  assert.equal(proof.classification,'DUPLICATED_FROZEN_CLOSING_DELIMITER');
  assert.equal(proof.boundary_line,'}\n');
  assert.equal(proof.additional_source_lines,1);
  assert.equal(proof.candidate_executed,false);assert.equal(proof.functional_acceptance_verified,false);
  assert.notEqual(proof.original_candidate_sha256,proof.corrected_candidate_sha256);
- assert.equal(proof.unchanged_replacement_sha256,'sha256:'+createHash('sha256').update(bad).digest('hex'));
+ assert.equal(proof.unchanged_replacement_sha256,'sha256:'+createHash('sha256').update(substantive).digest('hex'));
  assert.equal(reproduceFrozenBoundaryFailure(baseline,find,' return false;\n'),null);
  assert.equal(reproduceFrozenBoundaryFailure(baseline+baseline,find,bad),null);
  assert.equal(reproduceFrozenBoundaryFailure(baseline,find,' const x = ;\n}\n'),null);
