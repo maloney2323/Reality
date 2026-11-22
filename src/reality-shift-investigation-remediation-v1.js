@@ -31,7 +31,7 @@ async function read(path,token,fetchImpl){
  const r=await fetchImpl(base+path,{method:'GET',cache:'no-store',redirect:'error',
   signal:AbortSignal.timeout(5000),headers:{accept:'application/vnd.github+json',
    'x-github-api-version':'2022-11-28','user-agent':'Reality-continuity-remediation-verifier',
-   authorization:'Bearer '+token}});
+   ...(/^[A-Za-z0-9_-]{20,}$/.test(token||'')?{authorization:'Bearer '+token}:{})}});
  if(!r?.ok)throw Error('INDEPENDENT_CI_PROVIDER_UNAVAILABLE');
  return r.json();
 }
@@ -54,10 +54,11 @@ export async function qualifyVerifiedInvestigationRemediation({
   scope.installation_authorized!==false||scope.original_job_completed!==false||
   scope.production_changed!==false)
   return safe('FORMAT_REMEDIATION_EXACT_EVIDENCE_NOT_QUALIFIED');
- const token=String(env.REALITY_GITHUB_TOKEN||'');
+ // Public repository CI evidence is independently readable without a write token.
+ const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
  const sha=env.VERCEL_GIT_COMMIT_SHA, branch=env.VERCEL_GIT_COMMIT_REF;
- if(token.length<20||typeof branch!=='string'||!branch.length)
-  return safe('FORMAT_REMEDIATION_PROVIDER_SCOPE_UNAVAILABLE');
+ if(typeof branch!=='string'||!branch.length)
+  return safe('FORMAT_REMEDIATION_DEPLOYMENT_BRANCH_UNAVAILABLE');
  let run,job;
  try{
   const data=await read('/actions/workflows/'+workflow+'/runs?head_sha='+sha+
