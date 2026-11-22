@@ -44,7 +44,7 @@ export async function requalifyOneFencedSignedChatProvider({
    q.phase!=='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED')
   return safe('NO_FENCED_SIGNED_CHAT_PROVIDER_REQUALIFICATION_DUE');
  if(!UUID.test(q.trigger_id||'')||
-   q.original_work_id?.match(/^work:[a-f0-9]{32}$/)===null||
+   !/^work:[a-f0-9]{32}$/.test(q.original_work_id||'')||
    !UUID.test(q.message_id||'')||
    !HASH.test(q.candidate?.candidate_sha256||'')||
    !HASH.test(q.spec_sha256||'')||
