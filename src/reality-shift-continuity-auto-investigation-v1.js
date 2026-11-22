@@ -172,7 +172,8 @@ export async function investigateOneSignedShiftContinuityIncident({
   !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
-    'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'].includes(claim.kind)||
+    'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED',
+    'SIGNED_CHAT_RECOVERY_MODEL_REJECTED'].includes(claim.kind)||
   (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
    (!UUID.test(claim.source_claim_id||'')||
     !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
@@ -201,6 +202,26 @@ export async function investigateOneSignedShiftContinuityIncident({
    claim.source_evidence.failure_history.some(x=>x?.candidate!=='INVALID_SYNTAX'||x.baseline!=='VALID_SYNTAX'||x.parse_only!==true||x.candidate_executed!==false)||
    claim.source_evidence.investigation_only!==true||claim.source_evidence.root_cause_verified!==false||
    claim.source_evidence.original_job_completed!==false||claim.source_evidence.installation_authorized!==false||claim.source_evidence.production_changed!==false))||
+  (claim.kind==='SIGNED_CHAT_RECOVERY_MODEL_REJECTED'&&(
+   claim.source_evidence?.schema!=='reality-signed-rejected-source-incident-v1'||
+   !/^work:[a-f0-9]{32}$/.test(claim.source_evidence.original_work_id||'')||
+   !UUID.test(claim.source_evidence.trigger_id||'')||
+   !UUID.test(claim.source_evidence.source_claim_id||'')||
+   claim.source_evidence.source_claim_id!==claim.source_claim_id||
+   claim.source_evidence.observed_phase!=='SIGNED_CHAT_RECOVERY_MODEL_REJECTED'||
+   !HASH.test(claim.source_evidence.spec_sha256||'')||
+   !HASH.test(claim.source_evidence.rejection_receipt_sha256||'')||
+   !HASH.test(claim.source_evidence.blocker_receipt_sha256||'')||
+   !/^[A-Z][A-Z0-9_]{4,110}$/.test(claim.source_evidence.rejection_reason||'')||
+   !/^[a-f0-9]{40}$/.test(claim.source_evidence.source_release_sha||'')||
+   claim.source_evidence.rejection_evidence?.negative_memory?.reason!==claim.source_evidence.rejection_reason||
+   claim.source_evidence.rejection_evidence?.spec_sha256!==claim.source_evidence.spec_sha256||
+   claim.source_evidence.investigation_only!==true||
+   claim.source_evidence.root_cause_verified!==false||
+   claim.source_evidence.source_candidate_executed!==false||
+   claim.source_evidence.original_job_completed!==false||
+   claim.source_evidence.installation_authorized!==false||
+   claim.source_evidence.production_changed!==false))||
   claim.scope!=='SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY'||
   claim.model_inquiry_authorized!==true||
   claim.new_original_jobs_created!==0||
@@ -251,7 +272,8 @@ export async function investigateOneSignedShiftContinuityIncident({
    }catch{sourceReadback={status:'CURRENT_SOURCE_READBACK_UNVERIFIED',source_ref:sourceRef}}
   }
   const syntaxIncident=claim.kind==='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED';
-  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident;
+  const modelRejectionIncident=claim.kind==='SIGNED_CHAT_RECOVERY_MODEL_REJECTED';
+  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident||modelRejectionIncident;
   const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident;
   // Real repeated wake receipts prove no progress, not a root cause.
   // The existing owner-scoped original preflight provides current admission
@@ -330,7 +352,13 @@ export async function investigateOneSignedShiftContinuityIncident({
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
      'Return only the specified fields.'+
-     (syntaxIncident?
+     (modelRejectionIncident?
+      ' This is an exact signed Chat recovery candidate MODEL_REJECTED, not a completed job or permission to retry. '+
+      'Read the typed rejection_reason, immutable rejection_evidence, original ID and frozen spec. '+
+      'Diagnose the specific model/compiler source-span or validation gap, decide a smallest safe correction and '+
+      'require a full pinned-module parse, independent CI and distinct preview release before same-original reentry. '+
+      'A changed build alone is not proof of a repaired original. Never reuse the rejected candidate or grant installation. ':
+      syntaxIncident?
       ' Two independently parsed candidates failed while their frozen baselines parsed. Investigate the exact model/compiler splice boundary and preserved distinct failure receipts. Prefer RUN_INDEPENDENT_FROZEN_TEST or INVESTIGATE_EXISTING_HANDOFF for the compiler defect. Require read-only reproduction against pinned source bytes: original splice invalid, uniquely corrected span valid, replacement bytes unchanged. No candidate execution, testing claim, installation, policy weakening, or bypass. ':
       chatReviewIncident?
       ' The incident is a signed Chat original reviewer infrastructure failure. '+
