@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {attestSignedWorkerLoadedCapabilities as attest,
- assessSignedWorkerCapabilityActivation as assess}
+ assessSignedWorkerCapabilityActivation as assess,
+ deliverOnceApprovedSignedWorkerCapability as deliver}
  from '../src/reality-signed-worker-capability-delivery-v1.js';
 
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
@@ -140,4 +141,117 @@ test('arbitrary signed capability types and owner shifts use the same contract',
  assert.equal(v.status,
   'APPROVED_CAPABILITY_LOADED_AWAITING_SIGNED_EXECUTOR_CLAIM');
  assert.equal(v.capability_usable_by_llm,false);
+});
+
+
+const aliasName='governed-worker-preview.vercel.app';
+const claimId='eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee';
+const validOldAlias={provider:'VERCEL',independently_observed:true,
+ preview_only:true,project_verified:true,
+ resolved_release_sha:old,resolved_branch:'repair/old-worker-branch'};
+const validNewAlias={...validOldAlias,resolved_release_sha:next,
+ resolved_branch:branch};
+const authorizedClaim={status:'EXACT_SIGNED_CAPABILITY_DELIVERY_CLAIMED',
+ owner_id:owner,shift_id:shift,release_sha:next,release_ref:branch,
+ capability_key:action,scheduled_alias:aliasName,
+ previous_release_sha:old,
+ previous_release_ref:validOldAlias.resolved_branch,
+ independent_ci_run_id:ci.run_id,target_environment:'ISOLATED_PREVIEW',
+ one_use_service_claim:true,owner_approved_exact_release:true,
+ claim_id:claimId,approval_receipt_sha256:'sha256:'+'a'.repeat(64),
+ production_change_permitted:false};
+const deliveryArgs=(more={})=>({
+ env:{...env(),'REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED':'true'},
+ ownerId:owner,shiftId:shift,
+ targetReleaseSha:next,targetReleaseRef:branch,capabilityKey:action,
+ scheduledAlias:aliasName,releaseCandidate:candidate,ci,
+ claimApprovedRelease:async()=>authorizedClaim,
+ observeAlias:async()=>validOldAlias,
+ assignAlias:async()=>({provider:'VERCEL',alias:aliasName,
+  release_sha:next,claim_id:claimId}),
+ ...more
+});
+test('delivery is disabled without the explicit signed installer feature gate',async()=>{
+ let claims=0,writes=0;
+ const v=await deliver(deliveryArgs({
+  env:env(),claimApprovedRelease:async()=>{claims++;return authorizedClaim},
+  assignAlias:async()=>{writes++}
+ }));
+ assert.equal(v.status,'SIGNED_CAPABILITY_DELIVERY_SERVICE_BOUNDARY_UNVERIFIED');
+ assert.equal(claims,0);assert.equal(writes,0);
+});
+test('owner claim absent: never call provider alias mutation',async()=>{
+ let writes=0;
+ const v=await deliver(deliveryArgs({
+  claimApprovedRelease:async()=>({...authorizedClaim,owner_approved_exact_release:false}),
+  assignAlias:async()=>{writes++}
+ }));
+ assert.equal(v.status,'SIGNED_CAPABILITY_DELIVERY_EXACT_OWNER_AUTHORITY_MISSING');
+ assert.equal(writes,0);
+ assert.equal(v.original_job_completed,false);
+});
+test('existing alias at target is read only, never a repeated write',async()=>{
+ let claims=0,writes=0;
+ const v=await deliver(deliveryArgs({
+  observeAlias:async()=>validNewAlias,
+  claimApprovedRelease:async()=>{claims++;return authorizedClaim},
+  assignAlias:async()=>{writes++}
+ }));
+ assert.equal(v.status,'SIGNED_CAPABILITY_DELIVERY_ALIAS_ALREADY_TARGET_NO_REPLAY');
+ assert.equal(claims,0);assert.equal(writes,0);
+});
+test('wrong pinned CI stops before owner claim or any effect',async()=>{
+ let calls=0;
+ const v=await deliver(deliveryArgs({
+  ci:{...ci,release_sha:old},
+  claimApprovedRelease:async()=>{calls++;return authorizedClaim}
+ }));
+ assert.equal(v.status,'SIGNED_CAPABILITY_DELIVERY_PINNED_CI_OR_RELEASE_UNVERIFIED');
+ assert.equal(calls,0);
+});
+test('prewrite provider drift fences already claimed release',async()=>{
+ let reads=0,writes=0;
+ const v=await deliver(deliveryArgs({
+  observeAlias:async()=>++reads===1?validOldAlias:validNewAlias,
+  assignAlias:async()=>{writes++}
+ }));
+ assert.equal(v.status,'SIGNED_CAPABILITY_DELIVERY_OLD_ALIAS_DRIFT_NO_WRITE');
+ assert.equal(writes,0);
+});
+test('provider write timeout is uncertain effect, never replay',async()=>{
+ let attempts=0,reads=0;
+ const v=await deliver(deliveryArgs({
+  observeAlias:async()=>{reads++;return validOldAlias},
+  assignAlias:async()=>{attempts++;throw Error('provider timeout')}
+ }));
+ assert.equal(v.status,
+  'SIGNED_CAPABILITY_DELIVERY_PROVIDER_EFFECT_UNKNOWN_NO_REPLAY');
+ assert.equal(v.provider_assignment_attempted,true);
+ assert.equal(attempts,1);assert.equal(reads,2);
+ assert.equal(v.original_job_completed,false);
+});
+test('provider response does not bypass independent alias proof',async()=>{
+ let reads=0;
+ const v=await deliver(deliveryArgs({
+  observeAlias:async()=>{reads++;return validOldAlias}
+ }));
+ assert.equal(v.status,
+  'SIGNED_CAPABILITY_DELIVERY_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY');
+ assert.equal(reads,3);
+});
+test('even independently verified alias activation waits for signed worker',async()=>{
+ let reads=0,writes=0;
+ const v=await deliver(deliveryArgs({
+  observeAlias:async()=>++reads>=3?validNewAlias:validOldAlias,
+  assignAlias:async()=>{writes++;return{
+   provider:'VERCEL',alias:aliasName,release_sha:next,claim_id:claimId
+  }}
+ }));
+ assert.equal(v.status,
+  'SIGNED_CAPABILITY_DELIVERY_ALIAS_VERIFIED_AWAITING_WORKER_WAKE');
+ assert.equal(v.independent_alias_verified,true);
+ assert.equal(v.signed_worker_new_release_observed,false);
+ assert.equal(v.original_job_completed,false);
+ assert.equal(v.model_tool_permission_granted,false);
+ assert.equal(writes,1);assert.equal(reads,3);
 });
