@@ -173,6 +173,8 @@ const pendingEnvelope={
  observed_at:'2026-11-22T22:00:00Z',
  revision:1,jobs:[{
   source_ref:source,original_work_id:work,
+  source_step_index:2,source_phase:'SOURCE_ADMITTED',
+  native_next_governed_action:'GENERATE_AND_TEST_ORIGINAL',
   original_kind:'REAL_ENGINEERING_REPAIR_ORIGINAL',
   source_proof_sha256:sha('a'),
   independent_source_proof_verified:true,
