@@ -34,6 +34,8 @@ const proof={
  original_job_completed:false,production_changed:false,
  jobs:[{
   source_ref:source,original_work_id:work,
+  source_step_index:2,source_phase:'SOURCE_ADMITTED',
+  native_next_governed_action:'GENERATE_AND_TEST_ORIGINAL',
   source_proof_sha256:hash('d'),independent_source_proof_verified:true,
   original_acceptance_verified:false,authority_proof_verified:false,
   capacity_proof_verified:false,final_outcome_verified:false,
@@ -45,6 +47,8 @@ const sourceGraph={
  owner_id:owner,shift_id:shift,plan_fingerprint:hash('a'),
  installation_authorized:false,production_changed:false,
  jobs:[{source_ref:source,original_work_id:work,
+  source_step_index:2,phase:'SOURCE_ADMITTED',
+  next_governed_action:'GENERATE_AND_TEST_ORIGINAL',
   source_proof_sha256:hash('d'),independent_source_proof_verified:true}]
 };
 function bundle(raw=proof){
@@ -61,6 +65,8 @@ function bundle(raw=proof){
   installation_authorized:false,production_changed:false,
   decisions:raw.jobs.map(j=>({
    original_work_id:j.original_work_id,source_ref:j.source_ref,
+   source_step_index:j.source_step_index,source_phase:j.source_phase,
+   native_next_governed_action:j.native_next_governed_action,
    decision:'REFRESH',
    next_governed_action:
     'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS',
