@@ -79,6 +79,50 @@ test('initial GitHub branch-write refusal is passed intact as typed no-replay ev
  assert.equal(malformed.provider_write_http_status,undefined);
  assert.equal(malformed.installation_authorized,false);
 });
+test('authenticated broker identity is receipted read-only without turning a repo push flag into contents-write authority',async()=>{
+ const proof={
+  schema:'reality-broker-read-only-credential-provenance-v1',
+  repository:'maloney2323/Reality',
+  credential_kind:'USER_ACCESS_TOKEN',
+  github_actor_login:'authorized-user',
+  github_actor_user_http_status:200,
+  installation_repository_access_verified:false,
+  installation_repository_http_status:403,
+  classic_repo_scope_observed:false,
+  oauth_scopes_header_available:false,
+  rulesets_read_http_status:200,ruleset_count:0,
+  contents_write_effectively_tested:false,
+  exact_ref_write_authorized:false,provider_effect_replayed:false,
+  action:'VERIFY_EXACT_BROKER_CONTENTS_WRITE_OR_REQUEST_OWNER_PROVIDER_CORRECTION'
+ };
+ const r=await stage('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',{
+  broker_read_only_diagnosis:'GITHUB_REF_NOT_OBSERVED_PUSH_PERMISSION_PRESENT',
+  provider_ref_http_status:404,broker_push_permission_verified:true,
+  provider_effect_settled:false,write_replay_authorized:false,
+  broker_credential_readback:proof});
+ assert.equal(r.broker_credential_readback?.github_actor_login,'authorized-user');
+ assert.equal(r.broker_credential_readback?.contents_write_effectively_tested,false);
+ assert.equal(r.broker_credential_readback?.exact_ref_write_authorized,false);
+ const misleading=await stage('RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY',{
+  broker_read_only_diagnosis:'GITHUB_REF_NOT_OBSERVED_PUSH_PERMISSION_PRESENT',
+  provider_ref_http_status:404,broker_push_permission_verified:true,
+  provider_effect_settled:false,write_replay_authorized:false,
+  broker_credential_readback:{...proof,contents_write_effectively_tested:true,
+   exact_ref_write_authorized:true}});
+ assert.equal(misleading.broker_credential_readback,null);
+ assert.equal(misleading.installation_authorized,false);
+});
+test('the credential probe is GET-only and never touches pending reference mutation',()=>{
+ const begin=broker.indexOf('async function githubCredentialReadback(token)');
+ const end=broker.indexOf('const bytes=x=>',begin);
+ assert.ok(begin>0&&end>begin);
+ const path=broker.slice(begin,end);
+ assert.match(path,/method:'GET'/);
+ assert.ok(path.includes("get('user')"));
+ assert.ok(path.includes("get('installation/repositories')"));
+ assert.match(path,/provider_effect_replayed:false/);
+ assert.doesNotMatch(path,/method:'POST'|method:'PUT'|method:'PATCH'|method:'DELETE'/);
+});
 test('fenced broker path only performs GET reobservations and cannot recreate an uncertain branch',()=>{
  const fenced=broker.indexOf("if(s.phase==='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED')");
  const fresh=broker.indexOf("const before=await gh(token,'/git/ref/heads/'+branch)");
