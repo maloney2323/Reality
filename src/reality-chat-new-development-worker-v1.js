@@ -543,7 +543,7 @@ export async function generateNextSignedChatDevelopmentDraft({
   }
   if(!checked.ok)
    fail('MODEL_BOUNDED_UNIQUE_CODE_CHANGE_NOT_VERIFIED');
-  if(/\\.js$/.test(path)&&parseOnlyModule(checked.proposed)!=='VALID_SYNTAX')
+  if(/\.js$/.test(path)&&parseOnlyModule(checked.proposed)!=='VALID_SYNTAX')
    fail('MODEL_COMPLETE_MODULE_SYNTAX_NOT_VERIFIED');
   const {find,replace,reason}=patch.choice;
   const proposed=checked.proposed;
