@@ -57,7 +57,7 @@ export async function stageNextSignedChatRecoveryQuarantine({
   return safe('SIGNED_RECOVERY_QUARANTINE_SERVICE_OR_PROVIDER_UNVERIFIED');
  if(result.status==='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_RECEIPTED'){
   if(!WORK.test(result.original_work_id||'')||
-     !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i.test(
+     !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
        result.trigger_id||'')||
      !HASH.test(result.quarantine_receipt_sha256||'')||
      !SHA.test(result.artifact_commit_sha||'')||
