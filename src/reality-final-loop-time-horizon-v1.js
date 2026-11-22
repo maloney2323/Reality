@@ -54,7 +54,8 @@ export function projectRealityFinalLoopTimeHorizon({
    engine.installation_authorized!==false||
    engine.production_changed!==false||
    (engine.schema!=='reality-final-loop-engine-v1'&&
-    engine.schema!=='reality-final-loop-signed-worker-bridge-v1'))
+    engine.schema!=='reality-final-loop-signed-worker-bridge-v1'&&
+    engine.schema!=='reality-final-loop-owner-readback-v1'))
   return safeUnbound(past);
  const seen=new Set();
  const obligations=[];
