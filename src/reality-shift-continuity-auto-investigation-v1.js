@@ -84,6 +84,25 @@ export function classifySignedContinuityClaimTransportError(error){
   return 'SIGNED_INVESTIGATION_CLAIM_INVALID';
  return 'INVESTIGATION_RUNTIME_UNVERIFIED';
 }
+// One contract for validation and model guidance; no rejected model text is retained.
+export function continuityTextContract(guidedRecovery=false){
+ return [
+  ['diagnosis',30,1500],['proposed_upgrade',30,guidedRecovery?1100:1600],
+  ['independent_test_requirement',30,guidedRecovery?1200:1600],
+  ['limitations',20,1200],
+  ...(guidedRecovery?[['resume_acceptance_condition',30,300]]:[])
+ ].map(([field,min,max])=>({field,min,max}));
+}
+function textContractViolations(value,guidedRecovery){
+ return continuityTextContract(guidedRecovery).flatMap(({field,min,max})=>{
+  const text=value[field];
+  const length=typeof text==='string'?text.length:null;
+  const reason=length===null?'NOT_STRING':
+   text.trim()!==text?'OUTER_WHITESPACE':
+   length<min?'BELOW_MIN':length>max?'ABOVE_MAX':null;
+  return reason?[{field,min,max,length,reason}]:[];
+ });
+}
 export function parseContinuityModelInvestigation(response,roles,{guidedRecovery=false}={}){
  if(response?.status==='incomplete')fail('MODEL_RESPONSE_INCOMPLETE');
  if(response?.status!=='completed')fail('MODEL_NOT_VERIFIED');
@@ -101,15 +120,11 @@ export function parseContinuityModelInvestigation(response,roles,{guidedRecovery
  const reviewer=functions.get(value.reviewer_function_id);
  if(!worker||!reviewer||worker.function_id===reviewer.function_id)
   fail('INDEPENDENT_EMPLOYEE_REVIEWER_REQUIRED');
- for(const [key,min,max] of [
-  ['diagnosis',30,1500],['proposed_upgrade',30,guidedRecovery?1100:1600],
-  ['independent_test_requirement',30,guidedRecovery?1200:1600],
-  ['limitations',20,1200],
-  ...(guidedRecovery?[['resume_acceptance_condition',30,300]]:[])
- ]){
-  if(typeof value[key]!=='string'||value[key].trim()!==value[key]||
-   value[key].length<min||value[key].length>max)
-   fail('DIAGNOSIS_AND_TEST_SPEC_UNVERIFIED');
+ const violations=textContractViolations(value,guidedRecovery);
+ if(violations.length){
+  const error=Error('SHIFT_CONTINUITY_DIAGNOSIS_AND_TEST_SPEC_UNVERIFIED');
+  error.validationEvidence={schema:'reality-continuity-text-validation-v1',violations};
+  throw error;
  }
  if(guidedRecovery&&(
   !GOVERNED_RECOVERY_CLASSES.includes(value.blocker_class)||
@@ -289,8 +304,11 @@ export async function investigateOneSignedShiftContinuityIncident({
      'incident and this owner shift authorize source investigation ONLY. You '+
      'must not claim the repair is implemented, current capability gap is '+
      'independently proved, installation is approved, or original job is done. '+
-     'Use 70-600 characters for each of diagnosis, proposed_upgrade, and '+
-     'independent_test_requirement, and 40-400 characters for limitations. '+
+     'Follow every field in text_contract, including the resume condition when present. '+
+     'Use concise complete sentences within each preferred range; no outer whitespace. '+
+     'If prior validation failed, adapt the response format to the supplied field-level '+
+     'evidence, or if older evidence is coarse, check every bounded field. Do not change '+
+     'the original goal, invent evidence, or weaken the validation contract. '+
      'Select two DISTINCT available role function IDs. '+
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
@@ -326,6 +344,8 @@ export async function investigateOneSignedShiftContinuityIncident({
       ci_run_id:claim.remediation_ci_run_id}:null,
      previous_failure_reason:claim.previous_failure_reason||null,
      prior_failure_history:claim.failure_history||[],
+      text_contract:continuityTextContract(guidedRecovery).map(x=>({...x,
+       preferred_min:Math.max(x.min,70),preferred_max:Math.min(x.max-20,500)})),
      failed_job:{job_id:claim.qualified_job_id||null,
       source_ref:claim.failed_source_ref||null,
       phase:claim.failed_job_phase||null,
@@ -416,14 +436,20 @@ export async function investigateOneSignedShiftContinuityIncident({
  }catch(error){
   const failureReason=classifyInvestigationFailure(error,stage);
   let blocked=null;
-  try{blocked=await call(db,'reality_block_shift_continuity_investigation_v1',{
+  const validationEvidence=failureReason==='MODEL_TEXT_BOUNDS_UNVERIFIED'?
+   error.validationEvidence:null;
+  try{blocked=await call(db,validationEvidence?
+   'reality_block_shift_continuity_investigation_evidenced_v1':
+   'reality_block_shift_continuity_investigation_v1',{
    p_owner_id:claim.owner_id,p_incident_id:claim.incident_id,
-   p_lease_id:claim.lease_id,
-   p_reason:failureReason
+   p_lease_id:claim.lease_id,p_reason:failureReason,
+   ...(validationEvidence?{p_validation_evidence:validationEvidence}:{})
   },{fetchImpl})}catch{}
   return restricted('SHIFT_CONTINUITY_INVESTIGATION_BLOCKED',{
    incident_id:claim.incident_id,failed_stage:stage,
    failure_reason:failureReason,
+   ...(validationEvidence?{validation_evidence:validationEvidence}:{}),
+   failure_receipt_recorded:blocked?.status==='CONTINUITY_INVESTIGATION_BLOCKED_NEEDS_PROOF',
    investigation_attempt:claim.investigation_attempt||1,
    next_attempt_at:blocked?.next_investigation_at||null,
    next_action:blocked?.automatic_reinvestigation_eligible===true?
