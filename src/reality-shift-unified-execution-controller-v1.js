@@ -1,3 +1,5 @@
+import {projectRealityFinalLoopTimeHorizon}
+ from './reality-final-loop-time-horizon-v1.js';
 // One trusted view of the WHOLE authorized Reality employee shift.
 // It binds source-native originals and Universe originals by the SAME
 // owner/shift/source evidence without manufacturing goal transitions.
@@ -157,7 +159,7 @@ const makeLoopDecision=(item,choice,next,reason,detail={})=>Object.freeze({
  installation_authorized:false,independent_settlement_committed:false,
  original_job_completed:false,production_changed:false
 });
-const loopEnvelope=(view,ledger,decisions,status)=>Object.freeze({
+const loopEnvelope=(view,ledger,decisions,status)=>{const envelope={
  schema:REALITY_FINAL_LOOP_ENGINE_VERSION,status,
  owner_id:view.owner_id,shift_id:view.shift_id,
  plan_fingerprint:view.plan_fingerprint,
@@ -169,8 +171,13 @@ const loopEnvelope=(view,ledger,decisions,status)=>Object.freeze({
   decisions.length>0&&decisions.every(d=>d.decision==='SETTLE'),
  all_selected_settled:false,shift_completed:false,
  canonical_ledger_mutated:false,universe_mutated:false,
- installation_authorized:false,production_changed:false
-});
+ installation_authorized:false,production_changed:false,
+ original_job_completed:false
+ };
+ return Object.freeze({...envelope,
+  time_horizon:projectRealityFinalLoopTimeHorizon({engine:envelope})
+ });
+};
 
 // One logical evaluation for an entire shift. A signed worker must obtain
 // 'ledger' from an authenticated, independent service-only readback; no model,
