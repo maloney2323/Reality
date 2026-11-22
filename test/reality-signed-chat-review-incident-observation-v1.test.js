@@ -126,7 +126,7 @@ test('all text violations are reported as metadata only; no raw rejected text es
   assert.equal(e.message,'SHIFT_CONTINUITY_DIAGNOSIS_AND_TEST_SPEC_UNVERIFIED');
   assert.deepEqual(e.validationEvidence.violations,[
    {field:'diagnosis',min:30,max:1500,length:5,reason:'BELOW_MIN'},
-   {field:'limitations',min:20,max:1200,length:9,reason:'OUTER_WHITESPACE'},
+   {field:'limitations',min:20,max:1200,length:7,reason:'BELOW_MIN'},
    {field:'resume_acceptance_condition',min:30,max:300,length:301,reason:'ABOVE_MAX'}]);
   assert.doesNotMatch(JSON.stringify(e.validationEvidence),/private|short|xxx/);return true;
  });
