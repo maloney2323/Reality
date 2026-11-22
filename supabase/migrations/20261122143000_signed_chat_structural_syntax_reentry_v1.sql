@@ -1,6 +1,4 @@
--- Evidence-bound generalized frozen structural parse proof for existing signed original.
--- One distinct signed incident investigation and later read-only parser wake
--- are required before any recompile. No source writes, replay or new authority.
+-- Accept generic independently reproduced, parse-valid source structure into same-original recovery.
 CREATE OR REPLACE FUNCTION public.reality_record_signed_chat_recovery_syntax_v1(p_shift_id uuid, p_worker_run_id uuid, p_trigger_id uuid, p_candidate_sha256 text, p_base_sha text, p_source_blob_sha text, p_release_sha text, p_proof jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -112,99 +110,9 @@ begin
     and prior_proof->>'baseline_sha256'=proof->>'baseline_sha256'
     and prior_proof->>'proposed_sha256'=proof->>'proposed_sha256'
     and boundary->>'original_candidate_sha256'=proof->>'proposed_sha256'
-    and boundary->>'corrected_candidate_sha256'~'^sha256:[a-f0-9]{64}
-   then
-    select j.* into i from reality_internal.owner_shift_continuity_incidents_v1 j
-    where j.owner_id=q.owner_id and j.shift_id=p_shift_id and j.kind='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'
-     and j.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' and j.source_evidence=evidence
-     and j.evidence_sha256='sha256:'||pg_catalog.encode(extensions.digest(evidence::text,'sha256'),'hex')
-     and j.investigation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
-     and j.assigned_function_id<>j.reviewer_function_id
-     and j.investigated_at<sh.started_at
-     and j.proposed_upgrade ~ '^\[GOVERNED_ACTION:(INVESTIGATE_EXISTING_HANDOFF|RUN_INDEPENDENT_FROZEN_TEST|VERIFY_INSTALLED_EXECUTOR)\]'
-     and j.repair_executed=false and j.installation_authorized=false and j.production_changed=false
-    order by j.investigated_at desc limit 1 for update;
-    if found then
-     archive:=pg_catalog.jsonb_build_object('prior_phase',q.phase,'prior_candidate',q.qualified_candidate,'prior_claim_id',q.claim_id,
-       'prior_spec',q.recovery_spec,'prior_spec_sha256',q.recovery_spec_sha256,'prior_qualification_receipt',q.qualification_receipt,
-       'syntax_proof',prior_proof,'syntax_receipt_sha256',receipt,'independent_boundary_reproduction',boundary,
-       'reobservation_worker_run_id',p_worker_run_id,'investigation_incident_id',i.incident_id,'investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'prior_provider_effect_not_replayed',true,'no_install_authority',true,'prior_branch','reality/chat-recovery/'||q.trigger_id::text||
-        (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0' then '-feature-r'||(q.recovery_spec->>'feature_revision_epoch') else '' end)||
-        '-syntax-r'||rev::text);
-     spec:=q.recovery_spec||pg_catalog.jsonb_build_object('schema','reality-recovery-compiler-capability-spec-v2',
-       'syntax_revision_epoch',rev+1,'prior_syntax_rejection_receipt_sha256',receipt,
-       'prior_syntax_target_path',q.qualified_candidate->>'target_path','prior_syntax_failed_candidate_sha256',p_candidate_sha256,
-       'prior_syntax_reason','INVALID_SYNTAX','syntax_investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'syntax_compiler_reproduction',boundary,'syntax_investigation_diagnosis',i.diagnosis,
-       'syntax_investigation_test_requirement',i.independent_test_requirement,
-       'full_goal_accepted',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-     spec_hash:='sha256:'||pg_catalog.encode(extensions.digest(spec::text,'sha256'),'hex');
-     update reality_internal.genuine_capability_queue_v1 set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
-       claim_id=null,claim_expires_at=null,qualified_candidate=null,recovery_spec=spec,recovery_spec_sha256=spec_hash,frozen_suite_ref='recovery-spec:'||spec_hash,
-       qualification_receipt=(qualification_receipt-array['target_review','target_review_receipt_sha256','target_review_lease','target_reviewed_at',
-        'target_review_retry_count','target_review_last_failure','target_review_failure_receipt_sha256','target_review_failure_history','target_review_next_action',
-        'last_target_rejection','continuity_source_probe','continuity_source_probe_sha256','publish_fenced_at','publish_candidate_sha256','syntax_proof','syntax_receipt_sha256','syntax_next_action'])
-        ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
-       updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
-     status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_VERIFIED_STRUCTURAL_COMPILER';
-    end if;
-   end if;
-  end if;
- end if;
- return pg_catalog.jsonb_build_object('status',status,'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'syntax_receipt_sha256',receipt,'next_action',next_action,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false,'new_shift_started',false);
-end $function$
-
+    and boundary->>'corrected_candidate_sha256'~'^sha256:[a-f0-9]{64}$'
     and boundary->>'corrected_candidate_sha256'<>proof->>'proposed_sha256'
-    and boundary->>'expanded_find_sha256'~'^sha256:[a-f0-9]{64}
-   then
-    select j.* into i from reality_internal.owner_shift_continuity_incidents_v1 j
-    where j.owner_id=q.owner_id and j.shift_id=p_shift_id and j.kind='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'
-     and j.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' and j.source_evidence=evidence
-     and j.evidence_sha256='sha256:'||pg_catalog.encode(extensions.digest(evidence::text,'sha256'),'hex')
-     and j.investigation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
-     and j.assigned_function_id<>j.reviewer_function_id
-     and j.investigated_at<sh.started_at
-     and j.proposed_upgrade ~ '^\[GOVERNED_ACTION:(INVESTIGATE_EXISTING_HANDOFF|RUN_INDEPENDENT_FROZEN_TEST|VERIFY_INSTALLED_EXECUTOR)\]'
-     and j.repair_executed=false and j.installation_authorized=false and j.production_changed=false
-    order by j.investigated_at desc limit 1 for update;
-    if found then
-     archive:=pg_catalog.jsonb_build_object('prior_phase',q.phase,'prior_candidate',q.qualified_candidate,'prior_claim_id',q.claim_id,
-       'prior_spec',q.recovery_spec,'prior_spec_sha256',q.recovery_spec_sha256,'prior_qualification_receipt',q.qualification_receipt,
-       'syntax_proof',prior_proof,'syntax_receipt_sha256',receipt,'independent_boundary_reproduction',boundary,
-       'reobservation_worker_run_id',p_worker_run_id,'investigation_incident_id',i.incident_id,'investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'prior_provider_effect_not_replayed',true,'no_install_authority',true,'prior_branch','reality/chat-recovery/'||q.trigger_id::text||
-        (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0' then '-feature-r'||(q.recovery_spec->>'feature_revision_epoch') else '' end)||
-        '-syntax-r'||rev::text);
-     spec:=q.recovery_spec||pg_catalog.jsonb_build_object('schema','reality-recovery-compiler-capability-spec-v2',
-       'syntax_revision_epoch',rev+1,'prior_syntax_rejection_receipt_sha256',receipt,
-       'prior_syntax_target_path',q.qualified_candidate->>'target_path','prior_syntax_failed_candidate_sha256',p_candidate_sha256,
-       'prior_syntax_reason','INVALID_SYNTAX','syntax_investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'syntax_compiler_reproduction',boundary,'syntax_investigation_diagnosis',i.diagnosis,
-       'syntax_investigation_test_requirement',i.independent_test_requirement,
-       'full_goal_accepted',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-     spec_hash:='sha256:'||pg_catalog.encode(extensions.digest(spec::text,'sha256'),'hex');
-     update reality_internal.genuine_capability_queue_v1 set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
-       claim_id=null,claim_expires_at=null,qualified_candidate=null,recovery_spec=spec,recovery_spec_sha256=spec_hash,frozen_suite_ref='recovery-spec:'||spec_hash,
-       qualification_receipt=(qualification_receipt-array['target_review','target_review_receipt_sha256','target_review_lease','target_reviewed_at',
-        'target_review_retry_count','target_review_last_failure','target_review_failure_receipt_sha256','target_review_failure_history','target_review_next_action',
-        'last_target_rejection','continuity_source_probe','continuity_source_probe_sha256','publish_fenced_at','publish_candidate_sha256','syntax_proof','syntax_receipt_sha256','syntax_next_action'])
-        ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
-       updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
-     status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_PROVEN_BOUNDARY_COMPILER';
-    end if;
-   end if;
-  end if;
- end if;
- return pg_catalog.jsonb_build_object('status',status,'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'syntax_receipt_sha256',receipt,'next_action',next_action,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false,'new_shift_started',false);
-end $function$
-
+    and boundary->>'expanded_find_sha256'~'^sha256:[a-f0-9]{64}$'
     and boundary->>'unchanged_replacement_sha256'='sha256:'||pg_catalog.encode(extensions.digest(q.qualified_candidate->>'replace','sha256'),'hex')
     and boundary->>'parse_only'='true' and boundary->>'candidate_executed'='false'
     and boundary->>'functional_acceptance_verified'='false'
@@ -217,191 +125,11 @@ end $function$
      (boundary->>'schema'='reality-exact-structural-span-reproduction-v1'
       and boundary->>'classification'='INCOMPLETE_FROZEN_SYNTAX_SPAN'
       and boundary->>'baseline_sha256'=proof->>'baseline_sha256'
-      and coalesce(boundary->>'additional_source_lines','')~'^[1-9][0-9]?
-   then
-    select j.* into i from reality_internal.owner_shift_continuity_incidents_v1 j
-    where j.owner_id=q.owner_id and j.shift_id=p_shift_id and j.kind='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'
-     and j.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' and j.source_evidence=evidence
-     and j.evidence_sha256='sha256:'||pg_catalog.encode(extensions.digest(evidence::text,'sha256'),'hex')
-     and j.investigation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
-     and j.assigned_function_id<>j.reviewer_function_id
-     and j.investigated_at<sh.started_at
-     and j.proposed_upgrade ~ '^\[GOVERNED_ACTION:(INVESTIGATE_EXISTING_HANDOFF|RUN_INDEPENDENT_FROZEN_TEST|VERIFY_INSTALLED_EXECUTOR)\]'
-     and j.repair_executed=false and j.installation_authorized=false and j.production_changed=false
-    order by j.investigated_at desc limit 1 for update;
-    if found then
-     archive:=pg_catalog.jsonb_build_object('prior_phase',q.phase,'prior_candidate',q.qualified_candidate,'prior_claim_id',q.claim_id,
-       'prior_spec',q.recovery_spec,'prior_spec_sha256',q.recovery_spec_sha256,'prior_qualification_receipt',q.qualification_receipt,
-       'syntax_proof',prior_proof,'syntax_receipt_sha256',receipt,'independent_boundary_reproduction',boundary,
-       'reobservation_worker_run_id',p_worker_run_id,'investigation_incident_id',i.incident_id,'investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'prior_provider_effect_not_replayed',true,'no_install_authority',true,'prior_branch','reality/chat-recovery/'||q.trigger_id::text||
-        (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0' then '-feature-r'||(q.recovery_spec->>'feature_revision_epoch') else '' end)||
-        '-syntax-r'||rev::text);
-     spec:=q.recovery_spec||pg_catalog.jsonb_build_object('schema','reality-recovery-compiler-capability-spec-v2',
-       'syntax_revision_epoch',rev+1,'prior_syntax_rejection_receipt_sha256',receipt,
-       'prior_syntax_target_path',q.qualified_candidate->>'target_path','prior_syntax_failed_candidate_sha256',p_candidate_sha256,
-       'prior_syntax_reason','INVALID_SYNTAX','syntax_investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'syntax_compiler_reproduction',boundary,'syntax_investigation_diagnosis',i.diagnosis,
-       'syntax_investigation_test_requirement',i.independent_test_requirement,
-       'full_goal_accepted',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-     spec_hash:='sha256:'||pg_catalog.encode(extensions.digest(spec::text,'sha256'),'hex');
-     update reality_internal.genuine_capability_queue_v1 set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
-       claim_id=null,claim_expires_at=null,qualified_candidate=null,recovery_spec=spec,recovery_spec_sha256=spec_hash,frozen_suite_ref='recovery-spec:'||spec_hash,
-       qualification_receipt=(qualification_receipt-array['target_review','target_review_receipt_sha256','target_review_lease','target_reviewed_at',
-        'target_review_retry_count','target_review_last_failure','target_review_failure_receipt_sha256','target_review_failure_history','target_review_next_action',
-        'last_target_rejection','continuity_source_probe','continuity_source_probe_sha256','publish_fenced_at','publish_candidate_sha256','syntax_proof','syntax_receipt_sha256','syntax_next_action'])
-        ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
-       updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
-     status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_PROVEN_BOUNDARY_COMPILER';
-    end if;
-   end if;
-  end if;
- end if;
- return pg_catalog.jsonb_build_object('status',status,'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'syntax_receipt_sha256',receipt,'next_action',next_action,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false,'new_shift_started',false);
-end $function$
-
+      and coalesce(boundary->>'additional_source_lines','')~'^[1-9][0-9]?$'
       and (boundary->>'additional_source_lines')::integer between 1 and 80
-      and coalesce(boundary->>'original_start_line','')~'^[1-9][0-9]{0,5}
-   then
-    select j.* into i from reality_internal.owner_shift_continuity_incidents_v1 j
-    where j.owner_id=q.owner_id and j.shift_id=p_shift_id and j.kind='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'
-     and j.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' and j.source_evidence=evidence
-     and j.evidence_sha256='sha256:'||pg_catalog.encode(extensions.digest(evidence::text,'sha256'),'hex')
-     and j.investigation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
-     and j.assigned_function_id<>j.reviewer_function_id
-     and j.investigated_at<sh.started_at
-     and j.proposed_upgrade ~ '^\[GOVERNED_ACTION:(INVESTIGATE_EXISTING_HANDOFF|RUN_INDEPENDENT_FROZEN_TEST|VERIFY_INSTALLED_EXECUTOR)\]'
-     and j.repair_executed=false and j.installation_authorized=false and j.production_changed=false
-    order by j.investigated_at desc limit 1 for update;
-    if found then
-     archive:=pg_catalog.jsonb_build_object('prior_phase',q.phase,'prior_candidate',q.qualified_candidate,'prior_claim_id',q.claim_id,
-       'prior_spec',q.recovery_spec,'prior_spec_sha256',q.recovery_spec_sha256,'prior_qualification_receipt',q.qualification_receipt,
-       'syntax_proof',prior_proof,'syntax_receipt_sha256',receipt,'independent_boundary_reproduction',boundary,
-       'reobservation_worker_run_id',p_worker_run_id,'investigation_incident_id',i.incident_id,'investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'prior_provider_effect_not_replayed',true,'no_install_authority',true,'prior_branch','reality/chat-recovery/'||q.trigger_id::text||
-        (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0' then '-feature-r'||(q.recovery_spec->>'feature_revision_epoch') else '' end)||
-        '-syntax-r'||rev::text);
-     spec:=q.recovery_spec||pg_catalog.jsonb_build_object('schema','reality-recovery-compiler-capability-spec-v2',
-       'syntax_revision_epoch',rev+1,'prior_syntax_rejection_receipt_sha256',receipt,
-       'prior_syntax_target_path',q.qualified_candidate->>'target_path','prior_syntax_failed_candidate_sha256',p_candidate_sha256,
-       'prior_syntax_reason','INVALID_SYNTAX','syntax_investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'syntax_compiler_reproduction',boundary,'syntax_investigation_diagnosis',i.diagnosis,
-       'syntax_investigation_test_requirement',i.independent_test_requirement,
-       'full_goal_accepted',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-     spec_hash:='sha256:'||pg_catalog.encode(extensions.digest(spec::text,'sha256'),'hex');
-     update reality_internal.genuine_capability_queue_v1 set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
-       claim_id=null,claim_expires_at=null,qualified_candidate=null,recovery_spec=spec,recovery_spec_sha256=spec_hash,frozen_suite_ref='recovery-spec:'||spec_hash,
-       qualification_receipt=(qualification_receipt-array['target_review','target_review_receipt_sha256','target_review_lease','target_reviewed_at',
-        'target_review_retry_count','target_review_last_failure','target_review_failure_receipt_sha256','target_review_failure_history','target_review_next_action',
-        'last_target_rejection','continuity_source_probe','continuity_source_probe_sha256','publish_fenced_at','publish_candidate_sha256','syntax_proof','syntax_receipt_sha256','syntax_next_action'])
-        ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
-       updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
-     status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_PROVEN_BOUNDARY_COMPILER';
-    end if;
-   end if;
-  end if;
- end if;
- return pg_catalog.jsonb_build_object('status',status,'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'syntax_receipt_sha256',receipt,'next_action',next_action,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false,'new_shift_started',false);
-end $function$
-
-      and coalesce(boundary->>'original_end_line','')~'^[1-9][0-9]{0,5}
-   then
-    select j.* into i from reality_internal.owner_shift_continuity_incidents_v1 j
-    where j.owner_id=q.owner_id and j.shift_id=p_shift_id and j.kind='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'
-     and j.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' and j.source_evidence=evidence
-     and j.evidence_sha256='sha256:'||pg_catalog.encode(extensions.digest(evidence::text,'sha256'),'hex')
-     and j.investigation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
-     and j.assigned_function_id<>j.reviewer_function_id
-     and j.investigated_at<sh.started_at
-     and j.proposed_upgrade ~ '^\[GOVERNED_ACTION:(INVESTIGATE_EXISTING_HANDOFF|RUN_INDEPENDENT_FROZEN_TEST|VERIFY_INSTALLED_EXECUTOR)\]'
-     and j.repair_executed=false and j.installation_authorized=false and j.production_changed=false
-    order by j.investigated_at desc limit 1 for update;
-    if found then
-     archive:=pg_catalog.jsonb_build_object('prior_phase',q.phase,'prior_candidate',q.qualified_candidate,'prior_claim_id',q.claim_id,
-       'prior_spec',q.recovery_spec,'prior_spec_sha256',q.recovery_spec_sha256,'prior_qualification_receipt',q.qualification_receipt,
-       'syntax_proof',prior_proof,'syntax_receipt_sha256',receipt,'independent_boundary_reproduction',boundary,
-       'reobservation_worker_run_id',p_worker_run_id,'investigation_incident_id',i.incident_id,'investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'prior_provider_effect_not_replayed',true,'no_install_authority',true,'prior_branch','reality/chat-recovery/'||q.trigger_id::text||
-        (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0' then '-feature-r'||(q.recovery_spec->>'feature_revision_epoch') else '' end)||
-        '-syntax-r'||rev::text);
-     spec:=q.recovery_spec||pg_catalog.jsonb_build_object('schema','reality-recovery-compiler-capability-spec-v2',
-       'syntax_revision_epoch',rev+1,'prior_syntax_rejection_receipt_sha256',receipt,
-       'prior_syntax_target_path',q.qualified_candidate->>'target_path','prior_syntax_failed_candidate_sha256',p_candidate_sha256,
-       'prior_syntax_reason','INVALID_SYNTAX','syntax_investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'syntax_compiler_reproduction',boundary,'syntax_investigation_diagnosis',i.diagnosis,
-       'syntax_investigation_test_requirement',i.independent_test_requirement,
-       'full_goal_accepted',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-     spec_hash:='sha256:'||pg_catalog.encode(extensions.digest(spec::text,'sha256'),'hex');
-     update reality_internal.genuine_capability_queue_v1 set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
-       claim_id=null,claim_expires_at=null,qualified_candidate=null,recovery_spec=spec,recovery_spec_sha256=spec_hash,frozen_suite_ref='recovery-spec:'||spec_hash,
-       qualification_receipt=(qualification_receipt-array['target_review','target_review_receipt_sha256','target_review_lease','target_reviewed_at',
-        'target_review_retry_count','target_review_last_failure','target_review_failure_receipt_sha256','target_review_failure_history','target_review_next_action',
-        'last_target_rejection','continuity_source_probe','continuity_source_probe_sha256','publish_fenced_at','publish_candidate_sha256','syntax_proof','syntax_receipt_sha256','syntax_next_action'])
-        ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
-       updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
-     status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_PROVEN_BOUNDARY_COMPILER';
-    end if;
-   end if;
-  end if;
- end if;
- return pg_catalog.jsonb_build_object('status',status,'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'syntax_receipt_sha256',receipt,'next_action',next_action,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false,'new_shift_started',false);
-end $function$
-
-      and coalesce(boundary->>'corrected_end_line','')~'^[1-9][0-9]{0,5}
-   then
-    select j.* into i from reality_internal.owner_shift_continuity_incidents_v1 j
-    where j.owner_id=q.owner_id and j.shift_id=p_shift_id and j.kind='SIGNED_CHAT_RECOVERY_SYNTAX_STALLED'
-     and j.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' and j.source_evidence=evidence
-     and j.evidence_sha256='sha256:'||pg_catalog.encode(extensions.digest(evidence::text,'sha256'),'hex')
-     and j.investigation_receipt_sha256~'^sha256:[a-f0-9]{64}$'
-     and j.assigned_function_id<>j.reviewer_function_id
-     and j.investigated_at<sh.started_at
-     and j.proposed_upgrade ~ '^\[GOVERNED_ACTION:(INVESTIGATE_EXISTING_HANDOFF|RUN_INDEPENDENT_FROZEN_TEST|VERIFY_INSTALLED_EXECUTOR)\]'
-     and j.repair_executed=false and j.installation_authorized=false and j.production_changed=false
-    order by j.investigated_at desc limit 1 for update;
-    if found then
-     archive:=pg_catalog.jsonb_build_object('prior_phase',q.phase,'prior_candidate',q.qualified_candidate,'prior_claim_id',q.claim_id,
-       'prior_spec',q.recovery_spec,'prior_spec_sha256',q.recovery_spec_sha256,'prior_qualification_receipt',q.qualification_receipt,
-       'syntax_proof',prior_proof,'syntax_receipt_sha256',receipt,'independent_boundary_reproduction',boundary,
-       'reobservation_worker_run_id',p_worker_run_id,'investigation_incident_id',i.incident_id,'investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'prior_provider_effect_not_replayed',true,'no_install_authority',true,'prior_branch','reality/chat-recovery/'||q.trigger_id::text||
-        (case when coalesce(q.recovery_spec->>'feature_revision_epoch','0')<>'0' then '-feature-r'||(q.recovery_spec->>'feature_revision_epoch') else '' end)||
-        '-syntax-r'||rev::text);
-     spec:=q.recovery_spec||pg_catalog.jsonb_build_object('schema','reality-recovery-compiler-capability-spec-v2',
-       'syntax_revision_epoch',rev+1,'prior_syntax_rejection_receipt_sha256',receipt,
-       'prior_syntax_target_path',q.qualified_candidate->>'target_path','prior_syntax_failed_candidate_sha256',p_candidate_sha256,
-       'prior_syntax_reason','INVALID_SYNTAX','syntax_investigation_receipt_sha256',i.investigation_receipt_sha256,
-       'syntax_compiler_reproduction',boundary,'syntax_investigation_diagnosis',i.diagnosis,
-       'syntax_investigation_test_requirement',i.independent_test_requirement,
-       'full_goal_accepted',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-     spec_hash:='sha256:'||pg_catalog.encode(extensions.digest(spec::text,'sha256'),'hex');
-     update reality_internal.genuine_capability_queue_v1 set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
-       claim_id=null,claim_expires_at=null,qualified_candidate=null,recovery_spec=spec,recovery_spec_sha256=spec_hash,frozen_suite_ref='recovery-spec:'||spec_hash,
-       qualification_receipt=(qualification_receipt-array['target_review','target_review_receipt_sha256','target_review_lease','target_reviewed_at',
-        'target_review_retry_count','target_review_last_failure','target_review_failure_receipt_sha256','target_review_failure_history','target_review_next_action',
-        'last_target_rejection','continuity_source_probe','continuity_source_probe_sha256','publish_fenced_at','publish_candidate_sha256','syntax_proof','syntax_receipt_sha256','syntax_next_action'])
-        ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
-       updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
-     status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_PROVEN_BOUNDARY_COMPILER';
-    end if;
-   end if;
-  end if;
- end if;
- return pg_catalog.jsonb_build_object('status',status,'trigger_id',q.trigger_id,'original_work_id',q.original_work_id,
-  'syntax_receipt_sha256',receipt,'next_action',next_action,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false,'new_shift_started',false);
-end $function$
-
+      and coalesce(boundary->>'original_start_line','')~'^[1-9][0-9]{0,5}$'
+      and coalesce(boundary->>'original_end_line','')~'^[1-9][0-9]{0,5}$'
+      and coalesce(boundary->>'corrected_end_line','')~'^[1-9][0-9]{0,5}$'
       and (boundary->>'original_end_line')::integer>=(boundary->>'original_start_line')::integer
       and (boundary->>'corrected_end_line')::integer=
           (boundary->>'original_end_line')::integer+(boundary->>'additional_source_lines')::integer
@@ -442,7 +170,7 @@ end $function$
         ||pg_catalog.jsonb_build_object('prior_syntax_epoch',archive,'syntax_revision_epoch',rev+1,'revised_spec_sha256',spec_hash),
        updated_at=clock_timestamp() where trigger_id=q.trigger_id and phase=q.phase;
      status:='SIGNED_RECOVERY_SYNTAX_INVESTIGATION_RECOMPILED_SAME_ORIGINAL';
-     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_PROVEN_BOUNDARY_COMPILER';
+     next_action:='GENERATE_DISTINCT_CANDIDATE_WITH_INDEPENDENTLY_VERIFIED_STRUCTURAL_COMPILER';
     end if;
    end if;
   end if;
