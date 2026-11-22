@@ -1356,6 +1356,19 @@ export default async function handler(req,res){
   // Different signed worker invocation performs independently sourced
   // dependency review AFTER the model draft, BEFORE the protected broker.
   // A graph hit is not feature acceptance or owner installation authority.
+  // Reality must reconcile its own prior independently claimed review.
+  // A provider/readback failure may leave a fenced lease. Requeue only
+  // after expiry under a DIFFERENT real signed worker, one time, with
+  // its failed attempt and original identity retained.
+  workerStage='SIGNED_CHAT_RECOVERY_EXPIRED_REVIEW_RECONCILIATION';
+  const signedRecoveryReviewRecovery=await shiftRpc(db,
+   'reality_reconcile_expired_signed_chat_target_review_v1',{
+    p_worker_run_id:actualWorkerRunId
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_EXPIRED_REVIEW_RECONCILIATION_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW';
   const signedRecoveryTargetReview=
    await independentlyReviewOneSignedChatRecoveryTarget({
@@ -1463,7 +1476,17 @@ export default async function handler(req,res){
      signedRecoveryTargetReview.review_receipt_sha256||'')&&
    signedRecoveryTargetReview.installation_authorized===false&&
    signedRecoveryTargetReview.original_job_completed===false;
-  const newDevelopmentAdvanced=recoverySourceProgress||
+  const recoveryReviewRetryProgress=
+   signedRecoveryReviewRecovery.status===
+    'SIGNED_CHAT_RECOVERY_EXPIRED_REVIEW_REQUEUED_ON_SAME_ORIGINAL'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryReviewRecovery.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryReviewRecovery.failure_receipt_sha256||'')&&
+   signedRecoveryReviewRecovery.installation_authorized===false&&
+   signedRecoveryReviewRecovery.original_job_completed===false;
+  const newDevelopmentAdvanced=recoveryReviewRetryProgress||
+   recoverySourceProgress||
    recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
    recoveryStrategyProgress||recoveryReviewProgress||goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
@@ -1475,6 +1498,7 @@ export default async function handler(req,res){
    chatNewDevelopmentCheckpoint={
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
     development_result:recoverySourceProgress?signedRecoveryQuarantine:
+     recoveryReviewRetryProgress?signedRecoveryReviewRecovery:
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
        recoveryRevisionProgress?signedRecoveryRevision:
