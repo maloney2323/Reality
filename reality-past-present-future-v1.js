@@ -175,11 +175,17 @@
      brief.priority_count===time.time_horizon?.present?.obligations?.length){
    const needsAcceptance=brief.priority_items?.some(x=>
     x.independent_original_acceptance_pending===true);
+   const native=brief.priority_native_diagnostic;
+   const nativeStatus=brief.priority_native_diagnostic_authorizes_nothing===true&&
+    typeof native==='string'&&/^[A-Z][A-Z0-9_]{6,130}$/.test(native)?
+    ' Native source next check: '+native.replaceAll('_',' ').toLowerCase()+'.':
+    '';
    executive.textContent='Executive briefing · '+brief.priority_count+
     ' current obligation(s). '+
     (needsAcceptance?
      'Customer-goal acceptance still needs independent proof.':
-     'Inspect the governed next step before authorizing any effect.');
+     'Inspect the governed next step before authorizing any effect.')+
+    nativeStatus+' This read does not authorize execution.';
   }else{
    executive.textContent=
     'Executive briefing · Final Loop owner proof view not yet verified. Existing Past, Present and Future remain read-only.';
