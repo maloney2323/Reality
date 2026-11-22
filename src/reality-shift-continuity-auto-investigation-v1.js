@@ -149,10 +149,25 @@ export async function investigateOneSignedShiftContinuityIncident({
   !['ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE',
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
-    'SIGNED_SHIFT_REPEATED_NO_PROGRESS'].includes(claim.kind)||
+    'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED'].includes(claim.kind)||
   (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
    (!UUID.test(claim.source_claim_id||'')||
     !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
+  (claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'&&
+   (claim.source_evidence?.schema!=='reality-signed-chat-review-incident-source-v1'||
+    !/^work:[a-f0-9]{32}$/.test(claim.source_evidence.original_work_id||'')||
+    !UUID.test(claim.source_evidence.trigger_id||'')||
+    !UUID.test(claim.source_claim_id||'')||
+    claim.source_evidence.source_claim_id!==claim.source_claim_id||
+    !HASH.test(claim.source_evidence.candidate_sha256||'')||
+    !HASH.test(claim.source_evidence.failure_receipt_sha256||'')||
+    !Array.isArray(claim.source_evidence.failure_history)||
+    claim.source_evidence.failure_history.length!==2||
+    claim.source_evidence.investigation_only!==true||
+    claim.source_evidence.root_cause_verified!==false||
+    claim.source_evidence.original_job_completed!==false||
+    claim.source_evidence.installation_authorized!==false||
+    claim.source_evidence.production_changed!==false))||
   claim.scope!=='SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY'||
   claim.model_inquiry_authorized!==true||
   claim.new_original_jobs_created!==0||
@@ -202,12 +217,13 @@ export async function investigateOneSignedShiftContinuityIncident({
      source_body_untrusted:String(observed.source_body||'').slice(0,4500)};
    }catch{sourceReadback={status:'CURRENT_SOURCE_READBACK_UNVERIFIED',source_ref:sourceRef}}
   }
-  const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS';
+  const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED';
+  const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident;
   // Real repeated wake receipts prove no progress, not a root cause.
   // The existing owner-scoped original preflight provides current admission
   // gates and exact Continuity routes to the LLM without granting authority.
   let liveWorkPreflight={status:'CURRENT_OWNER_WORK_PREFLIGHT_UNAVAILABLE'};
-  if(guidedRecovery){
+  if(guidedRecovery&&!chatReviewIncident){
    try{
     const observed=await call(db,'reality_read_owner_multi_original_shift_preflight_v1',{
      p_owner_id:claim.owner_id,p_target_original_count:2
@@ -279,6 +295,13 @@ export async function investigateOneSignedShiftContinuityIncident({
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
      'Return only the specified fields.'+
+     (chatReviewIncident?
+      ' The incident is a signed Chat original reviewer infrastructure failure. '+
+      'Use the exact original, candidate and failed review receipts in source_evidence. '+
+      'The active shift is investigation scope only; do not transfer authority or confuse '+
+      'a successful worker wake with the original review verdict. Distinguish absent '+
+      'verdict from an actual rejection, propose a targeted diagnostic or frozen test, '+
+      'and preserve the retry limit until a verified cause-specific repair. ' : '')+
      (guidedRecovery?
       ' A successful worker wake with the SAME unresolved gate is not job progress. '+
       'Independently classify the cause using the live owner Continuity preflight. '+
@@ -292,6 +315,7 @@ export async function investigateOneSignedShiftContinuityIncident({
     {role:'user',content:[{type:'input_text',text:JSON.stringify({
      owner_shift_id:claim.shift_id,incident_id:claim.incident_id,
      kind:claim.kind,evidence_sha256:claim.evidence_sha256,
+     source_evidence:chatReviewIncident?claim.source_evidence:null,
      error_summary:claim.error_summary,
      claim_id:claim.source_claim_id||null,
      observed_at:claim.first_detected_at,
