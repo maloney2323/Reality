@@ -123,3 +123,17 @@ test('independent observation routes the frozen original through existing target
  assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/);
  assert.ok(worker.indexOf('await independentlyReobserveStalledRecoveryReview')<worker.indexOf('await stageNextSignedChatRecoveryQuarantine'));
 });
+
+test('a distinct off-target revision restricts actual candidate choices to a fresh verified graph',async()=>{
+ const {restrictRecoveryTargetsToVerifiedGraph}=await import('../src/reality-chat-new-development-worker-v1.js');
+ const spec={target_selection_policy:'CURRENT_PINNED_ENTRYPOINT_GRAPH_ONLY',rejected_target_path:'src/rejected.js'};
+ const candidates=['src/rejected.js','src/relevant.js','src/outside.js'].map(path=>({path}));
+ const proof={verified:true,tree_sha:sha,source_paths:['src/rejected.js','src/relevant.js']};
+ assert.deepEqual(restrictRecoveryTargetsToVerifiedGraph(candidates,proof,spec),[{path:'src/relevant.js'}]);
+ assert.deepEqual(restrictRecoveryTargetsToVerifiedGraph(candidates,{...proof,verified:false},spec),[]);
+ const sql=readFileSync(new URL('../supabase/migrations/20261122021430_recompile_independent_chat_target_rejection_v1.sql',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ for(const v of ["SIGNED_CHAT_RECOVERY_RELEVANCE_REJECTED","prior_review_epoch","prior_qualification_receipt","relevance_revision_count","CURRENT_PINNED_ENTRYPOINT_GRAPH_ONLY","prior.finished_at<sh.started_at","for update of g skip locked","SIGNED_CHAT_RECOVERY_SPEC_FROZEN"])assert.ok(sql.includes(v),v);
+ assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/);
+ assert.ok(worker.includes('reality_recompile_signed_rejected_chat_target_v1'));
+});
