@@ -5,7 +5,8 @@ import {projectRealityFinalLoopTimeHorizon}
  from './reality-final-loop-time-horizon-v1.js';
 import {projectRealityFinalLoopExecutiveBrief}
  from './reality-final-loop-executive-brief-v1.js';
-import {verifyFinalLoopCanonicalContinuityHandoff}
+import {verifyFinalLoopCanonicalContinuityHandoff,
+ derivePendingFinalLoopSourceDecisions}
  from './reality-final-loop-canonical-handoff-v1.js';
 export const FINAL_LOOP_OWNER_TIME_BRIDGE_VERSION=
  'reality-final-loop-owner-time-bridge-v1';
@@ -66,15 +67,12 @@ export function projectOwnerFinalLoopTimeReadback({
    return blocked('FINAL_LOOP_OWNER_ORIGINAL_EVIDENCE_SCOPE_INVALID');
   seenSource.add(p.source_ref);
   if(p.original_work_id!=null)seenWork.add(p.original_work_id);
-  decisions.push({
-   original_work_id:p.original_work_id,source_ref:p.source_ref,
-   decision:'REFRESH',
-   next_governed_action:
-    'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS',
-   reason:'CUSTOMER_ORIGINAL_ACCEPTANCE_NOT_INDEPENDENTLY_PROVEN',
-   transition_committed:false
-  });
+
  }
+ const sourceDecisions=derivePendingFinalLoopSourceDecisions(proof);
+ if(sourceDecisions===null)
+  return blocked('FINAL_LOOP_OWNER_MISSING_SOURCE_ADMISSION_POLICY');
+ decisions.push(...sourceDecisions);
  const timeHorizon=projectRealityFinalLoopTimeHorizon({
   engine:{
    schema:'reality-final-loop-owner-readback-v1',
