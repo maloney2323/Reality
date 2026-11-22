@@ -163,3 +163,108 @@ export async function invokeOneRegisteredSignedCapability({
   production_changed:false,new_shift_started:false
  });
 }
+
+
+// Bridge the EXISTING Continuity categorizer into the EXISTING registered
+// capability router. This only selects an evidence-bound next route; it
+// cannot grant authority, claim an executor effect, or settle an original.
+// Registered action types are supplied by the installed signed worker.
+export function planCategorizedContinuityRecovery({
+ classification,ownerId,shiftId,registeredActionKeys=[]
+}={}){
+ const base=Object.freeze({
+  schema:'reality-categorized-continuity-registered-action-route-v1',
+  owner_id:UUID.test(ownerId||'')?ownerId:null,
+  shift_id:UUID.test(shiftId||'')?shiftId:null,
+  read_only:true,registered_action_selection_only:true,
+  action_dispatched:false,executor_invoked:false,
+  repair_executed:false,independent_repair_verified:false,
+  owner_approval_granted:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false,
+  new_shift_started:false
+ });
+ const result=(status,items=[])=>Object.freeze({
+  ...base,status,items:Object.freeze(items),count:items.length,
+  ready_for_registered_handler_count:items.filter(x=>
+   x.route==='REGISTERED_HANDLER_REQUIRES_SIGNED_CLAIM').length,
+  missing_registered_handler_count:items.filter(x=>
+   x.route==='REGISTERED_HANDLER_MISSING').length,
+  provider_authority_proof_count:items.filter(x=>
+   x.route==='INDEPENDENT_PROVIDER_AUTHORITY_PROOF_REQUIRED').length
+ });
+ if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+  !Array.isArray(registeredActionKeys)||registeredActionKeys.length>32||
+  registeredActionKeys.some(x=>!KEY.test(x))||
+  classification?.schema!=='reality-governed-continuity-recovery-handoff-v1'||
+  classification.status!=='GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED'||
+  classification.owner_id!==ownerId||classification.shift_id!==shiftId||
+  classification.read_only!==true||
+  classification.classification_only!==true||
+  classification.action_dispatched!==false||
+  classification.original_job_completed!==false||
+  classification.installation_authorized!==false||
+  classification.production_changed!==false||
+  !Array.isArray(classification.items)||
+  classification.count!==classification.items.length||
+  classification.items.length>8)
+  return result('CONTINUITY_REGISTERED_ROUTE_INDEPENDENT_READBACK_REQUIRED');
+ const registered=new Set(registeredActionKeys);
+ const items=[],seen=new Set();
+ for(const i of classification.items){
+  if(!UUID.test(i?.incident_id||'')||i.shift_id!==shiftId||
+   seen.has(i.incident_id)||
+   !KEY.test(i.kind||'')||
+   !KEY.test(i.incident_phase||'')||
+   i.original_job_completed!==false||
+   i.execution_permitted_by_classification!==false||
+   i.owner_approval_granted_by_classification!==false||
+   i.repair_verified_by_classification!==false)
+   return result('CONTINUITY_REGISTERED_ROUTE_INCIDENT_UNVERIFIED');
+  seen.add(i.incident_id);
+  let route='WAIT_FOR_NEW_INDEPENDENT_EVIDENCE';
+  let next='REQUIRE_INDEPENDENT_DIAGNOSIS_AND_ACTION_PROOF';
+  if(i.continuity_state==='DIAGNOSIS_RECORDED_CORRECTIVE_ACTION_UNVERIFIED'&&
+   SHA.test(i.investigation_receipt_sha256||'')&&
+   i.governed_action_receipt_sha256==null&&
+   KEY.test(i.proposed_action||'')&&KEY.test(i.blocker_class||'')){
+   if(i.blocker_class==='MISSING_OWNER_AUTHORITY'||
+      i.proposed_action==='REQUEST_EXACT_OWNER_APPROVAL'){
+    route='INDEPENDENT_PROVIDER_AUTHORITY_PROOF_REQUIRED';
+    next='VERIFY_EXACT_PROVIDER_SCOPE_THEN_REQUEST_OWNER_AUTHORITY';
+   }else if(registered.has(i.proposed_action)){
+    route='REGISTERED_HANDLER_REQUIRES_SIGNED_CLAIM';
+    next='RECHECK_OWNER_SHIFT_WARRANT_AND_CLAIM_EXACT_INCIDENT';
+   }else{
+    route='REGISTERED_HANDLER_MISSING';
+    next='INDEPENDENTLY_QUALIFY_AND_REGISTER_RECOVERY_ADAPTER';
+   }
+  }else if(i.continuity_state===
+    'GOVERNED_ACTION_RECORDED_INDEPENDENT_REVIEW_PENDING'&&
+    SHA.test(i.governed_action_receipt_sha256||'')){
+   route='DISTINCT_INDEPENDENT_REVIEW_REQUIRED';
+   next='VERIFY_REGISTERED_ACTION_EFFECT_WITH_DIFFERENT_SIGNED_WORKER';
+  }else if(i.continuity_state===
+    'GOVERNED_ACTION_INDEPENDENTLY_REVIEWED_ORIGINAL_UNSETTLED'&&
+    SHA.test(i.independent_action_review_receipt_sha256||'')){
+   route='EXACT_ORIGINAL_REENTRY_GATE_REQUIRED';
+   next='RECHECK_ORIGINAL_JOB_WARRANT_AND_INDEPENDENT_ACCEPTANCE';
+  }else if(i.continuity_state===
+   'INCIDENT_RECOVERY_RECEIPTED_ORIGINAL_SETTLEMENT_UNVERIFIED'&&
+   SHA.test(i.incident_recovery_receipt_sha256||'')){
+   route='ORIGINAL_SETTLEMENT_PROOF_REQUIRED';
+   next='VERIFY_ORIGINAL_INDEPENDENT_FINAL_RECEIPT_AND_UNIVERSE_RETURN';
+  }
+  items.push(Object.freeze({
+   incident_id:i.incident_id,shift_id:shiftId,
+   incident_kind:i.kind,blocker_class:i.blocker_class,
+   proposed_action:KEY.test(i.proposed_action||'')?i.proposed_action:null,
+   investigation_receipt_sha256:SHA.test(
+    i.investigation_receipt_sha256||'')?i.investigation_receipt_sha256:null,
+   route,next_governed_action:next,
+   handler_registered:route==='REGISTERED_HANDLER_REQUIRES_SIGNED_CLAIM',
+   execution_authorized:false,action_executed:false,
+   independent_repair_verified:false,original_job_completed:false
+  }));
+ }
+ return result('CONTINUITY_REGISTERED_ACTION_ROUTES_CLASSIFIED',items);
+}

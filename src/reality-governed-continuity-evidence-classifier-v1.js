@@ -147,3 +147,110 @@ export function classifyRealityGovernedContinuityEvidence({
    'GOVERNED_CONTINUITY_EVIDENCE_UNVERIFIED',
   ownerId,shiftId,lanes,notes);
 }
+
+
+// The SAME categorizer also reconciles durable Continuity investigation,
+// governed-action and independent-review readbacks. These are different
+// receipts: a model's diagnosis is never repair, execution or settlement.
+// This projects next-work evidence only; it does not invoke any handler.
+export function classifyRealityContinuityRecoveryHandoff({
+ ownerId,shiftId,incidentsReadback,actionsReadback
+}={}){
+ const base={
+  schema:'reality-governed-continuity-recovery-handoff-v1',
+  owner_id:UUID.test(ownerId||'')?ownerId:null,
+  shift_id:UUID.test(shiftId||'')?shiftId:null,
+  read_only:true,classification_only:true,
+  action_dispatched:false,repair_executed:false,
+  independent_repair_verified:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false,
+  owner_approval_granted:false,new_shift_started:false
+ };
+ const finish=(status,items=[])=>Object.freeze({
+  ...base,status,items:Object.freeze(items),count:items.length
+ });
+ const goodRead=(r,status)=>r?.status===status&&
+  r.owner_id===ownerId&&r.owner_scope_verified===true&&
+  r.read_only===true&&r.execution_authorized===false&&
+  r.installation_authorized===false&&r.production_changed===false&&
+  Array.isArray(r.items)&&r.count===r.items.length&&
+  Number.isSafeInteger(r.count)&&r.count>=0&&r.count<=8;
+ if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+  !goodRead(incidentsReadback,'OWNER_SHIFT_CONTINUITY_INCIDENTS_READ_ONLY')||
+  !goodRead(actionsReadback,'OWNER_SIGNED_SHIFT_RECOVERY_ACTIONS_READ_ONLY'))
+  return finish('GOVERNED_RECOVERY_DURABLE_READBACK_UNVERIFIED');
+ const actions=new Map();
+ for(const a of actionsReadback.items){
+  if(!UUID.test(a?.incident_id||'')||
+    !UUID.test(a?.shift_id||'')||
+    a.original_job_completed!==false||
+    a.installation_authorized!==false||
+    a.production_changed!==false)
+   return finish('GOVERNED_RECOVERY_ACTION_LINEAGE_UNVERIFIED');
+  // An owner can have historical shifts; their independently scoped receipts
+  // are not foreign authorization and cannot drive this particular shift.
+  if(a.shift_id!==shiftId)continue;
+  if(actions.has(a.incident_id))
+   return finish('GOVERNED_RECOVERY_ACTION_LINEAGE_UNVERIFIED');
+  actions.set(a.incident_id,a);
+ }
+ const items=[],seen=new Set();
+ for(const i of incidentsReadback.items){
+  if(!UUID.test(i?.incident_id||'')||
+   !UUID.test(i?.shift_id||'')||
+   typeof i.kind!=='string'||!/^[A-Z][A-Z0-9_]{3,110}$/.test(i.kind)||
+   typeof i.phase!=='string'||!/^[A-Z][A-Z0-9_]{3,110}$/.test(i.phase)||
+   seen.has(i.incident_id))
+   return finish('GOVERNED_RECOVERY_INCIDENT_LINEAGE_UNVERIFIED');
+  seen.add(i.incident_id);
+  if(i.shift_id!==shiftId)continue; // Other owner's shifts cannot be routed here.
+  const a=actions.get(i.incident_id);
+  if(a&&(a.kind!==i.kind||a.incident_phase!==i.phase||
+    !HASH.test(a.action_receipt_sha256||'')||
+    a.action_independently_rechecked===true&&
+     !HASH.test(a.independent_review_receipt_sha256||'')))
+   return finish('GOVERNED_RECOVERY_ACTION_RECEIPT_UNVERIFIED');
+  const m=typeof i.proposed_upgrade==='string'?
+   /^\[GOVERNED_ACTION:([A-Z][A-Z0-9_]{3,90})\]\[BLOCKER_CLASS:([A-Z][A-Z0-9_]{3,90})\] /.exec(i.proposed_upgrade):null;
+  const diagnosisValid=
+   i.phase==='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'&&
+   HASH.test(i.investigation_receipt_sha256||'');
+  const recoveryRecorded=
+   HASH.test(i.recovery_receipt_sha256||'')&&
+   typeof i.recovered_at==='string'&&
+   Number.isFinite(Date.parse(i.recovered_at));
+  const reviewed=Boolean(a&&a.action_independently_rechecked===true&&
+   HASH.test(a.independent_review_receipt_sha256||''));
+  const state=recoveryRecorded?
+   'INCIDENT_RECOVERY_RECEIPTED_ORIGINAL_SETTLEMENT_UNVERIFIED':
+   reviewed?'GOVERNED_ACTION_INDEPENDENTLY_REVIEWED_ORIGINAL_UNSETTLED':
+   a?'GOVERNED_ACTION_RECORDED_INDEPENDENT_REVIEW_PENDING':
+   diagnosisValid?'DIAGNOSIS_RECORDED_CORRECTIVE_ACTION_UNVERIFIED':
+   'INCIDENT_UNVERIFIED_OR_STILL_UNDER_INVESTIGATION';
+  const nextAction=recoveryRecorded?'VERIFY_ORIGINAL_JOB_SETTLEMENT_INDEPENDENTLY':
+   reviewed?(typeof a.owner_next_action==='string'?
+     a.owner_next_action:'VERIFY_EXACT_ORIGINAL_AND_REENTRY_GATE'):
+   a?'WAIT_FOR_DISTINCT_INDEPENDENT_ACTION_REVIEW':
+   diagnosisValid&&m&&m[1]==='REQUEST_EXACT_OWNER_APPROVAL'?
+    'VERIFY_PROVIDER_AUTHORITY_BEFORE_EXACT_OWNER_REQUEST':
+   diagnosisValid&&m?'DISCOVER_REGISTERED_GOVERNED_ACTION_ADAPTER':
+    'REQUIRE_DURABLE_INDEPENDENT_INVESTIGATION_PROOF';
+  items.push(Object.freeze({
+   incident_id:i.incident_id,shift_id:shiftId,kind:i.kind,
+   incident_phase:i.phase,continuity_state:state,
+   proposed_action:m?m[1]:null,blocker_class:m?m[2]:null,
+   investigation_receipt_sha256:diagnosisValid?
+    i.investigation_receipt_sha256:null,
+   governed_action_receipt_sha256:a?a.action_receipt_sha256:null,
+   independent_action_review_receipt_sha256:reviewed?
+    a.independent_review_receipt_sha256:null,
+   incident_recovery_receipt_sha256:recoveryRecorded?
+    i.recovery_receipt_sha256:null,
+   next_governed_action:nextAction,
+   execution_permitted_by_classification:false,
+   owner_approval_granted_by_classification:false,
+   original_job_completed:false,repair_verified_by_classification:false
+  }));
+ }
+ return finish('GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED',items);
+}
