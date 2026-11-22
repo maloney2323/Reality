@@ -143,7 +143,8 @@ test('outcome receipt is not settlement until independent Universe reconciliatio
  assert.equal(r.decisions[0].decision,'ADVANCE');
  assert.equal(r.decisions[0].next_governed_action,
   'RECONCILE_INDEPENDENT_ORIGINAL_RECEIPT_TO_UNIVERSE');
- p[0].universe={independently_reconciled:true,receipt_sha256:hash('b')};
+ p[0].universe={independently_reconciled:true,receipt_sha256:hash('b'),
+  original_work_id:work1,outcome_receipt_sha256:hash('a')};
  r=run(ledger(p));
  assert.equal(r.decisions[0].decision,'SETTLE');
  assert.equal(r.decisions[0].independent_settlement_committed,false);
@@ -162,6 +163,23 @@ test('independent final receipt from another original or acceptance contract can
  p[0].outcome.original_work_id=work1;
  p[0].outcome.acceptance_contract_sha256=hash('f');
  assert.equal(run(ledger(p)).decisions[0].decision,'SUSPEND');
+});
+
+test('foreign Universe return cannot settle and already settled original is never re-issued',()=>{
+ const p=jobs.map(proof);
+ p[0].outcome={status:'INDEPENDENT_FINAL_VERIFIED',
+  verifier_independent:true,original_work_id:work1,
+  acceptance_contract_sha256:hash('d'),receipt_sha256:hash('a')};
+ p[0].universe={independently_reconciled:true,receipt_sha256:hash('b'),
+  original_work_id:work2,outcome_receipt_sha256:hash('a')};
+ assert.equal(run(ledger(p)).decisions[0].decision,'ADVANCE');
+ p[0].universe.original_work_id=work1;
+ p[0].original_settled=true;
+ const r=run(ledger(p));
+ assert.equal(r.decisions[0].decision,'SUSPEND');
+ assert.equal(r.decisions[0].next_governed_action,
+  'INDEPENDENTLY_READ_PREVIOUS_ATOMIC_SETTLEMENT_NO_REPLAY');
+ assert.equal(r.decisions[0].original_job_completed,false);
 });
 
 test('stale source evidence or changed causal head leads to REFRESH, not replay',()=>{
@@ -202,7 +220,8 @@ test('all independently proven jobs request settlement but are not declared sett
   x.outcome={status:'INDEPENDENT_FINAL_VERIFIED',verifier_independent:true,
    original_work_id:x.original_work_id,
    acceptance_contract_sha256:hash('d'),receipt_sha256:hash('a')};
-  x.universe={independently_reconciled:true,receipt_sha256:hash('b')};
+  x.universe={independently_reconciled:true,receipt_sha256:hash('b'),
+   original_work_id:x.original_work_id,outcome_receipt_sha256:hash('a')};
  }
  const r=run(ledger(p));
  assert.equal(r.all_originals_independently_settlement_eligible,true);
