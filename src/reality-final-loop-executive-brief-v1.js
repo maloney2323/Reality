@@ -70,6 +70,7 @@ export function projectRealityFinalLoopExecutiveBrief({
    source_ref:item.source_ref,original_work_id:item.original_work_id,
    priority_band:priority[item.decision],
    engine_decision:item.decision,
+   original_admission_pending:item.source_admission_verified===false,
    required_next_evidence_action:item.next_governed_action,
    independent_original_acceptance_pending:
     item.source_admission_verified===false||
@@ -107,6 +108,8 @@ export function projectRealityFinalLoopExecutiveBrief({
   existing_supervisor_cross_checked:supervisor!==null,
   next_executive_message:primary===null?
    'No independently eligible active original in this readback.':
+   primary.original_admission_pending?
+    'Source needs independent original-job admission before any customer-goal acceptance or execution.':
    primary.independent_original_acceptance_pending?
     'Original customer-goal acceptance needs independent verification before execution.':
    primary.engine_decision==='SUSPEND'?
