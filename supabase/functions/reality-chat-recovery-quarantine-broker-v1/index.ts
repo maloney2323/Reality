@@ -70,6 +70,8 @@ function valid(s){
    'SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'].includes(s.phase)&&
   HASH.test(s.target_review_receipt_sha256||'')&&
   s.independent_target_review_verified===true&&
+  Number.isSafeInteger(s.quarantine_epoch)&&[0,1].includes(s.quarantine_epoch)&&
+  (s.phase==='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'||s.syntax_verified===true)&&
   SHA.test(s.release_sha||'')&&
   s.installation_authorized===false&&s.original_job_completed===false&&
   s.production_changed===false&&s.new_shift_started===false&&
@@ -92,7 +94,7 @@ function valid(s){
   c.production_changed===false;
 }
 const loc=s=>({
- branch:'reality/chat-recovery/'+s.trigger_id,
+ branch:'reality/chat-recovery/'+s.trigger_id+(s.quarantine_epoch===1?'-syntax-r1':''),
  artifact:'evidence/reality-chat-recovery/'+s.trigger_id+'.json'
 });
 const evidence=s=>JSON.stringify({
@@ -112,7 +114,7 @@ const evidence=s=>JSON.stringify({
 },null,2)+'\n';
 async function prepare(s,token,base){
  const baseRef=await gh(token,'/git/ref/heads/'+base);
- if(!baseRef.ok||baseRef.data?.object?.sha!==s.release_sha)
+ if(!baseRef.ok||(s.phase!=='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'&&baseRef.data?.object?.sha!==s.release_sha))
   return null;
  const original=await gh(token,'/contents/'+s.candidate.target_path+'?ref='+s.release_sha);
  const raw=un64(original.data?.content);
@@ -275,7 +277,7 @@ Deno.serve(async request=>{
     'reality_read_next_signed_chat_recovery_publish_v1');
   if(q.status==='NO_SIGNED_CHAT_RECOVERY_QUARANTINE_CANDIDATE')
    return safe(q.status);
-  if(!valid(q)||q.release_sha!==b.base_sha)
+  if(!valid(q)||(q.phase!=='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED'&&q.release_sha!==b.base_sha))
    return safe('SIGNED_RECOVERY_SPEC_SOURCE_OR_DEPLOYMENT_DRIFT');
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<24)
