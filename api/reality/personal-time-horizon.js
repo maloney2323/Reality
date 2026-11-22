@@ -4,6 +4,8 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {projectOwnerFinalLoopTimeReadback}
+ from '../../src/reality-final-loop-owner-time-bridge-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -102,7 +104,9 @@ function futureDiscoveryProjection(value,now){
 
 // Shared owner-scoped readback for Home and employee inquiry context.
 // This reads existing ledgers; it cannot qualify, approve, create or dispatch work.
-export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now=Date.now()}={}){
+export async function readOwnerTimeHorizonEvidence({
+ ownerId,db,call=shiftRpc,now=Date.now(),env=process.env
+}={}){
  if(!UUID.test(ownerId||'')||!db||!Number.isFinite(now))
   throw Error('REALITY_TIME_OWNER_READ_INPUT_UNVERIFIED');
   const checks=await Promise.allSettled([
@@ -120,6 +124,49 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
   const potential=checks[2].status==='fulfilled'&&
    checks[2].value?.owner_id===ownerId?
    futureDiscoveryProjection(checks[2].value,now):null;
+  // Existing owner-visible Past / Present / Future remains sourced from
+  // the original three readbacks. This optional FOURTH read is a strict
+  // same-owner, same-active-shift Final Loop proof projection, not a new
+  // customer job, active worker or CEO agent. It cannot change card counts.
+  let finalLoopOwner={
+   status:'FINAL_LOOP_OWNER_TIME_VIEW_NOT_ENABLED',
+   read_only:true,owner_scope_verified:false,
+   executive:null,time_horizon:null,
+   original_job_completed:false,external_execution_authorized:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'){
+   try{
+    const shifts=checks[1].status==='fulfilled'?
+     assertShiftReadback(checks[1].value).shifts:[];
+    const active=shifts.filter(s=>shiftStillActive(s,now));
+    if(active.length!==1){
+     finalLoopOwner={
+      status:active.length===0?
+       'FINAL_LOOP_NO_ACTIVE_SIGNED_OWNER_SHIFT':
+       'FINAL_LOOP_MULTIPLE_ACTIVE_SHIFT_SCOPE_UNVERIFIED',
+      read_only:true,owner_scope_verified:false,
+      executive:null,time_horizon:null,
+      original_job_completed:false,external_execution_authorized:false
+     };
+    }else{
+     const proof=await call(db,
+      'reality_read_current_final_loop_proof_envelope_v1',
+      {p_shift_id:active[0].shift_id},{timeoutMs:6000});
+     finalLoopOwner=projectOwnerFinalLoopTimeReadback({
+      ownerId,shiftId:active[0].shift_id,
+      proof,independentHistory:past,now
+     });
+    }
+   }catch{
+    finalLoopOwner={
+     status:'FINAL_LOOP_CANONICAL_PROOF_READER_NOT_INSTALLED_OR_UNAVAILABLE',
+     read_only:true,owner_scope_verified:false,
+     executive:null,time_horizon:null,
+     original_job_completed:false,external_execution_authorized:false
+    };
+   }
+  }
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -129,6 +176,7 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
    past:past||{status:'PAST_RECEIPTS_NOT_VERIFIED'},
    present:present||{status:'PRESENT_SHIFT_NOT_VERIFIED'},
    future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
+   final_loop_owner:finalLoopOwner,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null
