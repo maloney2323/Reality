@@ -3,7 +3,8 @@ on:
   pull_request:
   push:
     branches:
-      - repair/maintenance-artifact-to-same-shift-review-20261120
+      - 'repair/**'
+      - 'reality/**'
 permissions:
   contents: read
 jobs:
