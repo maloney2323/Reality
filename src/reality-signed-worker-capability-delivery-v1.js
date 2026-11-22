@@ -185,7 +185,7 @@ export async function deliverOnceApprovedSignedWorkerCapability({
   !SHA.test(targetReleaseSha||'')||!REF.test(targetReleaseRef||'')||
   !KEY.test(capabilityKey||'')||
   typeof scheduledAlias!=='string'||
-  !/^[a-z0-9-]{6,145}\\.vercel\\.app$/.test(scheduledAlias)||
+  !/^[a-z0-9-]{6,145}\.vercel\.app$/.test(scheduledAlias)||
   typeof claimApprovedRelease!=='function'||
   typeof observeAlias!=='function'||
   typeof assignAlias!=='function')
