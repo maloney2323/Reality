@@ -1380,6 +1380,18 @@ export default async function handler(req,res){
     original_job_completed:false,production_changed:false,
     new_shift_started:false
    }));
+  // Only if the independent reviewer previously established a source-target
+  // mismatch, compile one source-graph-constrained follow-up capability
+  // under the SAME original, without any owner instruction or install grant.
+  workerStage='SIGNED_CHAT_RECOVERY_OFFTARGET_SOURCE_RECOMPILATION';
+  const signedRecoveryOfftarget=await shiftRpc(db,
+   'reality_recompile_signed_chat_recovery_offtarget_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_OFFTARGET_COMPILER_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
   workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
   const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
    db,env:process.env,fetchImpl:fetch
@@ -1485,8 +1497,15 @@ export default async function handler(req,res){
     signedRecoveryReviewRecovery.failure_receipt_sha256||'')&&
    signedRecoveryReviewRecovery.installation_authorized===false&&
    signedRecoveryReviewRecovery.original_job_completed===false;
+  const recoveryOfftargetProgress=
+   signedRecoveryOfftarget.status===
+    'SIGNED_CHAT_RECOVERY_OFFTARGET_SOURCE_STRATEGY_RECOMPILED'&&
+   /^work:[a-f0-9]{32}$/.test(signedRecoveryOfftarget.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(signedRecoveryOfftarget.new_spec_sha256||'')&&
+   signedRecoveryOfftarget.installation_authorized===false&&
+   signedRecoveryOfftarget.original_job_completed===false;
   const newDevelopmentAdvanced=recoveryReviewRetryProgress||
-   recoverySourceProgress||
+   recoveryOfftargetProgress||recoverySourceProgress||
    recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
    recoveryStrategyProgress||recoveryReviewProgress||goalGapRecorded||
    publisherProgress.has(chatNewPublished.status)||
@@ -1499,6 +1518,7 @@ export default async function handler(req,res){
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
     development_result:recoverySourceProgress?signedRecoveryQuarantine:
      recoveryReviewRetryProgress?signedRecoveryReviewRecovery:
+      recoveryOfftargetProgress?signedRecoveryOfftarget:
      recoveryDraftProgress?signedRecoveryDraft:
       recoverySpecProgress?signedRecoverySpec:
        recoveryRevisionProgress?signedRecoveryRevision:
