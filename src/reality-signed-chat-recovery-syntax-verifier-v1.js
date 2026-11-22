@@ -3,6 +3,7 @@
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {reproduceFrozenStructuralSpanFailure} from './reality-recovery-structural-splice-v1.js';
 const SHA=/^[a-f0-9]{40}$/, HASH=/^sha256:[a-f0-9]{64}$/, UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const WORK=/^work:[a-f0-9]{32}$/;
 const digest=b=>'sha256:'+createHash('sha256').update(b).digest('hex');
@@ -92,11 +93,16 @@ export async function independentlyVerifySignedRecoverySyntax({
    return safe('SIGNED_RECOVERY_SYNTAX_SOURCE_BYTES_UNVERIFIED');
   const proof=compareFrozenCandidateSyntax(source,c.find,c.replace,parse);
   if(!proof)return safe('SIGNED_RECOVERY_SYNTAX_PROOF_UNAVAILABLE');
-  const boundary=proof.candidate==='INVALID_SYNTAX'?reproduceFrozenBoundaryFailure(source,c.find,c.replace,parse):null;
+  const structural=proof.candidate==='INVALID_SYNTAX'?
+   reproduceFrozenStructuralSpanFailure(source,c.find,c.replace,{parse}):null;
+  const boundary=proof.candidate==='INVALID_SYNTAX'?
+   (reproduceFrozenBoundaryFailure(source,c.find,c.replace,parse)||structural):null;
+  const boundaryReceipt=boundary?Object.fromEntries(Object.entries(boundary)
+   .filter(([key])=>!['corrected_find','unchanged_replace'].includes(key))):null;
   const recorded=await call(db,'reality_record_signed_chat_recovery_syntax_v1',{
    p_shift_id:shiftId,p_worker_run_id:workerRunId,p_trigger_id:q.trigger_id,
    p_candidate_sha256:c.candidate_sha256,p_base_sha:c.base_sha,p_source_blob_sha:c.source_blob_sha,
-   p_release_sha:env.VERCEL_GIT_COMMIT_SHA,p_proof:{...proof,...(boundary?{boundary_reproduction:boundary}:{})}},{fetchImpl});
+   p_release_sha:env.VERCEL_GIT_COMMIT_SHA,p_proof:{...proof,...(boundaryReceipt?{boundary_reproduction:boundaryReceipt}:{})}},{fetchImpl});
   if(recorded?.original_work_id!==q.original_work_id||recorded.trigger_id!==q.trigger_id||
    !HASH.test(recorded.syntax_receipt_sha256||'')||
    recorded.installation_authorized!==false||recorded.original_job_completed!==false||recorded.production_changed!==false)

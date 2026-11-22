@@ -11,6 +11,7 @@ import {readPinnedSignedRecoverySourceGraph}
  from './reality-signed-chat-recovery-target-review-v1.js';
 import {outputText} from './reality-riley-native-model-draft-v1.js';
 import {reproduceFrozenBoundaryFailure,parseOnlyModule} from './reality-signed-chat-recovery-syntax-verifier-v1.js';
+import {reproduceFrozenStructuralSpanFailure} from './reality-recovery-structural-splice-v1.js';
 const BASE='https://api.github.com/repos/maloney2323/Reality';
 const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -471,20 +472,54 @@ export async function generateNextSignedChatDevelopmentDraft({
    }
    if(!derived.ok)
     fail('MODEL_FROZEN_LINE_SPAN_INVALID');
-   // The independent incident reobservation proved a source-span compiler
-   // defect. Only apply the same general compiler rule when its exact
-   // reproduction is unique against THIS pinned blob and visible range.
-   if(claim.recovery_spec.syntax_investigation_receipt_sha256&&
-      claim.recovery_spec.syntax_compiler_reproduction?.classification==='DUPLICATED_FROZEN_CLOSING_DELIMITER'&&
-      parseOnlyModule(derived.proposed)==='INVALID_SYNTAX'){
-    const boundary=reproduceFrozenBoundaryFailure(text,derived.find,derived.replace);
-    if(boundary&&raw.choice.end_line-raw.choice.start_line<80&&
-       frozenExcerpt.ranges.some(([a,b])=>raw.choice.start_line>=a&&raw.choice.end_line+1<=b)){
-     const expanded=deriveExactPatchFromFrozenLineSpan(text,{...raw.choice,end_line:raw.choice.end_line+1},frozenExcerpt.ranges);
-     if(expanded.ok&&expanded.replace===derived.replace&&
-        parseOnlyModule(expanded.proposed)==='VALID_SYNTAX')derived=expanded;
+   // Compile the COMPLETE proposed module before recording any source
+   // draft. One exact, independently parse-verified structural extension
+   // is permitted only within the originally displayed frozen range.
+   // The model's replacement bytes are NEVER changed by the compiler.
+   let syntaxVerdict=parseOnlyModule(derived.proposed);
+   if(syntaxVerdict==='INVALID_SYNTAX'){
+    const legacy=claim.recovery_spec.syntax_investigation_receipt_sha256?
+      reproduceFrozenBoundaryFailure(text,derived.find,derived.replace):null;
+    const structural=reproduceFrozenStructuralSpanFailure(
+     text,derived.find,derived.replace,{visibleRanges:frozenExcerpt.ranges});
+    const corrected=structural?.corrected_find||
+      (legacy?derived.find+legacy.boundary_line:null);
+    if(corrected){
+     const next=deriveExactPatchFromFrozenLineSpan(text,{
+      ...raw.choice,end_line:raw.choice.end_line+
+       (structural?.additional_source_lines||legacy?.additional_source_lines||0)
+     },frozenExcerpt.ranges);
+     if(next.ok&&next.find===corrected&&next.replace===derived.replace&&
+        parseOnlyModule(next.proposed)==='VALID_SYNTAX'){
+      derived=next;syntaxVerdict='VALID_SYNTAX';
+     }
     }
    }
+   if(syntaxVerdict==='INVALID_SYNTAX'){
+    // A new model proposal may correct the span, but cannot waive a full
+    // parse check or gain any installation/execution authority.
+    const retry=await askModel({apiKey,model,fetchImpl,claim,
+     role:'patch_line_correction',maxTokens:4400,
+     input:'The independently checked complete JavaScript module has INVALID_SYNTAX. '+
+      'Your model-selected replacement left a partial source statement. '+
+      'This is the one correction: select the COMPLETE original syntactic '+
+      'statement as one visible contiguous bounded line span. Do not invent '+
+      'source lines, remove unrelated statements, or claim test success. '+
+      'Return new JSON start_line,end_line,replace,reason.\n'+instruction});
+    const candidate=deriveExactPatchFromFrozenLineSpan(
+     text,retry.choice,frozenExcerpt.ranges);
+    if(!candidate.ok)fail('MODEL_REVIEWED_STRUCTURAL_SPAN_INVALID');
+    const fixed=reproduceFrozenStructuralSpanFailure(
+     text,candidate.find,candidate.replace,{visibleRanges:frozenExcerpt.ranges});
+    const corrected= fixed?deriveExactPatchFromFrozenLineSpan(text,{
+     ...retry.choice,end_line:retry.choice.end_line+fixed.additional_source_lines
+    },frozenExcerpt.ranges):candidate;
+    if(!corrected.ok||parseOnlyModule(corrected.proposed)!=='VALID_SYNTAX')
+     fail('MODEL_COMPLETE_MODULE_SYNTAX_NOT_VERIFIED');
+    raw=retry;derived=corrected;syntaxVerdict='VALID_SYNTAX';
+   }
+   if(syntaxVerdict!=='VALID_SYNTAX')
+    fail('MODEL_COMPLETE_MODULE_SYNTAX_PROVIDER_UNVERIFIED');
    patch={reply:raw.reply,choice:{
     find:derived.find,replace:derived.replace,
     reason:derived.source_reason}};
@@ -508,6 +543,8 @@ export async function generateNextSignedChatDevelopmentDraft({
   }
   if(!checked.ok)
    fail('MODEL_BOUNDED_UNIQUE_CODE_CHANGE_NOT_VERIFIED');
+  if(/\.js$/.test(path)&&parseOnlyModule(checked.proposed)!=='VALID_SYNTAX')
+   fail('MODEL_COMPLETE_MODULE_SYNTAX_NOT_VERIFIED');
   const {find,replace,reason}=patch.choice;
   const proposed=checked.proposed;
   failure='MODEL_DRAFT_PERSISTENCE_UNVERIFIED';
