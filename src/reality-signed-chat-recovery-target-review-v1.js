@@ -37,7 +37,7 @@ async function gh(pathSuffix,token,fetchImpl){
   headers:{accept:'application/vnd.github+json',
    'x-github-api-version':'2022-11-28',
    'user-agent':'Reality-independent-signed-chat-recovery-target-review',
-   authorization:'Bearer '+token}});
+   ...(/^[A-Za-z0-9_-]{20,}$/.test(token||'')?{authorization:'Bearer '+token}:{})}});
  if(!r?.ok)fail('PINNED_GITHUB_READ_UNVERIFIED');
  const json=await r.json().catch(()=>null);
  if(!json||typeof json!=='object'||Array.isArray(json))
@@ -204,7 +204,7 @@ export async function readPinnedSignedRecoverySourceGraph({
  if(!SHA.test(baseSha||'')||!safePath(target)||
   !Array.isArray(expectedRoots)||expectedRoots.length!==ROOTS.length||
   expectedRoots.some((v,i)=>v!==ROOTS[i]))fail('PINNED_SOURCE_SCOPE_INVALID');
- if(!/^[A-Za-z0-9_-]{20,}$/.test(token||''))fail('SOURCE_READ_PERMISSION_UNAVAILABLE');
+ // Same repository-pinned GET boundary; public source does not require a credential.
  const commit=await gh('/git/commits/'+baseSha,token,fetchImpl);
  if(commit.sha!==baseSha||!SHA.test(commit.tree?.sha||''))fail('PINNED_SOURCE_TREE_DRIFT');
  const files=await Promise.all(ROOTS.map(root=>gh('/contents/'+root+'?ref='+baseSha,token,fetchImpl)));

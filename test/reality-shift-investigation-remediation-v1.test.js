@@ -137,3 +137,49 @@ test('a distinct off-target revision restricts actual candidate choices to a fre
  assert.doesNotMatch(sql,/security definer|installation_authorized',true|original_job_completed',true/);
  assert.ok(worker.includes('reality_recompile_signed_rejected_chat_target_v1'));
 });
+
+test('public exact-CI readback is credential-free and never falls back to production authority',async()=>{
+ const seen=[];
+ const {REALITY_GITHUB_TOKEN,...publicEnv}=env;
+ const result=await qualifyVerifiedInvestigationRemediation({db,env:publicEnv,shiftId:scope.shift_id,workerRunId:scope.worker_run_id,
+  call:async(_db,method,args)=>{
+   if(method.includes('read_'))return scope;
+   assert.equal(method,'reality_record_shift_investigation_remediation_v1');
+   assert.equal(args.p_provider_proof.head_sha,sha);
+   assert.equal(args.p_failure_history_sha256,hash);
+   return {status:'ONE_VERIFIED_FORMAT_REMEDIATION_INQUIRY_READY',owner_id:scope.owner_id,incident_id:scope.incident_id,shift_id:scope.shift_id,remediation_release_commit:sha,remediation_ci_run_id:run.id,remediation_receipt_sha256:hash,investigation_attempts:3,...flags};
+  },fetchImpl:async(url,options)=>{
+   assert.match(url,/^https:\/\/api\.github\.com\/repos\/maloney2323\/Reality\/actions\//);
+   assert.equal(options.method,'GET');assert.equal(options.redirect,'error');
+   assert.equal(options.headers.authorization,undefined);seen.push(url);
+   return {ok:true,json:async()=>url.includes('/jobs?')?{jobs:[job]}:{workflow_runs:[run]}};
+  }});
+ assert.equal(seen.length,2);assert.equal(result.one_use_inquiry_only,true);
+ for(const name of Object.keys(flags))assert.equal(result[name],false);
+ for(const badEnv of [{...publicEnv,VERCEL_GIT_COMMIT_REF:''},{...publicEnv,VERCEL_ENV:'production'}]){
+  const blocked=await qualifyVerifiedInvestigationRemediation({db,env:badEnv,shiftId:scope.shift_id,workerRunId:scope.worker_run_id,
+   call:async(_db,method)=>{assert.ok(method.includes('read_'));return scope;},
+   fetchImpl:async()=>{throw Error('Unexpected provider request');}});
+  assert.notEqual(blocked.status,'ONE_VERIFIED_FORMAT_REMEDIATION_INQUIRY_READY');
+ }
+});
+test('pinned original source readback needs no write credential; verifies bytes and fails closed',async()=>{
+ const {createHash}=await import('node:crypto');
+ const {readPinnedSignedRecoverySourceGraph}=await import('../src/reality-signed-chat-recovery-target-review-v1.js');
+ const roots=['api/reality/governed-employee-shift-worker.js','api/reality/generalized-original-install-review.js','api/reality/generalized-owner-install-approval.js'];
+ const source="import '../../src/fixture.js';\n// Pinned fixture source with a valid known direct dependency and exact bytes.";
+ const bytes=Buffer.from(source,'utf8');
+ const blob=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
+ const target='src/fixture.js';
+ let reads=0;
+ const fetchImpl=async(url,options)=>{
+  reads++;assert.equal(options.method,'GET');assert.equal(options.redirect,'error');
+  assert.equal(options.headers.authorization,undefined);
+  assert.match(url,/^https:\/\/api\.github\.com\/repos\/maloney2323\/Reality\//);
+  const root=roots.find(x=>url.includes('/contents/'+x+'?ref='+sha));
+  return {ok:true,json:async()=>root?{path:root,sha:blob,size:bytes.length,encoding:'base64',content:bytes.toString('base64')}:{sha,tree:{sha}}};
+ };
+ const proof=await readPinnedSignedRecoverySourceGraph({baseSha:sha,target,expectedRoots:roots,token:'',fetchImpl});
+ assert.equal(proof.target_in_graph,true);assert.equal(proof.verified,true);assert.equal(reads,4);
+ await assert.rejects(readPinnedSignedRecoverySourceGraph({baseSha:sha,target,expectedRoots:roots,token:'',fetchImpl:async()=>({ok:false})}),/PINNED_GITHUB_READ_UNVERIFIED/);
+});
