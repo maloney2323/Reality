@@ -60,7 +60,10 @@ export function projectRealityFinalLoopTimeHorizon({
  const obligations=[];
  for(const item of engine.decisions){
   const id=item?.original_work_id;
-  if(!WORK.test(id||'')||seen.has(id)||
+  const sourceOnly=id===null&&(item?.decision==='SUSPEND'||
+   item?.decision==='REFRESH');
+  const identity=sourceOnly?item?.source_ref:id;
+  if((!WORK.test(id||'')&&!sourceOnly)||seen.has(identity)||
    !DECISIONS.has(item?.decision)||
    typeof item?.source_ref!=='string'||
    !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/.test(item.source_ref)||
@@ -68,9 +71,10 @@ export function projectRealityFinalLoopTimeHorizon({
    typeof item.reason!=='string'||
    item.transition_committed!==false)
     return safeUnbound(past);
-  seen.add(id);
+  seen.add(identity);
   obligations.push(frozen({
    original_work_id:id,source_ref:item.source_ref,
+   source_admission_verified:!sourceOnly,
    decision:item.decision,
    next_governed_action:item.next_governed_action,
    reason:item.reason,
@@ -82,7 +86,9 @@ export function projectRealityFinalLoopTimeHorizon({
  }
  const present=frozen({
   status:obligations.length?
-   'CURRENT_VERIFIED_SHIFT_DECISION_PROJECTION':
+   engine.status==='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'?
+    'CURRENT_VERIFIED_SHIFT_ACCEPTANCE_PENDING':
+    'CURRENT_VERIFIED_SHIFT_DECISION_PROJECTION':
    'CURRENT_SHIFT_HAS_NO_ADMITTED_ORIGINAL_DECISIONS',
   owner_id:engine.owner_id,shift_id:engine.shift_id,
   continuity_head_sha256:hash.test(engine.continuity_head_sha256||'')?
