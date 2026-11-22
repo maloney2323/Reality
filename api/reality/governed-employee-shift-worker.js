@@ -23,7 +23,8 @@ import {createRileyServiceOriginalRuntime}
  from '../../src/reality-riley-service-original-runtime-v1.js';
 import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
-import {runAuthorizedRileyPrReview}
+import {runAuthorizedRileyPrReview,
+ inspectCurrentRileyPrReviewSourceReadiness}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
 import {executeExactlyPreparedRileyReviewViaReality}
  from '../../src/reality-riley-governed-pr-provider-bridge-v1.js';
@@ -2430,6 +2431,32 @@ export default async function handler(req,res){
   const hasReview=unifiedGraph.jobs.some(x=>
    x.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
    x.independent_source_proof_verified===true&&x.phase!=='SETTLED');
+  // Observe real GitHub source eligibility before treating the next
+  // original PR review as a recoverable provider/LLM job. Draft sources
+  // are incompatible with the existing executor's sourceDetails gate.
+  // This is a read-only, preview-only shadow diagnostic; existing claims,
+  // owner authority and worker dispatch are left entirely unchanged.
+  let rileyPrSourceReadiness={
+   status:'SIGNED_PR_SOURCE_READINESS_SHADOW_DISABLED',
+   read_only:true,original_job_completed:false,
+   production_changed:false
+  };
+  if(hasReview&&process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   try{
+    rileyPrSourceReadiness=
+     await inspectCurrentRileyPrReviewSourceReadiness({
+      graph:unifiedGraph,env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    rileyPrSourceReadiness={
+     status:'SIGNED_PR_SOURCE_CURRENT_PROVIDER_READ_UNAVAILABLE',
+     read_only:true,original_job_completed:false,
+     production_changed:false
+    };
+   }
+  }
+
 
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
@@ -3254,6 +3281,7 @@ export default async function handler(req,res){
     commit_reference_triage_qualification:commitTriageHandoff.qualification,
     commit_reference_triage_original:commitTriageHandoff.original,
     commit_reference_triage_settlement:commitTriageSettlement,
+    riley_pr_source_readiness:rileyPrSourceReadiness,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
