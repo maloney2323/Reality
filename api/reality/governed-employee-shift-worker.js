@@ -111,6 +111,8 @@ import {advanceSignedChatFullGoalAcceptance}
  from '../../src/reality-signed-chat-full-goal-acceptance-v1.js';
 import {independentlyVerifySignedRecoverySyntax}
  from '../../src/reality-signed-chat-recovery-syntax-verifier-v1.js';
+import {requalifyOneFencedSignedChatProvider}
+ from '../../src/reality-signed-fenced-provider-requalification-v1.js';
 import {stageNextSignedChatRecoveryQuarantine}
  from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
 import {independentlyReviewOneSignedChatRecoveryTarget,independentlyReobserveStalledRecoveryReview}
@@ -1446,6 +1448,22 @@ export default async function handler(req,res){
    await independentlyVerifySignedRecoverySyntax({db,env:process.env,shiftId:wakeReceipt.shift_id,
     workerRunId:actualWorkerRunId,fetchImpl:fetch}).catch(()=>({status:'SIGNED_RECOVERY_PARSE_PROOF_UNVERIFIED'})):
    {status:'NO_CURRENT_SIGNED_RECOVERY_PARSE_SCOPE'};
+  // A prior GitHub branch creation may have had uncertain effects. Preserve
+  // that fenced write and the same original. The independent, signed worker
+  // confirms repository/ref and live preview SHA before a single fresh source
+  // epoch is permitted; NO GitHub write is retried or performed in this step.
+  workerStage='SIGNED_CHAT_FENCED_PROVIDER_INDEPENDENT_SOURCE_REQUALIFICATION';
+  const fencedProviderRequalification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await requalifyOneFencedSignedChatProvider({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_FENCED_PROVIDER_REQUALIFICATION_UNVERIFIED',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_FENCED_PROVIDER_REQUALIFICATION_SCOPE',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
   workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
   const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
    db,env:process.env,fetchImpl:fetch
@@ -3119,6 +3137,7 @@ export default async function handler(req,res){
     chat_new_development_checkpoint:chatNewDevelopmentCheckpoint,
     signed_chat_recovery_syntax:signedRecoverySyntax,
     signed_chat_full_goal_acceptance:signedChatFullGoalAcceptance,
+    signed_chat_fenced_provider_requalification:fencedProviderRequalification,
     signed_chat_recovery_quarantine:signedRecoveryQuarantine,
     corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
     generalized_original_install_review:generalizedInstallReview,
