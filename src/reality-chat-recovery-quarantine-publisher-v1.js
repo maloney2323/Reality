@@ -86,13 +86,16 @@ export async function stageNextSignedChatRecoveryQuarantine({
    'GITHUB_BRANCH_CREATE_EFFECT_UNKNOWN'
   ];
   if(allowed.includes(diagnostic)&&
-   (result.provider_ref_http_status===null||
+   (result.provider_ref_http_status===undefined||result.provider_ref_http_status===null||
     (Number.isInteger(result.provider_ref_http_status)&&
      result.provider_ref_http_status>=100&&result.provider_ref_http_status<=599))&&
    (result.provider_write_http_status===undefined||result.provider_write_http_status===null||
     (Number.isInteger(result.provider_write_http_status)&&
      result.provider_write_http_status>=100&&result.provider_write_http_status<=599))&&
    [true,false,null,undefined].includes(result.broker_push_permission_verified)&&
+   (result.status!=='RECOVERY_GITHUB_BRANCH_EFFECT_UNKNOWN_NO_REPLAY'||
+     (Number.isInteger(result.provider_write_http_status)&&
+      result.provider_write_http_status>=100&&result.provider_write_http_status<=599))&&
    result.provider_effect_settled===false&&result.write_replay_authorized===false){
    return safe(result.status,{
     broker_read_only_diagnosis:diagnostic,
