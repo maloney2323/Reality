@@ -264,6 +264,7 @@ BEGIN
    'read_only',true,'execution_authorized',false);END IF;
  SELECT coalesce(pg_catalog.jsonb_agg(
   jsonb_build_object(
+   'plan_id',p.plan_id,
    'source_ref',p.source_ref,'parent_original_work_id',p.parent_original_work_id,
    'parent_source_phase',p.parent_source_phase,
    'source_manifest_sha256',p.source_manifest_sha256,
