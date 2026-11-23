@@ -243,3 +243,12 @@ jobs:
           node --test test/reality-past-present-future-time-map-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-final-loop-db-contract-v1.test.js
+
+      - name: Preserve independent Reality coding evaluation receipt
+        if: ${{ success() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reality-governed-engineering-candidate-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/reality-engineering-candidate-evidence.json
+          if-no-files-found: error
+          retention-days: 3
