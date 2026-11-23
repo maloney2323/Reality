@@ -181,7 +181,7 @@ test('actual model candidate is replayed only in an isolated temporary source fi
    };
    writeFileSync(join(process.env.RUNNER_TEMP,
     'reality-engineering-candidate-evidence.json'),
-    JSON.stringify(receipt,null,2)+'\\n',{mode:0o600,flag:'w'});
+    JSON.stringify(receipt,null,2)+'\n',{mode:0o600,flag:'w'});
   }
  }finally{
   if(existsSync(file))unlinkSync(file);
