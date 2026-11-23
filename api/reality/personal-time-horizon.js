@@ -7,6 +7,8 @@ import {shiftDatabase,shiftRpc,assertShiftReadback}
 import {projectOwnerFinalLoopTimeReadback,
  projectFinalLoopOwnerReviewedRecoveryGuidance}
  from '../../src/reality-final-loop-owner-time-bridge-v1.js';
+import {projectFinalLoopUniverseFeedback}
+ from '../../src/reality-final-loop-universe-feedback-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -333,6 +335,30 @@ export async function readOwnerTimeHorizonEvidence({
     };
    }
   }
+  // One owner/shift/root-bound Universe feedback projection over the
+  // INDEPENDENT native+Universe settlement reader and canonical Continuity.
+  // The same result can inform CEO and Chat, but grants no new authority.
+  let finalLoopUniverseFeedback={
+   status:'FINAL_LOOP_UNIVERSE_FEEDBACK_NOT_ENABLED',
+   read_only:true,universe_readback_verified:false,
+   execution_authorized:false,original_job_completed:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'&&
+     finalLoopOwner.status===
+      'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopParentOutcomes.status===
+      'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ'){
+   finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
+    canonicalView:finalLoopOwner,parentOutcomes:finalLoopParentOutcomes,
+    recoveryGuidance:finalLoopRecoveryGuidance
+   });
+   if(finalLoopUniverseFeedback.status===
+      'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY')
+    finalLoopOwner=Object.freeze({...finalLoopOwner,
+     universe_feedback:finalLoopUniverseFeedback});
+  }
+
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -345,6 +371,7 @@ export async function readOwnerTimeHorizonEvidence({
    final_loop_owner:finalLoopOwner,
    final_loop_source_plans:finalLoopSourcePlans,
    final_loop_parent_outcomes:finalLoopParentOutcomes,
+   final_loop_universe_feedback:finalLoopUniverseFeedback,
    final_loop_recovery_guidance:finalLoopRecoveryGuidance,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
