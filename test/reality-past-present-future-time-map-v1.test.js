@@ -126,3 +126,16 @@ test('Universe feedback shows verified outcomes without treating Future as autho
  assert.match(ui,/Universe continuity/);
  assert.doesNotMatch(ui,/reality_record_final_loop_parent_settlement_v1/);
 });
+
+
+test('exact same original engineering proof informs CEO but never authorizes',()=>{
+ assert.match(api,/inspectFinalLoopGovernedEngineering/);
+ assert.match(api,/reality_read_same_original_postmaintenance_gate_v1/);
+ assert.match(api,/final_loop_governed_engineering:finalLoopGovernedEngineering/);
+ assert.match(ui,/data\.final_loop_governed_engineering/);
+ assert.match(ui,/ENGINEERING_EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED/);
+ assert.match(ui,/engineering\.continuity_head_sha256===horizon\?\.continuity_head_sha256/);
+ assert.match(ui,/engineering\.engineering_handler_dispatch_authorized===false/);
+ assert.match(ui,/engineering\.original_job_completed===false/);
+ assert.match(ui,/Next required engineering proof:/);
+});
