@@ -560,3 +560,340 @@ BEGIN
   'read_only',true,'post_retry_authorized',false,
   'original_job_completed',false,'production_changed',false);
 END $fn$;
+
+
+-- Independent provider verification and canonical Universe OUTCOME are one
+-- atomic database transaction. A signed receipt is never sufficient alone:
+-- the outside GitHub comment must be reread in full by a DIFFERENT run.
+CREATE OR REPLACE FUNCTION public.reality_record_final_loop_parent_settlement_v1(
+ p_delivery_id uuid,p_publication_claim_id uuid,
+ p_verifier_worker_run_id uuid,p_provider_evidence jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE d record;p record;a record;parent record;goal record;v_rec jsonb;
+ v_outcome uuid;v_settlement uuid;v_now timestamptz;v_iso text;
+ v_payload jsonb;v_provenance jsonb;v_refs jsonb;v_basis jsonb;
+ v_body_sha text;v_content_sha text;v_lineage_sha text;
+ v_comment_id bigint;v_url text;v_provider_time timestamptz;
+ v_updated integer;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_FINAL_SETTLEMENT_SERVICE_ONLY';END IF;
+ IF p_delivery_id IS NULL OR p_publication_claim_id IS NULL OR
+   p_verifier_worker_run_id IS NULL OR
+   pg_catalog.jsonb_typeof(p_provider_evidence)<>'object' OR
+   p_provider_evidence->>'schema'<>
+     'reality-final-loop-independent-github-parent-verification-v1' OR
+   p_provider_evidence->>'independent_provider_readback'<>'true' OR
+   p_provider_evidence->>'full_comment_body_verified'<>'true' OR
+   p_provider_evidence->>'source_head_current'<>'true' OR
+   p_provider_evidence->>'authenticated_writer_verified'<>'true' OR
+   p_provider_evidence->>'provider_comment_unique'<>'true' OR
+   p_provider_evidence->>'external_effect_performed'<>'true' OR
+   p_provider_evidence->>'production_changed'<>'false' OR
+   p_provider_evidence->>'comment_id' !~ '^[1-9][0-9]{0,17}$' OR
+   p_provider_evidence->>'provider_actor_id' !~ '^[1-9][0-9]{0,17}$' OR
+   p_provider_evidence->>'authenticated_actor_id'<>
+     p_provider_evidence->>'provider_actor_id' OR
+   coalesce(p_provider_evidence->>'body_sha256','') !~
+     '^sha256:[a-f0-9]{64}$' OR
+   coalesce(p_provider_evidence->>'source_head_sha','') !~
+     '^[a-f0-9]{40}$' OR
+   coalesce(p_provider_evidence->>'provider_comment_created_at','') !~
+     '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]{8,15}Z$'
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_INDEPENDENT_PROVIDER_PROOF_INVALID',
+  'original_job_completed',false,'universe_reconciled',false);END IF;
+ SELECT * INTO d FROM reality_internal.final_loop_parent_deliveries_v1
+ WHERE delivery_id=p_delivery_id AND
+  publication_claim_id=p_publication_claim_id
+  AND status='POST_RESERVED_RECONCILE_ONLY' FOR UPDATE;
+ IF NOT FOUND OR d.publisher_worker_run_id=p_verifier_worker_run_id OR
+   NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 vr
+    WHERE vr.run_id=p_verifier_worker_run_id AND vr.status='STARTED'
+     AND vr.finished_at IS NULL AND
+     vr.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes') OR
+   NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 pr
+    WHERE pr.run_id=d.publisher_worker_run_id AND pr.started_at IS NOT NULL)
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_DIFFERENT_SIGNED_PROVIDER_VERIFIER_REQUIRED',
+  'original_job_completed',false,'universe_reconciled',false);END IF;
+ SELECT * INTO p FROM reality_internal.final_loop_pr_source_plans_v1
+ WHERE plan_id=d.plan_id AND owner_id=d.owner_id AND shift_id=d.shift_id
+  AND parent_original_work_id=d.parent_original_work_id
+  AND source_ref=d.source_ref
+  AND source_manifest_sha256=d.source_manifest_sha256
+  AND source_head_sha=d.source_head_sha;
+ SELECT * INTO a FROM reality_internal.final_loop_child_approval_packets_v1
+ WHERE packet_id=d.packet_id AND plan_id=d.plan_id
+  AND owner_id=d.owner_id AND shift_id=d.shift_id
+  AND state='EFFECT_RESERVED_RECONCILE_ONLY'
+  AND owner_approval_receipt_sha256 IS NOT NULL;
+ SELECT * INTO parent FROM reality_internal.riley_pr_review_originals_v1
+ WHERE original_work_id=d.parent_original_work_id
+  AND owner_id=d.owner_id AND shift_id=d.shift_id
+  AND source_ref=d.source_ref FOR UPDATE;
+ SELECT * INTO goal FROM public.universe_events e
+ WHERE e.event_id=d.universe_goal_event_id
+  AND e.continuity_root_id=d.shift_id AND e.worldline_id=d.plan_id
+  AND e.parent_event_id IS NULL AND e.event_kind='WORK'
+  AND e.entity_type='reality_final_loop_owner_accepted_goal_v1'
+  AND e.epistemic_status='VERIFIED'
+  AND e.payload->>'owner_id'=d.owner_id::text
+  AND e.payload->>'original_work_id'=d.parent_original_work_id
+  AND e.payload->>'source_head_sha'=d.source_head_sha
+  AND e.payload->>'acceptance_contract_sha256'=
+    d.acceptance_contract_sha256
+  AND e.payload->>'original_job_completed'='false';
+ v_rec:=public.reality_read_final_loop_child_recovery_v1(d.shift_id,d.plan_id);
+ v_body_sha:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+  pg_catalog.convert_to(d.delivery_body,'UTF8')),'hex');
+ IF p.plan_id IS NULL OR a.packet_id IS NULL OR
+   parent.original_work_id IS NULL OR
+   parent.phase<>'BLOCKED' OR parent.review_body IS NOT NULL OR
+   parent.provider_comment_id IS NOT NULL OR
+   parent.settlement_receipt_id IS NOT NULL OR
+   goal.event_id IS NULL OR goal.lineage_hash !~ '^[a-f0-9]{64}$' OR
+   goal.content_hash<>pg_catalog.encode(extensions.digest(
+     pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(
+       goal.payload),'UTF8'),'sha256'),'hex') OR
+   (SELECT count(*) FROM public.universe_events e
+    WHERE e.continuity_root_id=d.shift_id AND e.worldline_id=d.plan_id)<>1 OR
+   d.owner_publication_receipt_sha256 IS NULL OR
+   d.owner_publication_approval_request_id IS NULL OR
+   a.acceptance_contract_sha256<>d.acceptance_contract_sha256 OR
+   a.acceptance_contract_sha256 IS DISTINCT FROM
+     reality_internal.final_loop_pr_review_acceptance_digest_v1(p.plan_id) OR
+   v_body_sha<>d.delivery_body_sha256 OR
+   v_rec->'cross_scope'->>'independently_verified'<>'true' OR
+   v_rec->'cross_scope'->>'receipt_sha256'<>
+     d.cross_scope_receipt_sha256 OR
+   v_rec->>'provider_effect_uncertain'<>'false' OR
+   p_provider_evidence->>'delivery_id'<>d.delivery_id::text OR
+   p_provider_evidence->>'publication_claim_id'<>d.publication_claim_id::text OR
+   p_provider_evidence->>'verifier_worker_run_id'<>
+     p_verifier_worker_run_id::text OR
+   p_provider_evidence->>'source_ref'<>d.source_ref OR
+   p_provider_evidence->>'parent_original_work_id'<>
+     d.parent_original_work_id OR
+   p_provider_evidence->>'source_head_sha'<>d.source_head_sha OR
+   p_provider_evidence->>'source_manifest_sha256'<>
+     d.source_manifest_sha256 OR
+   p_provider_evidence->>'body_sha256'<>d.delivery_body_sha256 OR
+   p_provider_evidence->>'approval_receipt_sha256'<>
+     d.owner_publication_receipt_sha256
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_FINAL_SCOPE_OR_UNIVERSE_MISMATCH',
+  'original_job_completed',false,'universe_reconciled',false);END IF;
+ v_comment_id:=(p_provider_evidence->>'comment_id')::bigint;
+ v_url:='https://github.com/maloney2323/Reality/pull/'||
+  pg_catalog.split_part(d.source_ref,'/pull/',2)||
+  '#issuecomment-'||v_comment_id::text;
+ IF p_provider_evidence->>'provider_comment_url'<>v_url THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_PARENT_PROVIDER_URL_NOT_EXACT',
+   'original_job_completed',false,'universe_reconciled',false);END IF;
+ BEGIN
+  v_provider_time:=(p_provider_evidence->>'provider_comment_created_at')::timestamptz;
+ EXCEPTION WHEN others THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_PARENT_PROVIDER_TIME_UNVERIFIED',
+   'original_job_completed',false,'universe_reconciled',false);
+ END;
+ IF v_provider_time<d.owner_approved_at-interval '2 minutes' OR
+  v_provider_time>pg_catalog.clock_timestamp()+interval '3 minutes' THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_PARENT_PROVIDER_COMMENT_PREDATES_APPROVAL',
+   'original_job_completed',false,'universe_reconciled',false);END IF;
+ -- A single canonical workline within the existing Universe; the goal
+ -- created at the first owner click is the exact verified predecessor.
+ PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+  'reality:final-loop-parent-universe:'||d.plan_id::text,0));
+ IF EXISTS(SELECT 1 FROM public.universe_events e
+   WHERE e.parent_event_id=goal.event_id) THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_PARENT_UNIVERSE_PRIOR_SETTLEMENT_OR_FORK',
+   'original_job_completed',false,'universe_reconciled',false);END IF;
+ v_now:=pg_catalog.clock_timestamp();
+ v_iso:=pg_catalog.to_char(v_now AT TIME ZONE 'UTC',
+  'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ v_outcome:=pg_catalog.gen_random_uuid();
+ v_settlement:=pg_catalog.gen_random_uuid();
+ v_payload:=pg_catalog.jsonb_build_object(
+  'schema','reality-final-loop-verified-pr-review-outcome-v1',
+  'owner_id',d.owner_id,'shift_id',d.shift_id,
+  'original_work_id',d.parent_original_work_id,
+  'source_ref',d.source_ref,'source_head_sha',d.source_head_sha,
+  'source_manifest_sha256',d.source_manifest_sha256,
+  'acceptance_contract_sha256',d.acceptance_contract_sha256,
+  'owner_approval_receipt_sha256',a.owner_approval_receipt_sha256,
+  'owner_publication_receipt_sha256',d.owner_publication_receipt_sha256,
+  'independent_cross_scope_receipt_sha256',d.cross_scope_receipt_sha256,
+  'provider_comment_id',v_comment_id,
+  'provider_comment_url',v_url,
+  'provider_comment_body_sha256',d.delivery_body_sha256,
+  'independent_verifier_worker_run_id',p_verifier_worker_run_id,
+  'independent_outcome_verified',true,
+  'original_job_completed',true,'constitutional_phase','SETTLED',
+  'external_effect_performed',true,'production_changed',false);
+ v_refs:=pg_catalog.jsonb_build_array(
+  d.source_ref,v_url,
+  'supabase:final_loop_parent_deliveries_v1:'||d.delivery_id::text);
+ v_provenance:=pg_catalog.jsonb_build_object(
+  'source','SIGNED_FINAL_LOOP_OWNER_APPROVAL_GITHUB_PROVIDER_READBACK',
+  'principal_id',d.owner_id::text,'parent_original_work_id',
+    d.parent_original_work_id,
+  'publisher_worker_run_id',d.publisher_worker_run_id,
+  'independent_verifier_worker_run_id',p_verifier_worker_run_id,
+  'provider_actor_id',p_provider_evidence->>'provider_actor_id',
+  'continuity_spine',pg_catalog.jsonb_build_object(
+   'version','reality-continuity-spine-v2.1',
+   'source_event_id',goal.event_id::text,
+   'prior_lineage_hash',goal.lineage_hash,
+   'transformation_receipt_id',null));
+ v_content_sha:=pg_catalog.encode(extensions.digest(
+  pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(
+   v_payload),'UTF8'),'sha256'),'hex');
+ v_basis:=pg_catalog.jsonb_build_object(
+  'spine_version','reality-continuity-spine-v2.1',
+  'continuity_root_id',d.shift_id::text,
+  'worldline_id',d.plan_id::text,'parent_event_id',goal.event_id,
+  'prior_lineage_hash',goal.lineage_hash,
+  'stage','OUTCOME','entity_id',d.plan_id::text,
+  'evidence_refs',v_refs,'transformation_receipt_id',null,
+  'effective_time',v_iso,'assertion_time',v_iso,
+  'epistemic_status','VERIFIED','payload',v_payload,
+  'provenance',v_provenance);
+ v_lineage_sha:=pg_catalog.encode(extensions.digest(
+  pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(
+   v_basis),'UTF8'),'sha256'),'hex');
+ INSERT INTO public.universe_events(
+  event_id,event_kind,entity_type,entity_id,continuity_root_id,
+  worldline_id,parent_event_id,effective_time,assertion_time,
+  epistemic_status,payload,evidence_refs,provenance,
+  content_hash,lineage_hash)
+ VALUES(v_outcome,'OUTCOME','reality_final_loop_verified_original_outcome_v1',
+  d.plan_id,d.shift_id,d.plan_id,goal.event_id,
+  v_now,v_now,'VERIFIED',v_payload,v_refs,v_provenance,
+  v_content_sha,v_lineage_sha);
+ UPDATE reality_internal.riley_pr_review_originals_v1
+ SET phase='SETTLED',source_head_sha=d.source_head_sha,
+  review_body=d.delivery_body,review_digest=d.delivery_body_sha256,
+  provider_comment_id=v_comment_id,provider_comment_url=v_url,
+  settlement_receipt_id=v_settlement,
+  independent_provider_digest=d.delivery_body_sha256,
+  settled_at=pg_catalog.clock_timestamp(),
+  updated_at=pg_catalog.clock_timestamp()
+ WHERE original_work_id=d.parent_original_work_id
+  AND shift_id=d.shift_id AND owner_id=d.owner_id
+  AND phase='BLOCKED' AND provider_comment_id IS NULL
+  AND settlement_receipt_id IS NULL;
+ GET DIAGNOSTICS v_updated=ROW_COUNT;
+ IF v_updated<>1 THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_ATOMIC_NATIVE_SETTLEMENT_FAILED';END IF;
+ UPDATE reality_internal.final_loop_parent_deliveries_v1
+ SET status='SETTLED',provider_comment_id=v_comment_id,
+  provider_comment_url=v_url,
+  independent_verifier_worker_run_id=p_verifier_worker_run_id,
+  independent_provider_body_sha256=d.delivery_body_sha256,
+  universe_outcome_event_id=v_outcome,
+  original_settlement_receipt_id=v_settlement,
+  settled_at=pg_catalog.clock_timestamp()
+ WHERE delivery_id=d.delivery_id
+  AND publication_claim_id=p_publication_claim_id
+  AND status='POST_RESERVED_RECONCILE_ONLY';
+ GET DIAGNOSTICS v_updated=ROW_COUNT;
+ IF v_updated<>1 THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_ATOMIC_DELIVERY_SETTLEMENT_FAILED';END IF;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_ORIGINAL_AND_UNIVERSE_ATOMICALLY_SETTLED',
+  'delivery_id',d.delivery_id,
+  'owner_id',d.owner_id,'shift_id',d.shift_id,
+  'original_work_id',d.parent_original_work_id,
+  'parent_settlement_receipt_id',v_settlement,
+  'universe_goal_event_id',goal.event_id,
+  'verified_universe_outcome_event_id',v_outcome,
+  'provider_comment_id',v_comment_id,'provider_comment_url',v_url,
+  'independent_provider_readback_verified',true,
+  'universe_reconciled',true,'original_job_completed',true,
+  'production_changed',false);
+END $fn$;
+
+-- Read-only receipts drive Universe, Past/Present/Future and Reality CEO.
+-- Neither an AI text claim nor a single GitHub comment can rewrite status.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_parent_settlement_v1(
+ p_owner_id uuid,p_original_work_id text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE d record;r record;goal record;outcome record;
+BEGIN
+ IF current_user<>'service_role' OR p_owner_id IS NULL OR
+  coalesce(p_original_work_id,'') !~ '^work:[a-f0-9]{32}$' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_SETTLEMENT_OWNER_SERVICE_ONLY';END IF;
+ SELECT * INTO d FROM reality_internal.final_loop_parent_deliveries_v1
+ WHERE owner_id=p_owner_id AND parent_original_work_id=p_original_work_id;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_NOT_DELIVERED',
+  'owner_id',p_owner_id,'original_work_id',p_original_work_id,
+  'original_job_completed',false);END IF;
+ SELECT * INTO r FROM reality_internal.riley_pr_review_originals_v1
+ WHERE original_work_id=d.parent_original_work_id
+  AND shift_id=d.shift_id AND owner_id=d.owner_id;
+ SELECT * INTO goal FROM public.universe_events e
+ WHERE event_id=d.universe_goal_event_id;
+ SELECT * INTO outcome FROM public.universe_events e
+ WHERE event_id=d.universe_outcome_event_id;
+ IF d.status='SETTLED' AND
+   r.phase='SETTLED' AND
+   r.provider_comment_id=d.provider_comment_id AND
+   r.provider_comment_url=d.provider_comment_url AND
+   r.settlement_receipt_id=d.original_settlement_receipt_id AND
+   r.independent_provider_digest=d.delivery_body_sha256 AND
+   goal.epistemic_status='VERIFIED' AND
+   goal.continuity_root_id=d.shift_id AND goal.worldline_id=d.plan_id AND
+   outcome.epistemic_status='VERIFIED' AND
+   outcome.event_kind='OUTCOME' AND
+   outcome.parent_event_id=goal.event_id AND
+   outcome.continuity_root_id=d.shift_id AND
+   outcome.worldline_id=d.plan_id AND
+   outcome.payload->>'original_job_completed'='true' AND
+   outcome.payload->>'original_work_id'=d.parent_original_work_id AND
+   outcome.payload->>'owner_id'=d.owner_id::text AND
+   outcome.payload->>'provider_comment_url'=d.provider_comment_url AND
+   outcome.payload->>'acceptance_contract_sha256'=d.acceptance_contract_sha256
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_AND_UNIVERSE_INDEPENDENT_READBACK_SETTLED',
+  'owner_id',d.owner_id,'shift_id',d.shift_id,
+  'original_work_id',d.parent_original_work_id,
+  'source_ref',d.source_ref,
+  'verified_provider_comment_url',d.provider_comment_url,
+  'independent_provider_body_sha256',d.independent_provider_body_sha256,
+  'parent_settlement_receipt_id',d.original_settlement_receipt_id,
+  'universe_goal_event_id',goal.event_id,
+  'verified_universe_outcome_event_id',outcome.event_id,
+  'independent_database_readback',true,'original_job_completed',true,
+  'universe_reconciled',true,'production_changed',false);END IF;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_SETTLEMENT_STILL_OPEN_OR_DISPUTED',
+  'owner_id',d.owner_id,'shift_id',d.shift_id,
+  'original_work_id',d.parent_original_work_id,
+  'phase',d.status,'original_job_completed',false,
+  'universe_reconciled',false,'production_changed',false);
+END $fn$;
+
+REVOKE ALL ON FUNCTION
+ public.reality_prepare_final_loop_parent_delivery_v1(uuid,uuid),
+ public.reality_read_owner_final_loop_parent_deliveries_v1(uuid,uuid),
+ public.reality_owner_approve_final_loop_parent_delivery_v1(uuid,uuid,text,text,uuid),
+ public.reality_claim_final_loop_parent_publish_v1(uuid,uuid),
+ public.reality_read_final_loop_parent_publish_verify_v1(uuid,uuid),
+ public.reality_record_final_loop_parent_settlement_v1(uuid,uuid,uuid,jsonb),
+ public.reality_read_final_loop_parent_settlement_v1(uuid,text)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION
+ public.reality_prepare_final_loop_parent_delivery_v1(uuid,uuid),
+ public.reality_read_owner_final_loop_parent_deliveries_v1(uuid,uuid),
+ public.reality_owner_approve_final_loop_parent_delivery_v1(uuid,uuid,text,text,uuid),
+ public.reality_claim_final_loop_parent_publish_v1(uuid,uuid),
+ public.reality_read_final_loop_parent_publish_verify_v1(uuid,uuid),
+ public.reality_record_final_loop_parent_settlement_v1(uuid,uuid,uuid,jsonb),
+ public.reality_read_final_loop_parent_settlement_v1(uuid,text)
+ TO service_role;
