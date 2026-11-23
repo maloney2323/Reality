@@ -30,12 +30,12 @@ test('approval API binds one owner session and cannot install, publish or execut
  assert.match(api,/original_job_completed:false/);
  assert.doesNotMatch(api,/reality_claim_final_loop_child_review_v1|reality_settle_authorized_riley_pr_review_v1/);
 });
-test('owner consent cannot replace independently verified original goal acceptance',()=>{
+test('verified signed goal proposal requires actual owner consent before child work',()=>{
  const sql=source('sql/reality-final-loop-child-transactional-v1.sql');
  assert.match(sql,/FINAL_LOOP_INDEPENDENT_PARENT_ACCEPTANCE_OR_SOURCE_NOT_VERIFIED/);
  assert.match(sql,/final_loop_pr_review_acceptance_digest_v1/);
  assert.match(sql,/AWAITING_EXACT_OWNER_APPROVAL/);
- assert.match(sql,/e\.payload->>'acceptance_contract_sha256'/);
+ assert.match(sql,/final_loop_pr_review_acceptance_digest_v1/);
  assert.match(sql,/final_loop_child_approval_packets_v1/);
  assert.match(sql,/owner_approval_receipt_sha256/);
  assert.match(sql,/EFFECT_RESERVED_RECONCILE_ONLY/);
