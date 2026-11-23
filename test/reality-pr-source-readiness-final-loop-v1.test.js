@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {inspectCurrentRileyPrReviewSourceReadiness as inspect}
+import {inspectCurrentRileyPrReviewSourceReadiness as inspect,
+ shouldFenceRileyPrClaimForObservedIncompatibility as shouldFence}
  from '../src/reality-riley-authorized-pr-review-job-v1.js';
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -97,6 +98,45 @@ test('removing draft status alone cannot make oversized PR eligible',async()=>{
   'SOURCE_PR_TOO_LARGE_FOR_NATIVE_BOUNDED_REVIEW');
  assert.equal(r.source_diagnostics[1].existing_executor_can_start_from_this_observation,false);
 });
+test('signed worker may suppress only safely incompatible pre-provider source claims',async()=>{
+ const r=await inspect({graph,env,fetchImpl:async(url)=>{
+  const id=Number(/\/pulls\/(\d+)$/.exec(url)[1]);
+  return {ok:true,json:async()=>({
+   number:id,html_url:ref(id),state:'open',draft:true,
+   changed_files:id===307?34:304,head:{sha:'f'.repeat(40)}
+  })};
+ }});
+ assert.equal(shouldFence({graph,inspection:r}),true);
+ assert.equal(shouldFence({graph:{...graph,owner_id:shift},inspection:r}),false);
+ assert.equal(shouldFence({graph:{...graph,jobs:[{
+  ...graph.jobs[0],phase:'PUBLISHING'},graph.jobs[1]]},inspection:r}),false);
+ assert.equal(shouldFence({graph:{...graph,jobs:[{
+  ...graph.jobs[0],phase:'PREPARED'},graph.jobs[1]]},inspection:r}),false);
+ assert.equal(shouldFence({graph:{...graph,jobs:[
+  {...graph.jobs[0],source_proof_sha256:sha('c')},graph.jobs[1]]},inspection:r}),true);
+ assert.equal(shouldFence({graph,inspection:{...r,source_diagnostics:[
+  r.source_diagnostics[0]
+ ]}}),false);
+ assert.equal(shouldFence({graph,inspection:{...r,source_diagnostics:[
+  {...r.source_diagnostics[0],current_provider_metadata_read:false},
+  r.source_diagnostics[1]
+ ]}}),false);
+ assert.equal(r.worker_claim_consumed,false);
+});
+test('unrelated source eligible for native bounded review is not starved',async()=>{
+ const r=await inspect({graph,env,fetchImpl:async(url)=>{
+  const id=Number(/\/pulls\/(\d+)$/.exec(url)[1]);
+  return {ok:true,json:async()=>({
+   number:id,html_url:ref(id),state:'open',
+   draft:id===307,changed_files:id===307?34:3,
+   head:{sha:'f'.repeat(40)}
+  })};
+ }});
+ const g={...graph,jobs:[
+  graph.jobs[0],{...graph.jobs[1],original_work_id:'work:'+'2'.repeat(32),phase:'CLAIMED'}
+ ]};
+ assert.equal(shouldFence({graph:g,inspection:r}),false);
+});
 test('disabled or foreign signed scope makes no provider calls',async()=>{
  for(const options of [
   {graph,env:{...env,REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED:'false'}},
@@ -133,6 +173,8 @@ test('signed worker reports eligibility separately from native executor and sett
   import.meta.url),'utf8');
  assert.match(code,/inspectCurrentRileyPrReviewSourceReadiness/);
  assert.match(code,/riley_pr_source_readiness:rileyPrSourceReadiness/);
+ assert.match(code,/shouldFenceRileyPrClaimForObservedIncompatibility/);
+ assert.match(code,/PR_REVIEW_SIGNED_SOURCES_INCOMPATIBLE_NO_CLAIM_OR_RETRY/);
  assert.match(code,/runAuthorizedRileyPrReview/);
  assert.match(code,/final_loop_engine_shadow:finalLoopEngineShadow/);
 });
