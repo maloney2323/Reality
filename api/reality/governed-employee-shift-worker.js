@@ -23,6 +23,8 @@ import {createRileyServiceOriginalRuntime}
  from '../../src/reality-riley-service-original-runtime-v1.js';
 import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
+import {connectFinalLoopPrSourcePlanToSignedShift}
+ from '../../src/reality-final-loop-pr-source-handoff-v1.js';
 import {runAuthorizedRileyPrReview,
  inspectCurrentRileyPrReviewSourceReadiness,
  shouldFenceRileyPrClaimForObservedIncompatibility}
@@ -2459,6 +2461,33 @@ export default async function handler(req,res){
   }
 
 
+  // Native signed PR source inspection -> scoped parent-bound evidence
+  // handoff. The preview branch is read-only by default. Even when an
+  // explicitly isolated DB is configured, staging never creates executable
+  // children, changes draft status, consumes approval or settles a parent.
+  let finalLoopPrSourcePlanHandoff={
+   status:'FINAL_LOOP_CHILD_SOURCE_HANDOFF_NOT_ENABLED',
+   read_only:true,child_original_admitted:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(hasReview&&process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   try{
+    finalLoopPrSourcePlanHandoff=
+     await connectFinalLoopPrSourcePlanToSignedShift({
+      db,graph:unifiedGraph,inspection:rileyPrSourceReadiness,
+      workerRunId:actualWorkerRunId,env:process.env,
+      fetchImpl:fetch
+     });
+   }catch{
+    finalLoopPrSourcePlanHandoff={
+     status:'FINAL_LOOP_CHILD_SOURCE_HANDOFF_OR_DB_PROOF_UNAVAILABLE',
+     read_only:true,child_original_admitted:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
+
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
   // Reality does not consume owner approval, write code, or settle the job.
@@ -3294,6 +3323,7 @@ export default async function handler(req,res){
     commit_reference_triage_original:commitTriageHandoff.original,
     commit_reference_triage_settlement:commitTriageSettlement,
     riley_pr_source_readiness:rileyPrSourceReadiness,
+    final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
