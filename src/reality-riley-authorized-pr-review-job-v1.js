@@ -7,6 +7,8 @@ import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {createRealityGovernedOpenAIGateway}
  from './reality-governed-openai-gateway-v1.js';
 export const RILEY_AUTHORIZED_PR_REVIEW_VERSION='reality-riley-authorized-pr-review-original-v1';
+// Same bounded changed-files constraint enforced by sourceDetails and DB claim.
+export const RILEY_PR_REVIEW_MAX_CHANGED_FILES=8;
 const REPO='maloney2323/Reality';
 const ROOT='https://api.github.com/repos/'+REPO;
 const SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/([1-9]\d{0,7})$/;
@@ -101,6 +103,8 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
    return safe('SIGNED_PR_SOURCE_NATIVE_IDENTITY_INVALID');
   seen.add(item.source_ref);
   let status='GITHUB_PR_CURRENT_METADATA_UNVERIFIED',headSha=null;
+  let changedFileCount=null,draft=null;
+  let sourceBlockers=Object.freeze(['GITHUB_CURRENT_SOURCE_METADATA_NOT_VERIFIED']);
   try{
    const current=await github('/pulls/'+Number(match[1]),{
     fetchImpl,token:githubToken,method:'GET'
@@ -109,12 +113,30 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
       current.html_url===item.source_ref&&
       SHA.test(current.head?.sha||'')&&
       typeof current.draft==='boolean'&&
+      Number.isInteger(current.changed_files)&&
+      current.changed_files>=0&&current.changed_files<=100000&&
       ['open','closed'].includes(current.state)){
     headSha=current.head.sha;
+    draft=current.draft;
+    changedFileCount=current.changed_files;
+    const incompatible=[
+     ...(current.state==='closed'?['SOURCE_PR_NOT_OPEN']:[]),
+     ...(current.draft?['DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR']:[]),
+     ...(current.changed_files<1?['SOURCE_HAS_NO_CHANGED_FILES']:[]),
+     ...(current.changed_files>RILEY_PR_REVIEW_MAX_CHANGED_FILES?
+      ['CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW']:[]),
+     ...(item.phase==='BLOCKED'?['EXISTING_ORIGINAL_BLOCKED_REQUIRES_DURABLE_RECONCILIATION']:[]),
+     ...(item.original_work_id===null?['SOURCE_NOT_ADMITTED_AS_ORIGINAL']:[])
+    ];
+    sourceBlockers=Object.freeze(incompatible);
     status=current.state!=='open'?
      'SOURCE_PR_CLOSED_REQUIRES_REQUALIFICATION':
      current.draft?
       'SOURCE_PR_DRAFT_INCOMPATIBLE_WITH_EXISTING_REVIEW_EXECUTOR':
+     current.changed_files>RILEY_PR_REVIEW_MAX_CHANGED_FILES?
+      'SOURCE_PR_TOO_LARGE_FOR_NATIVE_BOUNDED_REVIEW':
+     current.changed_files===0?
+      'SOURCE_PR_EMPTY_CHANGESET_NOT_REVIEWABLE':
       'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED';
    }
   }catch{
@@ -126,6 +148,11 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
    native_phase:item.phase,
    native_next_governed_action:item.next_governed_action,
    github_source_head_sha:headSha,
+   current_github_changed_file_count:changedFileCount,
+   current_github_draft:draft,
+   native_max_complete_review_files:RILEY_PR_REVIEW_MAX_CHANGED_FILES,
+   source_requalification_required:sourceBlockers.length>0,
+   eligibility_blockers:sourceBlockers,
    eligibility_status:status,
    current_provider_metadata_read:headSha!==null,
    existing_executor_can_start_from_this_observation:false,
@@ -136,8 +163,11 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
   owner_id:graph.owner_id,shift_id:graph.shift_id,
   source_count:diagnostics.length,
   draft_incompatible_count:diagnostics.filter(d=>
-   d.eligibility_status===
-    'SOURCE_PR_DRAFT_INCOMPATIBLE_WITH_EXISTING_REVIEW_EXECUTOR').length,
+   d.eligibility_blockers.includes('DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR')).length,
+  oversized_changeset_count:diagnostics.filter(d=>
+   d.eligibility_blockers.includes('CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW')).length,
+  blocked_original_count:diagnostics.filter(d=>
+   d.eligibility_blockers.includes('EXISTING_ORIGINAL_BLOCKED_REQUIRES_DURABLE_RECONCILIATION')).length,
   source_diagnostics:Object.freeze(diagnostics),
   next_read_only_governed_step:diagnostics.some(d=>
    d.eligibility_status!==
@@ -155,7 +185,7 @@ async function sourceDetails(c,{fetchImpl,token}){
  if(pr?.number!==id||pr?.html_url!==c.source_ref||
   pr.state!=='open'||pr.draft===true||
   !SHA.test(pr.head?.sha||'')||
-  !Array.isArray(files)||files.length<1||files.length>8||
+  !Array.isArray(files)||files.length<1||files.length>RILEY_PR_REVIEW_MAX_CHANGED_FILES||
   pr.changed_files!==files.length||
   files.some(f=>!/^[-_./a-zA-Z0-9]+$/.test(f.filename||'')||
     f.filename.includes('..')||
