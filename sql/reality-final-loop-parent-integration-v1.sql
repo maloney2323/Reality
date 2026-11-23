@@ -64,7 +64,8 @@ BEGIN
   AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL
   AND s.planned_end_at='infinity'::timestamptz
   AND s.status IN ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
-  AND w.state='ACTIVE' AND w.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+  AND w.state='ACTIVE' AND w.mode IN ('UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS',
+   'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS')
   AND EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
    WHERE r.original_work_id=a.parent_original_work_id
     AND r.shift_id=a.shift_id AND r.owner_id=a.owner_id
