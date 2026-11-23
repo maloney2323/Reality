@@ -180,12 +180,34 @@
     typeof native==='string'&&/^[A-Z][A-Z0-9_]{6,130}$/.test(native)?
     ' Native source next check: '+native.replaceAll('_',' ').toLowerCase()+'.':
     '';
+   // Canonical proposed scopes are shown only as unfinished Present
+   // evidence; never increase Past receipts or Future executable jobs.
+   const sourcePlans=data.final_loop_source_plans;
+   const scoped=sourcePlans?.status===
+    'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY'&&
+    sourcePlans.owner_scope_verified===true&&
+    sourcePlans.read_only===true&&
+    sourcePlans.execution_authorized===false&&
+    sourcePlans.child_originals_admitted===0&&
+    sourcePlans.original_job_completed===false&&
+    sourcePlans.shift_id===time.shift_id&&
+    Array.isArray(sourcePlans.plans)&&sourcePlans.plans.length<=32&&
+    sourcePlans.plans.every(p=>p.child_originals_admitted===0&&
+     p.independent_source_review_verified===false&&
+     p.owner_acceptance_verified===false&&
+     brief.priority_items.some(j=>j.source_ref===p.source_ref&&
+      j.original_work_id===(p.parent_original_work_id??null)));
+   const sourceNote=scoped&&sourcePlans.plans.length?
+    ' Source review planning: '+sourcePlans.plans.length+
+    ' frozen manifest(s), '+sourcePlans.plans.reduce(
+     (sum,p)=>sum+p.proposed_scope_count,0)+
+    ' proposed bounded review scopes; none admitted or executed.':'';
    executive.textContent='Executive briefing · '+brief.priority_count+
     ' current obligation(s). '+
     (needsAcceptance?
      'Customer-goal acceptance still needs independent proof.':
      'Inspect the governed next step before authorizing any effect.')+
-    nativeStatus+' This read does not authorize execution.';
+    nativeStatus+sourceNote+' This read does not authorize execution.';
   }else{
    executive.textContent=
     'Executive briefing · Final Loop owner proof view not yet verified. Existing Past, Present and Future remain read-only.';
