@@ -174,16 +174,10 @@ BEGIN
    WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
     AND r.finished_at IS NULL
     AND r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
-  -- Independently verified goal acceptance and continuity scope, not
-  -- user-entered hashes, signed shift plans, or model-generated wishes.
-  AND EXISTS(SELECT 1 FROM public.universe_events e
-   WHERE e.epistemic_status='VERIFIED'
-    AND e.continuity_root_id IS NOT NULL AND e.worldline_id IS NOT NULL
-    AND e.payload->>'principal_id'=p.owner_id::text
-    AND e.payload->>'original_work_id'=p.parent_original_work_id
-    AND e.payload->>'acceptance_contract_sha256'=p_acceptance_contract_sha256
-    AND (e.payload->>'source_ref'=p.source_ref OR
-         e.provenance->>'source_ref'=p.source_ref));
+  -- Derived from the actual signed original, never a model-provided
+  -- customer goal. OWNER ACCEPTANCE IS STILL PENDING at this point.
+  AND p_acceptance_contract_sha256=
+   reality_internal.final_loop_pr_review_acceptance_digest_v1(p.plan_id);
  IF NOT FOUND THEN
   RETURN pg_catalog.jsonb_build_object(
    'status','FINAL_LOOP_INDEPENDENT_PARENT_ACCEPTANCE_OR_SOURCE_NOT_VERIFIED',
@@ -273,14 +267,8 @@ BEGIN
     AND r.original_work_id=v_packet.parent_original_work_id
     AND r.owner_id=p_owner_id AND r.phase='BLOCKED'
     AND r.provider_comment_id IS NULL AND r.settlement_receipt_id IS NULL)
-  OR NOT EXISTS(SELECT 1 FROM public.universe_events e
-   WHERE e.epistemic_status='VERIFIED'
-    AND e.payload->>'principal_id'=p_owner_id::text
-    AND e.payload->>'original_work_id'=v_packet.parent_original_work_id
-    AND e.payload->>'acceptance_contract_sha256'=
-      v_packet.acceptance_contract_sha256
-    AND (e.payload->>'source_ref'=v_packet.source_ref OR
-         e.provenance->>'source_ref'=v_packet.source_ref))
+  OR v_packet.acceptance_contract_sha256 IS DISTINCT FROM
+   reality_internal.final_loop_pr_review_acceptance_digest_v1(v_plan.plan_id)
  THEN RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_CHILD_APPROVAL_PARENT_ACCEPTANCE_STALE',
   'approved',false,'execution_authorized',false);END IF;
@@ -757,15 +745,8 @@ BEGIN
  WHERE a.plan_id=p_plan_id AND a.shift_id=p_shift_id
   AND a.state='EFFECT_RESERVED_RECONCILE_ONLY'
   AND a.owner_approval_receipt_sha256 IS NOT NULL;
- IF NOT FOUND OR NOT EXISTS(
-  SELECT 1 FROM public.universe_events e
-   WHERE e.epistemic_status='VERIFIED'
-   AND e.payload->>'principal_id'=v_plan.owner_id::text
-   AND e.payload->>'original_work_id'=v_plan.parent_original_work_id
-   AND e.payload->>'acceptance_contract_sha256'=
-    v_packet.acceptance_contract_sha256
-   AND (e.payload->>'source_ref'=v_plan.source_ref OR
-        e.provenance->>'source_ref'=v_plan.source_ref))
+ IF NOT FOUND OR v_packet.acceptance_contract_sha256 IS DISTINCT FROM
+  reality_internal.final_loop_pr_review_acceptance_digest_v1(v_plan.plan_id)
  THEN RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_PARENT_CHILD_ACCEPTANCE_NOT_VERIFIED',
   'independent_service_readback_verified',false); END IF;
@@ -945,9 +926,12 @@ BEGIN
    'parent_original_work_id',p.parent_original_work_id,
    'source_manifest_sha256',p.source_manifest_sha256,
    'acceptance_contract_sha256',
-    CASE WHEN u.contract_count=1 THEN u.acceptance_hash ELSE null END,
-   'independent_goal_acceptance_verified',u.contract_count=1,
-   'pending_exact_owner_approval',u.contract_count=1 AND NOT EXISTS(
+    u.acceptance_hash,
+   'verified_signed_source_goal_contract_prepared',
+    u.acceptance_hash IS NOT NULL,
+   'owner_goal_acceptance_pending',u.acceptance_hash IS NOT NULL,
+   'independent_goal_acceptance_verified',false,
+   'pending_exact_owner_approval',u.acceptance_hash IS NOT NULL AND NOT EXISTS(
     SELECT 1 FROM reality_internal.final_loop_child_approval_packets_v1 a
     WHERE a.plan_id=p.plan_id AND
      a.acceptance_contract_sha256=u.acceptance_hash),
@@ -955,18 +939,8 @@ BEGIN
   ) ORDER BY p.staged_at),'[]'::jsonb) INTO v_plans
  FROM reality_internal.final_loop_pr_source_plans_v1 p
  CROSS JOIN LATERAL (
-  SELECT count(DISTINCT e.payload->>'acceptance_contract_sha256')
-    AS contract_count,
-   min(e.payload->>'acceptance_contract_sha256') AS acceptance_hash
-  FROM public.universe_events e
-  WHERE e.epistemic_status='VERIFIED'
-   AND e.continuity_root_id IS NOT NULL AND e.worldline_id IS NOT NULL
-   AND e.payload->>'principal_id'=p.owner_id::text
-   AND e.payload->>'original_work_id'=p.parent_original_work_id
-   AND e.payload->>'acceptance_contract_sha256'
-     ~'^sha256:[a-f0-9]{64}$'
-   AND (e.payload->>'source_ref'=p.source_ref OR
-        e.provenance->>'source_ref'=p.source_ref)
+  SELECT reality_internal.final_loop_pr_review_acceptance_digest_v1(p.plan_id)
+   AS acceptance_hash
  ) u
  WHERE p.shift_id=p_shift_id AND p.owner_id=v_shift.owner_id
   AND p.parent_original_work_id IS NOT NULL;
