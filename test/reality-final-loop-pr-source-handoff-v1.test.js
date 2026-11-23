@@ -139,6 +139,83 @@ test('wrong project, untrusted worker run or unisolated flag never writes',async
  }
  assert.equal(calls,0);
 });
+test('explicit signed shared benchmark stages proposals without approving or invoking a model',async()=>{
+ const shared={...env,
+  REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED:'true',
+  REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED:'false',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED:'true',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:'reality-test-db',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:owner,
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:shift,
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false',
+  REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false'};
+ const writes=[];
+ const r=await connect({db:{project:'reality-test-db',strictSecrets:true},
+  graph,inspection,workerRunId:run,env:shared,
+  call:async(_db,rpc,args)=>{
+   if(rpc==='reality_read_final_loop_child_recovery_v1')
+    return {status:'CHILD_RECOVERY_DB_READ_UNAVAILABLE'};
+   assert.equal(rpc,'reality_stage_final_loop_pr_source_plan_v1');
+   assert.equal(args.p_shift_id,shift);
+   assert.equal(args.p_worker_run_id,run);
+   writes.push(args.p_plan.source_ref);
+   return {status:'FINAL_LOOP_SOURCE_PLAN_STAGED_PENDING_GOVERNED_ADMISSION',
+    plan_id:writes.length===1?
+     'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee':
+     'ffffffff-ffff-4fff-ffff-ffffffffffff',
+    owner_id:owner,shift_id:shift,
+    source_ref:args.p_plan.source_ref,
+    parent_original_work_id:args.p_plan.original_work_id,
+    source_manifest_sha256:args.p_plan.source_manifest_sha256,
+    source_plan_staged:true,child_original_admitted:false,
+    original_job_completed:false,production_changed:false};
+  }});
+ assert.deepEqual(writes,[source(307),source(308)]);
+ assert.equal(r.status,'FINAL_LOOP_PROPOSED_SOURCE_PLANS_DURABLY_STAGED_NOT_EXECUTABLE');
+ assert.equal(r.staging_target,'SHARED_BENCHMARK_PROPOSALS_ONLY');
+ assert.equal(r.owner_approval_granted,false);
+ assert.equal(r.child_execution_authorized,false);
+ assert.equal(r.child_original_admitted,false);
+ assert.equal(r.original_job_completed,false);
+});
+
+test('shared benchmark fails closed on wrong target, owner, shift, mode or enabled executor',async()=>{
+ const shared={...env,
+  REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED:'true',
+  REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED:'false',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED:'true',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:'reality-test-db',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:owner,
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:shift,
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false',
+  REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false'};
+ const cases=[
+  {env:{...shared,REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED:'false'}},
+  {env:{...shared,REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:'other-project'}},
+  {env:{...shared,REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:
+    'dddddddd-dddd-4ddd-dddd-dddddddddddd'}},
+  {env:{...shared,REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:
+    'dddddddd-dddd-4ddd-dddd-dddddddddddd'}},
+  {env:{...shared,REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'true'}},
+  {env:{...shared,REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'true'}},
+  {env:{...shared,REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED:'true'}},
+  {env:{...shared,VERCEL_ENV:'production'}},
+  {db:{project:'other-project',strictSecrets:true}},
+  {db:{project:'reality-test-db',strictSecrets:false}},
+  {workerRunId:'untrusted'}
+ ];
+ let calls=0;
+ for(const options of cases){
+  const r=await connect({db:{project:'reality-test-db',strictSecrets:true},
+   graph,inspection,workerRunId:run,env:shared,...options,
+   call:async()=>{calls++;throw Error('SHARED_BENCHMARK_WRITE_NOT_ALLOWED')}});
+  assert.notEqual(r.status,'FINAL_LOOP_PROPOSED_SOURCE_PLANS_DURABLY_STAGED_NOT_EXECUTABLE');
+  assert.equal(r.owner_approval_granted,false);
+  assert.equal(r.child_original_admitted,false);
+ }
+ assert.equal(calls,0);
+});
+
 test('forged plan, cross-original source, and ambiguous original identity fail closed',async()=>{
  const i={...inspection,source_diagnostics:[
   {...inspection.source_diagnostics[0],
