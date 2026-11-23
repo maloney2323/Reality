@@ -25,6 +25,8 @@ import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {connectFinalLoopPrSourcePlanToSignedShift}
  from '../../src/reality-final-loop-pr-source-handoff-v1.js';
+import {classifySignedFinalLoopStagedPlanActions}
+ from '../../src/reality-final-loop-staged-plan-action-router-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../../src/reality-final-loop-child-approval-request-v1.js';
 import {advanceOneFinalLoopChildReview}
@@ -327,10 +329,17 @@ export default async function handler(req,res){
     sourceHandoff.staging_receipts.every(x=>x.source_plan_staged===true);
    // Independent service-role readback; the model and staging worker
    // cannot self-certify a durable plan from a local return object.
-   const plansReadback=await shiftRpc(db,
-    'reality_read_final_loop_pr_source_plans_v1',{
+   const [plansReadback,approvalPreflight]=await Promise.all([
+    shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{
      p_shift_id:sourceGraph.shift_id
-    },{timeoutMs:6000});
+    },{timeoutMs:6000}),
+    shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{
+     p_shift_id:sourceGraph.shift_id
+    },{timeoutMs:6000}).catch(()=>null)
+   ]);
+   const stagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
+    graph:sourceGraph,staged:plansReadback,preflight:approvalPreflight
+   });
    const linked=staged&&
     plansReadback?.shift_id===sourceGraph.shift_id&&
     plansReadback?.owner_id===sourceGraph.owner_id&&
@@ -377,6 +386,7 @@ export default async function handler(req,res){
     staging_target:'SHARED_BENCHMARK_PROPOSALS_ONLY',
     staged_plan_count:linked?sourceHandoff.staging_receipts.length:0,
     durable_source_plan_readback_verified:Boolean(linked),
+    final_loop_staged_action_routes:stagedActionRoutes,
     signed_worker_run_recorded:true,
     owner_approval_granted:false,child_execution_authorized:false,
     model_invoked:false,github_write_performed:false,
@@ -2603,6 +2613,38 @@ export default async function handler(req,res){
    }
   }
 
+  // The signed categorizer consumes TWO independent service-role reads:
+  // durable source plans and original-goal acceptance preflight. The result
+  // selects a registered capability TYPE; it cannot authorize its effect.
+  let finalLoopStagedActionRoutes={
+   status:'FINAL_LOOP_STAGED_ACTION_ROUTING_NOT_ENABLED',
+   action_dispatched:false,owner_approval_granted:false,
+   model_execution_authorized:false,original_job_completed:false
+  };
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+   try{
+    const [staged,preflight]=await Promise.all([
+     shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000}),
+     shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000})
+    ]);
+    finalLoopStagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
+     graph:unifiedGraph,staged,preflight
+    });
+   }catch{
+    finalLoopStagedActionRoutes={
+     status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
+     action_dispatched:false,owner_approval_granted:false,
+     model_execution_authorized:false,original_job_completed:false
+    };
+   }
+  }
   // The existing signed worker advances the SAME Final Loop child
   // lifecycle: exact parent goal acceptance -> itemized owner approval ->
   // one-use child claim -> governed model -> separate-run verifier.
@@ -2626,22 +2668,31 @@ export default async function handler(req,res){
   };
   if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.VERCEL_ENV==='preview'&&
-     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
-     process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
-   try{
-    finalLoopChildApprovalRequest=
-     await requestFinalLoopChildApprovalFromAcceptedOriginal({
-      db,graph:unifiedGraph,workerRunId:actualWorkerRunId,
-      env:process.env,fetchImpl:fetch
-     });
-   }catch{
-    finalLoopChildApprovalRequest={
-     status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_OR_OWNER_PACKET_UNVERIFIED',
-     execution_authorized:false,original_job_completed:false
-    };
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   // An exact packet is never an execution warrant. The registered handler
+   // independently checks its isolated DB fence and signed source proof.
+   if(finalLoopStagedActionRoutes.status===
+       'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
+      finalLoopStagedActionRoutes.routes.some(r=>
+       r.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
+      (process.env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED==='true'||
+       process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true')){
+    try{
+     finalLoopChildApprovalRequest=
+      await requestFinalLoopChildApprovalFromAcceptedOriginal({
+       db,graph:unifiedGraph,workerRunId:actualWorkerRunId,
+       env:process.env,fetchImpl:fetch
+      });
+    }catch{
+     finalLoopChildApprovalRequest={
+      status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_OR_OWNER_PACKET_UNVERIFIED',
+      execution_authorized:false,original_job_completed:false
+     };
+    }
    }
-   try{
-    finalLoopChildReview=await advanceOneFinalLoopChildReview({
+   if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
+    try{
+     finalLoopChildReview=await advanceOneFinalLoopChildReview({
      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
      env:process.env,fetchImpl:fetch
     });
@@ -2664,6 +2715,7 @@ export default async function handler(req,res){
      status:'FINAL_LOOP_INDEPENDENT_PARENT_INTEGRATION_BLOCKED',
      original_job_completed:false,production_changed:false
     };
+   }
    }
   }
 
@@ -3523,6 +3575,7 @@ export default async function handler(req,res){
     commit_reference_triage_settlement:commitTriageSettlement,
     riley_pr_source_readiness:rileyPrSourceReadiness,
     final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
+    final_loop_staged_action_routes:finalLoopStagedActionRoutes,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
