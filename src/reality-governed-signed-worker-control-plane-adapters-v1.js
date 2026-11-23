@@ -76,7 +76,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  const serviceRpc=async(name,payload)=>{
   // Static allowlist: never put caller input into an RPC pathname.
   if(!['reality_read_governed_worker_release_schedule_v1',
-    'reality_claim_governed_signed_worker_release_v1'].includes(name))
+    'reality_claim_governed_signed_worker_release_v1',
+    'reality_read_governed_signed_worker_release_approval_v1'].includes(name))
    throw Error('RELEASE_CONTROL_RPC_NOT_ALLOWLISTED');
   return requestJson(fetchImpl,db.url+'rest/v1/rpc/'+name,{
    method:'POST',headers:dbHeaders,body:JSON.stringify(payload)
@@ -144,6 +145,22 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
     info.host===env.REALITY_SIGNED_WORKER_STABLE_ALIAS
   });
  }
+ async function readApprovedRelease({
+  owner_id,shift_id,release_sha,scheduled_alias,capability_key
+ }={}){
+  if(!UUID.test(owner_id||'')||!UUID.test(shift_id||'')||
+   release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   scheduled_alias!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
+   !KEY.test(capability_key||''))
+   throw Error('SIGNED_RELEASE_APPROVAL_READ_SCOPE_UNVERIFIED');
+  const approval=await serviceRpc(
+   'reality_read_governed_signed_worker_release_approval_v1',{
+    p_owner_id:owner_id,p_shift_id:shift_id,
+    p_release_sha:release_sha,p_scheduled_alias:scheduled_alias,
+    p_capability_key:capability_key
+   });
+  return approval;
+ }
  async function claimApprovedRelease({
   owner_id,shift_id,release_sha,release_ref,capability_key,
   scheduled_alias,previous_release_sha,previous_release_ref,
@@ -197,7 +214,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  return Object.freeze({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
   ready:true,read_only:false,
-  readSchedule,observeAlias,claimApprovedRelease,assignAlias,
+  readSchedule,observeAlias,readApprovedRelease,claimApprovedRelease,assignAlias,
   owner_approval_granted:false,provider_assignment_attempted:false
  });
 }
