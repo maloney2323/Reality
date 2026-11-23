@@ -503,6 +503,8 @@ BEGIN
   'publisher_worker_run_id',p_worker_run_id,
   'parent_original_work_id',d.parent_original_work_id,
   'source_ref',d.source_ref,'source_head_sha',d.source_head_sha,
+  'source_base_sha',p.source_base_sha,
+  'source_proof_sha256',p.source_proof_sha256,
   'source_manifest_sha256',d.source_manifest_sha256,
   'delivery_body',d.delivery_body,
   'delivery_body_sha256',d.delivery_body_sha256,
@@ -516,7 +518,7 @@ END $fn$;
 CREATE OR REPLACE FUNCTION public.reality_read_final_loop_parent_publish_verify_v1(
  p_shift_id uuid,p_verifier_worker_run_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
-DECLARE d record;
+DECLARE d record;p record;
 BEGIN
  IF current_user<>'service_role' THEN
   RAISE EXCEPTION 'FINAL_LOOP_PARENT_PROVIDER_VERIFIER_SERVICE_ONLY';END IF;
@@ -544,12 +546,22 @@ BEGIN
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_NO_PENDING_INDEPENDENT_PROVIDER_READBACK',
   'read_only',true,'original_job_completed',false);END IF;
+ SELECT * INTO p FROM reality_internal.final_loop_pr_source_plans_v1
+ WHERE plan_id=d.plan_id AND owner_id=d.owner_id AND shift_id=d.shift_id
+  AND source_head_sha=d.source_head_sha
+  AND source_manifest_sha256=d.source_manifest_sha256;
+ IF p.plan_id IS NULL THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_PARENT_PROVIDER_SOURCE_PLAN_STALE',
+   'read_only',true,'original_job_completed',false);END IF;
  RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_PARENT_GITHUB_EFFECT_UNCERTAIN_READBACK_ONLY',
   'delivery_id',d.delivery_id,'publication_claim_id',d.publication_claim_id,
   'owner_id',d.owner_id,'shift_id',d.shift_id,
   'parent_original_work_id',d.parent_original_work_id,
   'source_ref',d.source_ref,'source_head_sha',d.source_head_sha,
+  'source_base_sha',p.source_base_sha,
+  'source_proof_sha256',p.source_proof_sha256,
   'source_manifest_sha256',d.source_manifest_sha256,
   'delivery_body',d.delivery_body,
   'delivery_body_sha256',d.delivery_body_sha256,
