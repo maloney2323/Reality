@@ -750,7 +750,7 @@ BEGIN
  THEN RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_PARENT_CHILD_ACCEPTANCE_NOT_VERIFIED',
   'independent_service_readback_verified',false); END IF;
- SELECT pg_catalog.count(*),pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT pg_catalog.count(*),coalesce(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object(
    'index',c.scope_index,'scope_sha256',c.scope_sha256,
    'parent_original_work_id',c.parent_original_work_id,
@@ -808,7 +808,7 @@ BEGIN
    AND i.evidence->>'independent_provider_readback'='true'
    AND i.evidence->>'all_child_receipts_verified'='true'
    AND i.first_scope_index=i.batch_index*6
-   AND i.last_scope_index=pg_catalog.least(
+   AND i.last_scope_index=least(
     v_plan.proposed_scope_count-1,i.batch_index*6+5)
    AND EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
     WHERE r.run_id=i.verifier_worker_run_id AND r.started_at IS NOT NULL)
@@ -920,7 +920,7 @@ BEGIN
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_CHILD_PREFLIGHT_NO_CURRENT_SIGNED_SHIFT',
   'owner_acceptance_verified',false,'execution_authorized',false); END IF;
- SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT coalesce(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object(
    'plan_id',p.plan_id,'source_ref',p.source_ref,
    'parent_original_work_id',p.parent_original_work_id,
@@ -962,7 +962,7 @@ BEGIN
  IF current_user<>'service_role' OR p_owner_id IS NULL
   OR p_shift_id IS NULL THEN
   RAISE EXCEPTION 'FINAL_LOOP_CHILD_OWNER_READBACK_SERVICE_ONLY'; END IF;
- SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT coalesce(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object(
    'packet_id',a.packet_id,'source_ref',a.source_ref,
    'source_manifest_sha256',a.source_manifest_sha256,
