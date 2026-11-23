@@ -29,7 +29,7 @@
  const detail=node('p','reality-final-loop-child-detail','');
  const evidence=node('p','reality-final-loop-child-evidence','');
  const limits=node('p','reality-final-loop-child-limits',
-  'This approval is for READ-ONLY internal code review of the exact scoped source. '+
+  'Your click accepts the source-bound review goal and authorizes READ-ONLY internal review of the exact scoped source. '+
   'It does not authorize GitHub publication, installation, production changes, '+
   'or parent-job settlement. Other approvals remain separate.');
  const actions=node('div','reality-final-loop-child-actions');
@@ -111,7 +111,7 @@
    detail.textContent='Original '+p.parent_original_work_id+
     ' remains open. Reality has identified '+p.file_count+
     ' changed files in '+p.proposed_scope_count+
-    ' bounded review scopes, and independently recognized the source-bound goal acceptance.';
+    ' bounded review scopes. Reality has prepared a goal acceptance contract from the signed shift and verified source; it is not accepted until you approve.';
    evidence.textContent='Pinned source manifest: '+p.source_manifest_sha256+
     ' · exact approval packet: '+p.packet_id+'.';
    message.textContent=uncertain?
