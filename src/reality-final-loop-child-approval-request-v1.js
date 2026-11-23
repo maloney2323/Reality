@@ -57,11 +57,13 @@ export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
     j.independent_source_proof_verified===true))
    return fail('FINAL_LOOP_CHILD_PARENT_OR_PLAN_SCOPE_DRIFT');
   seen.add(plan.plan_id);
-  if(plan.independent_goal_acceptance_verified!==true||
+  if(plan.verified_signed_source_goal_contract_prepared!==true||
+     plan.owner_goal_acceptance_pending!==true||
+     plan.independent_goal_acceptance_verified!==false||
      !HASH.test(plan.acceptance_contract_sha256||'')||
      plan.pending_exact_owner_approval!==true){
    status.push({plan_id:plan.plan_id,
-    status:'PARENT_GOAL_ACCEPTANCE_OR_APPROVAL_ALREADY_PENDING',
+    status:'SIGNED_SOURCE_GOAL_CONTRACT_OR_OWNER_APPROVAL_NOT_READY',
     owner_approval_granted:false});
    continue;
   }
