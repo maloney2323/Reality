@@ -168,6 +168,64 @@ export async function readOwnerTimeHorizonEvidence({
     };
    }
   }
+  // Optional same-owner, same-frozen-shift source-plan readback.
+  // Proposed eight-file scopes remain Present evidence obligations, NEVER
+  // accepted originals, approved Future work or independently settled Past.
+  let finalLoopSourcePlans={
+   status:'FINAL_LOOP_SOURCE_PLAN_OWNER_VIEW_NOT_ENABLED',
+   read_only:true,owner_scope_verified:false,
+   plans:[],execution_authorized:false,child_originals_admitted:0,
+   original_job_completed:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'&&
+     env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED==='true'&&
+     finalLoopOwner?.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopOwner.owner_scope_verified===true){
+   try{
+    const p=await call(db,'reality_read_final_loop_pr_source_plans_v1',{
+     p_shift_id:finalLoopOwner.shift_id
+    },{timeoutMs:6000});
+    const expected=finalLoopOwner.time_horizon?.present?.obligations||[];
+    if(p?.schema==='reality-final-loop-pr-source-plans-readback-v1'&&
+       p.status==='FINAL_LOOP_PROPOSED_SOURCE_PLANS_NOT_EXECUTABLE'&&
+       p.owner_id===ownerId&&
+       p.shift_id===finalLoopOwner.shift_id&&
+       p.plan_fingerprint===finalLoopOwner.time_horizon?.present?.plan_fingerprint&&
+       p.read_only===true&&p.execution_authorized===false&&
+       p.original_job_completed===false&&
+       p.child_originals_admitted===0&&
+       Array.isArray(p.plans)&&p.plans.length<=32&&
+       p.plans.every(x=>
+        expected.some(j=>j.source_ref===x.source_ref&&
+         (j.original_work_id??null)===(x.parent_original_work_id??null))&&
+        x.state==='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION'&&
+        x.independent_source_review_verified===false&&
+        x.owner_acceptance_verified===false&&
+        x.child_originals_admitted===0&&
+        /^sha256:[a-f0-9]{64}$/.test(x.source_manifest_sha256||'')&&
+        /^[a-f0-9]{40}$/.test(x.source_head_sha||'')&&
+        Number.isSafeInteger(x.file_count)&&x.file_count>=9&&x.file_count<=500&&
+        Number.isSafeInteger(x.proposed_scope_count)&&
+        x.proposed_scope_count>=2&&x.proposed_scope_count<=63)){
+     finalLoopSourcePlans={
+      status:'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY',
+      owner_id:ownerId,shift_id:p.shift_id,
+      read_only:true,owner_scope_verified:true,
+      plans:p.plans,
+      execution_authorized:false,child_originals_admitted:0,
+      original_job_completed:false
+     };
+    }
+   }catch{
+    finalLoopSourcePlans={
+     status:'FINAL_LOOP_SOURCE_PLAN_PROOF_READER_NOT_INSTALLED',
+     read_only:true,owner_scope_verified:false,
+     plans:[],execution_authorized:false,child_originals_admitted:0,
+     original_job_completed:false
+    };
+   }
+  }
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -178,6 +236,7 @@ export async function readOwnerTimeHorizonEvidence({
    present:present||{status:'PRESENT_SHIFT_NOT_VERIFIED'},
    future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
    final_loop_owner:finalLoopOwner,
+   final_loop_source_plans:finalLoopSourcePlans,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null
