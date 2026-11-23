@@ -327,3 +327,74 @@ test('reviewed recovery informs owner past present future CEO without authorizin
  assert.notEqual(foreign.status,'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY');
  assert.equal(foreign.authority_granted,false);
 });
+
+
+test('owner endpoint carries the same independently reviewed recovery to Past Present Future CEO',async()=>{
+ const pr='https://github.com/maloney2323/Reality/pull/307';
+ const planId='55555555-5555-4555-8555-555555555555';
+ const env={VERCEL_ENV:'preview',
+  REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED:'true',
+  REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED:'true',
+  REALITY_FINAL_LOOP_RECOVERY_OWNER_GUIDANCE_ENABLED:'true'};
+ const liveProof={...proof,jobs:[{...proof.jobs[0],source_ref:pr,
+  source_phase:'BLOCKED',
+  native_next_governed_action:'READ_CURRENT_PR_REVIEW_PROVIDER_EFFECT'}]};
+ const sourcePlan={plan_id:planId,source_ref:pr,
+  parent_original_work_id:work,source_manifest_sha256:sha('7'),
+  source_head_sha:'8'.repeat(40),file_count:34,proposed_scope_count:5,
+  parent_source_phase:'BLOCKED',
+  state:'PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION',
+  independent_source_review_verified:false,
+  owner_acceptance_verified:false,child_originals_admitted:0};
+ const calls=[];
+ const got=await readOwnerTimeHorizonEvidence({ownerId:owner,db:{},
+  now:moment,env,call:async(_db,name,args)=>{
+   calls.push(name);
+   if(name==='reality_read_current_final_loop_proof_envelope_v1')
+    return liveProof;
+   if(name==='reality_read_final_loop_pr_source_plans_v1')
+    return {schema:'reality-final-loop-pr-source-plans-readback-v1',
+     status:'FINAL_LOOP_PROPOSED_SOURCE_PLANS_NOT_EXECUTABLE',
+     owner_id:owner,shift_id:shift,plan_fingerprint:sha('3'),
+     read_only:true,execution_authorized:false,
+     original_job_completed:false,child_originals_admitted:0,
+     plans:[sourcePlan]};
+   if(name==='reality_read_final_loop_child_approval_preflight_v1')
+    return {status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_READ_ONLY',
+     owner_id:owner,shift_id:shift,read_only:true,
+     execution_authorized:false,plans:[{
+      plan_id:planId,source_ref:pr,parent_original_work_id:work,
+      source_manifest_sha256:sha('7'),
+      acceptance_contract_sha256:sha('8'),
+      verified_signed_source_goal_contract_prepared:true,
+      independent_goal_acceptance_verified:false,
+      pending_exact_owner_approval:true}]};
+   if(name==='reality_read_owner_signed_shift_recovery_actions_v1')
+    return {status:'OWNER_SIGNED_SHIFT_RECOVERY_ACTIONS_READ_ONLY',
+     owner_id:owner,owner_scope_verified:true,read_only:true,
+     items:[{incident_id:'66666666-6666-4666-8666-666666666666',
+      shift_id:shift,kind:'SIGNED_SHIFT_REPEATED_NO_PROGRESS',
+      action_independently_rechecked:true,
+      action_receipt_sha256:sha('1'),
+      independent_review_receipt_sha256:sha('2'),
+      owner_next_action:'EXACT_OWNER_SOURCE_SCOPE_AND_ITEMIZED_BUSINESS_WARRANT_REQUIRED_IN_CHAT',
+      original_job_completed:false,installation_authorized:false,
+      production_changed:false}]};
+   if(name==='reality_read_owner_final_loop_child_approvals_v1')
+    return {status:'FINAL_LOOP_OWNER_EXACT_CHILD_APPROVALS_READ_ONLY',
+     owner_id:owner,shift_id:shift,read_only:true,packets:[]};
+   return api(_db,name,args);
+  }});
+ assert.equal(calls.length,8);
+ assert.equal(got.final_loop_recovery_guidance.status,
+  'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY');
+ assert.equal(got.final_loop_owner.recovery_guidance.original_work_id,work);
+ assert.equal(got.final_loop_owner.recovery_guidance.continuity_head_sha256,
+  got.final_loop_owner.continuity_head_sha256);
+ assert.equal(got.final_loop_recovery_guidance.ceo.required_next_action,
+  'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET');
+ assert.equal(got.final_loop_owner.time_horizon.future.automatically_authorized_jobs,0);
+ assert.equal(got.past.status,'INDEPENDENT_HISTORY_VERIFIED');
+ assert.equal(got.approved_new_work_by_read,false);
+ assert.equal(got.final_loop_recovery_guidance.recovery_verified,false);
+});
