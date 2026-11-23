@@ -29,6 +29,8 @@ import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../../src/reality-final-loop-child-approval-request-v1.js';
 import {advanceOneFinalLoopChildReview}
  from '../../src/reality-final-loop-child-review-worker-v1.js';
+import {advanceOneFinalLoopParentIntegration}
+ from '../../src/reality-final-loop-parent-integration-worker-v1.js';
 import {runAuthorizedRileyPrReview,
  inspectCurrentRileyPrReviewSourceReadiness,
  shouldFenceRileyPrClaimForObservedIncompatibility}
@@ -2504,6 +2506,10 @@ export default async function handler(req,res){
    status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',
    original_job_completed:false,production_changed:false
   };
+  let finalLoopParentIntegration={
+   status:'FINAL_LOOP_PARENT_INTEGRATION_NOT_ENABLED',
+   original_job_completed:false,production_changed:false
+  };
   if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.VERCEL_ENV==='preview'&&
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
@@ -2528,6 +2534,20 @@ export default async function handler(req,res){
    }catch{
     finalLoopChildReview={
      status:'FINAL_LOOP_CHILD_SIGNED_EXECUTION_OR_VERIFICATION_BLOCKED',
+     original_job_completed:false,production_changed:false
+    };
+   }
+   // The same authorized signed worker handles bounded integration AFTER
+   // child verification, never a new background orchestrator.
+   try{
+    finalLoopParentIntegration=
+     await advanceOneFinalLoopParentIntegration({
+      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+      env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    finalLoopParentIntegration={
+     status:'FINAL_LOOP_INDEPENDENT_PARENT_INTEGRATION_BLOCKED',
      original_job_completed:false,production_changed:false
     };
    }
@@ -3371,6 +3391,7 @@ export default async function handler(req,res){
     final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
+    final_loop_parent_integration:finalLoopParentIntegration,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
