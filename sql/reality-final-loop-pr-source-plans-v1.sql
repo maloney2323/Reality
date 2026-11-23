@@ -262,7 +262,7 @@ BEGIN
  IF NOT FOUND THEN
   RETURN jsonb_build_object('status','FINAL_LOOP_SOURCE_PLAN_SHIFT_UNVERIFIED',
    'read_only',true,'execution_authorized',false);END IF;
- SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT coalesce(pg_catalog.jsonb_agg(
   jsonb_build_object(
    'source_ref',p.source_ref,'parent_original_work_id',p.parent_original_work_id,
    'parent_source_phase',p.parent_source_phase,
