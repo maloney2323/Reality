@@ -59,7 +59,8 @@ export function verifyActuallyCompletedSignedWorkerRelease({
   approval.scheduled_alias!==schedule.host||
   approval.target_environment!=='ISOLATED_PREVIEW'||
   approval.production_change_permitted!==false||
-  !HASH.test(approval.receipt_sha256||''))
+  !HASH.test(approval.receipt_sha256||'')||
+  !Number.isFinite(Date.parse(approval.approved_at||'')))
   return ret('EXACT_OWNER_RELEASE_AUTHORITY_MISSING');
  if(alias?.provider!=='VERCEL'||alias.independently_observed!==true||
   alias.project_verified!==true||alias.preview_only!==true||
@@ -91,13 +92,13 @@ export function verifyActuallyCompletedSignedWorkerRelease({
   Array.isArray(w.registered_capabilities)&&
   w.registered_capabilities.includes(candidate.capability_key)
  );
- if(matches.length!==1)
+ if(!matches.length)
   return ret('APPROVED_RELEASE_SIGNED_HANDLER_WAKE_NOT_YET_OBSERVED',{
    expected_release_sha:candidate.sha,
    expected_capability_key:candidate.capability_key,
    completed_matching_wake_count:matches.length
   });
- const observed=matches[0];
+ const observed=[...matches].sort((a,b)=>Date.parse(b.finished_at)-Date.parse(a.finished_at))[0];
  const cronBound=cronInvocation?.status===
   'SIGNED_CRON_DISPATCH_BOUND_TO_WORKER_RUN'&&
   cronInvocation.independently_verified===true&&
