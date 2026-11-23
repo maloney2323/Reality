@@ -289,3 +289,42 @@ test('one signed worker integrates readback and optional checkpoint only',()=>{
  assert.match(worker,/final_loop_evidence_checkpoint:finalLoopEvidenceCheckpoint/);
  assert.match(boundary,/record_final_loop_evidence_checkpoint_v1/);
 });
+
+
+test('canonical Final Loop consumes current qualified next action without granting execution',async()=>{
+ const h={
+  source_ref:source,original_work_id:work,source_step_index:2,
+  qualifier_receipt_sha256:sha('9'),
+  qualifier_checked_at:'2026-11-22T22:00:00Z',
+  qualifier_next_action:'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC',
+  unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED','BUSINESS_ORIGINAL_WARRANT_MISMATCH'],
+  independent_source_proof_verified:true,proposed_transition:'SUSPEND',
+  reason_code:'AUTHORITY_NOT_VERIFIED',diagnosis_consumable:true,
+  registered_capability_lease:false,execution_authorized:false,
+  owner_approval_granted:false,original_job_completed:false,production_changed:false
+ };
+ const p={...pendingEnvelope,governed_qualification_handoffs:[h]};
+ const r=await caller(async(db,name)=>{
+  if(name==='reality_read_current_shift_execution_graph_v1')return rawGraph();
+  if(name==='reality_read_current_final_loop_proof_envelope_v1')return p;
+  throw Error('UNEXPECTED_RPC');
+ });
+ assert.equal(r.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ assert.equal(r.next_governed_action,h.qualifier_next_action);
+ assert.equal(r.governed_qualification_handoffs[0].decision,'SUSPEND');
+ assert.deepEqual(r.governed_qualification_handoffs[0].unresolved_proof_gates,
+  h.unresolved_proof_gates);
+ assert.equal(r.governed_qualification_handoffs[0].executor_invoked,false);
+ assert.equal(r.transition_committed,false);
+ assert.equal(r.installation_authorized,false);
+ const forged=await caller(async(db,name)=>{
+  if(name==='reality_read_current_shift_execution_graph_v1')return rawGraph();
+  return {...p,governed_qualification_handoffs:[{...h,owner_approval_granted:true}]};
+ });
+ assert.equal(forged.status,'FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
+ const swapped=await caller(async(db,name)=>{
+  if(name==='reality_read_current_shift_execution_graph_v1')return rawGraph();
+  return {...p,governed_qualification_handoffs:[{...h,original_work_id:'work:'+'2'.repeat(32)}]};
+ });
+ assert.equal(swapped.status,'FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
+});
