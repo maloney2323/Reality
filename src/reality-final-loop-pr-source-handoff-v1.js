@@ -134,20 +134,40 @@ export async function connectFinalLoopPrSourcePlanToSignedShift({
    owner_id:graph.owner_id,shift_id:graph.shift_id,
    proposals:summaries
   });
- const isolated=env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'&&
+ // Two truthful installation targets: an isolated preview database, or an
+ // explicitly selected SHARED benchmark for source-plan proposals only.
+ // Neither mode grants an owner warrant, an LLM executor, or a provider effect.
+ const stagingBase=env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'&&
+  db?.strictSecrets===true&&
+  db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
+  UUID.test(workerRunId||'')&&typeof call==='function';
+ const isolated=stagingBase&&
   env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&
   typeof env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF==='string'&&
   env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF.length>0&&
-  db?.strictSecrets===true&&
-  db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
-  db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&
-  UUID.test(workerRunId||'')&&typeof call==='function';
- if(!isolated)
+  db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF;
+ // A shared benchmark is never presented as isolated. Require exact
+ // project, owner and currently signed shift identity, from preview-only
+ // configuration and the independently checked existing shift graph.
+ // This path cannot enable child/model execution or parent publication.
+ const sharedBenchmark=stagingBase&&
+  env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'&&
+  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'&&
+  env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='true'&&
+  typeof env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF==='string'&&
+  env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF.length>0&&
+  db.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+  UUID.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||'')&&
+  UUID.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID||'')&&
+  graph.owner_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&
+  graph.shift_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID;
+ if(!isolated&&!sharedBenchmark)
   return result('FINAL_LOOP_SOURCE_PLANS_CONNECTED_ISOLATED_STAGING_NOT_ENABLED',{
    owner_id:graph.owner_id,shift_id:graph.shift_id,
    complete_manifest_count:eligible.length,
    proposals:summaries,
-   next_governed_action:'INSTALL_AND_VERIFY_CHILD_SOURCE_PLAN_RPC_IN_ISOLATED_DB'
+   next_governed_action:'CONFIGURE_EXACT_PREVIEW_ONLY_SOURCE_PLAN_STAGING_TARGET'
   });
  const receipts=[];
  for(const entry of proposals){
@@ -249,6 +269,7 @@ export async function connectFinalLoopPrSourcePlanToSignedShift({
   complete_manifest_count:eligible.length,
   proposals:summaries,staging_receipts:receipts,
   parent_child_recovery_decisions:Object.freeze(parentRecoveryDecisions),
+  staging_target:sharedBenchmark?'SHARED_BENCHMARK_PROPOSALS_ONLY':'ISOLATED_PREVIEW',
   next_governed_action:'INDEPENDENTLY_QUALIFY_PARENT_ACCEPTANCE_AUTHORITY_AND_CHILD_REVIEW'
  });
 }
