@@ -120,3 +120,156 @@ export function classifySignedFinalLoopStagedPlanActions({
   return result('FINAL_LOOP_STAGED_PREFLIGHT_REFERENCES_UNMATCHED_SOURCE');
  return result('FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED',routes);
 }
+
+
+// Join the independently reviewed Continuity recovery with the SAME frozen
+// shift's qualified source-plan routes. This is a read model in the existing
+// Final Loop Engine, not another orchestrator, approval or owner-job warrant.
+// Importantly, an incident without a source claim proves a same-shift candidate,
+// NOT that the incident was caused by that particular PR.
+export function reconcileReviewedRecoveryToFinalLoopSource({
+ graph,stagedActions,continuityClassification,registeredRouting
+}={}){
+ const base={
+  schema:'reality-final-loop-reviewed-recovery-continuation-v1',
+  read_only:true,classification_only:true,action_dispatched:false,
+  owner_approval_granted:false,execution_authorized:false,
+  recovery_verified:false,original_job_completed:false,
+  production_changed:false,continuity_ledger_mutated:false
+ };
+ const result=(status,fields={})=>Object.freeze({...base,status,...fields});
+ if(graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+  !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
+  !HASH.test(graph.plan_fingerprint||'')||
+  graph.installation_authorized!==false||
+  graph.production_changed!==false||!Array.isArray(graph.jobs)||
+  stagedActions?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+  stagedActions.owner_id!==undefined&&stagedActions.owner_id!==graph.owner_id||
+  stagedActions.read_only!==true||
+  stagedActions.action_dispatched!==false||
+  !Array.isArray(stagedActions.routes)||
+  continuityClassification?.schema!=='reality-governed-continuity-recovery-handoff-v1'||
+  continuityClassification.status!=='GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED'||
+  continuityClassification.owner_id!==graph.owner_id||
+  continuityClassification.shift_id!==graph.shift_id||
+  continuityClassification.classification_only!==true||
+  continuityClassification.action_dispatched!==false||
+  !Array.isArray(continuityClassification.items)||
+  registeredRouting?.schema!=='reality-categorized-continuity-registered-action-route-v1'||
+  registeredRouting.status!=='CONTINUITY_REGISTERED_ACTION_ROUTES_CLASSIFIED'||
+  registeredRouting.owner_id!==graph.owner_id||
+  registeredRouting.shift_id!==graph.shift_id||
+  registeredRouting.action_dispatched!==false||
+  !Array.isArray(registeredRouting.items))
+  return result('FINAL_LOOP_RECOVERY_AND_SOURCE_LEDGER_READBACK_MISSING');
+ const independentlyReviewed=registeredRouting.items.filter(x=>
+  x.route==='EXACT_ORIGINAL_REENTRY_GATE_REQUIRED'&&
+  HASH.test(x.investigation_receipt_sha256||'')&&
+  x.execution_authorized===false&&x.action_executed===false&&
+  x.original_job_completed===false&&
+  continuityClassification.items.some(i=>
+   i.incident_id===x.incident_id&&
+   i.shift_id===graph.shift_id&&
+   i.continuity_state==='GOVERNED_ACTION_INDEPENDENTLY_REVIEWED_ORIGINAL_UNSETTLED'&&
+   HASH.test(i.independent_action_review_receipt_sha256||'')&&
+   i.original_job_completed===false&&
+   i.execution_permitted_by_classification===false));
+ if(independentlyReviewed.length===0)
+  return result('FINAL_LOOP_NO_INDEPENDENTLY_REVIEWED_RECOVERY_REENTRY');
+ if(independentlyReviewed.length!==1)
+  return result('FINAL_LOOP_MULTIPLE_REVIEWED_RECOVERIES_REQUIRE_EXACT_LINEAGE',{
+   reviewed_incident_count:independentlyReviewed.length});
+ const eligible=stagedActions.routes.filter(route=>
+  route.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'&&
+  route.parent_source_phase==='BLOCKED'&&
+  WORK.test(route.parent_original_work_id||'')&&
+  HASH.test(route.source_manifest_sha256||'')&&
+  HASH.test(route.acceptance_contract_sha256||'')&&
+  graph.jobs.some(j=>j.source_ref===route.source_ref&&
+   j.original_work_id===route.parent_original_work_id&&
+   j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&j.phase==='BLOCKED'&&
+   j.independent_source_proof_verified===true));
+ if(eligible.length===0)
+  return result('FINAL_LOOP_RECOVERY_REENTRY_SOURCE_OR_GOAL_NOT_QUALIFIED',{
+   incident_id:independentlyReviewed[0].incident_id,
+   next_governed_action:'QUALIFY_CANONICAL_ORIGINAL_SOURCE_BEFORE_OWNER_PACKET'});
+ if(eligible.length!==1)
+  return result('FINAL_LOOP_RECOVERY_REENTRY_SOURCE_AMBIGUOUS',{
+   incident_id:independentlyReviewed[0].incident_id,
+   eligible_original_count:eligible.length,
+   next_governed_action:'REQUEST_EXACT_ORIGINAL_SCOPE_SELECTION'});
+ const p=eligible[0];
+ return result('FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE',{
+  incident_id:independentlyReviewed[0].incident_id,
+  owner_id:graph.owner_id,shift_id:graph.shift_id,
+  original_work_id:p.parent_original_work_id,
+  source_ref:p.source_ref,plan_id:p.plan_id,
+  source_manifest_sha256:p.source_manifest_sha256,
+  acceptance_contract_sha256:p.acceptance_contract_sha256,
+  next_registered_handler:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET',
+  // A shift-wide diagnosis may lack a source_claim_id. The independent
+  // source/goal contract can justify displaying a packet, but not settle the
+  // incident's causal source attribution or authorize effects.
+  incident_causal_lineage_independently_verified:false,
+  original_source_and_goal_verified_for_owner_proposal:true,
+  next_governed_action:'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'
+ });
+}
+
+// Report a specific operational next state after the EXISTING signed worker
+// attempts the registered handler. This report cannot execute or certify its
+// own recovery. Only a separate original outcome verifier may settle work.
+export function inspectFinalLoopRecoveryContinuation({
+ candidate,operatingLane,approvalRequest,childReview,parentDelivery
+}={}){
+ const base={
+  schema:'reality-final-loop-recovery-continuation-status-v1',
+  read_only:true,owner_approval_granted:false,
+  recovery_verified:false,original_job_completed:false,
+  production_changed:false,continuation_settled:false
+ };
+ const result=(status,more={})=>Object.freeze({...base,status,...more});
+ if(candidate?.status!==
+    'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE')
+  return result('FINAL_LOOP_REENTRY_REQUIRES_INDEPENDENT_SOURCE_QUALIFICATION',{
+   candidate_status:candidate?.status||'NOT_READ',
+   next_governed_action:candidate?.next_governed_action||
+    'READ_CANONICAL_RECOVERY_AND_SOURCE_REENTRY_EVIDENCE'});
+ if(operatingLane?.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+    operatingLane.status!==
+      'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED')
+  return result('FINAL_LOOP_REENTRY_BLOCKED_WORKER_RELEASE_OR_ISOLATION',{
+   incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
+   source_ref:candidate.source_ref,
+   worker_lane_status:operatingLane?.status||'NOT_READ',
+   next_governed_action:'VERIFY_ISOLATED_SIGNED_EXECUTION_RELEASE_AND_ENABLE_OWNER_PACKET_HANDLER'});
+ const approvals=approvalRequest?.approvals;
+ const matched=Array.isArray(approvals)?approvals.filter(p=>
+  p.plan_id===candidate.plan_id&&p.source_ref===candidate.source_ref):[];
+ if(approvalRequest?.status==='FINAL_LOOP_CHILD_APPROVAL_GATED_BY_EXACT_OWNER_ACTION'&&
+    matched.length===1&&
+    matched[0].status==='FINAL_LOOP_CHILD_EXACT_OWNER_APPROVAL_REQUIRED'&&
+    UUID.test(matched[0].packet_id||'')&&
+    HASH.test(matched[0].proposal_fingerprint||'')&&
+    approvalRequest.owner_id===candidate.owner_id&&
+    approvalRequest.shift_id===candidate.shift_id){
+  return result('FINAL_LOOP_EXACT_OWNER_APPROVAL_PACKET_DURABLY_PREPARED',{
+   incident_id:candidate.incident_id,
+   original_work_id:candidate.original_work_id,
+   source_ref:candidate.source_ref,packet_id:matched[0].packet_id,
+   next_governed_action:'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT',
+   handler_dispatched:true,handler_result_verified:true,
+   original_obligation_remains_open:true
+  });
+ }
+ return result('FINAL_LOOP_REGISTERED_OWNER_PACKET_HANDLER_NOT_VERIFIED',{
+  incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
+  source_ref:candidate.source_ref,
+  handler_status:approvalRequest?.status||'NOT_OBSERVED',
+  child_status:childReview?.status||'NOT_OBSERVED',
+  parent_status:parentDelivery?.status||'NOT_OBSERVED',
+  next_governed_action:'VERIFY_REGISTERED_OWNER_PACKET_EFFECT_OR_EXACT_BLOCKER',
+  handler_dispatched:false,handler_result_verified:false,
+  original_obligation_remains_open:true
+ });
+}
