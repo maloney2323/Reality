@@ -172,3 +172,91 @@ test('foreign or falsely authorized source-plan readback is not accepted by owne
   assert.equal(r.final_loop_owner.external_execution_authorized,false);
  }
 });
+
+
+test('independent native+Universe parent outcome projects verified Past and unfinished Present without executing',async()=>{
+ const env={VERCEL_ENV:'preview',
+  REALITY_FINAL_LOOP_PARENT_OUTCOME_OWNER_VIEW_ENABLED:'true'};
+ const sourceRef='https://github.com/maloney2323/Reality/pull/307';
+ const receipt='33333333-3333-4333-8333-333333333333';
+ const universe='44444444-4444-4444-8444-444444444444';
+ const rows=[
+  {original_work_id:work,source_ref:sourceRef,
+   source_manifest_sha256:sha('a'),status:'INDEPENDENTLY_SETTLED_UNIVERSE_PAST',
+   delivery_phase:'SETTLED',original_job_completed:true,
+   independent_universe_verified:true,
+   verified_provider_comment_url:sourceRef+'#issuecomment-9988',
+   verified_universe_outcome_event_id:universe,
+   parent_settlement_receipt_id:receipt},
+  {original_work_id:'work:'+'2'.repeat(32),
+   source_ref:'https://github.com/maloney2323/Reality/pull/308',
+   source_manifest_sha256:sha('b'),status:'PARENT_DELIVERY_UNFINISHED_PRESENT',
+   delivery_phase:'AWAITING_EXACT_PUBLICATION_APPROVAL',
+   original_job_completed:false,independent_universe_verified:false,
+   verified_provider_comment_url:null,
+   verified_universe_outcome_event_id:null}
+ ];
+ const calls=[];
+ const r=await readOwnerTimeHorizonEvidence({ownerId:owner,db:{},now:moment,env,
+  call:async(_db,name,args)=>{
+   calls.push(name);
+   if(name==='reality_read_owner_final_loop_parent_outcomes_v1'){
+    assert.deepEqual(args,{p_owner_id:owner,p_shift_id:shift});
+    return {status:'FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY',
+     owner_id:owner,shift_id:shift,read_only:true,
+     owner_scope_verified:true,execution_authorized:false,
+     shift_completed_by_read:false,outcomes:rows,
+     parent_delivery_count:2,verified_parent_count:1,
+     unfinished_parent_count:1};
+   }
+   return api(_db,name,args);
+  }});
+ assert.equal(calls.length,4);
+ assert.equal(r.final_loop_parent_outcomes.status,
+  'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ');
+ assert.equal(r.final_loop_parent_outcomes.verified_parent_count,1);
+ assert.equal(r.final_loop_parent_outcomes.unfinished_parent_count,1);
+ assert.equal(r.past.status,'INDEPENDENT_HISTORY_VERIFIED');
+ assert.equal(r.present.active_shift_count,1);
+ assert.equal(r.approved_new_work_by_read,false);
+ assert.equal(r.new_jobs_created_by_read,0);
+});
+
+test('cross-owner, missing settlement evidence or invented counts never appear as Past',async()=>{
+ const sourceRef='https://github.com/maloney2323/Reality/pull/307';
+ for(const mutation of [
+  {owner_id:root},
+  {verified_parent_count:2},
+  {execution_authorized:true},
+  {outcomes:[{original_work_id:work,source_ref:sourceRef,
+    source_manifest_sha256:sha('a'),
+    status:'INDEPENDENTLY_SETTLED_UNIVERSE_PAST',
+    original_job_completed:true,independent_universe_verified:true,
+    verified_provider_comment_url:null,
+    verified_universe_outcome_event_id:null}]}
+ ]){
+  const base={status:'FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY',
+   owner_id:owner,shift_id:shift,read_only:true,
+   owner_scope_verified:true,execution_authorized:false,
+   shift_completed_by_read:false,outcomes:[],
+   parent_delivery_count:0,verified_parent_count:0,
+   unfinished_parent_count:0};
+  const value={...base,...mutation};
+  if(mutation.outcomes){
+   value.parent_delivery_count=1;value.verified_parent_count=1;
+   value.unfinished_parent_count=0;
+  }
+  const r=await readOwnerTimeHorizonEvidence({
+   ownerId:owner,db:{},now:moment,
+   env:{VERCEL_ENV:'preview',
+    REALITY_FINAL_LOOP_PARENT_OUTCOME_OWNER_VIEW_ENABLED:'true'},
+   call:async(_db,name,args)=>{
+    if(name==='reality_read_owner_final_loop_parent_outcomes_v1')
+     return value;
+    return api(_db,name,args);
+   }});
+  assert.equal(r.final_loop_parent_outcomes.owner_scope_verified,false);
+  assert.equal(r.final_loop_parent_outcomes.verified_parent_count,null);
+  assert.equal(r.approved_new_work_by_read,false);
+ }
+});
