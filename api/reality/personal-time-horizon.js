@@ -237,7 +237,8 @@ export async function readOwnerTimeHorizonEvidence({
   if(env.VERCEL_ENV==='preview'&&
      env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'&&
      env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED==='true'&&
-     finalLoopOwner.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     env.REALITY_FINAL_LOOP_RECOVERY_OWNER_GUIDANCE_ENABLED==='true'&&
+     finalLoopOwner.status='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
      finalLoopSourcePlans.status===
       'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY'){
    try{
