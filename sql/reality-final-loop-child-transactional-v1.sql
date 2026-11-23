@@ -123,8 +123,7 @@ BEGIN
     AND e.payload->>'original_work_id'=p.parent_original_work_id
     AND e.payload->>'acceptance_contract_sha256'=p_acceptance_contract_sha256
     AND (e.payload->>'source_ref'=p.source_ref OR
-         e.provenance->>'source_ref'=p.source_ref))
- FOR UPDATE OF p;
+         e.provenance->>'source_ref'=p.source_ref));
  IF NOT FOUND THEN
   RETURN pg_catalog.jsonb_build_object(
    'status','FINAL_LOOP_INDEPENDENT_PARENT_ACCEPTANCE_OR_SOURCE_NOT_VERIFIED',
