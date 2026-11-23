@@ -117,7 +117,7 @@ BEGIN
    v_packet.shift_id,v_packet.parent_original_work_id,
    v_plan.source_manifest_sha256,v_plan.source_head_sha,
    v_packet.acceptance_contract_sha256,v_i,v_i*6,
-   pg_catalog.least(v_expected-1,(v_i*6)+5))
+   least(v_expected-1,(v_i*6)+5))
   ON CONFLICT DO NOTHING;
  END LOOP;
  SELECT i.* INTO v_batch FROM reality_internal.final_loop_parent_integration_batches_v1 i
