@@ -171,6 +171,8 @@ test('exact approved child claim becomes a prepared draft only via governed mode
  const r=await advanceOneFinalLoopChildReview({
   db,env,shiftId:shift,workerRunId:run,fetchImpl:mock,
   call:async(_db,name,args)=>{
+   if(name==='reality_reconcile_final_loop_child_premodel_v1')
+    return {status:'FINAL_LOOP_NO_SAFE_PREMODEL_CHILD_RECOVERY_READY'};
    if(name==='reality_read_final_loop_child_verify_v1')
     return {status:'FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION'};
    if(name==='reality_claim_final_loop_child_review_v1')return claim;
@@ -224,6 +226,8 @@ test('separate signed verifier only verifies the exact pinned source and draft',
   db,env,shiftId:shift,workerRunId:other,
   fetchImpl:provider({id:verifierId,text:modelText}),
   call:async(_db,name,args)=>{
+   if(name==='reality_reconcile_final_loop_child_premodel_v1')
+    return {status:'FINAL_LOOP_NO_SAFE_PREMODEL_CHILD_RECOVERY_READY'};
    if(name==='reality_read_final_loop_child_verify_v1')return verified;
    if(name==='reality_record_final_loop_child_verified_v1'){
     receipts++;
@@ -254,6 +258,7 @@ test('child SQL and worker integrate without mutating native review admission or
   'reality_prepare_final_loop_child_review_v1',
   'reality_read_final_loop_child_verify_v1',
   'reality_record_final_loop_child_verified_v1',
+  'reality_reconcile_final_loop_child_premodel_v1',
   'reality_read_final_loop_child_recovery_v1'])
   assert.ok(sql.includes(name));
  assert.match(sql,/ENABLE ROW LEVEL SECURITY/);
@@ -268,4 +273,21 @@ test('child SQL and worker integrate without mutating native review admission or
   '../src/reality-governed-openai-gateway-v1.js',import.meta.url),'utf8');
  assert.match(gateway,/finalLoopChildReadOnlyAdvisory/);
  assert.match(gateway,/source_manifest_sha256/);
+});
+
+test('unverified recovery cannot be used to mint a second child claim',async()=>{
+ let calls=0;
+ const r=await advanceOneFinalLoopChildReview({
+  db,env,shiftId:shift,workerRunId:run,
+  fetchImpl:async()=>{throw Error('NO_PROVIDER')},
+  call:async(_db,name)=>{
+   calls++;
+   assert.equal(name,'reality_reconcile_final_loop_child_premodel_v1');
+   return {status:'FINAL_LOOP_RECOVERY_SIGNED_WORKER_REQUIRED'};
+  }
+ });
+ assert.equal(calls,1);
+ assert.equal(r.status,'FINAL_LOOP_CHILD_PREMODEL_RECOVERY_SCOPE_UNVERIFIED');
+ assert.equal(r.parent_original_completed,false);
+ assert.equal(r.external_effect_performed,false);
 });
