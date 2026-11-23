@@ -103,7 +103,7 @@ BEGIN
   p_after IS NULL OR p_after>pg_catalog.clock_timestamp() THEN
   RAISE EXCEPTION 'SIGNED_RELEASE_WAKES_SERVICE_SCOPE_REQUIRED';
  END IF;
- SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT COALESCE(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object(
    'worker_run_id',q.worker_run_id,
    'shift_id',q.shift_id,'owner_id',q.owner_id,
