@@ -21,7 +21,7 @@ No new scheduler, parallel controller, automatic owner consent, manual fabricate
   - Independent result: `SOURCE_REQUALIFICATION_VERIFIED_BUSINESS_WARRANT_STILL_MISSING`
   - Exact remaining gate: `EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED_NO_SCOPE_EXPANSION`
 - Owner multi-original shift **read-only** preflight returned `NOT_ENOUGH_INDEPENDENTLY_QUALIFIED_BUSINESS_ORIGINALS`, `source_bound_originals=2`, `independently_qualified_originals_for_executor_preflight=0`, `pending_exact_chat_admission_approvals=0`. Source checks and worker wakes are not admissible substitutes.
-- The common Final Loop SQL and child/parent functions are **not installed** in the shared continuity-benchmark database. This is a deployment blocker, not a reason to lower its proof obligations.
+- The common Final Loop SQL and child/parent functions were initially absent. The subsequently owner-authorized shared-benchmark staging installation is present; see the latest resumed staging proof below. Execution and publication remain disabled.
 - Current draft PR #443 contains source-plan, bounded child, independent cross-scope, separate publication approval, GitHub effect/readback, and parent/Universe settlement paths with CI and rollback-only transactional tests. None of these synthetic receipts settles the real shift.
 - Supabase development branching was denied by the provider because the organization is not on Supabase Pro. No branch was created and no additional bill was authorized.
 
@@ -69,3 +69,33 @@ All checks below were against the **existing** `reality-continuity-benchmark` da
 - Subsequent independent database query: `source_plans=0`, `approval_packets=0`, `child_reviews=0`, shift status `AWAITING_EXACT_ORIGINAL_WORK`, original PR #307 phase `BLOCKED`. No full-loop acceptance or owner-authorized execution has occurred.
 
 **Next action without expanding acceptance:** invoke the **existing signed worker's authenticated preview-only staging route** through a supported secure execution path after validating its credential project mapping; inspect its bounded source diagnostics; independently query `reality_internal.final_loop_pr_source_plans_v1` for a real exact source-plan receipt. If present, proceed to the separate signed parent-goal acceptance and exact owner approval gates. No developer may infer consent from a staged plan or set `DB_ISOLATED=true` on this shared project.
+
+## Resumed staging proof and actual next gates — 2026-11-23 18:14 UTC
+
+**Real source-plan staging is now verified. Full-loop acceptance remains open.**
+
+- The existing staging-only signed worker was authenticated through a Vercel session whose egress credential broker injected the dedicated preview worker credential only for POST to the exact worker route on the exact deployment. The worker token was not present in the session process or logs. Deployment Protection remained enabled. The temporary session was stopped after verification.
+- The first authenticated request received HTTP 202 `WAKE_COALESCED_ACTIVE_OR_COOLDOWN`, with `worker_started=false`. The live lease showed an existing worker completion and cooldown. A subsequent single request after that observed cooldown received HTTP 200 `FINAL_LOOP_SIGNED_SOURCE_PLANS_STAGED_AND_READ_BACK`. No uncertain POST was replayed.
+- Exact invoked preview: `https://reality-cvdd268nx-maloney2323-5310s-projects.vercel.app`, deployment `dpl_9BtfEt4Zphz5vfesg4VGuGL62ehL`, existing source commit `5bb8ca62d426dc6447bd33874e731ca53f63aa8c`. This redeployment refreshed only the dedicated branch-scoped staging invocation credential.
+- A concrete receipt-contract defect was fixed in source commit [4f5abe81a2085407164cf7f47e8550bf80513f9b](https://github.com/maloney2323/Reality/commit/4f5abe81a2085407164cf7f47e8550bf80513f9b): `reality_read_final_loop_pr_source_plans_v1` now returns `plan_id`, which the existing worker requires to match its staging receipt. Migration `final_loop_source_plan_readback_identity` was installed on the already-approved benchmark. Independent introspection confirmed SECURITY INVOKER and service-role-only execution remained unchanged.
+- [Final Loop lifecycle CI](https://github.com/maloney2323/Reality/actions/runs/45235643168) and [governed wake single-flight CI](https://github.com/maloney2323/Reality/actions/runs/45235643053) passed on the repair commit.
+- Real signed worker run: `8a28b5c3-9c71-4ad4-9688-548e79354591`, STARTED `2026-11-23T18:14:17.533538Z`, COMPLETED `2026-11-23T18:14:20.885351Z`, stage `FINAL_LOOP_SOURCE_PLAN_PREVIEW_ONLY`. A separate database read joined both plans to this completed worker run.
+- PR #307 plan: `bc597605-3854-4b9f-ab27-929c567868db`; 34 files, 5 proposed bounded review scopes; source head `ef66038297480f5da9444072e5e79f5c59b27184`; manifest `sha256:0383393190a9b4363e96f90feb099a08d9c2b2c04d6f769619870bcca3835da8`. Existing parent remains `work:315562fe1bd66b30a48bb9be4f1d162a`.
+- PR #308 plan: `060c84f5-24a9-433f-b8fe-701fa0e172cd`; 304 files, 38 proposed bounded review scopes; source head `866066ca65960de33070cd162312f9b260a5b03e`; manifest `sha256:7df06eda458bb874d05f9de2f021dc01ce0efc402db9dbbc9f5fbb0b93b701c0`. Parent original is still null.
+- Separate read-only provider observations confirmed both source heads and file counts. Both PRs remain open drafts. No PR draft flag was changed.
+
+### What Reality itself reports next
+
+- **PR #307:** `INDEPENDENT_SOURCE_AND_OWNER_ACCEPTANCE_BEFORE_CHILD_ADMISSION`. Its preflight now reports `verified_signed_source_goal_contract_prepared=true`, `pending_exact_owner_approval=true`, and `independent_goal_acceptance_verified=false`. Exact prepared acceptance contract: `sha256:3e6769a9579d1b0eb16ec44ef8f5c0d0d3219131ea364f4626ffba0302fd67c2`. Its recovery reader reports `FINAL_LOOP_PARENT_CHILD_ACCEPTANCE_NOT_VERIFIED`.
+- **PR #308:** `QUALIFY_DISTINCT_PARENT_ORIGINAL_BEFORE_CHILD_REVIEW`. Its recovery reader reports `FINAL_LOOP_PARENT_SOURCE_PLAN_NOT_ADMITTED`. Staging did not admit a second original.
+- Post-proof counts: source plans **2**, approval packets **0**, child reviews **0**. Shift remains `AWAITING_EXACT_ORIGINAL_WORK`.
+
+### Verified approval/trigger connection gaps
+
+1. The preview staging-only branch returns before the normal worker's approval-preparation/execution lanes. Its success does not prepare an owner packet.
+2. `requestFinalLoopChildApprovalFromAcceptedOriginal` and the owner approval endpoint require child execution enabled and an explicitly isolated matching database. Current staging configuration truthfully uses the shared benchmark, `DB_ISOLATED=false`, with child execution and parent delivery disabled. Therefore even the available #307 goal contract cannot currently become a Chat approval packet through this configuration.
+3. Existing cron job 7, `reality-riley-preview-original-execution-wake-v1`, runs every five minutes and still targets `https://reality-git-repair-maintenanc-a67bda-maloney2323-5310s-projects.vercel.app`. It resolves to maintenance commit `f36a241fba7e5a5adbaebb7f1b65755454742200`, not the Final Loop staging branch. The cron was not retargeted.
+
+**Next engineering handoff:** connect verified staged-plan proposal preparation to the existing exact owner-approval path without enabling unapproved model work; resolve the truthful runtime target/authority gates before activating the existing worker for execution. Separately qualify #308's parent original. Keep the existing approval, independent-verification, same-original settlement and Universe acceptance requirements unchanged. Do not mark the shared benchmark isolated, infer consent, replace the active cron with a staging-only worker, or claim a completed shift from these staging receipts.
+
+The successful worker explicitly reported `model_invoked=false`, `github_write_performed=false`, `owner_approval_granted=false`, `child_execution_authorized=false`, `original_job_completed=false`, `shift_completed=false`, and `production_changed=false`.
