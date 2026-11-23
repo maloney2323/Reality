@@ -288,11 +288,17 @@ const childReadback=(plan)=>({
  source_head_sha:plan.live_head_sha,
  acceptance_contract_sha256:hash('d'),
  authority:{independently_verified:true,owner_id:owner,
-  acceptance_contract_sha256:hash('d'),receipt_sha256:hash('9')},
- capacity:{independently_attested:true,receipt_sha256:hash('8')},
+  parent_original_work_id:work1,
+  acceptance_contract_sha256:hash('d'),receipt_sha256:hash('9'),
+  permitted_effects:['READ','PREPARE'],requested_effects:['READ']},
+ capacity:{independently_attested:true,scheduled_worker_observed:true,
+  receipt_sha256:hash('8')},
  provider_effect_uncertain:false,
  children:plan.bounded_scopes.map((x,i)=>({
   index:i,scope_sha256:x.proposed_scope_sha256,
+  parent_original_work_id:work1,
+  source_manifest_sha256:plan.source_manifest_sha256,
+  acceptance_contract_sha256:hash('d'),
   phase:'VERIFIED',child_original_work_id:'work:'+String(i+3).repeat(32),
   independently_verified:true,verifier_independent:true,
   independent_receipt_sha256:hash('6')
@@ -393,4 +399,27 @@ test('foreign child ledger, uncertain effects and missing cross-scope proof fail
  assert.equal(integration.decision,'ADVANCE');
  assert.equal(integration.next_governed_action,
   'INDEPENDENTLY_VERIFY_CROSS_CHILD_INTEGRATION');
+});
+
+test('child effects cannot widen parent owner authority or bypass uncertain parent effects',()=>{
+ const parent={...jobs[0],phase:'BLOCKED'};
+ const plan=parentSourcePlan(parent),children=childReadback(plan);
+ const scope={parent,sourcePlan:plan,independentChildren:children,
+  ownerId:owner,shiftId:shift,acceptanceContractSha256:hash('d')};
+ const bad=evaluateRealityFinalLoopChildRecovery({...scope,
+  independentChildren:{...children,authority:{
+   ...children.authority,requested_effects:['INSTALL_PREVIEW']}}});
+ assert.equal(bad.decision,'SUSPEND');
+ assert.equal(bad.execution_authorized,false);
+ const ps=jobs.map(proof);
+ ps[0].child_recovery={source_plan:plan,independent_children:children};
+ ps[0].blocker={status:'PROVIDER_EFFECT_UNCERTAIN',
+  independently_attested:true,receipt_sha256:hash('6'),
+  provider_effect_uncertain:true,recovery_permitted_without_new_authority:true};
+ const g={...graph,jobs:[parent,jobs[1]]};
+ const r=run(ledger(ps),g);
+ assert.equal(r.decisions[0].decision,'SUSPEND');
+ assert.equal(r.decisions[0].next_governed_action,
+  'RECONCILE_PARENT_PROVIDER_EFFECT_WITHOUT_REPLAY');
+ assert.equal(r.decisions[1].decision,'ADVANCE');
 });
