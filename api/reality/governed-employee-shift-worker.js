@@ -277,6 +277,113 @@ export default async function handler(req,res){
      realRun.installation_authorized!==false||
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
+  // Explicitly authenticated, preview-only source staging for the SAME
+  // signed worker and its durable lease/run. This is NOT a second worker
+  // and never invokes a model, approves work, or publishes to a provider.
+  // Normal signed-shift wakes are unchanged when this flag is absent.
+  if(process.env.REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY==='true'){
+   workerStage='FINAL_LOOP_SOURCE_PLAN_PREVIEW_ONLY';
+   const e=process.env;
+   if(e.VERCEL_ENV!=='preview'||
+      e.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_LARGE_PR_QUALIFICATION_SHADOW_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'||
+      e.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+      e.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'||
+      db.project!==e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||
+      db.project!==e.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+    throw Error('FINAL_LOOP_SOURCE_PREVIEW_AUTHORITY_FENCE');
+   const sourceGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+    'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID
+    });
+   if(sourceGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+      sourceGraph.owner_id!==e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||
+      sourceGraph.shift_id!==e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID||
+      sourceGraph.installation_authorized!==false||
+      sourceGraph.production_changed!==false)
+    throw Error('FINAL_LOOP_SOURCE_PREVIEW_SIGNED_SCOPE_MISMATCH');
+   const sourceInspection=await inspectCurrentRileyPrReviewSourceReadiness({
+    graph:sourceGraph,env:e,fetchImpl:fetch
+   });
+   const sourceHandoff=await connectFinalLoopPrSourcePlanToSignedShift({
+    db,graph:sourceGraph,inspection:sourceInspection,
+    workerRunId:actualWorkerRunId,env:e,fetchImpl:fetch
+   });
+   // Source inspection failure may NOT be reported as a successful stage.
+   // A missing manifest or refused write is a bounded diagnostic, not work.
+   const expectedStatus='FINAL_LOOP_PROPOSED_SOURCE_PLANS_DURABLY_STAGED_NOT_EXECUTABLE';
+   const staged=sourceHandoff.status===expectedStatus&&
+    sourceHandoff.owner_id===sourceGraph.owner_id&&
+    sourceHandoff.shift_id===sourceGraph.shift_id&&
+    sourceHandoff.staging_target==='SHARED_BENCHMARK_PROPOSALS_ONLY'&&
+    sourceHandoff.child_execution_authorized===false&&
+    sourceHandoff.owner_approval_granted===false&&
+    sourceHandoff.original_job_completed===false&&
+    Array.isArray(sourceHandoff.staging_receipts)&&
+    sourceHandoff.staging_receipts.length>0&&
+    sourceHandoff.staging_receipts.every(x=>x.source_plan_staged===true);
+   // Independent service-role readback; the model and staging worker
+   // cannot self-certify a durable plan from a local return object.
+   const plansReadback=await shiftRpc(db,
+    'reality_read_final_loop_pr_source_plans_v1',{
+     p_shift_id:sourceGraph.shift_id
+    },{timeoutMs:6000});
+   const linked=staged&&
+    plansReadback?.shift_id===sourceGraph.shift_id&&
+    plansReadback?.owner_id===sourceGraph.owner_id&&
+    plansReadback?.read_only===true&&
+    Array.isArray(plansReadback?.plans)&&
+    sourceHandoff.staging_receipts.every(s=>plansReadback.plans.some(p=>
+     p.plan_id===s.plan_id&&p.source_ref===s.source_ref));
+   // Return a safe diagnostic if the preflight cannot stage; never
+   // synthesize owner approval or continue into other worker lanes.
+   const attested=await shiftRpc(db,
+    'reality_record_signed_worker_actual_run_v1',{
+     p_run_id:actualWorkerRunId,p_status:'COMPLETED',
+     p_stage:workerStage
+    });
+   workerCompletionAttestedBeforeResponse=
+    attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+    attested.run_id===actualWorkerRunId&&
+    attested.original_job_completed===false&&
+    attested.installation_authorized===false&&
+    attested.production_changed===false;
+   if(!workerCompletionAttestedBeforeResponse)
+    throw Error('FINAL_LOOP_PREVIEW_SIGNED_WORKER_ATTESTATION_UNVERIFIED');
+   const released=await shiftRpc(db,
+    'reality_release_governed_shift_worker_run_v1',{
+     p_claim_id:governedWakeClaimId
+    });
+   wakeLeaseReleasedBeforeResponse=
+    released?.status==='WAKE_RELEASED'&&
+    released.original_job_completed===false&&
+    released.installation_authorized===false;
+   if(!wakeLeaseReleasedBeforeResponse)
+    throw Error('FINAL_LOOP_PREVIEW_WORKER_LEASE_RELEASE_UNVERIFIED');
+   return res.status(200).json({
+    status:linked?'FINAL_LOOP_SIGNED_SOURCE_PLANS_STAGED_AND_READ_BACK':
+     'FINAL_LOOP_SIGNED_SOURCE_PLAN_STAGING_UNVERIFIED',
+    source_inspection_status:sourceInspection?.status||null,
+    source_diagnostics:(sourceInspection?.source_diagnostics||[]).map(x=>({
+     source_ref:x.source_ref,
+     eligibility_status:x.eligibility_status,
+     source_manifest_status:x.large_source_qualification?.status||null,
+     source_manifest_complete:x.large_source_qualification?.source_manifest_complete===true
+    })),
+    final_loop_source_handoff_status:sourceHandoff.status,
+    staging_target:'SHARED_BENCHMARK_PROPOSALS_ONLY',
+    staged_plan_count:linked?sourceHandoff.staging_receipts.length:0,
+    durable_source_plan_readback_verified:Boolean(linked),
+    signed_worker_run_recorded:true,
+    owner_approval_granted:false,child_execution_authorized:false,
+    model_invoked:false,github_write_performed:false,
+    original_job_completed:false,shift_completed:false,
+    production_changed:false
+   });
+  }
   // Existing owner-shift continuation, never another start or approval:
   // independently verify same installed Git/Vercel commit and TWO distinct
   // source+original acceptance CI runs before recording the final receipt.
