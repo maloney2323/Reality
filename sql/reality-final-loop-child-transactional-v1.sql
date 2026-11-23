@@ -73,6 +73,65 @@ GRANT SELECT,INSERT,UPDATE ON TABLE
  reality_internal.final_loop_child_approval_packets_v1,
  reality_internal.final_loop_child_review_work_v1 TO service_role;
 
+-- The Final Loop's canonical goal acceptance contract is derived from
+-- existing signed owner shift, frozen independently sourced PR original,
+-- and immutable full changed-file manifest. This creates a PROPOSAL,
+-- never grants owner consent. Only the authenticated owner click below
+-- can change the one-use packet from pending to approved.
+CREATE OR REPLACE FUNCTION
+ reality_internal.final_loop_pr_review_acceptance_digest_v1(p_plan_id uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path TO '' AS $goal$
+ SELECT 'sha256:'||pg_catalog.encode(pg_catalog.sha256(
+  pg_catalog.convert_to(pg_catalog.jsonb_build_object(
+   'version','reality-final-loop-pr-review-acceptance-contract-v1',
+   'owner_id',p.owner_id,
+   'shift_id',p.shift_id,
+   'original_work_id',p.parent_original_work_id,
+   'source_ref',p.source_ref,
+   'source_proof_sha256',p.source_proof_sha256,
+   'source_manifest_sha256',p.source_manifest_sha256,
+   'expected_outcome','INDEPENDENTLY_DELIVERED_AND_VERIFIED_PR_REVIEW',
+   'required_child_proof','INDEPENDENT_ALL_SCOPES_AND_INTEGRATION',
+   'required_parent_proof','EXACT_DELIVERY_AND_UNIVERSE_RECONCILIATION',
+   'execution_scope','READ_ONLY_REVIEW_UNTIL_SEPARATE_PUBLICATION_APPROVAL',
+   'prohibited_effects',pg_catalog.jsonb_build_array(
+    'PRODUCTION_INSTALL','UNAUTHORIZED_GITHUB_WRITE')
+   )::text,'UTF8')),'hex')
+ FROM reality_internal.final_loop_pr_source_plans_v1 p
+ JOIN reality_internal.governed_employee_shifts_v1 s
+  ON s.shift_id=p.shift_id AND s.owner_id=p.owner_id
+  AND s.plan_fingerprint=p.plan_fingerprint
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w
+  ON w.shift_id=s.shift_id AND w.owner_id=s.owner_id
+  AND w.plan_fingerprint=s.plan_fingerprint
+ JOIN reality_internal.riley_pr_review_originals_v1 r
+  ON r.original_work_id=p.parent_original_work_id
+  AND r.shift_id=p.shift_id AND r.owner_id=p.owner_id
+  AND r.source_ref=p.source_ref AND r.source_proof_sha256=p.source_proof_sha256
+ JOIN reality_internal.governed_employee_shift_steps_v1 step
+  ON step.shift_id=p.shift_id AND step.source_ref=p.source_ref
+  AND step.proof_sha256=p.source_proof_sha256 AND step.state='SOURCE_CHECKED'
+ WHERE p.plan_id=p_plan_id AND p.parent_original_work_id IS NOT NULL
+  AND p.state='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION'
+  AND s.authorized_at IS NOT NULL AND s.closed_at IS NULL
+  AND s.planned_end_at='infinity'::timestamptz
+  AND s.status IN ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+  AND w.state='ACTIVE' AND w.mode IN (
+   'UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS',
+   'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS')
+  AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(w.source_scope) item
+   WHERE item->>'source_ref'=p.source_ref)
+  AND r.phase='BLOCKED'
+  AND r.model_response_id IS NULL AND r.review_body IS NULL
+  AND r.provider_comment_id IS NULL AND r.settlement_receipt_id IS NULL
+ LIMIT 1
+$goal$;
+REVOKE ALL ON FUNCTION reality_internal.final_loop_pr_review_acceptance_digest_v1(uuid)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION reality_internal.final_loop_pr_review_acceptance_digest_v1(uuid)
+ TO service_role;
+
 -- Bind an exact approval request to a REAL canonical owner goal acceptance.
 -- A shift warrant is NOT customer acceptance and a manifest is NOT authority.
 CREATE OR REPLACE FUNCTION public.reality_prepare_final_loop_child_approval_v1(
