@@ -45,3 +45,16 @@ No new scheduler, parallel controller, automatic owner consent, manual fabricate
 - `NO_COMPLETE_SHIFT`: at least one original is unsettled or unadmitted and required by the frozen warrant — shift stays open.
 
 **Frozen standard:** An original obligation is complete only once its originally specified acceptance is independently satisfied, authoritative effects are scope-valid, a durable final receipt matches the same owner/work/goal, and the existing Continuity/Universe readback confirms it. Multi-job acceptance requires all originally required originals and shift closure. Do not add unrelated test conditions to this criterion.
+
+## Same-day activation-readiness evidence — 2026-11-23
+
+All checks below were against the **existing** `reality-continuity-benchmark` database using `BEGIN ... ROLLBACK` in the same SQL request. These are transactional SQL compatibility and **synthetic** functional tests; they are **not** permanent installation, genuine owner approval, actual external provider execution, independently observed business outcomes, or a completed live shift.
+
+1. **All five draft SQL files compile in dependency order, PASS:** canonical continuity, PR source plans, child transactional, parent integration and parent delivery. Inside the rollback-only transaction all five corresponding tables and the parent settlement RPC were present.
+2. **Signed goal / owner-consent / one-use child claim smoke, PASS:** `test/sql/reality-final-loop-signed-transaction-smoke-v1.sql` returned `SIGNED_GOAL_PROPOSAL_OWNER_CONSENT_CHILD_CLAIM_PARENT_OPEN`. The owner click was simulated only inside the rolled-back transaction.
+3. **Parent delivery / independent settlement / Universe smoke, PASS:** `test/sql/reality-final-loop-parent-delivery-smoke-v1.sql` returned `SYNTHETIC_PARENT_GOAL_CHILD_INTEGRATION_PUBLICATION_UNIVERSE_SETTLEMENT_ROLLED_BACK`. Synthetic GitHub evidence was internal test data; no actual GitHub comment was posted.
+4. **Post-test independent read, PASS:** all five proposed Final Loop tables and the settlement RPC were **absent** after rollback; the live shift was still `AWAITING_EXACT_ORIGINAL_WORK`, original `work:315562fe1bd66b30a48bb9be4f1d162a` still `BLOCKED`, and recorded business-effect approvals remained 0.
+
+**Activation is still blocked**, not by an observed SQL compile failure, but by lack of a separately authorized safe durable database target, authentic scoped owner-goal approval, and true signed-shift execution/independent provider receipts. The current Supabase organization denied creation of a paid development branch because branch support requires its Pro tier. A user request for the *fastest route toward testing* is **not** an exact authorization to alter the shared active-shift database or approve an external effect.
+
+**Next focused choice:** obtain exact authorization for a reviewed deployment against the shared active-shift DB with flags off, **or** obtain a genuinely isolated database; then require the real owner Chat acceptance, and prove one original through actual independent provider readback and Universe settlement before claiming multi-original shift PASS.
