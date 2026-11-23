@@ -26,6 +26,61 @@ const safe=(status,details={})=>Object.freeze({
 const identity=graph=>graph?.jobs?.map(item=>[
  item.source_ref,item.original_work_id,item.source_proof_sha256
 ]);
+// Consume the Canonical Final Loop reader's source-bound qualifier handoff.
+// A qualified diagnosis describes an unresolved obligation; it never issues a
+// registered capability lease, grants authority, or certifies an outcome.
+function verifyCanonicalQualificationHandoffs(proof,graph){
+ const items=proof?.governed_qualification_handoffs;
+ if(items===undefined)return Object.freeze([]);
+ if(!Array.isArray(items)||items.length>graph.jobs.length)return null;
+ const seen=new Set(),out=[];
+ for(const h of items){
+  if(!h||typeof h!=='object'||Array.isArray(h)||
+     !/^work:[a-f0-9]{32}$/.test(h.original_work_id||'')||
+     !HASH.test(h.qualifier_receipt_sha256||'')||
+     !/^[A-Z][A-Z0-9_]{5,120}$/.test(h.qualifier_next_action||'')||
+     !Number.isFinite(Date.parse(h.qualifier_checked_at||''))||
+     !Number.isInteger(h.source_step_index)||h.source_step_index<1||
+     h.proposed_transition!=='SUSPEND'||
+     !['AUTHORITY_NOT_VERIFIED','BLOCKER_ATTESTATION_PENDING']
+       .includes(h.reason_code)||
+     h.diagnosis_consumable!==true||
+     h.independent_source_proof_verified!==true||
+     h.registered_capability_lease!==false||
+     h.execution_authorized!==false||
+     h.owner_approval_granted!==false||
+     h.original_job_completed!==false||
+     h.production_changed!==false||
+     !Array.isArray(h.unresolved_proof_gates)||
+     h.unresolved_proof_gates.length<1||
+     h.unresolved_proof_gates.length>20||
+     h.unresolved_proof_gates.some(x=>
+      typeof x!=='string'||!/^[A-Z][A-Z0-9_]{3,99}$/.test(x)))
+   return null;
+  const exact=graph.jobs.filter(j=>
+   j.source_ref===h.source_ref&&
+   j.original_work_id===h.original_work_id&&
+   j.source_step_index===h.source_step_index&&
+   j.independent_source_proof_verified===true);
+  const key=h.source_ref+'|'+h.original_work_id;
+  if(exact.length!==1||seen.has(key))return null;
+  seen.add(key);
+  out.push(Object.freeze({
+   source_ref:h.source_ref,original_work_id:h.original_work_id,
+   source_step_index:h.source_step_index,
+   qualifier_receipt_sha256:h.qualifier_receipt_sha256,
+   qualifier_checked_at:h.qualifier_checked_at,
+   next_qualified_action:h.qualifier_next_action,
+   unresolved_proof_gates:Object.freeze([...h.unresolved_proof_gates]),
+   decision:'SUSPEND',reason_code:h.reason_code,
+   registered_capability_lease:false,transition_committed:false,
+   executor_invoked:false,execution_authorized:false,
+   owner_approval_granted:false,original_job_completed:false
+  }));
+ }
+ return Object.freeze(out);
+}
+
 export async function inspectFinalLoopOnExistingSignedWorker({
  db,wake,graph,env=process.env,now=new Date().toISOString(),
  read=shiftRpc,fetchImpl=fetch
@@ -123,6 +178,10 @@ export async function inspectFinalLoopOnExistingSignedWorker({
      source_ref:item.source_ref
     }));
   }
+  const governedQualificationHandoffs=
+   verifyCanonicalQualificationHandoffs(p,refreshed);
+  if(governedQualificationHandoffs===null)
+   return safe('FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
   const canonicalSourceDecisions=derivePendingFinalLoopSourceDecisions(p);
   if(canonicalSourceDecisions===null)
    return safe('FINAL_LOOP_CANONICAL_SOURCE_ADMISSION_POLICY_UNVERIFIED');
@@ -158,7 +217,10 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
    continuity_head_sha256:p.continuity_head_sha256,
    revision:p.revision,checkpoint_candidates:Object.freeze(pending),
-   next_governed_action:canonicalSourceDecisions.some(d=>
+   governed_qualification_handoffs:governedQualificationHandoffs,
+   next_governed_action:governedQualificationHandoffs.length>0?
+    governedQualificationHandoffs[0].next_qualified_action:
+    canonicalSourceDecisions.some(d=>
     d.decision==='SUSPEND')?
     'QUALIFY_DISTINCT_SOURCE_TO_ORIGINAL_BEFORE_ACCEPTANCE':
     'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS'
