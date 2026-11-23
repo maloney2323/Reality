@@ -28,7 +28,7 @@ const provider=(draft=true)=>async (url,options)=>{
  const id=Number(/\/pulls\/(\d+)$/.exec(url)[1]);
  return {ok:true,status:200,json:async()=>({
   number:id,html_url:ref(id),state:'open',draft,
-  head:{sha:'a'.repeat(40)}
+  changed_files:2,head:{sha:'a'.repeat(40)}
  })};
 };
 test('two signed draft PR sources are classified as incompatibilities with no claim or write',async()=>{
@@ -56,6 +56,46 @@ test('nondraft is still only metadata preflight, not execution authority',async(
   'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED');
  assert.equal(r.source_diagnostics[0].existing_executor_can_start_from_this_observation,false);
  assert.equal(r.worker_claim_consumed,false);
+});
+test('live-shaped draft PRs with 34 and 304 files preserve both independent blockers',async()=>{
+ const r=await inspect({graph,env,fetchImpl:async(url,options)=>{
+  assert.equal(options.method,'GET');
+  const id=Number(/\/pulls\/(\d+)$/.exec(url)[1]);
+  return {ok:true,json:async()=>({
+   number:id,html_url:ref(id),state:'open',draft:true,
+   changed_files:id===307?34:304,
+   head:{sha:'f'.repeat(40)}
+  })};
+ }});
+ assert.equal(r.source_count,2);
+ assert.equal(r.draft_incompatible_count,2);
+ assert.equal(r.oversized_changeset_count,2);
+ assert.equal(r.blocked_original_count,1);
+ assert.deepEqual(r.source_diagnostics.map(x=>x.current_github_changed_file_count),[34,304]);
+ assert.ok(r.source_diagnostics.every(x=>
+  x.eligibility_blockers.includes('DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR')&&
+  x.eligibility_blockers.includes('CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW')&&
+  x.source_requalification_required===true));
+ assert.equal(r.source_diagnostics[0].eligibility_blockers.includes(
+  'EXISTING_ORIGINAL_BLOCKED_REQUIRES_DURABLE_RECONCILIATION'),true);
+ assert.equal(r.source_diagnostics[1].eligibility_blockers.includes(
+  'SOURCE_NOT_ADMITTED_AS_ORIGINAL'),true);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.worker_claim_consumed,false);
+});
+test('removing draft status alone cannot make oversized PR eligible',async()=>{
+ const r=await inspect({graph,env,fetchImpl:async(url)=>{
+  const id=Number(/\/pulls\/(\d+)$/.exec(url)[1]);
+  return {ok:true,json:async()=>({
+   number:id,html_url:ref(id),state:'open',draft:false,
+   changed_files:id===307?34:304,head:{sha:'f'.repeat(40)}
+  })};
+ }});
+ assert.equal(r.draft_incompatible_count,0);
+ assert.equal(r.oversized_changeset_count,2);
+ assert.equal(r.source_diagnostics[0].eligibility_status,
+  'SOURCE_PR_TOO_LARGE_FOR_NATIVE_BOUNDED_REVIEW');
+ assert.equal(r.source_diagnostics[1].existing_executor_can_start_from_this_observation,false);
 });
 test('disabled or foreign signed scope makes no provider calls',async()=>{
  for(const options of [
