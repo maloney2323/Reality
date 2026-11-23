@@ -18,7 +18,8 @@ export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
  if(env.VERCEL_ENV!=='preview'||
   env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
   env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED!=='true'||
-  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'||
+  (env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED!=='true'&&
+   env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true')||
   env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
   db?.strictSecrets!==true||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
