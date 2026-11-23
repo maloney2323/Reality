@@ -950,3 +950,73 @@ REVOKE ALL ON FUNCTION
 GRANT EXECUTE ON FUNCTION
  public.reality_prepare_next_final_loop_parent_delivery_v1(uuid,uuid)
  TO service_role;
+
+
+-- One canonical owner-scope projection for Universe / Past / Present /
+-- Future / CEO. Only independent native+Universe settlement readback can
+-- place an original in verified Past; other phases stay in Present.
+CREATE OR REPLACE FUNCTION public.reality_read_owner_final_loop_parent_outcomes_v1(
+ p_owner_id uuid,p_shift_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE d record;v jsonb;v_entries jsonb:='[]'::jsonb;
+ v_verified integer:=0;v_count integer:=0;v_done boolean;
+BEGIN
+ IF current_user<>'service_role' OR p_owner_id IS NULL OR
+  p_shift_id IS NULL THEN
+  RAISE EXCEPTION 'FINAL_LOOP_OWNER_OUTCOMES_SERVICE_ONLY';END IF;
+ IF NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shifts_v1 s
+  WHERE s.shift_id=p_shift_id AND s.owner_id=p_owner_id
+   AND s.authorized_at IS NOT NULL) THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_OWNER_SHIFT_OUTCOME_SCOPE_UNVERIFIED',
+   'read_only',true,'owner_scope_verified',false,
+   'outcomes','[]'::jsonb,'verified_parent_count',0);
+ END IF;
+ FOR d IN SELECT p.* FROM reality_internal.final_loop_parent_deliveries_v1 p
+  WHERE p.owner_id=p_owner_id AND p.shift_id=p_shift_id
+  ORDER BY p.prepared_at,p.delivery_id LIMIT 16 LOOP
+  v:=public.reality_read_final_loop_parent_settlement_v1(
+    p_owner_id,d.parent_original_work_id);
+  v_done:=v->>'status'=
+    'FINAL_LOOP_PARENT_AND_UNIVERSE_INDEPENDENT_READBACK_SETTLED' AND
+   v->>'independent_database_readback'='true' AND
+   v->>'original_job_completed'='true' AND
+   v->>'universe_reconciled'='true';
+  v_count:=v_count+1;
+  IF v_done THEN v_verified:=v_verified+1;END IF;
+  v_entries:=v_entries||pg_catalog.jsonb_build_array(
+   pg_catalog.jsonb_build_object(
+    'original_work_id',d.parent_original_work_id,
+    'source_ref',d.source_ref,
+    'source_manifest_sha256',d.source_manifest_sha256,
+    'status',CASE WHEN v_done
+     THEN 'INDEPENDENTLY_SETTLED_UNIVERSE_PAST'
+     ELSE 'PARENT_DELIVERY_UNFINISHED_PRESENT' END,
+    'delivery_phase',d.status,
+    'original_job_completed',v_done,
+    'independent_universe_verified',v_done,
+    'verified_provider_comment_url',
+      CASE WHEN v_done THEN v->>'verified_provider_comment_url'
+       ELSE null END,
+    'verified_universe_outcome_event_id',
+      CASE WHEN v_done THEN v->>'verified_universe_outcome_event_id'
+       ELSE null END,
+    'parent_settlement_receipt_id',
+      CASE WHEN v_done THEN v->>'parent_settlement_receipt_id'
+       ELSE null END));
+ END LOOP;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY',
+  'owner_id',p_owner_id,'shift_id',p_shift_id,
+  'read_only',true,'owner_scope_verified',true,
+  'outcomes',v_entries,'parent_delivery_count',v_count,
+  'verified_parent_count',v_verified,
+  'unfinished_parent_count',v_count-v_verified,
+  'execution_authorized',false,'shift_completed_by_read',false);
+END $fn$;
+REVOKE ALL ON FUNCTION
+ public.reality_read_owner_final_loop_parent_outcomes_v1(uuid,uuid)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION
+ public.reality_read_owner_final_loop_parent_outcomes_v1(uuid,uuid)
+ TO service_role;
