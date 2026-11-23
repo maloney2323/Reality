@@ -143,3 +143,14 @@ test('owner and Chat use one optional authenticated Universe feedback projection
  assert.match(chat,/feedback\.shift_id===verifiedOwnerShift\?\.active_owner_shift_id/);
  assert.doesNotMatch(chat,/reality_record_final_loop_parent_settlement_v1/);
 });
+
+
+test('worker reuses canonical Universe readback without calling any independent authority adapter',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/projectFinalLoopUniverseFeedback/);
+ assert.match(worker,/reality_read_owner_final_loop_parent_outcomes_v1/);
+ assert.match(worker,/final_loop_universe_feedback:finalLoopUniverseFeedback/);
+ assert.match(worker,/REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED/);
+ assert.match(worker,/FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE/);
+});
