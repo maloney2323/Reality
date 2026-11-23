@@ -212,6 +212,31 @@
    executive.textContent=
     'Executive briefing · Final Loop owner proof view not yet verified. Existing Past, Present and Future remain read-only.';
   }
+  // Genuine parent outcomes are projected independently from the same
+  // signed Universe + native original receipt, NEVER from a model verdict.
+  const outcomes=data.final_loop_parent_outcomes;
+  const verified=outcomes?.status===
+   'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ'&&
+   outcomes.owner_scope_verified===true&&outcomes.read_only===true&&
+   outcomes.execution_authorized===false&&
+   Array.isArray(outcomes.outcomes)&&outcomes.outcomes.length<=16&&
+   Number.isSafeInteger(outcomes.verified_parent_count)&&
+   Number.isSafeInteger(outcomes.unfinished_parent_count)&&
+   outcomes.verified_parent_count+outcomes.unfinished_parent_count===
+    outcomes.outcomes.length&&
+   outcomes.outcomes.every(x=>x.independent_universe_verified===
+    x.original_job_completed&&
+    (x.original_job_completed?
+     x.status==='INDEPENDENTLY_SETTLED_UNIVERSE_PAST':
+     x.status==='PARENT_DELIVERY_UNFINISHED_PRESENT'));
+  if(verified&&outcomes.outcomes.length){
+   executive.textContent+=' Final Loop verified return: '+
+    outcomes.verified_parent_count+
+    ' original(s) independently settled in Universe (Past); '+
+    outcomes.unfinished_parent_count+
+    ' parent deliverable(s) still open (Present). '+
+    'No predicted Future work is automatically authorized.';
+  }
   return true;
  }
  async function load(){
