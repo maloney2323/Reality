@@ -17,6 +17,9 @@ on:
       - 'test/reality-signed-worker-operating-lane-v1.test.js'
       - 'src/reality-signed-worker-capability-delivery-v1.js'
       - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
+      - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
+      - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
       - 'test/reality-governed-signed-worker-release-switch-trigger-v1.test.js'
       - 'test/reality-signed-worker-capability-delivery-v1.test.js'
       - 'test/reality-final-loop-staged-plan-action-router-v1.test.js'
@@ -73,6 +76,9 @@ on:
       - 'test/reality-signed-worker-operating-lane-v1.test.js'
       - 'src/reality-signed-worker-capability-delivery-v1.js'
       - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
+      - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
+      - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
       - 'test/reality-governed-signed-worker-release-switch-trigger-v1.test.js'
       - 'test/reality-signed-worker-capability-delivery-v1.test.js'
       - 'test/reality-final-loop-staged-plan-action-router-v1.test.js'
@@ -139,6 +145,8 @@ jobs:
           node --check src/reality-signed-worker-operating-lane-v1.js
           node --check src/reality-signed-worker-capability-delivery-v1.js
           node --check src/reality-governed-signed-worker-release-switch-trigger-v1.js
+          node --check src/reality-governed-signed-worker-control-plane-adapters-v1.js
+          node --check test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
           node --check test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
           node --check test/reality-signed-worker-operating-lane-v1.test.js
           node --check test/reality-signed-worker-capability-delivery-v1.test.js
@@ -179,6 +187,7 @@ jobs:
           node --test test/reality-signed-worker-operating-lane-v1.test.js
           node --test test/reality-signed-worker-capability-delivery-v1.test.js
           node --test test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
+          node --test test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
           node --test test/reality-final-loop-child-transactional-v1.test.js
           node --test test/reality-final-loop-parent-integration-v1.test.js
           node --test test/reality-final-loop-parent-delivery-v1.test.js
