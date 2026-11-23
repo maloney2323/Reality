@@ -176,6 +176,49 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
    'USE_EXISTING_EXACT_CLAIM_AND_FULL_PATCH_PREFLIGHT_ONLY_AFTER_OWNER_PROOF'
  });
 }
+// Only suppress a redundant pre-provider claim if every active signed PR
+// original has CURRENT provider evidence that it is incompatible and every
+// original is pre-provider BLOCKED or not admitted. Never fence PREPARED or
+// PUBLISHING: those must retain the provider-effect reconciliation path.
+export function shouldFenceRileyPrClaimForObservedIncompatibility({
+ graph,inspection
+}={}){
+ if(inspection?.status!=='SIGNED_PR_SOURCE_COMPATIBILITY_OBSERVED_READ_ONLY'||
+    inspection.read_only!==true||
+    inspection.worker_claim_consumed!==false||
+    inspection.original_job_completed!==false||
+    inspection.owner_id!==graph?.owner_id||
+    inspection.shift_id!==graph?.shift_id||
+    !Array.isArray(graph?.jobs)||
+    !Array.isArray(inspection.source_diagnostics)||
+    inspection.source_diagnostics.length===0||
+    inspection.source_diagnostics.length>4)
+  return false;
+ const exact=graph.jobs.filter(j=>
+  j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+  j.independent_source_proof_verified===true&&
+  j.phase!=='SETTLED');
+ if(exact.length!==inspection.source_diagnostics.length)return false;
+ const seen=new Set();
+ return exact.every(j=>{
+  if(!['BLOCKED','NOT_ADMITTED'].includes(j.phase)||
+     seen.has(j.source_ref))return false;
+  seen.add(j.source_ref);
+  return inspection.source_diagnostics.filter(d=>
+   d.source_ref===j.source_ref&&
+   d.original_work_id===(j.original_work_id??null)&&
+   d.native_phase===j.phase&&
+   d.native_next_governed_action===j.next_governed_action&&
+   d.current_provider_metadata_read===true&&
+   Array.isArray(d.eligibility_blockers)&&
+   d.eligibility_blockers.some(b=>[
+    'DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR',
+    'CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW'
+   ].includes(b))&&
+   d.existing_executor_can_start_from_this_observation===false
+  ).length===1;
+ });
+}
 async function sourceDetails(c,{fetchImpl,token}){
  const id=Number(SOURCE.exec(c.source_ref)[1]);
  const [pr,files]=await Promise.all([
