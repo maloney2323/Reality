@@ -12,6 +12,12 @@ on:
       - 'src/reality-riley-authorized-pr-review-job-v1.js'
       - 'src/reality-pr-large-source-qualification-v1.js'
       - 'src/reality-final-loop-pr-source-handoff-v1.js'
+      - 'src/reality-final-loop-child-review-worker-v1.js'
+      - 'src/reality-final-loop-child-approval-request-v1.js'
+      - 'api/reality/owner-final-loop-child-approval.js'
+      - 'sql/reality-final-loop-child-transactional-v1.sql'
+      - 'test/reality-final-loop-child-transactional-v1.test.js'
+      - 'src/reality-governed-openai-gateway-v1.js'
       - 'sql/reality-final-loop-pr-source-plans-v1.sql'
       - 'test/reality-final-loop-pr-source-handoff-v1.test.js'
       - 'src/reality-final-loop-signed-worker-bridge-v1.js'
@@ -41,6 +47,12 @@ on:
       - 'src/reality-riley-authorized-pr-review-job-v1.js'
       - 'src/reality-pr-large-source-qualification-v1.js'
       - 'src/reality-final-loop-pr-source-handoff-v1.js'
+      - 'src/reality-final-loop-child-review-worker-v1.js'
+      - 'src/reality-final-loop-child-approval-request-v1.js'
+      - 'api/reality/owner-final-loop-child-approval.js'
+      - 'sql/reality-final-loop-child-transactional-v1.sql'
+      - 'test/reality-final-loop-child-transactional-v1.test.js'
+      - 'src/reality-governed-openai-gateway-v1.js'
       - 'sql/reality-final-loop-pr-source-plans-v1.sql'
       - 'test/reality-final-loop-pr-source-handoff-v1.test.js'
       - 'src/reality-final-loop-signed-worker-bridge-v1.js'
@@ -81,6 +93,11 @@ jobs:
           node --check src/reality-riley-authorized-pr-review-job-v1.js
           node --check src/reality-pr-large-source-qualification-v1.js
           node --check src/reality-final-loop-pr-source-handoff-v1.js
+          node --check src/reality-final-loop-child-review-worker-v1.js
+          node --check src/reality-final-loop-child-approval-request-v1.js
+          node --check api/reality/owner-final-loop-child-approval.js
+          node --check src/reality-governed-openai-gateway-v1.js
+          node --check test/reality-final-loop-child-transactional-v1.test.js
           node --check test/reality-final-loop-pr-source-handoff-v1.test.js
           node --check src/reality-final-loop-signed-worker-bridge-v1.js
           node --check src/reality-governed-shift-boundary-v1.js
@@ -101,6 +118,7 @@ jobs:
           node --test test/reality-final-loop-cross-surface-continuity-v1.test.js
           node --test test/reality-pr-source-readiness-final-loop-v1.test.js
           node --test test/reality-final-loop-pr-source-handoff-v1.test.js
+          node --test test/reality-final-loop-child-transactional-v1.test.js
           node --test test/reality-past-present-future-time-map-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-final-loop-db-contract-v1.test.js
