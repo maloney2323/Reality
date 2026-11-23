@@ -678,7 +678,8 @@ CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_recovery_v1(
  p_shift_id uuid,p_plan_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
 DECLARE v_plan record;v_packet record;v_children jsonb;v_count integer;
- v_capacity boolean;v_scope_count integer;
+ v_capacity boolean:=false;v_run_count integer:=0;
+ v_capacity_receipt text;
 BEGIN
  IF current_user<>'service_role' THEN
   RAISE EXCEPTION 'FINAL_LOOP_CHILD_RECOVERY_SERVICE_ONLY'; END IF;
@@ -730,11 +731,30 @@ BEGIN
   RETURN pg_catalog.jsonb_build_object(
    'status','FINAL_LOOP_CHILDREN_NOT_ATOMICALLY_ADMITTED',
    'independent_service_readback_verified',false);END IF;
- v_capacity:=NOT EXISTS(
+ -- Capacity is witnessed by actual separate signed worker records,
+ -- not inferred from an owner approval receipt or proposed scope count.
+ SELECT count(*) INTO v_run_count FROM
+  reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.plan_id=v_plan.plan_id AND c.claimant_worker_run_id IS NOT NULL;
+ v_capacity:=v_run_count=v_plan.proposed_scope_count AND NOT EXISTS(
   SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 c
-  WHERE c.plan_id=v_plan.plan_id AND c.claimant_worker_run_id IS NOT NULL
-   AND NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
-    WHERE r.run_id=c.claimant_worker_run_id AND r.started_at IS NOT NULL));
+  WHERE c.plan_id=v_plan.plan_id AND
+   (NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+     WHERE r.run_id=c.claimant_worker_run_id AND r.started_at IS NOT NULL)
+    OR (c.phase='INDEPENDENTLY_VERIFIED' AND
+      (c.independent_verifier_run_id=c.claimant_worker_run_id OR
+       NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 vr
+        WHERE vr.run_id=c.independent_verifier_run_id
+         AND vr.started_at IS NOT NULL)))));
+ SELECT CASE WHEN v_capacity THEN
+  'sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+   pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+    'scope_index',c.scope_index,'run_id',c.claimant_worker_run_id,
+    'verifier_run_id',c.independent_verifier_run_id,
+    'phase',c.phase) ORDER BY c.scope_index)::text,'UTF8')),'hex')
+  ELSE null END INTO v_capacity_receipt
+ FROM reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.plan_id=v_plan.plan_id;
  RETURN pg_catalog.jsonb_build_object(
   'schema','reality-final-loop-independent-child-readback-v1',
   'status','FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT',
@@ -756,7 +776,7 @@ BEGIN
   'capacity',pg_catalog.jsonb_build_object(
    'independently_attested',v_capacity,
    'scheduled_worker_observed',v_capacity,
-   'receipt_sha256',v_packet.owner_approval_receipt_sha256),
+   'receipt_sha256',v_capacity_receipt),
   'provider_effect_uncertain',EXISTS(SELECT 1 FROM
    reality_internal.final_loop_child_review_work_v1 c
    WHERE c.plan_id=v_plan.plan_id AND c.phase='EFFECT_UNCERTAIN'),
