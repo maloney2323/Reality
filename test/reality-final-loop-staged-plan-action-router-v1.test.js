@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {classifySignedFinalLoopStagedPlanActions as classify}
+import {classifySignedFinalLoopStagedPlanActions as classify,
+ reconcileReviewedRecoveryToFinalLoopSource as reconcile,
+ inspectFinalLoopRecoveryContinuation as inspect}
  from '../src/reality-final-loop-staged-plan-action-router-v1.js';
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -106,4 +108,110 @@ test('existing signed worker must publish route and keep child execution distinc
  assert.match(approval,/REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED/);
  assert.match(approval,/REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED/);
  assert.match(worker,/REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED/);
+});
+
+
+// The reviewed recovery exists in the same canonical shift. Its original
+// investigation has no source_claim_id, so an eligible proposal must not be
+// misrepresented as a proven causal link or an execution authorization.
+const reviewedIncident='33333333-3333-4333-8333-333333333333';
+const classification={
+ schema:'reality-governed-continuity-recovery-handoff-v1',
+ status:'GOVERNED_RECOVERY_DURABLE_HANDOFFS_CLASSIFIED',
+ owner_id:owner,shift_id:shift,classification_only:true,
+ action_dispatched:false,
+ items:[{incident_id:reviewedIncident,shift_id:shift,
+  continuity_state:'GOVERNED_ACTION_INDEPENDENTLY_REVIEWED_ORIGINAL_UNSETTLED',
+  independent_action_review_receipt_sha256:hash('a'),
+  original_job_completed:false,execution_permitted_by_classification:false}]
+};
+const recoveryRouting={
+ schema:'reality-categorized-continuity-registered-action-route-v1',
+ status:'CONTINUITY_REGISTERED_ACTION_ROUTES_CLASSIFIED',
+ owner_id:owner,shift_id:shift,action_dispatched:false,
+ items:[{incident_id:reviewedIncident,shift_id:shift,
+  route:'EXACT_ORIGINAL_REENTRY_GATE_REQUIRED',
+  investigation_receipt_sha256:hash('b'),
+  execution_authorized:false,action_executed:false,
+  original_job_completed:false}]
+};
+const operatingLane={
+ status:'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED',
+ operating_lane:'NORMAL_SIGNED_SHIFT'
+};
+const candidate=()=>reconcile({
+ graph,stagedActions:classify({graph,staged,preflight}),
+ continuityClassification:classification,registeredRouting:recoveryRouting
+});
+test('independently reviewed recovery joins one canonical original and owner packet candidate, without granting causal proof',()=>{
+ const c=candidate();
+ assert.equal(c.status,
+  'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE');
+ assert.equal(c.incident_id,reviewedIncident);
+ assert.equal(c.original_work_id,work);
+ assert.equal(c.source_ref,admitted.source_ref);
+ assert.equal(c.incident_causal_lineage_independently_verified,false);
+ assert.equal(c.original_source_and_goal_verified_for_owner_proposal,true);
+ assert.equal(c.action_dispatched,false);
+ assert.equal(c.execution_authorized,false);
+ assert.equal(c.recovery_verified,false);
+});
+test('missing independent review or stale source/owner fails closed',()=>{
+ const cases=[
+  {continuityClassification:{...classification,items:[{
+   ...classification.items[0],independent_action_review_receipt_sha256:null}]}},
+  {registeredRouting:{...recoveryRouting,owner_id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'}},
+  {stagedActions:classify({...{graph,staged,preflight},
+   staged:{...staged,plans:[{...admitted,source_head_sha:'0'},unadmitted]}})}
+ ];
+ for(const c of cases){
+  const r=reconcile({graph,
+   stagedActions:classify({graph,staged,preflight}),
+   continuityClassification:classification,
+   registeredRouting:recoveryRouting,...c});
+  assert.notEqual(r.status,
+   'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE');
+  assert.equal(r.action_dispatched,false);
+  assert.equal(r.original_job_completed,false);
+ }
+});
+test('staging-only release cannot report owner-packet dispatch',()=>{
+ const result=inspect({candidate:candidate(),
+  operatingLane:{status:'SOURCE_STAGING_ONLY_NOT_NORMAL_SCHEDULED_WORKER',
+   operating_lane:'STAGING_ONLY'}});
+ assert.equal(result.status,
+  'FINAL_LOOP_REENTRY_BLOCKED_WORKER_RELEASE_OR_ISOLATION');
+ assert.equal(result.recovery_verified,false);
+ assert.equal(result.original_job_completed,false);
+});
+test('real packet acknowledgement is a pending owner action, not recovery or settlement',()=>{
+ const c=candidate();
+ const p=inspect({candidate:c,operatingLane,
+  approvalRequest:{
+   status:'FINAL_LOOP_CHILD_APPROVAL_GATED_BY_EXACT_OWNER_ACTION',
+   owner_id:owner,shift_id:shift,
+   approvals:[{plan_id:admitted.plan_id,source_ref:admitted.source_ref,
+    status:'FINAL_LOOP_CHILD_EXACT_OWNER_APPROVAL_REQUIRED',
+    packet_id:'44444444-4444-4444-8444-444444444444',
+    proposal_fingerprint:hash('a')}]}
+ });
+ assert.equal(p.status,
+  'FINAL_LOOP_EXACT_OWNER_APPROVAL_PACKET_DURABLY_PREPARED');
+ assert.equal(p.handler_dispatched,true);
+ assert.equal(p.handler_result_verified,true);
+ assert.equal(p.recovery_verified,false);
+ assert.equal(p.original_job_completed,false);
+ const missing=inspect({candidate:c,operatingLane,approvalRequest:{
+  status:'FINAL_LOOP_CHILD_APPROVAL_GATED_BY_EXACT_OWNER_ACTION',
+  owner_id:owner,shift_id:shift,approvals:[]}});
+ assert.equal(missing.status,
+  'FINAL_LOOP_REGISTERED_OWNER_PACKET_HANDLER_NOT_VERIFIED');
+ assert.equal(missing.handler_dispatched,false);
+});
+test('signed worker publishes recovery-to-source disposition separately from outcome receipts',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/reconcileReviewedRecoveryToFinalLoopSource/);
+ assert.match(worker,/inspectFinalLoopRecoveryContinuation/);
+ assert.match(worker,/final_loop_recovery_continuation:/);
 });
