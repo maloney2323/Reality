@@ -226,6 +226,73 @@ export async function readOwnerTimeHorizonEvidence({
     };
    }
   }
+  // Separately verified native+Universe parent settlement becomes Past
+  // evidence. Pending parent delivery remains Present, never invented Past.
+  let finalLoopParentOutcomes={
+   status:'FINAL_LOOP_PARENT_OUTCOME_OWNER_VIEW_NOT_ENABLED',
+   owner_scope_verified:false,read_only:true,outcomes:[],
+   parent_delivery_count:null,verified_parent_count:null,
+   unfinished_parent_count:null,execution_authorized:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_PARENT_OUTCOME_OWNER_VIEW_ENABLED==='true'&&
+     checks[1].status==='fulfilled'){
+   try{
+    const shifts=assertShiftReadback(checks[1].value).shifts;
+    const active=shifts.filter(v=>shiftStillActive(v,now));
+    if(active.length===1){
+     const r=await call(db,
+      'reality_read_owner_final_loop_parent_outcomes_v1',{
+       p_owner_id:ownerId,p_shift_id:active[0].shift_id
+      },{timeoutMs:6000});
+     const items=r?.outcomes;
+     const valid=r?.status==='FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY'&&
+      r.owner_id===ownerId&&r.shift_id===active[0].shift_id&&
+      r.owner_scope_verified===true&&r.read_only===true&&
+      r.execution_authorized===false&&r.shift_completed_by_read===false&&
+      Array.isArray(items)&&items.length<=16&&
+      Number.isSafeInteger(r.parent_delivery_count)&&
+      r.parent_delivery_count===items.length&&
+      Number.isSafeInteger(r.verified_parent_count)&&
+      Number.isSafeInteger(r.unfinished_parent_count)&&
+      r.verified_parent_count+r.unfinished_parent_count===items.length&&
+      r.verified_parent_count===
+       items.filter(x=>x.original_job_completed===true).length&&
+      items.every(x=>
+       WORK.test(x.original_work_id||'')&&
+       /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(
+        x.source_ref||'')&&
+       SHA.test(x.source_manifest_sha256||'')&&
+       typeof x.independent_universe_verified==='boolean'&&
+       x.independent_universe_verified===x.original_job_completed&&
+       (x.original_job_completed?
+        x.status==='INDEPENDENTLY_SETTLED_UNIVERSE_PAST'&&
+        /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*#issuecomment-[1-9]\d*$/.test(
+         x.verified_provider_comment_url||'')&&
+        UUID.test(x.verified_universe_outcome_event_id||'')&&
+        UUID.test(x.parent_settlement_receipt_id||''):
+        x.status==='PARENT_DELIVERY_UNFINISHED_PRESENT'&&
+        x.verified_provider_comment_url==null&&
+        x.verified_universe_outcome_event_id==null));
+     if(valid)finalLoopParentOutcomes={
+      status:'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ',
+      owner_id:ownerId,shift_id:r.shift_id,
+      owner_scope_verified:true,read_only:true,
+      outcomes:items,parent_delivery_count:r.parent_delivery_count,
+      verified_parent_count:r.verified_parent_count,
+      unfinished_parent_count:r.unfinished_parent_count,
+      execution_authorized:false
+     };
+    }
+   }catch{
+    finalLoopParentOutcomes={
+     status:'FINAL_LOOP_PARENT_OUTCOME_PROOF_NOT_INSTALLED_OR_UNAVAILABLE',
+     owner_scope_verified:false,read_only:true,outcomes:[],
+     parent_delivery_count:null,verified_parent_count:null,
+     unfinished_parent_count:null,execution_authorized:false
+    };
+   }
+  }
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -237,6 +304,7 @@ export async function readOwnerTimeHorizonEvidence({
    future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
    final_loop_owner:finalLoopOwner,
    final_loop_source_plans:finalLoopSourcePlans,
+   final_loop_parent_outcomes:finalLoopParentOutcomes,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null
