@@ -84,7 +84,7 @@ BEGIN
    v_source_sha,repeat('f',40),
    approved->>'acceptance_contract_sha256',
    'INDEPENDENTLY_VERIFIED',v_runs[1+v_i*2],v_runs[2+v_i*2],
-   'resp_synthetic'+v_i::text,
+   'resp_synthetic'||v_i::text,
    repeat('Source-backed changes, verified controls and integration tests. ',12),
    'sha256:'||repeat('6',64),
    'sha256:'||repeat((v_i+3)::text,64),
