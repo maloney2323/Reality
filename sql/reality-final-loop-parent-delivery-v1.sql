@@ -314,3 +314,249 @@ BEGIN
   'publication_authorized',false,'original_job_completed',false,
   'production_changed',false);
 END $fn$;
+
+
+-- Authenticated owner Chat reads the same underlying durable parent packet.
+CREATE OR REPLACE FUNCTION public.reality_read_owner_final_loop_parent_deliveries_v1(
+ p_owner_id uuid,p_shift_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_packets jsonb;
+BEGIN
+ IF current_user<>'service_role' OR p_owner_id IS NULL OR
+  p_shift_id IS NULL THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_OWNER_SCOPE_SERVICE_ONLY';END IF;
+ SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'delivery_id',d.delivery_id,
+  'parent_original_work_id',d.parent_original_work_id,
+  'source_ref',d.source_ref,'source_head_sha',d.source_head_sha,
+  'source_manifest_sha256',d.source_manifest_sha256,
+  'acceptance_contract_sha256',d.acceptance_contract_sha256,
+  'delivery_body_sha256',d.delivery_body_sha256,
+  'proposal_fingerprint',d.proposal_fingerprint,
+  'delivery_preview',pg_catalog.left(d.delivery_body,1500),
+  'cross_scope_receipt_sha256',d.cross_scope_receipt_sha256,
+  'status',d.status,
+  'publication_approved',d.status<>'AWAITING_EXACT_PUBLICATION_APPROVAL',
+  'original_job_completed',d.status='SETTLED'
+ ) ORDER BY d.prepared_at),'[]'::jsonb) INTO v_packets
+ FROM reality_internal.final_loop_parent_deliveries_v1 d
+ JOIN reality_internal.governed_employee_shifts_v1 s
+  ON s.shift_id=d.shift_id AND s.owner_id=d.owner_id
+ WHERE d.owner_id=p_owner_id AND d.shift_id=p_shift_id
+  AND s.authorized_at IS NOT NULL;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_OWNER_PARENT_DELIVERY_PACKET_READ_ONLY',
+  'owner_id',p_owner_id,'shift_id',p_shift_id,
+  'deliveries',v_packets,'read_only',true,'publication_authorized',false);
+END $fn$;
+
+-- A SECOND exact owner action is needed for this external GitHub effect.
+-- The first approval only allowed read-only internal work and goal acceptance.
+CREATE OR REPLACE FUNCTION public.reality_owner_approve_final_loop_parent_delivery_v1(
+ p_owner_id uuid,p_delivery_id uuid,p_fingerprint text,
+ p_review_body_sha256 text,p_request_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE d record;p record;a record;r record;v_receipt text;v_recovery jsonb;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_PUBLISH_OWNER_SERVICE_ONLY';END IF;
+ IF p_owner_id IS NULL OR p_delivery_id IS NULL OR p_request_id IS NULL OR
+  coalesce(p_fingerprint,'') !~ '^sha256:[a-f0-9]{64}$' OR
+  coalesce(p_review_body_sha256,'') !~ '^sha256:[a-f0-9]{64}$'
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_PUBLISH_APPROVAL_INVALID_INPUT',
+  'publication_approved',false,'original_job_completed',false);END IF;
+ SELECT * INTO d FROM reality_internal.final_loop_parent_deliveries_v1
+ WHERE delivery_id=p_delivery_id FOR UPDATE;
+ SELECT * INTO p FROM reality_internal.final_loop_pr_source_plans_v1
+ WHERE plan_id=d.plan_id;
+ SELECT * INTO a FROM reality_internal.final_loop_child_approval_packets_v1
+ WHERE packet_id=d.packet_id;
+ SELECT * INTO r FROM reality_internal.riley_pr_review_originals_v1
+ WHERE original_work_id=d.parent_original_work_id
+  AND owner_id=d.owner_id AND shift_id=d.shift_id
+  AND source_ref=d.source_ref AND phase='BLOCKED'
+  AND review_body IS NULL AND provider_comment_id IS NULL
+  AND settlement_receipt_id IS NULL;
+ IF d.delivery_id IS NULL OR d.owner_id<>p_owner_id OR
+  d.status<>'AWAITING_EXACT_PUBLICATION_APPROVAL' OR
+  d.proposal_fingerprint<>p_fingerprint OR
+  d.delivery_body_sha256<>p_review_body_sha256 OR
+  d.owner_publication_receipt_sha256 IS NOT NULL OR
+  a.state<>'EFFECT_RESERVED_RECONCILE_ONLY' OR
+  a.owner_approval_receipt_sha256 IS NULL OR
+  r.original_work_id IS NULL OR
+  p.source_head_sha<>d.source_head_sha OR
+  p.source_manifest_sha256<>d.source_manifest_sha256 OR
+  p.parent_original_work_id<>d.parent_original_work_id OR
+  a.acceptance_contract_sha256 IS DISTINCT FROM
+   reality_internal.final_loop_pr_review_acceptance_digest_v1(p.plan_id) OR
+  NOT EXISTS(SELECT 1 FROM public.universe_events e
+   WHERE e.event_id=d.universe_goal_event_id
+    AND e.continuity_root_id=d.shift_id AND e.worldline_id=d.plan_id
+    AND e.event_kind='WORK' AND e.epistemic_status='VERIFIED'
+    AND e.payload->>'original_work_id'=d.parent_original_work_id
+    AND e.payload->>'goal_accepted'='true')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_PUBLISH_APPROVAL_SCOPE_STALE',
+  'publication_approved',false,'original_job_completed',false);END IF;
+ v_recovery:=public.reality_read_final_loop_child_recovery_v1(d.shift_id,d.plan_id);
+ IF v_recovery->'cross_scope'->>'receipt_sha256'<>
+   d.cross_scope_receipt_sha256 OR
+   v_recovery->'cross_scope'->>'independently_verified'<>'true' OR
+   v_recovery->>'provider_effect_uncertain'<>'false'
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_PUBLISH_CHILD_INTEGRATION_DRIFT',
+  'publication_approved',false,'original_job_completed',false);END IF;
+ v_receipt:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+  pg_catalog.convert_to(pg_catalog.jsonb_build_object(
+   'owner_id',p_owner_id,'delivery_id',d.delivery_id,
+   'original_work_id',d.parent_original_work_id,
+   'source_head_sha',d.source_head_sha,
+   'source_manifest_sha256',d.source_manifest_sha256,
+   'delivery_body_sha256',d.delivery_body_sha256,
+   'cross_scope_receipt_sha256',d.cross_scope_receipt_sha256,
+   'request_id',p_request_id,'effect','GITHUB_PR_REVIEW_COMMENT_ONCE')::text,
+   'UTF8')),'hex');
+ UPDATE reality_internal.final_loop_parent_deliveries_v1
+ SET status='APPROVED_ONCE',
+  owner_publication_approval_request_id=p_request_id,
+  owner_publication_receipt_sha256=v_receipt,
+  owner_approved_at=pg_catalog.clock_timestamp()
+ WHERE delivery_id=d.delivery_id AND status='AWAITING_EXACT_PUBLICATION_APPROVAL';
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_EXACT_PARENT_GITHUB_PUBLICATION_OWNER_APPROVED_ONCE',
+  'delivery_id',d.delivery_id,'owner_id',p_owner_id,
+  'parent_original_work_id',d.parent_original_work_id,
+  'source_ref',d.source_ref,
+  'source_head_sha',d.source_head_sha,
+  'delivery_body_sha256',d.delivery_body_sha256,
+  'publication_approval_receipt_sha256',v_receipt,
+  'publication_approved',true,
+  'publication_effect_reserved',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+
+-- Exactly one durable claim before external POST. From this point on,
+-- failed/unknown provider effects are READBACK ONLY; no second POST.
+CREATE OR REPLACE FUNCTION public.reality_claim_final_loop_parent_publish_v1(
+ p_shift_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE d record;p record;v_rec jsonb;v_claim uuid;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_PUBLISH_SERVICE_ONLY';END IF;
+ IF p_shift_id IS NULL OR p_worker_run_id IS NULL OR NOT EXISTS(
+  SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+  WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+   AND r.finished_at IS NULL
+   AND r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_PUBLISH_SIGNED_WORKER_REQUIRED',
+  'publication_effect_reserved',false,'original_job_completed',false);END IF;
+ SELECT * INTO d FROM reality_internal.final_loop_parent_deliveries_v1
+ WHERE shift_id=p_shift_id AND status='APPROVED_ONCE'
+  AND owner_publication_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
+  AND publication_claim_id IS NULL AND publisher_worker_run_id IS NULL
+  AND EXISTS(SELECT 1 FROM reality_internal.governed_employee_shifts_v1 s
+   JOIN reality_internal.governed_employee_completion_warrants_v1 w
+    ON w.shift_id=s.shift_id AND w.owner_id=s.owner_id
+    AND w.plan_fingerprint=s.plan_fingerprint
+   WHERE s.shift_id=p_shift_id AND s.owner_id=
+    reality_internal.final_loop_parent_deliveries_v1.owner_id
+    AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL
+    AND s.planned_end_at='infinity'::timestamptz AND w.state='ACTIVE')
+ ORDER BY owner_approved_at,delivery_id LIMIT 1 FOR UPDATE SKIP LOCKED;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_NO_EXACT_PARENT_PUBLICATION_APPROVED',
+  'publication_effect_reserved',false,'original_job_completed',false);END IF;
+ SELECT * INTO p FROM reality_internal.final_loop_pr_source_plans_v1
+ WHERE plan_id=d.plan_id AND owner_id=d.owner_id AND shift_id=d.shift_id
+  AND parent_original_work_id=d.parent_original_work_id
+  AND source_head_sha=d.source_head_sha
+  AND source_manifest_sha256=d.source_manifest_sha256;
+ v_rec:=public.reality_read_final_loop_child_recovery_v1(d.shift_id,d.plan_id);
+ IF p.plan_id IS NULL OR
+  v_rec->'cross_scope'->>'receipt_sha256'<>
+    d.cross_scope_receipt_sha256 OR
+  v_rec->'cross_scope'->>'independently_verified'<>'true' OR
+  v_rec->>'provider_effect_uncertain'<>'false' OR
+  NOT EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
+   WHERE r.original_work_id=d.parent_original_work_id
+    AND r.shift_id=d.shift_id AND r.owner_id=d.owner_id
+    AND r.phase='BLOCKED' AND r.provider_comment_id IS NULL
+    AND r.settlement_receipt_id IS NULL)
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_PUBLICATION_CURRENT_PROOFS_MISSING',
+  'publication_effect_reserved',false,'original_job_completed',false);END IF;
+ v_claim:=pg_catalog.gen_random_uuid();
+ UPDATE reality_internal.final_loop_parent_deliveries_v1
+ SET status='POST_RESERVED_RECONCILE_ONLY',
+  publication_claim_id=v_claim,
+  publisher_worker_run_id=p_worker_run_id,
+  publication_reserved_at=pg_catalog.clock_timestamp()
+ WHERE delivery_id=d.delivery_id AND status='APPROVED_ONCE';
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_GITHUB_WRITE_RESERVED_ONCE',
+  'delivery_id',d.delivery_id,'claim_id',v_claim,
+  'owner_id',d.owner_id,'shift_id',d.shift_id,
+  'publisher_worker_run_id',p_worker_run_id,
+  'parent_original_work_id',d.parent_original_work_id,
+  'source_ref',d.source_ref,'source_head_sha',d.source_head_sha,
+  'source_manifest_sha256',d.source_manifest_sha256,
+  'delivery_body',d.delivery_body,
+  'delivery_body_sha256',d.delivery_body_sha256,
+  'approval_receipt_sha256',d.owner_publication_receipt_sha256,
+  'publication_effect_reserved',true,'external_effect_performed',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+
+-- A DIFFERENT signed worker performs the provider readback; the publisher
+-- can never self-verify a GitHub comment or a Universe settlement receipt.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_parent_publish_verify_v1(
+ p_shift_id uuid,p_verifier_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE d record;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_PROVIDER_VERIFIER_SERVICE_ONLY';END IF;
+ IF p_shift_id IS NULL OR p_verifier_worker_run_id IS NULL OR NOT EXISTS(
+  SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+  WHERE r.run_id=p_verifier_worker_run_id AND r.status='STARTED'
+   AND r.finished_at IS NULL
+   AND r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_PROVIDER_SIGNED_VERIFIER_REQUIRED',
+  'read_only',true,'original_job_completed',false);END IF;
+ SELECT * INTO d FROM reality_internal.final_loop_parent_deliveries_v1
+ WHERE shift_id=p_shift_id AND status='POST_RESERVED_RECONCILE_ONLY'
+  AND publisher_worker_run_id IS NOT NULL
+  AND publisher_worker_run_id<>p_verifier_worker_run_id
+  AND publication_claim_id IS NOT NULL
+  AND owner_publication_receipt_sha256 IS NOT NULL
+  AND EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
+   WHERE r.original_work_id=
+    reality_internal.final_loop_parent_deliveries_v1.parent_original_work_id
+    AND r.shift_id=p_shift_id
+    AND r.phase='BLOCKED' AND r.provider_comment_id IS NULL
+    AND r.settlement_receipt_id IS NULL)
+ ORDER BY publication_reserved_at LIMIT 1;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_NO_PENDING_INDEPENDENT_PROVIDER_READBACK',
+  'read_only',true,'original_job_completed',false);END IF;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_GITHUB_EFFECT_UNCERTAIN_READBACK_ONLY',
+  'delivery_id',d.delivery_id,'publication_claim_id',d.publication_claim_id,
+  'owner_id',d.owner_id,'shift_id',d.shift_id,
+  'parent_original_work_id',d.parent_original_work_id,
+  'source_ref',d.source_ref,'source_head_sha',d.source_head_sha,
+  'source_manifest_sha256',d.source_manifest_sha256,
+  'delivery_body',d.delivery_body,
+  'delivery_body_sha256',d.delivery_body_sha256,
+  'owner_publication_receipt_sha256',d.owner_publication_receipt_sha256,
+  'publisher_worker_run_id',d.publisher_worker_run_id,
+  'verifier_worker_run_id',p_verifier_worker_run_id,
+  'publication_reserved_at',d.publication_reserved_at,
+  'read_only',true,'post_retry_authorized',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
