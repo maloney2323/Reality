@@ -489,3 +489,303 @@ BEGIN
   'review_prepared',true,'independent_verification_required',true,
   'original_job_completed',false,'production_changed',false);
 END $fn$;
+
+
+-- A different, actually started worker must perform fresh provider reads.
+-- This endpoint reads a prepared child but never publishes/retries the model.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_verify_v1(
+ p_shift_id uuid,p_verifier_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_child record;v_plan record;v_scope jsonb;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_VERIFY_SERVICE_ONLY'; END IF;
+ IF p_shift_id IS NULL OR p_verifier_run_id IS NULL OR
+  NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+   WHERE r.run_id=p_verifier_run_id AND r.status='STARTED'
+    AND r.finished_at IS NULL
+    AND r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes') THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILD_INDEPENDENT_SIGNED_RUN_REQUIRED',
+   'verification_committed',false);END IF;
+ SELECT c.* INTO v_child FROM
+ reality_internal.final_loop_child_review_work_v1 c
+ JOIN reality_internal.final_loop_child_approval_packets_v1 p
+  ON p.packet_id=c.packet_id
+ WHERE c.shift_id=p_shift_id AND c.phase='PREPARED'
+  AND c.claimant_worker_run_id<>p_verifier_run_id
+  AND c.model_response_id ~ '^resp_[A-Za-z0-9_-]{4,160}$'
+  AND c.review_sha256 ~ '^sha256:[a-f0-9]{64}$'
+  AND p.state='EFFECT_RESERVED_RECONCILE_ONLY'
+  AND EXISTS(SELECT 1 FROM reality_internal.governed_employee_shifts_v1 s
+   WHERE s.shift_id=c.shift_id AND s.owner_id=c.owner_id
+    AND s.closed_at IS NULL AND s.planned_end_at='infinity'::timestamptz)
+ ORDER BY c.updated_at,c.scope_index LIMIT 1;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION',
+  'verification_committed',false);END IF;
+ SELECT * INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1
+ WHERE plan_id=v_child.plan_id;
+ SELECT value INTO v_scope FROM pg_catalog.jsonb_array_elements(
+  v_plan.source_plan->'bounded_scopes') item(value)
+ WHERE (item.value->>'index')::integer=v_child.scope_index;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE',
+  'owner_id',v_child.owner_id,'shift_id',v_child.shift_id,
+  'child_work_id',v_child.child_work_id,
+  'parent_original_work_id',v_child.parent_original_work_id,
+  'source_ref',v_plan.source_ref,'source_head_sha',v_child.source_head_sha,
+  'source_manifest_sha256',v_child.source_manifest_sha256,
+  'source_proof_sha256',v_plan.source_proof_sha256,
+  'acceptance_contract_sha256',v_child.acceptance_contract_sha256,
+  'scope_index',v_child.scope_index,'scope_sha256',v_child.scope_sha256,
+  'scope',v_scope,'model_response_id',v_child.model_response_id,
+  'review_body',v_child.review_body,'review_sha256',v_child.review_sha256,
+  'original_generation_worker_run_id',v_child.claimant_worker_run_id,
+  'independent_verifier_run_id',p_verifier_run_id,
+  'read_only',true,'verification_committed',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+
+ALTER TABLE reality_internal.final_loop_child_review_work_v1
+ ADD COLUMN IF NOT EXISTS verifier_evidence jsonb;
+
+CREATE OR REPLACE FUNCTION public.reality_record_final_loop_child_verified_v1(
+ p_child_work_id text,p_verifier_run_id uuid,
+ p_review_sha256 text,p_source_head_sha text,
+ p_source_manifest_sha256 text,p_evidence jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_child record;v_plan record;v_scope jsonb;v_path jsonb;
+ v_count integer;v_distinct integer;v_receipt text;v_review text;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_VERIFICATION_SERVICE_ONLY';END IF;
+ IF p_verifier_run_id IS NULL OR
+  coalesce(p_child_work_id,'') !~ '^work:[a-f0-9]{32}$' OR
+  coalesce(p_review_sha256,'') !~ '^sha256:[a-f0-9]{64}$' OR
+  coalesce(p_source_head_sha,'') !~ '^[a-f0-9]{40}$' OR
+  coalesce(p_source_manifest_sha256,'') !~ '^sha256:[a-f0-9]{64}$' OR
+  pg_catalog.jsonb_typeof(p_evidence)<>'object' OR
+  p_evidence->>'schema'<>'reality-final-loop-independent-patch-review-v1' OR
+  p_evidence->>'review_source_verified'<>'true' OR
+  p_evidence->>'all_scope_patches_checked'<>'true' OR
+  p_evidence->>'independent_model_used'<>'true' OR
+  p_evidence->>'read_only'<>'true' OR
+  p_evidence->>'production_changed'<>'false' OR
+  p_evidence->>'source_manifest_sha256'<>p_source_manifest_sha256 OR
+  p_evidence->>'source_head_sha'<>p_source_head_sha OR
+  p_evidence->>'review_sha256'<>p_review_sha256 OR
+  coalesce(p_evidence->>'verifier_model_response_id','')
+   !~ '^resp_[A-Za-z0-9_-]{4,160}$' OR
+  coalesce(p_evidence->>'provider_evidence_sha256','')
+   !~ '^sha256:[a-f0-9]{64}$' OR
+  coalesce(p_evidence->>'verifier_verdict_sha256','')
+   !~ '^sha256:[a-f0-9]{64}$' OR
+  pg_catalog.jsonb_typeof(p_evidence->'verified_paths')<>'array'
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_INDEPENDENT_CHILD_PROOF_INVALID',
+  'independently_verified',false,'original_job_completed',false);END IF;
+ SELECT c.* INTO v_child FROM
+  reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.child_work_id=p_child_work_id AND c.phase='PREPARED'
+  AND c.claimant_worker_run_id<>p_verifier_run_id
+  AND c.review_sha256=p_review_sha256
+  AND c.source_head_sha=p_source_head_sha
+  AND c.source_manifest_sha256=p_source_manifest_sha256
+ FOR UPDATE;
+ IF NOT FOUND OR NOT EXISTS(
+  SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+  WHERE r.run_id=p_verifier_run_id AND r.status='STARTED'
+   AND r.finished_at IS NULL
+   AND r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_VERIFIER_RUN_OR_CLAIM_UNVERIFIED',
+  'independently_verified',false,'original_job_completed',false);END IF;
+ SELECT * INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1 p
+ WHERE p.plan_id=v_child.plan_id AND p.shift_id=v_child.shift_id
+  AND p.source_manifest_sha256=v_child.source_manifest_sha256;
+ SELECT value INTO v_scope FROM pg_catalog.jsonb_array_elements(
+  v_plan.source_plan->'bounded_scopes') item(value)
+ WHERE (item.value->>'index')::integer=v_child.scope_index;
+ IF v_scope->>'proposed_scope_sha256'<>v_child.scope_sha256
+  OR p_evidence->>'child_work_id'<>v_child.child_work_id
+  OR p_evidence->>'parent_original_work_id'<>v_child.parent_original_work_id
+  OR p_evidence->>'scope_sha256'<>v_child.scope_sha256
+  OR p_evidence->>'independent_verifier_run_id'<>p_verifier_run_id::text
+  OR (p_evidence->>'verifier_model_response_id')=v_child.model_response_id
+  OR p_evidence->>'review_source_verified'<>'true'
+  OR pg_catalog.jsonb_array_length(p_evidence->'verified_paths')
+     <>v_scope->>'file_count'::text::integer THEN
+   RETURN pg_catalog.jsonb_build_object(
+    'status','FINAL_LOOP_CHILD_INDEPENDENT_SCOPE_COVERAGE_MISMATCH',
+    'independently_verified',false,'original_job_completed',false);
+ END IF;
+ -- Full, unique, EXACT scope inventory. A model verdict by itself cannot
+ -- replace the independent provider patch recheck done by the worker.
+ SELECT count(DISTINCT x.value#>>'{}') INTO v_distinct
+ FROM pg_catalog.jsonb_array_elements(
+  p_evidence->'verified_paths') x(value);
+ IF v_distinct<>(v_scope->>'file_count')::integer OR EXISTS(
+  SELECT 1 FROM pg_catalog.jsonb_array_elements(
+   p_evidence->'verified_paths') x(value)
+  WHERE pg_catalog.jsonb_typeof(x.value)<>'string'
+   OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(
+     v_scope->'files') f(value)
+     WHERE f.value->>'path'=x.value#>>'{}')) THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILD_INDEPENDENT_PATHS_MISSING',
+   'independently_verified',false,'original_job_completed',false);
+ END IF;
+ v_review:='sha256:'||pg_catalog.encode(
+  pg_catalog.sha256(pg_catalog.convert_to(v_child.review_body,'UTF8')),'hex');
+ IF v_review<>p_review_sha256 THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILD_PREPARED_REVIEW_DIGEST_MISMATCH',
+   'independently_verified',false,'original_job_completed',false); END IF;
+ v_receipt:='sha256:'||pg_catalog.encode(
+  pg_catalog.sha256(pg_catalog.convert_to(pg_catalog.jsonb_build_object(
+    'child_work_id',v_child.child_work_id,
+    'parent_original_work_id',v_child.parent_original_work_id,
+    'review_sha256',v_child.review_sha256,
+    'source_manifest_sha256',v_child.source_manifest_sha256,
+    'independent_verifier_run_id',p_verifier_run_id,
+    'provider_evidence_sha256',p_evidence->>'provider_evidence_sha256',
+    'verifier_verdict_sha256',p_evidence->>'verifier_verdict_sha256'
+  )::text,'UTF8')),'hex');
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET
+  phase='INDEPENDENTLY_VERIFIED',
+  independent_verifier_run_id=p_verifier_run_id,
+  independent_provider_evidence_sha256=
+   p_evidence->>'provider_evidence_sha256',
+  independent_review_receipt_sha256=v_receipt,
+  verifier_evidence=p_evidence,
+  verified_at=pg_catalog.clock_timestamp(),
+  updated_at=pg_catalog.clock_timestamp()
+ WHERE child_work_id=v_child.child_work_id AND phase='PREPARED';
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN',
+  'child_work_id',v_child.child_work_id,
+  'parent_original_work_id',v_child.parent_original_work_id,
+  'independent_receipt_sha256',v_receipt,
+  'independently_verified',true,'parent_obligation_remains_open',true,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+
+-- The single Final Loop policy consumes this readback. Even all independently
+-- checked child reviews remain "Present" until cross-scope verification and
+-- the parent's actual final acceptance + Universe return have separate proof.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_recovery_v1(
+ p_shift_id uuid,p_plan_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_plan record;v_packet record;v_children jsonb;v_count integer;
+ v_capacity boolean;v_scope_count integer;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_RECOVERY_SERVICE_ONLY'; END IF;
+ SELECT p.* INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1 p
+ WHERE p.shift_id=p_shift_id AND p.plan_id=p_plan_id
+  AND p.parent_original_work_id IS NOT NULL;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_SOURCE_PLAN_NOT_ADMITTED',
+  'independent_service_readback_verified',false);END IF;
+ SELECT a.* INTO v_packet FROM
+  reality_internal.final_loop_child_approval_packets_v1 a
+ WHERE a.plan_id=p_plan_id AND a.shift_id=p_shift_id
+  AND a.state='EFFECT_RESERVED_RECONCILE_ONLY'
+  AND a.owner_approval_receipt_sha256 IS NOT NULL;
+ IF NOT FOUND OR NOT EXISTS(
+  SELECT 1 FROM public.universe_events e
+   WHERE e.epistemic_status='VERIFIED'
+   AND e.payload->>'principal_id'=v_plan.owner_id::text
+   AND e.payload->>'original_work_id'=v_plan.parent_original_work_id
+   AND e.payload->>'acceptance_contract_sha256'=
+    v_packet.acceptance_contract_sha256
+   AND (e.payload->>'source_ref'=v_plan.source_ref OR
+        e.provenance->>'source_ref'=v_plan.source_ref))
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_CHILD_ACCEPTANCE_NOT_VERIFIED',
+  'independent_service_readback_verified',false); END IF;
+ SELECT pg_catalog.count(*),pg_catalog.coalesce(pg_catalog.jsonb_agg(
+  pg_catalog.jsonb_build_object(
+   'index',c.scope_index,'scope_sha256',c.scope_sha256,
+   'parent_original_work_id',c.parent_original_work_id,
+   'source_manifest_sha256',c.source_manifest_sha256,
+   'acceptance_contract_sha256',c.acceptance_contract_sha256,
+   'phase',CASE
+    WHEN c.phase='INDEPENDENTLY_VERIFIED' THEN 'VERIFIED'
+    WHEN c.phase='EFFECT_UNCERTAIN' THEN 'EFFECT_UNCERTAIN'
+    ELSE 'ADMITTED' END,
+   'child_original_work_id',c.child_work_id,
+   'independently_verified',c.phase='INDEPENDENTLY_VERIFIED',
+   'verifier_independent',c.phase='INDEPENDENTLY_VERIFIED'
+    AND c.independent_verifier_run_id<>c.claimant_worker_run_id,
+   'independent_receipt_sha256',c.independent_review_receipt_sha256
+  ) ORDER BY c.scope_index),'[]'::jsonb)
+ INTO v_count,v_children FROM reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.plan_id=v_plan.plan_id AND c.packet_id=v_packet.packet_id
+  AND c.owner_id=v_plan.owner_id AND c.shift_id=v_plan.shift_id
+  AND c.parent_original_work_id=v_plan.parent_original_work_id
+  AND c.source_manifest_sha256=v_plan.source_manifest_sha256;
+ IF v_count<>v_plan.proposed_scope_count THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILDREN_NOT_ATOMICALLY_ADMITTED',
+   'independent_service_readback_verified',false);END IF;
+ v_capacity:=NOT EXISTS(
+  SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 c
+  WHERE c.plan_id=v_plan.plan_id AND c.claimant_worker_run_id IS NOT NULL
+   AND NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+    WHERE r.run_id=c.claimant_worker_run_id AND r.started_at IS NOT NULL));
+ RETURN pg_catalog.jsonb_build_object(
+  'schema','reality-final-loop-independent-child-readback-v1',
+  'status','FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT',
+  'owner_id',v_plan.owner_id,'shift_id',v_plan.shift_id,
+  'parent_original_work_id',v_plan.parent_original_work_id,
+  'parent_source_ref',v_plan.source_ref,
+  'source_manifest_sha256',v_plan.source_manifest_sha256,
+  'source_head_sha',v_plan.source_head_sha,
+  'acceptance_contract_sha256',v_packet.acceptance_contract_sha256,
+  'independent_service_readback_verified',true,
+  'authority',pg_catalog.jsonb_build_object(
+   'owner_id',v_plan.owner_id,
+   'parent_original_work_id',v_plan.parent_original_work_id,
+   'acceptance_contract_sha256',v_packet.acceptance_contract_sha256,
+   'independently_verified',true,
+   'receipt_sha256',v_packet.owner_approval_receipt_sha256,
+   'permitted_effects',pg_catalog.jsonb_build_array('READ','PREPARE'),
+   'requested_effects',pg_catalog.jsonb_build_array('READ')),
+  'capacity',pg_catalog.jsonb_build_object(
+   'independently_attested',v_capacity,
+   'scheduled_worker_observed',v_capacity,
+   'receipt_sha256',v_packet.owner_approval_receipt_sha256),
+  'provider_effect_uncertain',EXISTS(SELECT 1 FROM
+   reality_internal.final_loop_child_review_work_v1 c
+   WHERE c.plan_id=v_plan.plan_id AND c.phase='EFFECT_UNCERTAIN'),
+  'children',v_children,
+  'cross_scope',pg_catalog.jsonb_build_object(
+   'independently_verified',false,'receipt_sha256',null),
+  'parent_obligation_remains_open',true,
+  'parent_outcome_verified',false,
+  'universe_reconciled',false,'parent_settlement_committed',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+
+REVOKE ALL ON FUNCTION
+ public.reality_prepare_final_loop_child_approval_v1(uuid,text,uuid),
+ public.reality_owner_approve_final_loop_child_v1(uuid,uuid,text,text,uuid),
+ public.reality_claim_final_loop_child_review_v1(uuid,uuid),
+ public.reality_read_final_loop_child_model_scope_v1(text,uuid,uuid),
+ public.reality_prepare_final_loop_child_review_v1(text,uuid,uuid,text,text,text),
+ public.reality_read_final_loop_child_verify_v1(uuid,uuid),
+ public.reality_record_final_loop_child_verified_v1(text,uuid,text,text,text,jsonb),
+ public.reality_read_final_loop_child_recovery_v1(uuid,uuid)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION
+ public.reality_prepare_final_loop_child_approval_v1(uuid,text,uuid),
+ public.reality_owner_approve_final_loop_child_v1(uuid,uuid,text,text,uuid),
+ public.reality_claim_final_loop_child_review_v1(uuid,uuid),
+ public.reality_read_final_loop_child_model_scope_v1(text,uuid,uuid),
+ public.reality_prepare_final_loop_child_review_v1(text,uuid,uuid,text,text,text),
+ public.reality_read_final_loop_child_verify_v1(uuid,uuid),
+ public.reality_record_final_loop_child_verified_v1(text,uuid,text,text,text,jsonb),
+ public.reality_read_final_loop_child_recovery_v1(uuid,uuid)
+ TO service_role;
