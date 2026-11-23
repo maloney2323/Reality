@@ -396,6 +396,13 @@ export default async function handler(req,res){
     staged_plan_count:linked?sourceHandoff.staging_receipts.length:0,
     durable_source_plan_readback_verified:Boolean(linked),
     final_loop_staged_action_routes:stagedActionRoutes,
+    final_loop_governed_engineering:{
+     status:'ENGINEERING_SIGNED_CODING_WORKER_NOT_REACHED_STAGING_ONLY',
+     read_only:true,model_invoked:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     next_governed_action:
+      'VERIFY_SIGNED_ENGINEERING_WORKER_RELEASE_AND_CANONICAL_ORIGINAL_WARRANT'
+    },
     signed_worker_release_operating_lane:inspectFinalLoopSignedWorkerOperatingLane({
      env:e,dbProject:db.project
     }),
