@@ -207,7 +207,7 @@ function wholePrProvider({counts={307:34,308:304},drift=0,truncate=false,
    return {ok:true,json:async()=>pageFiles};
   }
   reads[id]=(reads[id]||0)+1;
-  const head=drift&&reads[id]>1?'b'.repeat(40):'a'.repeat(40);
+  const head=drift?'b'.repeat(40):'a'.repeat(40);
   return {ok:true,json:async()=>({
    number:id,html_url:ref(id),state:'open',draft:true,
    changed_files:count,head:{sha:head},base:{sha:'d'.repeat(40)}
