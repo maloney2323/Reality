@@ -25,6 +25,10 @@ import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {connectFinalLoopPrSourcePlanToSignedShift}
  from '../../src/reality-final-loop-pr-source-handoff-v1.js';
+import {requestFinalLoopChildApprovalFromAcceptedOriginal}
+ from '../../src/reality-final-loop-child-approval-request-v1.js';
+import {advanceOneFinalLoopChildReview}
+ from '../../src/reality-final-loop-child-review-worker-v1.js';
 import {runAuthorizedRileyPrReview,
  inspectCurrentRileyPrReviewSourceReadiness,
  shouldFenceRileyPrClaimForObservedIncompatibility}
@@ -2488,6 +2492,47 @@ export default async function handler(req,res){
    }
   }
 
+  // The existing signed worker advances the SAME Final Loop child
+  // lifecycle: exact parent goal acceptance -> itemized owner approval ->
+  // one-use child claim -> governed model -> separate-run verifier.
+  // There is no new scheduler or separate approval authority.
+  let finalLoopChildApprovalRequest={
+   status:'FINAL_LOOP_CHILD_APPROVAL_REQUEST_NOT_ENABLED',
+   execution_authorized:false,original_job_completed:false
+  };
+  let finalLoopChildReview={
+   status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',
+   original_job_completed:false,production_changed:false
+  };
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+     process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
+   try{
+    finalLoopChildApprovalRequest=
+     await requestFinalLoopChildApprovalFromAcceptedOriginal({
+      db,graph:unifiedGraph,workerRunId:actualWorkerRunId,
+      env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    finalLoopChildApprovalRequest={
+     status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_OR_OWNER_PACKET_UNVERIFIED',
+     execution_authorized:false,original_job_completed:false
+    };
+   }
+   try{
+    finalLoopChildReview=await advanceOneFinalLoopChildReview({
+     db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     env:process.env,fetchImpl:fetch
+    });
+   }catch{
+    finalLoopChildReview={
+     status:'FINAL_LOOP_CHILD_SIGNED_EXECUTION_OR_VERIFICATION_BLOCKED',
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
+
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
   // Reality does not consume owner approval, write code, or settle the job.
@@ -3324,6 +3369,8 @@ export default async function handler(req,res){
     commit_reference_triage_settlement:commitTriageSettlement,
     riley_pr_source_readiness:rileyPrSourceReadiness,
     final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
+    final_loop_child_approval_request:finalLoopChildApprovalRequest,
+    final_loop_child_review:finalLoopChildReview,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
