@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- evaluateRealityFinalLoopEngine,REALITY_FINAL_LOOP_ENGINE_VERSION
+ evaluateRealityFinalLoopEngine,evaluateRealityFinalLoopChildRecovery,
+ REALITY_FINAL_LOOP_ENGINE_VERSION
 } from '../src/reality-shift-unified-execution-controller-v1.js';
 
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
@@ -249,4 +250,147 @@ test('all independently proven jobs request settlement but are not declared sett
  assert.equal(r.all_originals_independently_settlement_eligible,true);
  assert.deepEqual(r.decisions.map(x=>x.decision),['SETTLE','SETTLE']);
  assert.equal(r.shift_completed,false);
+});
+
+const parentSourcePlan=(item=jobs[0])=>{
+ const total=17,scopes=[];
+ for(let first=0;first<total;first+=8){
+  const files=Array.from({length:Math.min(8,total-first)},(_,i)=>({
+   path:'src/example-'+(first+i)+'.js',status:'modified',
+   blob_sha:'f'.repeat(40),patch_proof_verified:false
+  }));
+  scopes.push({index:scopes.length,file_count:files.length,
+   proposed_scope_sha256:hash(String(scopes.length+1)),
+   source_head_sha:'a'.repeat(40),
+   proposed_only:true,native_child_original_admitted:false,
+   child_execution_authorized:false,files});
+ }
+ return {owner_id:owner,shift_id:shift,source_ref:item.source_ref,
+  original_work_id:item.original_work_id,
+  native_phase:item.phase,
+  frozen_source_proof_sha256:item.source_proof_sha256,
+  source_manifest_sha256:hash('7'),live_head_sha:'a'.repeat(40),
+  read_only:true,proposed_only:true,
+  parent_obligation_remains_open:true,
+  native_admission_unchanged:true,
+  worker_claim_consumed:false,owner_approval_granted:false,
+  original_job_completed:false,source_manifest_complete:true,
+  independent_review_completed:false,cross_scope_review_verified:false,
+  manifest_file_count:total,bounded_scope_count:scopes.length,
+  bounded_scopes:scopes};
+};
+const childReadback=(plan)=>({
+ schema:'reality-final-loop-independent-child-readback-v1',
+ independent_service_readback_verified:true,
+ owner_id:owner,shift_id:shift,
+ parent_original_work_id:work1,parent_source_ref:plan.source_ref,
+ source_manifest_sha256:plan.source_manifest_sha256,
+ source_head_sha:plan.live_head_sha,
+ acceptance_contract_sha256:hash('d'),
+ authority:{independently_verified:true,owner_id:owner,
+  acceptance_contract_sha256:hash('d'),receipt_sha256:hash('9')},
+ capacity:{independently_attested:true,receipt_sha256:hash('8')},
+ provider_effect_uncertain:false,
+ children:plan.bounded_scopes.map((x,i)=>({
+  index:i,scope_sha256:x.proposed_scope_sha256,
+  phase:'VERIFIED',child_original_work_id:'work:'+String(i+3).repeat(32),
+  independently_verified:true,verifier_independent:true,
+  independent_receipt_sha256:hash('6')
+ })),
+ cross_scope:{independently_verified:true,receipt_sha256:hash('5')}
+});
+test('one Final Loop controller owns parent/child recovery and rejects plan-only admission',()=>{
+ const parent={...jobs[0],phase:'BLOCKED'};
+ const plan=parentSourcePlan(parent);
+ const p=jobs.map(proof);p[0].child_recovery={source_plan:plan};
+ const g={...graph,jobs:[parent,jobs[1]]};
+ const x=run(ledger(p),g);
+ assert.equal(x.decisions[0].decision,'SUSPEND');
+ assert.equal(x.decisions[0].next_governed_action,
+  'BIND_SIGNED_PARENT_ACCEPTANCE_AND_CHILD_AUTHORITY');
+ assert.equal(x.decisions[1].decision,'ADVANCE');
+ assert.equal(x.decisions[0].original_job_completed,false);
+ const policy=evaluateRealityFinalLoopChildRecovery({
+  parent,sourcePlan:plan,ownerId:owner,shiftId:shift});
+ assert.equal(policy.schema,'reality-final-loop-child-policy-v1');
+ assert.equal(policy.proposed_child_scope_count,3);
+ assert.equal(policy.parent_obligation_remains_open,true);
+ assert.equal(policy.child_original_admitted_by_engine,false);
+});
+test('complete verified children cannot replace independent final parent receipt',()=>{
+ const parent={...jobs[0],phase:'BLOCKED'};
+ const plan=parentSourcePlan(parent),independentChildren=childReadback(plan);
+ const p=jobs.map(proof);
+ p[0].child_recovery={source_plan:plan,independent_children:independentChildren};
+ const g={...graph,jobs:[parent,jobs[1]]};
+ let r=run(ledger(p),g);
+ assert.equal(r.decisions[0].decision,'ADVANCE');
+ assert.equal(r.decisions[0].next_governed_action,
+  'INDEPENDENTLY_VERIFY_PARENT_ACCEPTANCE_AND_UNIVERSE');
+ assert.equal(r.all_originals_independently_settlement_eligible,false);
+ p[0].outcome={status:'INDEPENDENT_FINAL_VERIFIED',
+  verifier_independent:true,original_work_id:work1,
+  acceptance_contract_sha256:hash('d'),receipt_sha256:hash('a')};
+ r=run(ledger(p),g);
+ assert.equal(r.decisions[0].decision,'ADVANCE');
+ assert.equal(r.decisions[0].next_governed_action,
+  'RECONCILE_INDEPENDENT_ORIGINAL_RECEIPT_TO_UNIVERSE');
+ p[0].universe={independently_reconciled:true,
+  original_work_id:work1,outcome_receipt_sha256:hash('a'),
+  receipt_sha256:hash('b')};
+ r=run(ledger(p),g);
+ assert.equal(r.decisions[0].decision,'SETTLE');
+ assert.equal(r.decisions[0].independent_settlement_committed,false);
+ assert.equal(r.decisions[0].original_job_completed,false);
+});
+test('partially verified children recover only under independent same-parent readback',()=>{
+ const parent={...jobs[0],phase:'BLOCKED'};
+ const plan=parentSourcePlan(parent),proofs=childReadback(plan);
+ proofs.children[1].phase='ADMITTED';
+ delete proofs.children[1].independently_verified;
+ const r=evaluateRealityFinalLoopChildRecovery({
+  parent,sourcePlan:plan,independentChildren:proofs,
+  ownerId:owner,shiftId:shift,acceptanceContractSha256:hash('d')});
+ assert.equal(r.decision,'RECOVER');
+ assert.equal(r.next_governed_action,
+  'CONTINUE_NEXT_AUTHORIZED_CHILD_WITH_ATOMIC_CLAIM');
+ assert.equal(r.verified_child_count,2);
+ assert.equal(r.execution_authorized,false);
+});
+test('no child approval from unadmitted parents, provider uncertainty or source drift',()=>{
+ const parent={...jobs[0],phase:'BLOCKED'},plan=parentSourcePlan(parent);
+ const options={ownerId:owner,shiftId:shift,sourcePlan:plan};
+ const notAdmitted={...parent,original_work_id:null,phase:'NOT_ADMITTED'};
+ const r=evaluateRealityFinalLoopChildRecovery({
+  ...options,parent:notAdmitted,sourcePlan:parentSourcePlan(notAdmitted)});
+ assert.equal(r.decision,'SUSPEND');
+ assert.equal(r.next_governed_action,'ADMIT_EXACT_PARENT_ORIGINAL_BEFORE_RECOVERY');
+ const publishing={...parent,phase:'PUBLISHING'};
+ const q=evaluateRealityFinalLoopChildRecovery({
+  ...options,parent:publishing,sourcePlan:parentSourcePlan(publishing)});
+ assert.equal(q.next_governed_action,'RECONCILE_PARENT_PROVIDER_EFFECT_WITHOUT_REPLAY');
+ const drift=evaluateRealityFinalLoopChildRecovery({
+  ...options,parent,sourcePlan:{...plan,source_manifest_sha256:'bad'}});
+ assert.equal(drift.decision,'REFRESH');
+ const missing=evaluateRealityFinalLoopChildRecovery({
+  ...options,parent,sourcePlan:{...plan,bounded_scopes:plan.bounded_scopes.slice(1)}});
+ assert.equal(missing.decision,'REFRESH');
+});
+test('foreign child ledger, uncertain effects and missing cross-scope proof fail closed',()=>{
+ const parent={...jobs[0],phase:'BLOCKED'};
+ const plan=parentSourcePlan(parent),children=childReadback(plan);
+ const base={parent,sourcePlan:plan,ownerId:owner,shiftId:shift,
+  acceptanceContractSha256:hash('d')};
+ const wrong=evaluateRealityFinalLoopChildRecovery({
+  ...base,independentChildren:{...children,owner_id:root}});
+ assert.equal(wrong.decision,'SUSPEND');
+ const uncertain=evaluateRealityFinalLoopChildRecovery({
+  ...base,independentChildren:{...children,provider_effect_uncertain:true}});
+ assert.equal(uncertain.next_governed_action,
+  'RECONCILE_CHILD_PROVIDER_EFFECT_WITHOUT_REPLAY');
+ const integration=evaluateRealityFinalLoopChildRecovery({
+  ...base,independentChildren:{...children,cross_scope:{independently_verified:false}}});
+ assert.equal(integration.decision,'ADVANCE');
+ assert.equal(integration.next_governed_action,
+  'INDEPENDENTLY_VERIFY_CROSS_CHILD_INTEGRATION');
 });
