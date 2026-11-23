@@ -24,6 +24,10 @@ on:
       - 'sql/reality-final-loop-signed-worker-release-wakes-v1.sql'
       - 'test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js'
       - 'src/reality-signed-worker-scheduled-release-verifier-v1.js'
+      - 'src/reality-governed-release-independent-qualification-v1.js'
+      - 'test/reality-governed-release-independent-qualification-v1.test.js'
+      - 'api/reality/governed-worker-release-control-plane.js'
+      - 'test/reality-governed-worker-release-control-plane-v1.test.js'
       - 'test/reality-signed-worker-scheduled-release-verifier-v1.test.js'
       - 'test/reality-governed-signed-worker-release-switch-trigger-v1.test.js'
       - 'test/reality-signed-worker-capability-delivery-v1.test.js'
@@ -88,6 +92,10 @@ on:
       - 'sql/reality-final-loop-signed-worker-release-wakes-v1.sql'
       - 'test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js'
       - 'src/reality-signed-worker-scheduled-release-verifier-v1.js'
+      - 'src/reality-governed-release-independent-qualification-v1.js'
+      - 'test/reality-governed-release-independent-qualification-v1.test.js'
+      - 'api/reality/governed-worker-release-control-plane.js'
+      - 'test/reality-governed-worker-release-control-plane-v1.test.js'
       - 'test/reality-signed-worker-scheduled-release-verifier-v1.test.js'
       - 'test/reality-governed-signed-worker-release-switch-trigger-v1.test.js'
       - 'test/reality-signed-worker-capability-delivery-v1.test.js'
@@ -159,6 +167,10 @@ jobs:
           node --check test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
           node --check test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js
           node --check src/reality-signed-worker-scheduled-release-verifier-v1.js
+          node --check src/reality-governed-release-independent-qualification-v1.js
+          node --check api/reality/governed-worker-release-control-plane.js
+          node --check test/reality-governed-release-independent-qualification-v1.test.js
+          node --check test/reality-governed-worker-release-control-plane-v1.test.js
           node --check test/reality-signed-worker-scheduled-release-verifier-v1.test.js
           node --check test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
           node --check test/reality-signed-worker-operating-lane-v1.test.js
@@ -203,6 +215,8 @@ jobs:
           node --test test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
           node --test test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js
           node --test test/reality-signed-worker-scheduled-release-verifier-v1.test.js
+          node --test test/reality-governed-release-independent-qualification-v1.test.js
+          node --test test/reality-governed-worker-release-control-plane-v1.test.js
           node --test test/reality-final-loop-child-transactional-v1.test.js
           node --test test/reality-final-loop-parent-integration-v1.test.js
           node --test test/reality-final-loop-parent-delivery-v1.test.js
