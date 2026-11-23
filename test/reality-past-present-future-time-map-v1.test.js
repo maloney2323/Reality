@@ -97,3 +97,18 @@ test('original Home and other route visibility gates actually allow the lifted M
  assert.match(connectCss,/main>:not\(\.top\):not\(#realityUnifiedView\):not\(#realityTimeHorizon\)/);
  assert.match(css,/#realityTimeHorizon\[hidden\]\{display:none!important\}/);
 });
+
+
+test('one independently reviewed blocker guides Past Present Future and CEO without changing counts or authority',()=>{
+ assert.match(api,/final_loop_recovery_guidance:finalLoopRecoveryGuidance/);
+ assert.match(api,/projectFinalLoopOwnerReviewedRecoveryGuidance/);
+ assert.match(ui,/data\.final_loop_recovery_guidance/);
+ assert.match(ui,/FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY/);
+ assert.match(ui,/continuity_head_sha256===horizon\.continuity_head_sha256/);
+ assert.match(ui,/recovery\.future\?\.automatically_executable===false/);
+ assert.match(ui,/recovery\.recovery_verified===false/);
+ assert.match(ui,/recovery\.present\?\.original_settled===false/);
+ assert.match(ui,/recovery\.ceo\?\.autonomous_authority_granted===false/);
+ assert.match(ui,/Future \/ CEO next permitted step:/);
+ assert.doesNotMatch(ui,/fetch\(.*reality_owner_approve_final_loop_child_v1/);
+});
