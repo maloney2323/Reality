@@ -615,7 +615,7 @@ BEGIN
   OR (p_evidence->>'verifier_model_response_id')=v_child.model_response_id
   OR p_evidence->>'review_source_verified'<>'true'
   OR pg_catalog.jsonb_array_length(p_evidence->'verified_paths')
-     <>v_scope->>'file_count'::text::integer THEN
+     <>(v_scope->>'file_count')::integer THEN
    RETURN pg_catalog.jsonb_build_object(
     'status','FINAL_LOOP_CHILD_INDEPENDENT_SCOPE_COVERAGE_MISMATCH',
     'independently_verified',false,'original_job_completed',false);
