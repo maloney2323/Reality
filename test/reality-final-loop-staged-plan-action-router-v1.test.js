@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {classifySignedFinalLoopStagedPlanActions as classify,
  reconcileReviewedRecoveryToFinalLoopSource as reconcile,
- inspectFinalLoopRecoveryContinuation as inspect}
+ inspectFinalLoopRecoveryContinuation as inspect,
+ verifyFinalLoopRecoveryContinuityReadback as observe}
  from '../src/reality-final-loop-staged-plan-action-router-v1.js';
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -214,4 +215,45 @@ test('signed worker publishes recovery-to-source disposition separately from out
  assert.match(worker,/reconcileReviewedRecoveryToFinalLoopSource/);
  assert.match(worker,/inspectFinalLoopRecoveryContinuation/);
  assert.match(worker,/final_loop_recovery_continuation:/);
+});
+
+
+test('after-action Continuity readback detects real head revision but cannot self-certify recovery',()=>{
+ const c=candidate(),before={
+  status:'CANONICAL_HANDOFF_CARRIED_WITH_UNFINISHED_PROOFS',
+  canonical_handoff_verified:true,
+  continuity_root_id:'55555555-5555-4555-8555-555555555555',
+  continuity_head_sha256:hash('1'),revision:3
+ };
+ const after={
+  schema:'reality-final-loop-canonical-proof-readback-v1',
+  status:'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING',
+  owner_id:owner,shift_id:shift,read_only:true,
+  independent_owner_scope_verified:true,
+  continuity_root_id:before.continuity_root_id,
+  continuity_head_sha256:hash('1'),revision:3,
+  original_job_completed:false
+ };
+ const unchanged=observe({candidate:c,before,after});
+ assert.equal(unchanged.status,
+  'FINAL_LOOP_RECOVERY_CONTINUITY_NO_STATE_CHANGE_ORIGINAL_OPEN');
+ assert.equal(unchanged.continuity_state_changed,false);
+ const advanced=observe({candidate:c,before,after:{
+  ...after,continuity_head_sha256:hash('2'),revision:4}});
+ assert.equal(advanced.status,
+  'FINAL_LOOP_RECOVERY_CONTINUITY_NEW_REVISION_ORIGINAL_STILL_OPEN');
+ assert.equal(advanced.continuity_state_changed,true);
+ assert.equal(advanced.recovery_verified,false);
+ assert.equal(advanced.original_job_completed,false);
+ for(const invalid of [
+  {...after,continuity_head_sha256:hash('2')},
+  {...after,owner_id:'99999999-9999-4999-8999-999999999999'},
+  {...after,original_job_completed:true},
+  {...after,continuity_root_id:'66666666-6666-4666-8666-666666666666'}
+ ]){
+  const r=observe({candidate:c,before,after:invalid});
+  assert.notEqual(r.status,
+   'FINAL_LOOP_RECOVERY_CONTINUITY_NEW_REVISION_ORIGINAL_STILL_OPEN');
+  assert.equal(r.recovery_verified,false);
+ }
 });
