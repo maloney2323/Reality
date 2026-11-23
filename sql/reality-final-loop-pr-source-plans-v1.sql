@@ -144,7 +144,8 @@ BEGIN
   AND s.closed_at IS NULL AND s.planned_end_at='infinity'::timestamptz
   AND s.status IN ('QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
   AND w.state='ACTIVE' AND w.authorized_at IS NOT NULL
-  AND w.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+  AND w.mode IN ('UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS',
+   'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS')
   AND EXISTS(
    SELECT 1 FROM pg_catalog.jsonb_array_elements(w.source_scope) item
    WHERE item->>'source_ref'=p_plan->>'source_ref')
