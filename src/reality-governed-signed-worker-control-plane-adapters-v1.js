@@ -79,7 +79,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
     'reality_claim_governed_signed_worker_release_v1',
     'reality_read_governed_signed_worker_release_approval_v1'].includes(name))
    throw Error('RELEASE_CONTROL_RPC_NOT_ALLOWLISTED');
-  return requestJson(fetchImpl,db.url+'rest/v1/rpc/'+name,{
+  return requestJson(fetchImpl,db.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{
    method:'POST',headers:dbHeaders,body:JSON.stringify(payload)
   });
  };
