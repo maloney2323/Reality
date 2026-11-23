@@ -44,6 +44,8 @@ test('source-only or shared benchmark config never proves isolated execution',()
   'FINAL_LOOP_WORKER_ISOLATED_DATABASE_IDENTITY_UNVERIFIED');
  assert.equal(check({REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:isolated}).status,
   'FINAL_LOOP_WORKER_ISOLATED_DATABASE_IDENTITY_UNVERIFIED');
+ assert.equal(check({REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:undefined}).status,
+  'FINAL_LOOP_WORKER_ISOLATED_DATABASE_IDENTITY_UNVERIFIED');
 });
 
 test('missing owner packet handler fails closed',()=>{
