@@ -334,6 +334,7 @@ BEGIN
   'delivery_body_sha256',d.delivery_body_sha256,
   'proposal_fingerprint',d.proposal_fingerprint,
   'delivery_preview',pg_catalog.left(d.delivery_body,1500),
+  'delivery_body',d.delivery_body,
   'cross_scope_receipt_sha256',d.cross_scope_receipt_sha256,
   'status',d.status,
   'publication_approved',d.status<>'AWAITING_EXACT_PUBLICATION_APPROVAL',
@@ -382,6 +383,9 @@ BEGIN
   d.status<>'AWAITING_EXACT_PUBLICATION_APPROVAL' OR
   d.proposal_fingerprint<>p_fingerprint OR
   d.delivery_body_sha256<>p_review_body_sha256 OR
+  d.delivery_body_sha256 IS DISTINCT FROM
+   ('sha256:'||pg_catalog.encode(pg_catalog.sha256(
+     pg_catalog.convert_to(d.delivery_body,'UTF8')),'hex')) OR
   d.owner_publication_receipt_sha256 IS NOT NULL OR
   a.state<>'EFFECT_RESERVED_RECONCILE_ONLY' OR
   a.owner_approval_receipt_sha256 IS NULL OR
