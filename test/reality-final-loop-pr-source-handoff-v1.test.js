@@ -37,7 +37,8 @@ function makePlan(job,n){
    patch_proof_verified:false
   }));
   scopes.push({index:scopes.length,file_count:files.length,
-   proposed_scope_sha256:hash('d'),source_head_sha:'e'.repeat(40),
+   proposed_scope_sha256:'sha256:'+(scopes.length+1).toString(16).padStart(64,'0'),
+   source_head_sha:'e'.repeat(40),
    files,proposed_only:true,native_child_original_admitted:false,
    child_execution_authorized:false,independent_review_verified:false});
  }
@@ -47,7 +48,8 @@ function makePlan(job,n){
   owner_id:owner,shift_id:shift,source_ref:job.source_ref,
   original_work_id:job.original_work_id,native_phase:job.phase,
   frozen_source_proof_sha256:job.source_proof_sha256,
-  source_manifest_sha256:hash('e'),manifest_file_count:n,
+  source_manifest_sha256:hash('e'),live_head_sha:'e'.repeat(40),
+  manifest_file_count:n,
   bounded_scope_count:scopes.length,bounded_scopes:scopes,
   source_manifest_complete:true,read_only:true,proposed_only:true,
   native_admission_unchanged:true,parent_obligation_remains_open:true,
@@ -76,6 +78,10 @@ test('same signed graph connects both full source plans but does not admit or ex
  assert.equal(r.proposals[0].native_phase,'BLOCKED');
  assert.equal(r.proposals[1].native_phase,'NOT_ADMITTED');
  assert.equal(r.proposals[1].original_work_id,null);
+ assert.equal(r.proposals[0].engine_child_recovery.decision,'SUSPEND');
+ assert.equal(r.proposals[1].engine_child_recovery.decision,'SUSPEND');
+ assert.equal(r.proposals[0].engine_child_recovery.parent_obligation_remains_open,true);
+ assert.equal(r.proposals[1].engine_child_recovery.child_original_admitted_by_engine,false);
  assert.equal(r.proposals[0].next_governed_action,
   'RECONCILE_EXISTING_PARENT_BLOCKER_AND_REQUIRE_EXACT_ACCEPTANCE');
  assert.equal(r.proposals[1].next_governed_action,
@@ -192,4 +198,20 @@ test('existing signed worker publishes the child source handoff separately from 
   '../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
  assert.match(boundary,/stage_final_loop_pr_source_plan_v1/);
  assert.match(boundary,/read_final_loop_pr_source_plans_v1/);
+});
+
+test('controller refuses to persist a source plan with duplicated child-scope identity',async()=>{
+ const forged=makePlan(graph.jobs[0],34);
+ forged.bounded_scopes[1].proposed_scope_sha256=
+  forged.bounded_scopes[0].proposed_scope_sha256;
+ const bad={...inspection,source_diagnostics:[
+  {...inspection.source_diagnostics[0],large_source_qualification:forged},
+  inspection.source_diagnostics[1]
+ ]};
+ let calls=0;
+ const result=await connect({graph,inspection:bad,env,
+  call:async()=>{calls++;throw Error('UNEXPECTED_STAGE')}});
+ assert.equal(result.status,'FINAL_LOOP_CHILD_SOURCE_MANIFEST_SCOPE_MISMATCH');
+ assert.equal(result.child_original_admitted,false);
+ assert.equal(calls,0);
 });
