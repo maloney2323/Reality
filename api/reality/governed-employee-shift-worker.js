@@ -25,6 +25,8 @@ import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {connectFinalLoopPrSourcePlanToSignedShift}
  from '../../src/reality-final-loop-pr-source-handoff-v1.js';
+import {projectFinalLoopUniverseFeedback}
+ from '../../src/reality-final-loop-universe-feedback-v1.js';
 import {classifySignedFinalLoopStagedPlanActions,
  reconcileReviewedRecoveryToFinalLoopSource,
  inspectFinalLoopRecoveryContinuation,
@@ -2847,6 +2849,40 @@ export default async function handler(req,res){
    }
   }
 
+  // Universe feedback is independently read from the SAME service-owned
+  // signed shift, original obligations, and parent/Universe settlement RPC.
+  // This is operational context only; neither the model nor a Universe
+  // projection can dispatch, certify an outcome, grant approval, or restart.
+  let finalLoopUniverseFeedback={
+   status:'FINAL_LOOP_UNIVERSE_FEEDBACK_NOT_ENABLED',
+   read_only:true,universe_readback_verified:false,
+   execution_authorized:false,original_job_completed:false
+  };
+  if(process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'&&
+     finalLoopEngineShadow.status===
+       'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'&&
+     finalLoopEngineShadow.canonical_continuity_handoff
+      ?.canonical_handoff_verified===true){
+   try{
+    const universeOutcomes=await shiftRpc(db,
+     'reality_read_owner_final_loop_parent_outcomes_v1',{
+      p_owner_id:unifiedGraph.owner_id,
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000});
+    finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
+     canonicalView:finalLoopEngineShadow,
+     parentOutcomes:universeOutcomes
+    });
+   }catch{
+    finalLoopUniverseFeedback={
+     status:'FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE',
+     read_only:true,universe_readback_verified:false,
+     execution_authorized:false,original_job_completed:false
+    };
+   }
+  }
+
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
   // Reality does not consume owner approval, write code, or settle the job.
@@ -3689,6 +3725,7 @@ export default async function handler(req,res){
     final_loop_recovery_source_candidate:finalLoopRecoveryCandidate,
     final_loop_recovery_continuation:finalLoopRecoveryContinuation,
     final_loop_recovery_continuity_readback:finalLoopRecoveryContinuityReadback,
+    final_loop_universe_feedback:finalLoopUniverseFeedback,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
