@@ -7,6 +7,7 @@ on:
       - 'src/reality-final-loop-executive-brief-v1.js'
       - 'src/reality-final-loop-owner-time-bridge-v1.js'
       - 'src/reality-final-loop-universe-feedback-v1.js'
+      - 'src/reality-final-loop-governed-engineering-v1.js'
       - 'src/reality-final-loop-canonical-handoff-v1.js'
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
@@ -63,6 +64,7 @@ on:
       - 'test/reality-final-loop-executive-brief-v1.test.js'
       - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
       - 'test/reality-final-loop-universe-feedback-v1.test.js'
+      - 'test/reality-final-loop-governed-engineering-v1.test.js'
       - 'test/reality-final-loop-canonical-handoff-v1.test.js'
       - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
       - 'test/reality-pr-source-readiness-final-loop-v1.test.js'
@@ -160,6 +162,7 @@ jobs:
           node --check src/reality-final-loop-executive-brief-v1.js
           node --check src/reality-final-loop-owner-time-bridge-v1.js
           node --check src/reality-final-loop-universe-feedback-v1.js
+          node --check src/reality-final-loop-governed-engineering-v1.js
           node --check src/reality-final-loop-canonical-handoff-v1.js
           node --check api/reality/personal-time-horizon.js
           node --check api/reality/personal-chat.js
@@ -206,6 +209,7 @@ jobs:
           node --check test/reality-final-loop-db-contract-v1.test.js
           node --check test/reality-final-loop-owner-time-endpoint-v1.test.js
           node --check test/reality-final-loop-universe-feedback-v1.test.js
+          node --check test/reality-final-loop-governed-engineering-v1.test.js
       - name: Run existing controller and new Final Loop Engine invariants
         run: |
           node --test test/reality-unified-shift-execution-controller-v1.test.js
@@ -214,6 +218,7 @@ jobs:
           node --test test/reality-final-loop-executive-brief-v1.test.js
           node --test test/reality-final-loop-owner-time-endpoint-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js
+          node --test test/reality-final-loop-governed-engineering-v1.test.js
           node --test test/reality-final-loop-canonical-handoff-v1.test.js
           node --test test/reality-final-loop-cross-surface-continuity-v1.test.js
           node --test test/reality-pr-source-readiness-final-loop-v1.test.js
