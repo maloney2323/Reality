@@ -27,7 +27,8 @@ import {connectFinalLoopPrSourcePlanToSignedShift}
  from '../../src/reality-final-loop-pr-source-handoff-v1.js';
 import {classifySignedFinalLoopStagedPlanActions,
  reconcileReviewedRecoveryToFinalLoopSource,
- inspectFinalLoopRecoveryContinuation}
+ inspectFinalLoopRecoveryContinuation,
+ verifyFinalLoopRecoveryContinuityReadback}
  from '../../src/reality-final-loop-staged-plan-action-router-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../../src/reality-final-loop-child-approval-request-v1.js';
@@ -2817,6 +2818,35 @@ export default async function handler(req,res){
    childReview:finalLoopChildReview,parentDelivery:finalLoopParentDelivery
   });
 
+  // Read the current canonical Continuity head after any verified packet
+  // preparation. A packet receipt is durable progress in its own approval
+  // ledger, but it must not be treated as original recovery or settlement.
+  let finalLoopRecoveryContinuityReadback={
+   status:'FINAL_LOOP_RECOVERY_CONTINUITY_READBACK_NOT_TRIGGERED',
+   read_only:true,recovery_verified:false,original_job_completed:false
+  };
+  if(finalLoopRecoveryContinuation.handler_result_verified===true&&
+     finalLoopRecoveryCandidate.status===
+      'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE'){
+   try{
+    const currentProof=await shiftRpc(db,
+     'reality_read_current_final_loop_proof_envelope_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000});
+    finalLoopRecoveryContinuityReadback=
+     verifyFinalLoopRecoveryContinuityReadback({
+      candidate:finalLoopRecoveryCandidate,
+      before:finalLoopEngineShadow.canonical_continuity_handoff,
+      after:currentProof
+     });
+   }catch{
+    finalLoopRecoveryContinuityReadback={
+     status:'FINAL_LOOP_RECOVERY_CONTINUITY_AFTER_ACTION_NOT_OBSERVED',
+     read_only:true,recovery_verified:false,original_job_completed:false
+    };
+   }
+  }
+
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
   // Reality does not consume owner approval, write code, or settle the job.
@@ -3658,6 +3688,7 @@ export default async function handler(req,res){
     final_loop_staged_action_routes:finalLoopStagedActionRoutes,
     final_loop_recovery_source_candidate:finalLoopRecoveryCandidate,
     final_loop_recovery_continuation:finalLoopRecoveryContinuation,
+    final_loop_recovery_continuity_readback:finalLoopRecoveryContinuityReadback,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
