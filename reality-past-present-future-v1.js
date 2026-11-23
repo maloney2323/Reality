@@ -215,7 +215,7 @@
   // Genuine parent outcomes are projected independently from the same
   // signed Universe + native original receipt, NEVER from a model verdict.
   const outcomes=data.final_loop_parent_outcomes;
-  const verified=outcomes?.status===
+  const independentlyVerifiedOutcomes=outcomes?.status===
    'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ'&&
    outcomes.owner_scope_verified===true&&outcomes.read_only===true&&
    outcomes.execution_authorized===false&&
@@ -229,7 +229,7 @@
     (x.original_job_completed?
      x.status==='INDEPENDENTLY_SETTLED_UNIVERSE_PAST':
      x.status==='PARENT_DELIVERY_UNFINISHED_PRESENT'));
-  if(verified&&outcomes.outcomes.length){
+  if(independentlyVerifiedOutcomes&&outcomes.outcomes.length){
    executive.textContent+=' Final Loop verified return: '+
     outcomes.verified_parent_count+
     ' original(s) independently settled in Universe (Past); '+
