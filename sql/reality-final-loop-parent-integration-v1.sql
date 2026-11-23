@@ -71,13 +71,11 @@ BEGIN
     AND r.shift_id=a.shift_id AND r.owner_id=a.owner_id
     AND r.phase='BLOCKED' AND r.provider_comment_id IS NULL
     AND r.settlement_receipt_id IS NULL)
-  AND EXISTS(SELECT 1 FROM public.universe_events e
-   WHERE e.epistemic_status='VERIFIED'
-    AND e.payload->>'principal_id'=a.owner_id::text
-    AND e.payload->>'original_work_id'=a.parent_original_work_id
-    AND e.payload->>'acceptance_contract_sha256'=a.acceptance_contract_sha256
-    AND (e.payload->>'source_ref'=a.source_ref OR
-         e.provenance->>'source_ref'=a.source_ref))
+  AND a.acceptance_contract_sha256=
+   reality_internal.final_loop_pr_review_acceptance_digest_v1(a.plan_id)
+  -- The separate owner click is recorded by the packet; a proposed
+  -- contract alone can never authorize a child or integration model effect.
+  AND a.owner_approval_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
  ORDER BY a.approved_at,a.packet_id LIMIT 1
  FOR UPDATE OF a SKIP LOCKED;
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
