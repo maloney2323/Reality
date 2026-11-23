@@ -868,11 +868,16 @@ BEGIN
    'approval_fingerprint',a.proposal_fingerprint,
    'acceptance_contract_sha256',a.acceptance_contract_sha256,
    'effect_type',a.authority_effect,
+   'file_count',p.file_count,
+   'proposed_scope_count',p.proposed_scope_count,
    'state',a.state,
    'approved',a.state<>'AWAITING_EXACT_OWNER_APPROVAL',
    'original_job_completed',false
   ) ORDER BY a.created_at),'[]'::jsonb) INTO v_plans
  FROM reality_internal.final_loop_child_approval_packets_v1 a
+ JOIN reality_internal.final_loop_pr_source_plans_v1 p
+  ON p.plan_id=a.plan_id AND p.shift_id=a.shift_id
+  AND p.owner_id=a.owner_id
  JOIN reality_internal.governed_employee_shifts_v1 s
   ON s.shift_id=a.shift_id AND s.owner_id=a.owner_id
  WHERE a.owner_id=p_owner_id AND a.shift_id=p_shift_id
