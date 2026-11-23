@@ -87,7 +87,7 @@ test('an uninstalled or unisolated child executor cannot claim or call OpenAI',a
  }
  assert.equal(calls,0);
 });
-test('missing verified parent acceptance does not mint approval or admit work',async()=>{
+test('missing source-derived parent contract does not mint approval or admit work',async()=>{
  let calls=0;
  const r=await requestFinalLoopChildApprovalFromAcceptedOriginal({
   graph,db,env,workerRunId:run,
@@ -109,7 +109,7 @@ test('missing verified parent acceptance does not mint approval or admit work',a
  assert.equal(r.owner_approval_granted,false);
  assert.equal(r.child_originals_admitted,0);
 });
-test('verified source-bound goal creates only exact owner approval request, never consent',async()=>{
+test('verified source-bound goal proposal creates exact owner approval request, never consent',async()=>{
  const calls=[];
  const packet='11111111-1111-4111-8111-111111111111';
  const r=await requestFinalLoopChildApprovalFromAcceptedOriginal({
@@ -122,7 +122,9 @@ test('verified source-bound goal creates only exact owner approval request, neve
      read_only:true,execution_authorized:false,plans:[{
       plan_id:packet,source_ref:pr,parent_original_work_id:parent,
       source_manifest_sha256:hash('d'),
-      independent_goal_acceptance_verified:true,
+      verified_signed_source_goal_contract_prepared:true,
+      owner_goal_acceptance_pending:true,
+      independent_goal_acceptance_verified:false,
       acceptance_contract_sha256:acceptance,
       pending_exact_owner_approval:true}]};
    assert.equal(name,'reality_prepare_final_loop_child_approval_v1');
