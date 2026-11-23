@@ -31,6 +31,8 @@ import {advanceOneFinalLoopChildReview}
  from '../../src/reality-final-loop-child-review-worker-v1.js';
 import {advanceOneFinalLoopParentIntegration}
  from '../../src/reality-final-loop-parent-integration-worker-v1.js';
+import {advanceOneFinalLoopParentDelivery}
+ from '../../src/reality-final-loop-parent-delivery-worker-v1.js';
 import {runAuthorizedRileyPrReview,
  inspectCurrentRileyPrReviewSourceReadiness,
  shouldFenceRileyPrClaimForObservedIncompatibility}
@@ -2510,6 +2512,11 @@ export default async function handler(req,res){
    status:'FINAL_LOOP_PARENT_INTEGRATION_NOT_ENABLED',
    original_job_completed:false,production_changed:false
   };
+  let finalLoopParentDelivery={
+   status:'FINAL_LOOP_PARENT_DELIVERY_NOT_ENABLED',
+   original_job_completed:false,universe_reconciled:false,
+   production_changed:false
+  };
   if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.VERCEL_ENV==='preview'&&
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
@@ -2549,6 +2556,26 @@ export default async function handler(req,res){
     finalLoopParentIntegration={
      status:'FINAL_LOOP_INDEPENDENT_PARENT_INTEGRATION_BLOCKED',
      original_job_completed:false,production_changed:false
+    };
+   }
+  }
+
+  // Same signed shift wake carries the final parent proof obligation. This
+  // never bypasses parent source, exact owner effect or independent verifier.
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+    process.env.VERCEL_ENV==='preview'&&
+    process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+    process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'){
+   try{
+    finalLoopParentDelivery=await advanceOneFinalLoopParentDelivery({
+     db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     env:process.env,fetchImpl:fetch
+    });
+   }catch{
+    finalLoopParentDelivery={
+     status:'FINAL_LOOP_PARENT_PROVIDER_OR_UNIVERSE_NOT_VERIFIED',
+     original_job_completed:false,universe_reconciled:false,
+     production_changed:false
     };
    }
   }
@@ -3392,6 +3419,7 @@ export default async function handler(req,res){
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
+    final_loop_parent_delivery:finalLoopParentDelivery,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
