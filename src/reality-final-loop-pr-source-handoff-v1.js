@@ -189,12 +189,66 @@ export async function connectFinalLoopPrSourcePlanToSignedShift({
    original_job_completed:false
   }));
  }
+ // Signed readback returns child status to the SAME canonical Final Loop
+ // decision evaluator. Never infer a verified child from a local proposal.
+ const parentRecoveryDecisions=[];
+ for(const item of eligible){
+  const staged=receipts.find(x=>x.source_ref===item.source_ref&&
+   x.source_plan_staged===true&&UUID.test(x.plan_id||''));
+  if(!staged){
+   parentRecoveryDecisions.push({
+    source_ref:item.source_ref,
+    status:'CHILD_RECOVERY_DURABLE_PLAN_NOT_VERIFIED'
+   });
+   continue;
+  }
+  let canonical;
+  try{
+   canonical=await call(db,'reality_read_final_loop_child_recovery_v1',{
+    p_shift_id:graph.shift_id,p_plan_id:staged.plan_id
+   },{fetchImpl,timeoutMs:6000});
+  }catch{
+   canonical={status:'CHILD_RECOVERY_DB_READ_UNAVAILABLE'};
+  }
+  const trusted=canonical?.schema==='reality-final-loop-independent-child-readback-v1'&&
+   canonical.status==='FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT'&&
+   canonical.owner_id===graph.owner_id&&
+   canonical.shift_id===graph.shift_id&&
+   canonical.parent_original_work_id===item.original_work_id&&
+   canonical.parent_source_ref===item.source_ref&&
+   canonical.source_manifest_sha256===item.source_manifest_sha256&&
+   canonical.source_head_sha===item.plan.live_head_sha&&
+   canonical.independent_service_readback_verified===true&&
+   canonical.parent_obligation_remains_open===true&&
+   canonical.original_job_completed===false&&
+   canonical.production_changed===false;
+  const original=jobs.find(j=>j.source_ref===item.source_ref&&
+   j.original_work_id===item.original_work_id);
+  const decision=evaluateRealityFinalLoopChildRecovery({
+   parent:original,sourcePlan:item.plan,
+   independentChildren:trusted?canonical:null,
+   ownerId:graph.owner_id,shiftId:graph.shift_id,
+   acceptanceContractSha256:trusted?
+    canonical.acceptance_contract_sha256:null
+  });
+  parentRecoveryDecisions.push(Object.freeze({
+   source_ref:item.source_ref,
+   original_work_id:item.original_work_id,
+   independent_child_ledger_verified:trusted,
+   decision:decision.decision,
+   next_governed_action:decision.next_governed_action,
+   reason:decision.reason,
+   original_job_completed:false,
+   parent_obligation_remains_open:true
+  }));
+ }
  return result(receipts.every(x=>x.source_plan_staged)?
    'FINAL_LOOP_PROPOSED_SOURCE_PLANS_DURABLY_STAGED_NOT_EXECUTABLE':
    'FINAL_LOOP_PROPOSED_SOURCE_PLAN_STAGE_PARTIALLY_BLOCKED',{
   owner_id:graph.owner_id,shift_id:graph.shift_id,
   complete_manifest_count:eligible.length,
   proposals:summaries,staging_receipts:receipts,
+  parent_child_recovery_decisions:Object.freeze(parentRecoveryDecisions),
   next_governed_action:'INDEPENDENTLY_QUALIFY_PARENT_ACCEPTANCE_AUTHORITY_AND_CHILD_REVIEW'
  });
 }
