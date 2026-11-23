@@ -9,6 +9,8 @@ import {projectOwnerFinalLoopTimeReadback,
  from '../../src/reality-final-loop-owner-time-bridge-v1.js';
 import {projectFinalLoopUniverseFeedback}
  from '../../src/reality-final-loop-universe-feedback-v1.js';
+import {inspectFinalLoopGovernedEngineering}
+ from '../../src/reality-final-loop-governed-engineering-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -359,6 +361,41 @@ export async function readOwnerTimeHorizonEvidence({
      universe_feedback:finalLoopUniverseFeedback});
   }
 
+  // Same original-work service-role maintenance reader already installed
+  // in Reality. No new database table, work queue, model, or authority.
+  // The original stays open if the business warrant or frozen RED is missing.
+  let finalLoopGovernedEngineering={
+   status:'ENGINEERING_OWNER_EVIDENCE_VIEW_NOT_ENABLED',
+   read_only:true,original_job_completed:false,
+   engineering_handler_dispatch_authorized:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_GOVERNED_ENGINEERING_VIEW_ENABLED==='true'&&
+     finalLoopOwner.status===
+      'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'){
+   try{
+    const gate=await call(db,
+     'reality_read_same_original_postmaintenance_gate_v1',{
+      p_shift_id:finalLoopOwner.shift_id
+     },{timeoutMs:6000});
+    finalLoopGovernedEngineering=inspectFinalLoopGovernedEngineering({
+     canonicalView:finalLoopOwner,maintenanceGate:gate
+    });
+    if(['ENGINEERING_EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED',
+        'ENGINEERING_INDEPENDENT_FROZEN_RED_STILL_REQUIRED',
+        'ENGINEERING_CASE_CI_VERIFIED_ORIGINAL_STILL_OPEN'].includes(
+       finalLoopGovernedEngineering.status))
+     finalLoopOwner=Object.freeze({...finalLoopOwner,
+      governed_engineering:finalLoopGovernedEngineering});
+   }catch{
+    finalLoopGovernedEngineering={
+     status:'ENGINEERING_OWNER_ORIGINAL_MAINTENANCE_RPC_UNAVAILABLE',
+     read_only:true,original_job_completed:false,
+     engineering_handler_dispatch_authorized:false
+    };
+   }
+  }
+
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -373,6 +410,7 @@ export async function readOwnerTimeHorizonEvidence({
    final_loop_parent_outcomes:finalLoopParentOutcomes,
    final_loop_universe_feedback:finalLoopUniverseFeedback,
    final_loop_recovery_guidance:finalLoopRecoveryGuidance,
+   final_loop_governed_engineering:finalLoopGovernedEngineering,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null
