@@ -43,10 +43,24 @@ test('worker releases only its own lease and falls back to bounded expiry',()=>{
  // remains a bounded best-effort fallback for early failure.
  const publication=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'");
  const response=worker.indexOf('return res.status(200).json({...result,');
- const firstRelease=worker.indexOf("'reality_release_governed_shift_worker_run_v1'");
+ // There are now two authenticated success routes: the standard signed
+ // shift and an explicitly flagged preview source-staging-only route.
+ // BOTH must release the durable lease before their success responses.
+ const previewGate=worker.indexOf(
+  "if(process.env.REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY==='true')");
+ const previewRelease=worker.indexOf("'reality_release_governed_shift_worker_run_v1'",
+  previewGate);
+ const previewResponse=worker.indexOf(
+  "return res.status(200).json({\n    status:linked?",previewGate);
+ const normalRelease=worker.indexOf("'reality_release_governed_shift_worker_run_v1'",
+  publication);
  const fallback=worker.indexOf('}finally{');
- assert.ok(publication>0&&firstRelease>publication&&response>firstRelease,
-  'lease release must be attempted before success response');
+ assert.ok(previewGate>0&&previewRelease>previewGate&&
+  previewResponse>previewRelease&&previewResponse<publication,
+  'preview signed source-only route must release before success response');
+ assert.ok(publication>previewResponse&&normalRelease>publication&&
+  response>normalRelease,
+  'normal signed worker must release before success response');
  assert.ok(worker.lastIndexOf("'reality_release_governed_shift_worker_run_v1'")>fallback,
   'finally must preserve fallback release for failures');
  assert.match(worker,/if\(governedWakeClaimId&&!wakeLeaseReleasedBeforeResponse&&/);
