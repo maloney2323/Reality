@@ -65,7 +65,7 @@ BEGIN
    'status','GOVERNED_RELEASE_CRON_SCHEDULE_UNVERIFIED',
    'credential_values_exposed',false);
  END IF;
- h:=pg_catalog.substring(j.command FROM
+ h:=pg_catalog.substring(j.command,
   'https://([a-z0-9-]+[.]vercel[.]app)/api/reality/governed-employee-shift-worker');
  IF h IS NULL THEN
   RETURN pg_catalog.jsonb_build_object(
