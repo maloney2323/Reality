@@ -2,6 +2,8 @@
 // handoff for large PRs. This NEVER dispatches a child or overrides the
 // existing <=8-file native admission gate; no parallel engine or worker.
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {evaluateRealityFinalLoopChildRecovery}
+ from './reality-shift-unified-execution-controller-v1.js';
 export const FINAL_LOOP_PR_SOURCE_HANDOFF_VERSION=
  'reality-final-loop-pr-source-handoff-v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -102,6 +104,13 @@ export async function connectFinalLoopPrSourcePlanToSignedShift({
    manifest_file_count:complete?p.manifest_file_count:0,
    proposed_scope_count:complete?p.bounded_scope_count:0,
    next_governed_action:actionFor(d.native_phase),
+   // One canonical Final Loop controller owns these recovery decisions.
+   // No source-plan wrapper can override its independent proof gates.
+   engine_child_recovery:complete?
+    evaluateRealityFinalLoopChildRecovery({
+     parent:parents[0],sourcePlan:p,ownerId:graph.owner_id,
+     shiftId:graph.shift_id
+    }):null,
    // Local evidence-only proposal, never proof of factual acceptance.
    plan:complete?p:null
   }));
