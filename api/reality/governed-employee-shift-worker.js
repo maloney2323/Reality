@@ -24,7 +24,8 @@ import {createRileyServiceOriginalRuntime}
 import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {runAuthorizedRileyPrReview,
- inspectCurrentRileyPrReviewSourceReadiness}
+ inspectCurrentRileyPrReviewSourceReadiness,
+ shouldFenceRileyPrClaimForObservedIncompatibility}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
 import {executeExactlyPreparedRileyReviewViaReality}
  from '../../src/reality-riley-governed-pr-provider-bridge-v1.js';
@@ -2606,7 +2607,18 @@ export default async function handler(req,res){
   // Any uncertain GitHub write is fenced in the database and never re-POSTed.
   let rileyOriginalReview;
   try{
+   const incompatiblePreclaim=hasReview&&
+    shouldFenceRileyPrClaimForObservedIncompatibility({
+     graph:unifiedGraph,inspection:rileyPrSourceReadiness
+    });
    rileyOriginalReview=hasReview?
+    incompatiblePreclaim?{
+     status:'PR_REVIEW_SIGNED_SOURCES_INCOMPATIBLE_NO_CLAIM_OR_RETRY',
+     source_diagnostics:rileyPrSourceReadiness.source_diagnostics,
+     owner_approval_granted:false,worker_claim_consumed:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    }:
     await runAuthorizedRileyPrReview({db,env:process.env}):
     {status:'NO_CURRENT_UNSETTLED_OWNER_PR_REVIEW',
      original_job_completed:false,installation_authorized:false,
