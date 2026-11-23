@@ -41,7 +41,11 @@ function verifyCanonicalQualificationHandoffs(proof,graph){
      !/^[A-Z][A-Z0-9_]{5,120}$/.test(h.qualifier_next_action||'')||
      !Number.isFinite(Date.parse(h.qualifier_checked_at||''))||
      !Number.isInteger(h.source_step_index)||h.source_step_index<1||
-     h.proposed_transition!=='SUSPEND'||
+     !['SUSPEND','RECOVER'].includes(h.proposed_transition)||
+     (h.proposed_transition==='RECOVER'&&
+       h.recovery_authority_scope!=='INTERNAL_MAINTENANCE_ONLY')||
+     (h.proposed_transition==='SUSPEND'&&
+       h.recovery_authority_scope!=='NO_DISPATCH')||
      !['AUTHORITY_NOT_VERIFIED','BLOCKER_ATTESTATION_PENDING']
        .includes(h.reason_code)||
      h.diagnosis_consumable!==true||
@@ -72,7 +76,8 @@ function verifyCanonicalQualificationHandoffs(proof,graph){
    qualifier_checked_at:h.qualifier_checked_at,
    next_qualified_action:h.qualifier_next_action,
    unresolved_proof_gates:Object.freeze([...h.unresolved_proof_gates]),
-   decision:'SUSPEND',reason_code:h.reason_code,
+   decision:h.proposed_transition,reason_code:h.reason_code,
+   recovery_authority_scope:h.recovery_authority_scope,
    registered_capability_lease:false,transition_committed:false,
    executor_invoked:false,execution_authorized:false,
    owner_approval_granted:false,original_job_completed:false
