@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readOwnerTimeHorizonEvidence}
  from '../api/reality/personal-time-horizon.js';
+import {projectFinalLoopOwnerReviewedRecoveryGuidance}
+ from '../src/reality-final-loop-owner-time-bridge-v1.js';
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
 const root='cccccccc-cccc-4ccc-cccc-cccccccccccc';
@@ -259,4 +261,69 @@ test('cross-owner, missing settlement evidence or invented counts never appear a
   assert.equal(r.final_loop_parent_outcomes.verified_parent_count,null);
   assert.equal(r.approved_new_work_by_read,false);
  }
+});
+
+
+// An independently reviewed recovery and a source-backed pending original
+// feed a single owner-scoped read-only Past/Present/Future/CEO projection.
+// The owner must still approve the actual effect; history is not settlement.
+test('reviewed recovery informs owner past present future CEO without authorizing execution',()=>{
+ const pr='https://github.com/maloney2323/Reality/pull/307';
+ const planId='33333333-3333-4333-8333-333333333333';
+ const incident='44444444-4444-4444-8444-444444444444';
+ const baseView={
+  status:'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY',
+  owner_scope_verified:true,owner_id:owner,shift_id:shift,
+  continuity_head_sha256:sha('9'),original_job_completed:false,
+  external_execution_authorized:false
+ };
+ const sourcePlans={
+  status:'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY',
+  owner_id:owner,shift_id:shift,owner_scope_verified:true,read_only:true,
+  plans:[{plan_id:planId,source_ref:pr,parent_original_work_id:work,
+   source_manifest_sha256:sha('7'),parent_source_phase:'BLOCKED',
+   state:'PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION'}]
+ };
+ const preflight={
+  status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_READ_ONLY',
+  owner_id:owner,shift_id:shift,read_only:true,
+  execution_authorized:false,
+  plans:[{plan_id:planId,source_ref:pr,parent_original_work_id:work,
+   source_manifest_sha256:sha('7'),acceptance_contract_sha256:sha('8'),
+   verified_signed_source_goal_contract_prepared:true,
+   pending_exact_owner_approval:true,independent_goal_acceptance_verified:false}]
+ };
+ const actions={
+  status:'OWNER_SIGNED_SHIFT_RECOVERY_ACTIONS_READ_ONLY',
+  owner_id:owner,owner_scope_verified:true,read_only:true,
+  items:[{incident_id:incident,shift_id:shift,
+   kind:'SIGNED_SHIFT_REPEATED_NO_PROGRESS',
+   action_independently_rechecked:true,
+   action_receipt_sha256:sha('1'),
+   independent_review_receipt_sha256:sha('2'),
+   owner_next_action:'EXACT_OWNER_SOURCE_SCOPE_AND_ITEMIZED_BUSINESS_WARRANT_REQUIRED_IN_CHAT',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false}]
+ };
+ const g=projectFinalLoopOwnerReviewedRecoveryGuidance({
+  ownerView:baseView,sourcePlans,preflight,recoveryActions:actions,
+  ownerPackets:{status:'FINAL_LOOP_OWNER_EXACT_CHILD_APPROVALS_READ_ONLY',
+   owner_id:owner,shift_id:shift,read_only:true,packets:[]}
+ });
+ assert.equal(g.status,'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY');
+ assert.equal(g.continuity_head_sha256,sha('9'));
+ assert.equal(g.original_work_id,work);
+ assert.equal(g.past.reviewed_recovery_is_not_original_settlement,true);
+ assert.equal(g.present.original_settled,false);
+ assert.equal(g.future.next_governed_action,
+  'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET');
+ assert.equal(g.ceo.required_next_action,g.future.next_governed_action);
+ assert.equal(g.ceo.autonomous_authority_granted,false);
+ assert.equal(g.action_dispatched,false);
+ assert.equal(g.original_job_completed,false);
+ const foreign=projectFinalLoopOwnerReviewedRecoveryGuidance({
+  ownerView:{...baseView,owner_id:root},
+  sourcePlans,preflight,recoveryActions:actions});
+ assert.notEqual(foreign.status,'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY');
+ assert.equal(foreign.authority_granted,false);
 });
