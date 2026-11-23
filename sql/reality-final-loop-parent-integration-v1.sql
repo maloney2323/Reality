@@ -383,7 +383,7 @@ BEGIN
   'last_scope_index',v_batch.last_scope_index,
   'verified_child_receipts_sha256',v_current,
   'reviews',v_reviews,'read_only',true,'integration_model_authorized',true,
-  'original_job_completed':false,'production_changed':false);
+  'original_job_completed',false,'production_changed',false);
 END $fn$;
 
 REVOKE ALL ON FUNCTION
