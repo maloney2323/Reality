@@ -310,6 +310,33 @@
     ' unfinished original/source obligation(s). '+
     'Verified results inform the next decision; neither Universe nor Future authorizes execution.';
   }
+  // Governing Reality's own engineering uses the SAME original/Continuity
+  // and the independently read service-only maintenance warrant; a model
+  // draft never becomes an installed or settled repair on this screen.
+  const engineering=data.final_loop_governed_engineering;
+  const engineeringReady=
+   ['ENGINEERING_EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED',
+    'ENGINEERING_INDEPENDENT_FROZEN_RED_STILL_REQUIRED',
+    'ENGINEERING_CASE_CI_VERIFIED_ORIGINAL_STILL_OPEN'].includes(
+     engineering?.status)&&
+   engineering.read_only===true&&
+   engineering.original_job_completed===false&&
+   engineering.installation_authorized===false&&
+   engineering.engineering_handler_dispatch_authorized===false&&
+   engineering.owner_approval_granted===false&&
+   engineering.continuity_head_sha256===horizon?.continuity_head_sha256&&
+   engineering.owner_id===horizon?.owner_id&&
+   engineering.shift_id===horizon?.shift_id&&
+   engineering.source_not_replaced===true&&
+   /^work:[a-f0-9]{32}$/.test(engineering.original_work_id||'')&&
+   /^[A-Z][A-Z0-9_]{6,130}$/.test(engineering.next_governed_action||'');
+  if(engineeringReady){
+   const next=engineering.next_governed_action
+    .replaceAll('_',' ').toLowerCase();
+   executive.textContent+=' Governed engineering · Original work remains open. '+
+    'Next required engineering proof: '+next+
+    '. A code candidate or CI run cannot authorize its own installation.';
+  }
   return true;
  }
  async function load(){
