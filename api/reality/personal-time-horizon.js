@@ -4,7 +4,8 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
-import {projectOwnerFinalLoopTimeReadback}
+import {projectOwnerFinalLoopTimeReadback,
+ projectFinalLoopOwnerReviewedRecoveryGuidance}
  from '../../src/reality-final-loop-owner-time-bridge-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -226,6 +227,44 @@ export async function readOwnerTimeHorizonEvidence({
     };
    }
   }
+  // Read the SAME signed shift's verified recovery and owner-packet evidence
+  // into Past/Present/Future and CEO guidance. Do not change canonical
+  // completion or authorization, and never self-certify this as settlement.
+  let finalLoopRecoveryGuidance={
+   status:'FINAL_LOOP_OWNER_RECOVERY_GUIDANCE_NOT_ENABLED',
+   read_only:true,original_job_completed:false,authority_granted:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'&&
+     env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED==='true'&&
+     finalLoopOwner.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopSourcePlans.status===
+      'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY'){
+   try{
+    const [preflight,recoveryActions,ownerPackets]=await Promise.all([
+     call(db,'reality_read_final_loop_child_approval_preflight_v1',{
+      p_shift_id:finalLoopOwner.shift_id},{timeoutMs:6000}),
+     call(db,'reality_read_owner_signed_shift_recovery_actions_v1',{
+      p_owner_id:ownerId},{timeoutMs:6000}),
+     call(db,'reality_read_owner_final_loop_child_approvals_v1',{
+      p_owner_id:ownerId,p_shift_id:finalLoopOwner.shift_id
+     },{timeoutMs:6000})
+    ]);
+    finalLoopRecoveryGuidance=projectFinalLoopOwnerReviewedRecoveryGuidance({
+     ownerView:finalLoopOwner,sourcePlans:finalLoopSourcePlans,
+     preflight,recoveryActions,ownerPackets
+    });
+    if(finalLoopRecoveryGuidance.status===
+       'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY')
+     finalLoopOwner=Object.freeze({...finalLoopOwner,
+      recovery_guidance:finalLoopRecoveryGuidance});
+   }catch{
+    finalLoopRecoveryGuidance={
+     status:'FINAL_LOOP_OWNER_RECOVERY_GUIDANCE_INDEPENDENT_READBACK_FAILED',
+     read_only:true,original_job_completed:false,authority_granted:false
+    };
+   }
+  }
   // Separately verified native+Universe parent settlement becomes Past
   // evidence. Pending parent delivery remains Present, never invented Past.
   let finalLoopParentOutcomes={
@@ -305,6 +344,7 @@ export async function readOwnerTimeHorizonEvidence({
    final_loop_owner:finalLoopOwner,
    final_loop_source_plans:finalLoopSourcePlans,
    final_loop_parent_outcomes:finalLoopParentOutcomes,
+   final_loop_recovery_guidance:finalLoopRecoveryGuidance,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null
