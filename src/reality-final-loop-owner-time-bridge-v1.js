@@ -114,3 +114,131 @@ export function projectOwnerFinalLoopTimeReadback({
   original_job_completed:false,production_changed:false
  });
 }
+
+
+// Owner Past/Present/Future and CEO consume the SAME canonical Continuity head
+// and reviewed recovery evidence. This is a bounded advisory projection, not
+// another orchestrator, a second ledger, authority, or an independent outcome.
+// Do not recast a historical recovery review as a settled business original.
+export function projectFinalLoopOwnerReviewedRecoveryGuidance({
+ ownerView,sourcePlans,preflight,recoveryActions,ownerPackets
+}={}){
+ const base=Object.freeze({
+  schema:'reality-final-loop-owner-reviewed-recovery-guidance-v1',
+  read_only:true,authority_granted:false,
+  action_dispatched:false,recovery_verified:false,
+  original_job_completed:false,production_changed:false,
+  past:{reviewed_recovery_is_not_original_settlement:true},
+  present:null,future:null,ceo:null
+ });
+ const done=(status,more={})=>Object.freeze({...base,status,...more});
+ if(ownerView?.status!=='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'||
+    ownerView.owner_scope_verified!==true||
+    !UUID.test(ownerView.owner_id||'')||
+    !UUID.test(ownerView.shift_id||'')||
+    !HASH.test(ownerView.continuity_head_sha256||'')||
+    ownerView.original_job_completed!==false||
+    ownerView.external_execution_authorized!==false||
+    sourcePlans?.status!==
+      'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY'||
+    sourcePlans.owner_id!==ownerView.owner_id||
+    sourcePlans.shift_id!==ownerView.shift_id||
+    sourcePlans.owner_scope_verified!==true||
+    sourcePlans.read_only!==true||
+    !Array.isArray(sourcePlans.plans)||
+    preflight?.status!=='FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_READ_ONLY'||
+    preflight.owner_id!==ownerView.owner_id||
+    preflight.shift_id!==ownerView.shift_id||
+    preflight.read_only!==true||
+    preflight.execution_authorized!==false||
+    !Array.isArray(preflight.plans)||
+    recoveryActions?.status!=='OWNER_SIGNED_SHIFT_RECOVERY_ACTIONS_READ_ONLY'||
+    recoveryActions.owner_id!==ownerView.owner_id||
+    recoveryActions.owner_scope_verified!==true||
+    recoveryActions.read_only!==true||
+    !Array.isArray(recoveryActions.items))
+  return done('FINAL_LOOP_OWNER_RECOVERY_SOURCE_OR_CONTINUITY_UNVERIFIED');
+ const verifiedActions=recoveryActions.items.filter(x=>
+  x.shift_id===ownerView.shift_id&&
+  x.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'&&
+  x.action_independently_rechecked===true&&
+  HASH.test(x.action_receipt_sha256||'')&&
+  HASH.test(x.independent_review_receipt_sha256||'')&&
+  x.owner_next_action===
+   'EXACT_OWNER_SOURCE_SCOPE_AND_ITEMIZED_BUSINESS_WARRANT_REQUIRED_IN_CHAT'&&
+  x.original_job_completed===false&&x.installation_authorized===false&&
+  x.production_changed===false);
+ if(verifiedActions.length!==1)
+  return done('FINAL_LOOP_OWNER_REVIEWED_RECOVERY_ACTION_UNAVAILABLE_OR_AMBIGUOUS');
+ const candidates=preflight.plans.filter(p=>
+  p.verified_signed_source_goal_contract_prepared===true&&
+  p.pending_exact_owner_approval===true&&
+  p.independent_goal_acceptance_verified===false&&
+  HASH.test(p.acceptance_contract_sha256||'')&&
+  sourcePlans.plans.some(x=>x.plan_id===p.plan_id&&
+   x.source_ref===p.source_ref&&
+   x.parent_original_work_id===p.parent_original_work_id&&
+   x.source_manifest_sha256===p.source_manifest_sha256&&
+   x.parent_source_phase==='BLOCKED'&&
+   x.state==='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION'&&
+   WORK.test(x.parent_original_work_id||'')));
+ if(candidates.length!==1)
+  return done('FINAL_LOOP_OWNER_EXACT_ORIGINAL_SOURCE_CANDIDATE_REQUIRED');
+ const p=candidates[0];
+ if(ownerPackets!==null&&ownerPackets!==undefined&&(
+   ownerPackets.status!=='FINAL_LOOP_OWNER_EXACT_CHILD_APPROVALS_READ_ONLY'||
+   ownerPackets.owner_id!==ownerView.owner_id||
+   ownerPackets.shift_id!==ownerView.shift_id||
+   ownerPackets.read_only!==true||
+   !Array.isArray(ownerPackets.packets)))
+  return done('FINAL_LOOP_OWNER_PACKET_READBACK_UNVERIFIED');
+ const matching=ownerPackets?.packets?.filter(x=>
+  x.source_ref===p.source_ref&&
+  x.parent_original_work_id===p.parent_original_work_id&&
+  x.source_manifest_sha256===p.source_manifest_sha256&&
+  x.acceptance_contract_sha256===p.acceptance_contract_sha256)??[];
+ if(matching.length>1)
+  return done('FINAL_LOOP_OWNER_DUPLICATE_EXACT_APPROVAL_PACKET_RECHECK_REQUIRED');
+ const packet=matching[0]||null;
+ const next=packet?
+  packet.state==='AWAITING_EXACT_OWNER_APPROVAL'&&
+   packet.approved===false&&UUID.test(packet.packet_id||'')?
+   'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT':
+  'RECONCILE_EXACT_APPROVAL_AND_SIGNED_CHILD_CLAIM':
+  'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET';
+ return done('FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY',{
+  owner_id:ownerView.owner_id,shift_id:ownerView.shift_id,
+  continuity_head_sha256:ownerView.continuity_head_sha256,
+  incident_id:verifiedActions[0].incident_id,
+  original_work_id:p.parent_original_work_id,
+  source_ref:p.source_ref,plan_id:p.plan_id,
+  incident_causal_lineage_independently_verified:false,
+  past:{
+   status:'HISTORICAL_RECOVERY_ACTION_INDEPENDENTLY_REVIEWED_ONLY',
+   independent_recovery_receipt_sha256:
+    verifiedActions[0].independent_review_receipt_sha256,
+   reviewed_recovery_is_not_original_settlement:true
+  },
+  present:{
+   status:packet?
+    'EXACT_SOURCE_BOUND_OWNER_PACKET_OBSERVED':
+    'EXACT_SOURCE_BOUND_OWNER_PACKET_NOT_YET_OBSERVED',
+   original_work_id:p.parent_original_work_id,
+   approval_packet_id:packet?.packet_id??null,
+   source_ref:p.source_ref,
+   owner_approval_pending:!packet||packet.approved===false,
+   original_settled:false
+  },
+  future:{
+   next_governed_action:next,
+   automatically_executable:false,
+   original_outcome_verified:false
+  },
+  ceo:{
+   priority:'RESOLVE_EXISTING_FINAL_LOOP_RECOVERY_HANDOFF',
+   required_next_action:next,
+   independent_outcome_required:true,
+   autonomous_authority_granted:false
+  }
+ });
+}
