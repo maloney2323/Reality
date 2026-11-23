@@ -105,3 +105,70 @@ test('cross-owner canonical proof cannot appear as owner executive priority',asy
  assert.equal(r.final_loop_owner.executive,null);
  assert.equal(r.approved_new_work_by_read,false);
 });
+
+test('owner Present/CEO can read pinned proposed scopes without making Future executable',async()=>{
+ const pr='https://github.com/maloney2323/Reality/pull/307';
+ const p={...proof,jobs:[{...proof.jobs[0],source_ref:pr,
+  source_phase:'BLOCKED',
+  native_next_governed_action:'READ_CURRENT_PR_REVIEW_PROVIDER_EFFECT'}]};
+ const env={VERCEL_ENV:'preview',
+  REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED:'true',
+  REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED:'true'};
+ const calls=[];
+ const r=await readOwnerTimeHorizonEvidence({ownerId:owner,db:{},now:moment,env,
+  call:async(_db,name,args)=>{
+   calls.push(name);
+   if(name==='reality_read_current_final_loop_proof_envelope_v1')return p;
+   if(name==='reality_read_final_loop_pr_source_plans_v1')return {
+    schema:'reality-final-loop-pr-source-plans-readback-v1',
+    status:'FINAL_LOOP_PROPOSED_SOURCE_PLANS_NOT_EXECUTABLE',
+    owner_id:owner,shift_id:shift,plan_fingerprint:sha('3'),
+    read_only:true,execution_authorized:false,
+    original_job_completed:false,child_originals_admitted:0,
+    plans:[{source_ref:pr,parent_original_work_id:work,
+     source_manifest_sha256:sha('7'),source_head_sha:'8'.repeat(40),
+     file_count:34,proposed_scope_count:5,
+     state:'PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION',
+     independent_source_review_verified:false,
+     owner_acceptance_verified:false,child_originals_admitted:0}]
+   };
+   return api(_db,name,args);
+  }});
+ assert.equal(calls.length,5);
+ assert.equal(r.final_loop_owner.status,
+  'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY');
+ assert.equal(r.final_loop_source_plans.status,
+  'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY');
+ assert.equal(r.final_loop_source_plans.plans[0].proposed_scope_count,5);
+ assert.equal(r.final_loop_owner.executive.execution_authorized,false);
+ assert.equal(r.final_loop_owner.time_horizon.future.automatically_authorized_jobs,0);
+ assert.equal(r.new_jobs_created_by_read,0);
+});
+test('foreign or falsely authorized source-plan readback is not accepted by owner UI',async()=>{
+ const pr='https://github.com/maloney2323/Reality/pull/307';
+ const p={...proof,jobs:[{...proof.jobs[0],source_ref:pr}]};
+ const env={VERCEL_ENV:'preview',
+  REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED:'true',
+  REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED:'true'};
+ for(const bad of [
+  {owner_id:root,execution_authorized:false},
+  {owner_id:owner,execution_authorized:true}
+ ]){
+  const r=await readOwnerTimeHorizonEvidence({ownerId:owner,db:{},now:moment,env,
+   call:async(_db,name,args)=>{
+    if(name==='reality_read_current_final_loop_proof_envelope_v1')return p;
+    if(name==='reality_read_final_loop_pr_source_plans_v1')return {
+     schema:'reality-final-loop-pr-source-plans-readback-v1',
+     status:'FINAL_LOOP_PROPOSED_SOURCE_PLANS_NOT_EXECUTABLE',
+     owner_id:bad.owner_id,shift_id:shift,plan_fingerprint:sha('3'),
+     read_only:true,execution_authorized:bad.execution_authorized,
+     original_job_completed:false,child_originals_admitted:0,plans:[]
+    };
+    return api(_db,name,args);
+   }});
+  assert.equal(r.final_loop_source_plans.owner_scope_verified,false);
+  assert.equal(r.final_loop_source_plans.status,
+   'FINAL_LOOP_SOURCE_PLAN_OWNER_VIEW_NOT_ENABLED');
+  assert.equal(r.final_loop_owner.external_execution_authorized,false);
+ }
+});
