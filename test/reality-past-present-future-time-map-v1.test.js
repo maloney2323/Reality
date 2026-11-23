@@ -112,3 +112,17 @@ test('one independently reviewed blocker guides Past Present Future and CEO with
  assert.match(ui,/Future \/ CEO next permitted step:/);
  assert.doesNotMatch(ui,/fetch\(.*reality_owner_approve_final_loop_child_v1/);
 });
+
+
+test('Universe feedback shows verified outcomes without treating Future as authority',()=>{
+ assert.match(api,/projectFinalLoopUniverseFeedback/);
+ assert.match(api,/final_loop_universe_feedback:finalLoopUniverseFeedback/);
+ assert.match(ui,/data\.final_loop_universe_feedback/);
+ assert.match(ui,/FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY/);
+ assert.match(ui,/universe\.continuity_head_sha256===horizon\.continuity_head_sha256/);
+ assert.match(ui,/universe\.universe_readback_verified===true/);
+ assert.match(ui,/universe\.future_is_not_execution_authority===true/);
+ assert.match(ui,/universe\.execution_authorized===false/);
+ assert.match(ui,/Universe continuity/);
+ assert.doesNotMatch(ui,/reality_record_final_loop_parent_settlement_v1/);
+});
