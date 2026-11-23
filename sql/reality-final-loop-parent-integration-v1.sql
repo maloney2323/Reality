@@ -299,11 +299,100 @@ BEGIN
   'original_job_completed',false,'production_changed',false);
 END $fn$;
 
+-- A fresh service-only readback protects model inference against
+-- mid-call authority, source-head, child receipt, or lease changes.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_parent_integration_claim_v1(
+ p_batch_id uuid,p_claim_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_batch record;v_plan record;v_packet record;v_reviews jsonb;
+ v_current text;v_n integer;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_INTEGRATION_READ_SERVICE_ONLY';END IF;
+ SELECT i.* INTO v_batch FROM reality_internal.final_loop_parent_integration_batches_v1 i
+ WHERE i.batch_id=p_batch_id AND i.claim_id=p_claim_id
+  AND i.verifier_worker_run_id=p_worker_run_id AND i.phase='CLAIMED';
+ IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM
+  reality_internal.signed_worker_actual_runs_v1 r
+   WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+    AND r.finished_at IS NULL
+    AND r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_INTEGRATION_CURRENT_CLAIM_UNVERIFIED',
+  'integration_model_authorized',false);END IF;
+ SELECT * INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1 p
+ WHERE p.plan_id=v_batch.plan_id AND p.shift_id=v_batch.shift_id
+  AND p.owner_id=v_batch.owner_id
+  AND p.source_manifest_sha256=v_batch.source_manifest_sha256
+  AND p.source_head_sha=v_batch.source_head_sha;
+ SELECT * INTO v_packet FROM reality_internal.final_loop_child_approval_packets_v1 a
+ WHERE a.packet_id=v_batch.packet_id AND a.plan_id=v_batch.plan_id
+  AND a.state='EFFECT_RESERVED_RECONCILE_ONLY'
+  AND a.source_manifest_sha256=v_batch.source_manifest_sha256
+  AND a.acceptance_contract_sha256=v_batch.acceptance_contract_sha256;
+ IF v_plan.plan_id IS NULL OR v_packet.packet_id IS NULL OR
+  NOT EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 parent
+   WHERE parent.original_work_id=v_batch.parent_original_work_id
+    AND parent.shift_id=v_batch.shift_id AND parent.owner_id=v_batch.owner_id
+    AND parent.phase='BLOCKED' AND parent.review_body IS NULL
+    AND parent.provider_comment_id IS NULL
+    AND parent.settlement_receipt_id IS NULL)
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_INTEGRATION_PARENT_OR_APPROVAL_STALE',
+  'integration_model_authorized',false);END IF;
+ SELECT pg_catalog.count(*),'sha256:'||pg_catalog.encode(
+  pg_catalog.sha256(pg_catalog.convert_to(pg_catalog.jsonb_agg(
+   pg_catalog.jsonb_build_object(
+    'index',c.scope_index,'child_work_id',c.child_work_id,
+    'review_sha256',c.review_sha256,
+    'independent_receipt_sha256',c.independent_review_receipt_sha256
+   ) ORDER BY c.scope_index)::text,'UTF8')),'hex'),
+  pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+   'index',c.scope_index,'child_work_id',c.child_work_id,
+   'review_excerpt',pg_catalog.left(c.review_body,1300),
+   'review_sha256',c.review_sha256,
+   'independent_receipt_sha256',c.independent_review_receipt_sha256,
+   'scope_sha256',c.scope_sha256,
+   'files',v_plan.source_plan->'bounded_scopes'->c.scope_index->'files'
+  ) ORDER BY c.scope_index)
+ INTO v_n,v_current,v_reviews
+ FROM reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.plan_id=v_batch.plan_id
+  AND c.scope_index BETWEEN v_batch.first_scope_index AND v_batch.last_scope_index
+  AND c.phase='INDEPENDENTLY_VERIFIED'
+  AND c.claimant_worker_run_id<>p_worker_run_id
+  AND c.independent_verifier_run_id<>p_worker_run_id;
+ IF v_n<>(v_batch.last_scope_index-v_batch.first_scope_index+1) OR
+  v_current<>v_batch.verified_child_receipts_sha256 THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_PARENT_INTEGRATION_CHILD_PROOFS_CHANGED',
+   'integration_model_authorized',false);END IF;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','CURRENT_INDEPENDENT_PARENT_INTEGRATION_SCOPE',
+  'owner_id',v_batch.owner_id,'shift_id',v_batch.shift_id,
+  'batch_id',v_batch.batch_id,'claim_id',v_batch.claim_id,
+  'worker_run_id',p_worker_run_id,'plan_id',v_batch.plan_id,
+  'parent_original_work_id',v_batch.parent_original_work_id,
+  'source_ref',v_plan.source_ref,'source_proof_sha256',v_plan.source_proof_sha256,
+  'source_head_sha',v_batch.source_head_sha,
+  'source_base_sha',v_plan.source_base_sha,
+  'source_manifest_sha256',v_batch.source_manifest_sha256,
+  'acceptance_contract_sha256',v_batch.acceptance_contract_sha256,
+  'batch_index',v_batch.batch_index,
+  'first_scope_index',v_batch.first_scope_index,
+  'last_scope_index',v_batch.last_scope_index,
+  'verified_child_receipts_sha256',v_current,
+  'reviews',v_reviews,'read_only':true,'integration_model_authorized':true,
+  'original_job_completed':false,'production_changed':false);
+END $fn$;
+
 REVOKE ALL ON FUNCTION
  public.reality_claim_final_loop_parent_integration_v1(uuid,uuid),
- public.reality_record_final_loop_parent_integration_v1(uuid,uuid,uuid,jsonb)
+ public.reality_record_final_loop_parent_integration_v1(uuid,uuid,uuid,jsonb),
+ public.reality_read_final_loop_parent_integration_claim_v1(uuid,uuid,uuid)
  FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION
  public.reality_claim_final_loop_parent_integration_v1(uuid,uuid),
- public.reality_record_final_loop_parent_integration_v1(uuid,uuid,uuid,jsonb)
+ public.reality_record_final_loop_parent_integration_v1(uuid,uuid,uuid,jsonb),
+ public.reality_read_final_loop_parent_integration_claim_v1(uuid,uuid,uuid)
  TO service_role;
