@@ -200,6 +200,14 @@ export async function advanceOneFinalLoopChildReview({
  const model=env.REALITY_OPENAI_MODEL||'gpt-4.1-mini';
  let c,mode;
  try{
+  const recovery=await call(db,
+   'reality_reconcile_final_loop_child_premodel_v1',{
+    p_shift_id:shiftId,p_worker_run_id:workerRunId
+   },{fetchImpl});
+  if(!['FINAL_LOOP_NO_SAFE_PREMODEL_CHILD_RECOVERY_READY',
+    'FINAL_LOOP_SAME_CHILD_PREMODEL_RECOVERY_DURABLY_QUALIFIED'].includes(
+     recovery?.status))
+   return no('FINAL_LOOP_CHILD_PREMODEL_RECOVERY_SCOPE_UNVERIFIED');
   const review=await call(db,'reality_read_final_loop_child_verify_v1',{
    p_shift_id:shiftId,p_verifier_run_id:workerRunId},{fetchImpl});
   if(review?.status==='FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE'){
