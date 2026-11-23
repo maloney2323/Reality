@@ -897,3 +897,44 @@ GRANT EXECUTE ON FUNCTION
  public.reality_record_final_loop_parent_settlement_v1(uuid,uuid,uuid,jsonb),
  public.reality_read_final_loop_parent_settlement_v1(uuid,text)
  TO service_role;
+
+
+-- Existing signed worker asks for the next parent proof obligation. The
+-- canonical child + integration verifier decides whether it is ready.
+CREATE OR REPLACE FUNCTION public.reality_prepare_next_final_loop_parent_delivery_v1(
+ p_shift_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_plan uuid;v_pending jsonb;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_PARENT_NEXT_SERVICE_ONLY';END IF;
+ IF p_shift_id IS NULL OR p_worker_run_id IS NULL OR NOT EXISTS(
+  SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+  WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+   AND r.finished_at IS NULL)
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_PARENT_NEXT_SIGNED_WORKER_REQUIRED',
+  'parent_obligation_remains_open',true);END IF;
+ SELECT p.plan_id INTO v_plan
+ FROM reality_internal.final_loop_pr_source_plans_v1 p
+ JOIN reality_internal.final_loop_child_approval_packets_v1 a
+  ON a.plan_id=p.plan_id AND a.owner_id=p.owner_id
+  AND a.shift_id=p.shift_id
+  AND a.state='EFFECT_RESERVED_RECONCILE_ONLY'
+ WHERE p.shift_id=p_shift_id AND p.parent_original_work_id IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_parent_deliveries_v1 d
+   WHERE d.plan_id=p.plan_id AND d.status='SETTLED')
+ ORDER BY p.staged_at,p.plan_id LIMIT 1;
+ IF v_plan IS NULL THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_NO_UNFINISHED_APPROVED_PARENT_RECOVERY_PLAN',
+  'parent_obligation_remains_open',true);END IF;
+ v_pending:=public.reality_prepare_final_loop_parent_delivery_v1(
+  v_plan,p_worker_run_id);
+ RETURN v_pending;
+END $fn$;
+REVOKE ALL ON FUNCTION
+ public.reality_prepare_next_final_loop_parent_delivery_v1(uuid,uuid)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION
+ public.reality_prepare_next_final_loop_parent_delivery_v1(uuid,uuid)
+ TO service_role;
