@@ -274,6 +274,42 @@
     'Future / CEO next permitted step: '+next+
     '. Owner authority and independent outcome proof are still required.';
   }
+  // Universe feedback shares the SAME canonical owner/shift/root/head as
+  // the existing Continuity, Past/Present/Future and CEO. Display only
+  // independently supported outcomes; never promote a pending obligation.
+  const universe=data.final_loop_universe_feedback;
+  const universeReady=universe?.status===
+    'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY'&&
+   universe.read_only===true&&
+   universe.universe_readback_verified===true&&
+   universe.universe_is_not_a_second_truth_ledger===true&&
+   universe.future_is_not_execution_authority===true&&
+   universe.execution_authorized===false&&
+   universe.original_job_completed===false&&
+   universe.shift_completed===false&&
+   horizon?.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+   universe.owner_id===horizon.owner_id&&
+   universe.shift_id===horizon.shift_id&&
+   universe.continuity_head_sha256===horizon.continuity_head_sha256&&
+   universe.continuity_root_id===
+    horizon.canonical_continuity_handoff?.continuity_root_id&&
+   Number.isSafeInteger(universe.verified_parent_count)&&
+   Number.isSafeInteger(universe.unfinished_obligation_count)&&
+   universe.verified_parent_count>=0&&
+   universe.unfinished_obligation_count>=0&&
+   Array.isArray(universe.verified_outcomes)&&
+   Array.isArray(universe.unfinished_obligations)&&
+   universe.verified_outcomes.length===universe.verified_parent_count&&
+   universe.unfinished_obligations.length===
+    universe.unfinished_obligation_count;
+  if(universeReady){
+   executive.textContent+=' Universe continuity · '+
+    universe.verified_parent_count+
+    ' independently verified parent outcome(s), '+
+    universe.unfinished_obligation_count+
+    ' unfinished original/source obligation(s). '+
+    'Verified results inform the next decision; neither Universe nor Future authorizes execution.';
+  }
   return true;
  }
  async function load(){
