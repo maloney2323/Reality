@@ -2253,8 +2253,14 @@ export default async function handler(req,res){
   // classification does not independently authorize or replay that effect.
   // Missing provider authority is a proof/owner boundary, NOT an excuse
   // to synthesize a successful repair or restart the fenced GitHub write.
+  const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
+   env:process.env,dbProject:db.project
+  });
   const registeredRecoveryActionKeys=Object.freeze([
-   'REQUALIFY_EXISTING_CONTINUITY_SOURCE'
+   'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
+   ...(signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'?
+    ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[])
   ]);
   const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
    classification:continuityRecoveryHandoffClassification,
@@ -2268,9 +2274,6 @@ export default async function handler(req,res){
   const signedWorkerCapabilityDelivery=attestSignedWorkerLoadedCapabilities({
    wake:wakeReceipt,graph:unifiedGraph,env:process.env,
    registeredActionKeys:registeredRecoveryActionKeys
-  });
-  const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
-   env:process.env,dbProject:db.project
   });
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
@@ -2679,7 +2682,10 @@ export default async function handler(req,res){
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
    // An exact packet is never an execution warrant. The registered handler
    // independently checks its isolated DB fence and signed source proof.
-   if(finalLoopStagedActionRoutes.status===
+   if(signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'&&
+      registeredRecoveryActionKeys.includes('PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
+      finalLoopStagedActionRoutes.status===
        'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
       finalLoopStagedActionRoutes.routes.some(r=>
        r.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
