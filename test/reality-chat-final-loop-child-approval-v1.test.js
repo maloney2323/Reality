@@ -33,7 +33,8 @@ test('approval API binds one owner session and cannot install, publish or execut
 test('owner consent cannot replace independently verified original goal acceptance',()=>{
  const sql=source('sql/reality-final-loop-child-transactional-v1.sql');
  assert.match(sql,/FINAL_LOOP_INDEPENDENT_PARENT_ACCEPTANCE_OR_SOURCE_NOT_VERIFIED/);
- assert.match(sql,/final_loop_pr_review_acceptance_digest_v1/);\n assert.match(sql,/AWAITING_EXACT_OWNER_APPROVAL/);
+ assert.match(sql,/final_loop_pr_review_acceptance_digest_v1/);
+ assert.match(sql,/AWAITING_EXACT_OWNER_APPROVAL/);
  assert.match(sql,/e\.payload->>'acceptance_contract_sha256'/);
  assert.match(sql,/final_loop_child_approval_packets_v1/);
  assert.match(sql,/owner_approval_receipt_sha256/);
