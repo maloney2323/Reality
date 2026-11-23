@@ -50,7 +50,7 @@ export function inspectFinalLoopSignedWorkerOperatingLane({
   !PROJECT.test(expected||'')||
   !PROJECT.test(dbProject||'')||
   isolated!==expected||isolated!==dbProject||
-  (PROJECT.test(shared||'')&&shared===isolated))
+  !PROJECT.test(shared||'')||shared===isolated)
   return result('FINAL_LOOP_WORKER_ISOLATED_DATABASE_IDENTITY_UNVERIFIED',{
    ...identity,operating_lane:'NORMAL_SIGNED_SHIFT',
    next_governed_action:'VERIFY_INDEPENDENT_DATABASE_BRANCH_AND_SAME_PROJECT_BINDING'
