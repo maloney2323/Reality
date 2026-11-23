@@ -398,3 +398,43 @@ test('owner endpoint carries the same independently reviewed recovery to Past Pr
  assert.equal(got.approved_new_work_by_read,false);
  assert.equal(got.final_loop_recovery_guidance.recovery_verified,false);
 });
+
+
+test('owner PPF CEO surfaces the same-original engineering business warrant without executing',async()=>{
+ const pr='https://github.com/maloney2323/Reality/pull/307';
+ const env={VERCEL_ENV:'preview',
+  REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED:'true',
+  REALITY_FINAL_LOOP_GOVERNED_ENGINEERING_VIEW_ENABLED:'true'};
+ const p={...proof,jobs:[{...proof.jobs[0],source_ref:pr,source_phase:'BLOCKED',
+  native_next_governed_action:'READ_CURRENT_PR_REVIEW_PROVIDER_EFFECT'}]};
+ const calls=[];
+ const r=await readOwnerTimeHorizonEvidence({ownerId:owner,db:{},now:moment,env,
+  call:async(_db,name,args)=>{
+   calls.push(name);
+   if(name==='reality_read_current_final_loop_proof_envelope_v1')return p;
+   if(name==='reality_read_same_original_postmaintenance_gate_v1'){
+    assert.deepEqual(args,{p_shift_id:shift});
+    return {status:'EXISTING_ORIGINAL_AUTHORIZED_INTERNAL_MAINTENANCE',
+     read_only:true,owner_id:owner,shift_id:shift,source_ref:pr,
+     original_work_id:work,
+     existing_maintenance_id:'33333333-3333-4333-8333-333333333333',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,independent_final_receipt_verified:false,
+     canonical_owner_business_original_missing:true,
+     next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'};
+   }
+   return api(_db,name,args);
+  }});
+ assert.equal(calls.length,5);
+ assert.equal(r.final_loop_governed_engineering.status,
+  'ENGINEERING_EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED');
+ assert.equal(r.final_loop_governed_engineering.original_work_id,work);
+ assert.equal(r.final_loop_owner.governed_engineering.continuity_head_sha256,
+  r.final_loop_owner.continuity_head_sha256);
+ assert.equal(r.final_loop_governed_engineering.next_governed_action,
+  'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI');
+ assert.equal(r.final_loop_governed_engineering.original_job_completed,false);
+ assert.equal(r.final_loop_governed_engineering.engineering_handler_dispatch_authorized,false);
+ assert.equal(r.approved_new_work_by_read,false);
+ assert.equal(r.new_jobs_created_by_read,0);
+});
