@@ -175,8 +175,8 @@ test('exact approved child claim becomes a prepared draft only via governed mode
     return {status:'FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION'};
    if(name==='reality_claim_final_loop_child_review_v1')return claim;
    if(name==='reality_read_final_loop_child_model_scope_v1')
-    return {status:'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK',
-     ...claim,worker_run_id:run,phase:'CLAIMED',
+    return {...claim,status:'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK',
+     worker_run_id:run,phase:'CLAIMED',
      model_response_id:null,model_authorized:true};
    if(name==='reality_prepare_final_loop_child_review_v1'){
     prepare++;
