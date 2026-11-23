@@ -200,6 +200,12 @@ export async function deliverOnceApprovedSignedWorkerCapability({
   releaseCandidate.provider_deployment_ready!==true||
   releaseCandidate.environment!=='ISOLATED_PREVIEW'||
   releaseCandidate.production_changed!==false||
+  // A READY staging-only preview would replace normal shift processing with
+  // a restricted diagnostic lane. Never point the existing cron at it.
+  releaseCandidate.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+  releaseCandidate.source_staging_only!==false||
+  releaseCandidate.isolated_database_independently_verified!==true||
+  releaseCandidate.owner_packet_handler_registered!==true||
   ci?.status!=='INDEPENDENT_FROZEN_CI_PASSED'||
   ci.release_sha!==targetReleaseSha||
   ci.independently_verified!==true||
