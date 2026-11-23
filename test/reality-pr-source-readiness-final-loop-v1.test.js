@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import {inspectCurrentRileyPrReviewSourceReadiness as inspect,
  shouldFenceRileyPrClaimForObservedIncompatibility as shouldFence}
  from '../src/reality-riley-authorized-pr-review-job-v1.js';
+import {inspectLargePrSourceForBoundedReview}
+ from '../src/reality-pr-large-source-qualification-v1.js';
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
 const ref=n=>'https://github.com/maloney2323/Reality/pull/'+n;
@@ -177,4 +179,119 @@ test('signed worker reports eligibility separately from native executor and sett
  assert.match(code,/PR_REVIEW_SIGNED_SOURCES_INCOMPATIBLE_NO_CLAIM_OR_RETRY/);
  assert.match(code,/runAuthorizedRileyPrReview/);
  assert.match(code,/final_loop_engine_shadow:finalLoopEngineShadow/);
+});
+
+const fullSourceEnv={...env,
+ REALITY_FINAL_LOOP_LARGE_PR_QUALIFICATION_SHADOW_ENABLED:'true'};
+const fullFiles=n=>Array.from({length:n},(_,i)=>({
+ filename:'src/review-file-'+String(i).padStart(4,'0')+'.js',
+ status:'modified',sha:'c'.repeat(40),additions:1,deletions:2
+ // No patch: inventory evidence must NOT be labeled patch-review coverage.
+}));
+function wholePrProvider({counts={307:34,308:304},drift=0,truncate=false,
+ duplicate=false,badSha=false}={}){
+ const reads={};
+ return async (url,options)=>{
+  assert.equal(options.method,'GET');
+  assert.equal(options.body,undefined);
+  const match=/\/pulls\/(307|308)(?:\/files\?per_page=100&page=(\d+))?$/.exec(url);
+  assert.ok(match,'allowed read-only PR resource');
+  const id=Number(match[1]),count=counts[id];
+  const files=fullFiles(count);
+  if(match[2]){
+   const page=Number(match[2]);
+   const pageFiles=files.slice((page-1)*100,page*100);
+   if(duplicate&&page===1)pageFiles[1]={...pageFiles[0]};
+   if(badSha&&page===1)pageFiles[0]={...pageFiles[0],sha:'bad'};
+   if(truncate&&page===Math.ceil(count/100))pageFiles.pop();
+   return {ok:true,json:async()=>pageFiles};
+  }
+  reads[id]=(reads[id]||0)+1;
+  const head=drift&&reads[id]>1?'b'.repeat(40):'a'.repeat(40);
+  return {ok:true,json:async()=>({
+   number:id,html_url:ref(id),state:'open',draft:true,
+   changed_files:count,head:{sha:head},base:{sha:'d'.repeat(40)}
+  })};
+ };
+}
+test('complete 34/304-file inventories generate bounded proposed scopes but no review or admission',async()=>{
+ const r=await inspect({graph,env:fullSourceEnv,fetchImpl:wholePrProvider()});
+ assert.equal(r.status,'SIGNED_PR_SOURCE_COMPATIBILITY_OBSERVED_READ_ONLY');
+ const [a,b]=r.source_diagnostics.map(x=>x.large_source_qualification);
+ for(const [p,n,groups] of [[a,34,5],[b,304,38]]){
+  assert.equal(p.source_manifest_complete,true);
+  assert.equal(p.manifest_file_count,n);
+  assert.equal(p.bounded_scope_count,groups);
+  assert.equal(p.bounded_scopes.reduce((sum,x)=>sum+x.file_count,0),n);
+  assert.ok(p.bounded_scopes.every(x=>
+   x.file_count<=8&&x.native_child_original_admitted===false&&
+   x.independent_review_verified===false&&
+   x.full_patch_evidence_verified===false&&
+   x.child_execution_authorized===false));
+  const allPaths=p.bounded_scopes.flatMap(x=>x.files.map(f=>f.path));
+  assert.equal(new Set(allPaths).size,n);
+  assert.equal(p.parent_obligation_remains_open,true);
+  assert.equal(p.native_admission_unchanged,true);
+  assert.equal(p.patch_coverage_verified,false);
+  assert.equal(p.cross_scope_review_verified,false);
+  assert.equal(p.draft_review_authority_verified,false);
+  assert.equal(p.worker_claim_consumed,false);
+  assert.equal(p.original_job_completed,false);
+ }
+ assert.equal(a.native_phase,'BLOCKED');
+ assert.equal(b.native_phase,'NOT_ADMITTED');
+ assert.equal(b.original_work_id,null);
+ assert.equal(shouldFence({graph,inspection:r}),true);
+});
+test('manifest read is deterministic and pinned to the complete live base/head',async()=>{
+ const options={job:graph.jobs[0],ownerId:owner,shiftId:shift,
+  metadata:{number:307,html_url:ref(307),state:'open',draft:true,
+   changed_files:34,head:{sha:'a'.repeat(40)},base:{sha:'d'.repeat(40)}},
+  env:fullSourceEnv,fetchImpl:wholePrProvider()};
+ const a=await inspectLargePrSourceForBoundedReview(options);
+ const b=await inspectLargePrSourceForBoundedReview(options);
+ assert.equal(a.source_manifest_sha256,b.source_manifest_sha256);
+ assert.deepEqual(a.bounded_scopes.map(x=>x.proposed_scope_sha256),
+  b.bounded_scopes.map(x=>x.proposed_scope_sha256));
+ assert.equal(a.status,'FULL_DRAFT_MANIFEST_READ_REVIEW_AUTHORITY_PENDING');
+ assert.equal(a.model_invoked,false);
+ assert.equal(a.github_write_performed,false);
+});
+test('truncated provider pages, duplicate files, missing blob SHA and head drift all fail closed',async()=>{
+ const metadata={number:308,html_url:ref(308),state:'open',draft:true,
+  changed_files:304,head:{sha:'a'.repeat(40)},base:{sha:'d'.repeat(40)}};
+ for(const variant of [
+  {truncate:true},{duplicate:true},{badSha:true},{drift:1}
+ ]){
+  const r=await inspectLargePrSourceForBoundedReview({
+   job:graph.jobs[1],ownerId:owner,shiftId:shift,
+   metadata,env:fullSourceEnv,fetchImpl:wholePrProvider(variant)
+  });
+  assert.equal(r.source_manifest_complete,false);
+  assert.equal(r.bounded_scope_count,0);
+  assert.equal(r.worker_claim_consumed,false);
+  assert.equal(r.original_job_completed,false);
+ }
+});
+test('large PR outside hard manifest bound remains unqualified instead of sampling',async()=>{
+ const r=await inspectLargePrSourceForBoundedReview({
+  job:graph.jobs[1],ownerId:owner,shiftId:shift,
+  metadata:{number:308,html_url:ref(308),state:'open',draft:false,
+   changed_files:501,head:{sha:'a'.repeat(40)},base:{sha:'d'.repeat(40)}},
+  env:fullSourceEnv,fetchImpl:async()=>{throw Error('MUST_NOT_FETCH');}
+ });
+ assert.equal(r.status,'LARGE_PR_FULL_SOURCE_QUALIFICATION_UNVERIFIED');
+ assert.equal(r.source_manifest_complete,false);
+ assert.equal(r.bounded_scope_count,0);
+});
+test('qualification gate disabled never reads any extra file pages',async()=>{
+ const calls=[];
+ const r=await inspect({graph,env,fetchImpl:async(url,options)=>{
+  calls.push(url);
+  return wholePrProvider() (url,options);
+ }});
+ assert.equal(r.source_diagnostics[0].large_source_qualification,null);
+ assert.equal(r.source_diagnostics[1].large_source_qualification,null);
+ assert.equal(calls.length,2);
+ assert.ok(calls.every(x=>!/\/files\?/.test(x)));
 });
