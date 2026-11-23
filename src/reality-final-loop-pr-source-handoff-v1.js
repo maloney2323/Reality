@@ -94,25 +94,32 @@ export async function connectFinalLoopPrSourcePlanToSignedShift({
    p.bounded_scopes.every(g=>g.file_count>=1&&g.file_count<=8&&
     g.native_child_original_admitted===false&&
     g.child_execution_authorized===false);
+  const recoveryPolicy=complete?evaluateRealityFinalLoopChildRecovery({
+   parent:parents[0],sourcePlan:p,ownerId:graph.owner_id,
+   shiftId:graph.shift_id
+  }):null;
+  // The native Final Loop controller must accept the full source scope
+  // policy before any evidence-only staging. Unverified file inventory
+  // must not be turned into even a proposed durable child plan.
+  const canonical=complete&&recoveryPolicy?.decision==='SUSPEND'&&
+   ['BIND_SIGNED_PARENT_ACCEPTANCE_AND_CHILD_AUTHORITY',
+    'ADMIT_EXACT_PARENT_ORIGINAL_BEFORE_RECOVERY'].includes(
+     recoveryPolicy.next_governed_action);
   proposals.push(Object.freeze({
-   source_ref:d.source_ref,status:complete?
+   source_ref:d.source_ref,status:canonical?
     'COMPLETE_CHILD_SCOPE_SOURCE_PLAN_STILL_UNADMITTED':
     'CHILD_SOURCE_MANIFEST_OR_SIGNED_IDENTITY_MISMATCH',
    native_phase:d.native_phase,
    original_work_id:d.original_work_id,
-   source_manifest_sha256:complete?p.source_manifest_sha256:null,
-   manifest_file_count:complete?p.manifest_file_count:0,
-   proposed_scope_count:complete?p.bounded_scope_count:0,
+   source_manifest_sha256:canonical?p.source_manifest_sha256:null,
+   manifest_file_count:canonical?p.manifest_file_count:0,
+   proposed_scope_count:canonical?p.bounded_scope_count:0,
    next_governed_action:actionFor(d.native_phase),
    // One canonical Final Loop controller owns these recovery decisions.
    // No source-plan wrapper can override its independent proof gates.
-   engine_child_recovery:complete?
-    evaluateRealityFinalLoopChildRecovery({
-     parent:parents[0],sourcePlan:p,ownerId:graph.owner_id,
-     shiftId:graph.shift_id
-    }):null,
+   engine_child_recovery:recoveryPolicy,
    // Local evidence-only proposal, never proof of factual acceptance.
-   plan:complete?p:null
+   plan:canonical?p:null
   }));
  }
  if(proposals.some(x=>x.status==='CHILD_SOURCE_MANIFEST_OR_SIGNED_IDENTITY_MISMATCH'))
