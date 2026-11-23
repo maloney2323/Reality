@@ -154,3 +154,18 @@ test('worker reuses canonical Universe readback without calling any independent 
  assert.match(worker,/REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED/);
  assert.match(worker,/FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE/);
 });
+
+
+test('owner and signed worker resolve identical Universe facts from one canonical head',()=>{
+ const ownerRead=feedback({canonicalView:view,parentOutcomes:outcomes([verified])});
+ const workerRead=feedback({
+  canonicalView:{...view,status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'},
+  parentOutcomes:{...outcomes([verified]),
+   status:'FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY'}
+ });
+ assert.equal(ownerRead.status,
+  'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY');
+ assert.deepEqual(workerRead,ownerRead);
+ assert.equal(workerRead.execution_authorized,false);
+ assert.equal(workerRead.shift_completed,false);
+});
