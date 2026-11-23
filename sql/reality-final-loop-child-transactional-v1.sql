@@ -250,3 +250,243 @@ BEGIN
   'child_originals_admitted',0,'original_job_completed',false,
   'production_changed',false);
 END $fn$;
+
+
+-- Atomic batch creation is one child per actual bounded source scope. This
+-- consumes the packet's one-use execution authority only when an actual
+-- signed worker has capacity. A failure after CLAIMED requires reconciliation,
+-- never a blind second model invocation or external publication.
+CREATE OR REPLACE FUNCTION public.reality_claim_final_loop_child_review_v1(
+ p_shift_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_packet record;v_plan record;v_parent record;v_child record;
+ v_scope jsonb;v_expected integer;v_actual integer;v_work text;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_CLAIM_SERVICE_ONLY';END IF;
+ IF p_shift_id IS NULL OR p_worker_run_id IS NULL OR
+  NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+   WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+    AND r.finished_at IS NULL AND
+    r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes') THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILD_SIGNED_WORKER_REQUIRED',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ SELECT a.* INTO v_packet FROM
+  reality_internal.final_loop_child_approval_packets_v1 a
+ JOIN reality_internal.governed_employee_shifts_v1 s
+  ON s.shift_id=a.shift_id AND s.owner_id=a.owner_id
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w
+  ON w.shift_id=s.shift_id AND w.owner_id=s.owner_id
+  AND w.plan_fingerprint=s.plan_fingerprint
+ WHERE a.shift_id=p_shift_id
+  AND a.state IN ('APPROVED_ONCE','EFFECT_RESERVED_RECONCILE_ONLY')
+  AND a.owner_approval_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
+  AND a.approved_at>=pg_catalog.clock_timestamp()-interval '12 hours'
+  AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL
+  AND s.planned_end_at='infinity'::timestamptz
+  AND s.status IN ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
+  AND w.state='ACTIVE' AND w.mode='UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS'
+  AND EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
+   WHERE r.shift_id=a.shift_id AND r.owner_id=a.owner_id
+    AND r.original_work_id=a.parent_original_work_id
+    AND r.source_ref=a.source_ref AND r.phase='BLOCKED'
+    AND r.model_response_id IS NULL AND r.review_body IS NULL
+    AND r.provider_comment_id IS NULL
+    AND r.settlement_receipt_id IS NULL)
+ ORDER BY a.approved_at,a.packet_id LIMIT 1 FOR UPDATE OF a SKIP LOCKED;
+ IF NOT FOUND THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_NO_OWNER_APPROVED_PARENT_CHILD_REVIEW_READY',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ SELECT * INTO v_plan FROM
+  reality_internal.final_loop_pr_source_plans_v1 p
+ WHERE p.plan_id=v_packet.plan_id AND p.shift_id=v_packet.shift_id
+  AND p.owner_id=v_packet.owner_id
+  AND p.parent_original_work_id=v_packet.parent_original_work_id
+  AND p.source_ref=v_packet.source_ref
+  AND p.source_manifest_sha256=v_packet.source_manifest_sha256
+  AND p.state='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION';
+ IF NOT FOUND THEN
+  RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_PARENT_PLAN_DRIFT',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ IF pg_catalog.jsonb_array_length(v_plan.source_plan->'bounded_scopes')
+    <>v_plan.proposed_scope_count THEN
+  RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_SOURCE_SCOPES_CHANGED',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ IF v_packet.state='APPROVED_ONCE' THEN
+  FOR v_scope IN SELECT value FROM pg_catalog.jsonb_array_elements(
+   v_plan.source_plan->'bounded_scopes') item(value) LOOP
+   v_work:='work:'||pg_catalog.left(pg_catalog.encode(pg_catalog.sha256(
+    pg_catalog.convert_to('reality:final-loop-child-v1:'||
+     v_packet.packet_id::text||':'||(v_scope->>'index')||':'||
+     (v_scope->>'proposed_scope_sha256'),'UTF8')),'hex'),32);
+   INSERT INTO reality_internal.final_loop_child_review_work_v1
+    (child_work_id,packet_id,plan_id,owner_id,shift_id,
+     parent_original_work_id,scope_index,scope_sha256,
+     source_manifest_sha256,source_head_sha,acceptance_contract_sha256)
+   VALUES(v_work,v_packet.packet_id,v_plan.plan_id,v_packet.owner_id,
+    v_packet.shift_id,v_packet.parent_original_work_id,
+    (v_scope->>'index')::integer,v_scope->>'proposed_scope_sha256',
+    v_plan.source_manifest_sha256,v_plan.source_head_sha,
+    v_packet.acceptance_contract_sha256)
+   ON CONFLICT DO NOTHING;
+  END LOOP;
+  UPDATE reality_internal.final_loop_child_approval_packets_v1
+   SET state='EFFECT_RESERVED_RECONCILE_ONLY'
+   WHERE packet_id=v_packet.packet_id AND state='APPROVED_ONCE';
+ END IF;
+ SELECT count(*) INTO v_actual FROM
+  reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.packet_id=v_packet.packet_id AND c.plan_id=v_plan.plan_id
+  AND c.shift_id=v_packet.shift_id
+  AND c.parent_original_work_id=v_packet.parent_original_work_id
+  AND c.source_manifest_sha256=v_plan.source_manifest_sha256;
+ IF v_actual<>v_plan.proposed_scope_count THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_ATOMIC_SCOPE_ADMISSION_INCOMPLETE';END IF;
+ SELECT c.* INTO v_child FROM
+  reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.packet_id=v_packet.packet_id AND c.phase='ADMITTED'
+ ORDER BY c.scope_index LIMIT 1 FOR UPDATE SKIP LOCKED;
+ IF NOT FOUND THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_ALL_CHILDREN_CLAIMED_OR_PENDING_VERIFICATION',
+   'parent_original_work_id',v_packet.parent_original_work_id,
+   'child_claimed',false,'original_job_completed',false);END IF;
+ UPDATE reality_internal.final_loop_child_review_work_v1
+ SET phase='CLAIMED',claimant_worker_run_id=p_worker_run_id,
+  claimed_at=pg_catalog.clock_timestamp(),
+  claim_id=pg_catalog.gen_random_uuid(),
+  updated_at=pg_catalog.clock_timestamp()
+ WHERE child_work_id=v_child.child_work_id AND phase='ADMITTED'
+ RETURNING * INTO v_child;
+ IF NOT FOUND THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILD_CONCURRENT_CLAIM_NOT_COMMITTED',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ SELECT value INTO v_scope FROM pg_catalog.jsonb_array_elements(
+  v_plan.source_plan->'bounded_scopes') item(value)
+ WHERE (item.value->>'index')::integer=v_child.scope_index;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',
+  'owner_id',v_child.owner_id,'shift_id',v_child.shift_id,
+  'child_work_id',v_child.child_work_id,'claim_id',v_child.claim_id,
+  'claimant_worker_run_id',v_child.claimant_worker_run_id,
+  'parent_original_work_id',v_child.parent_original_work_id,
+  'source_ref',v_plan.source_ref,'source_head_sha',v_child.source_head_sha,
+  'source_manifest_sha256',v_child.source_manifest_sha256,
+  'source_proof_sha256',v_plan.source_proof_sha256,
+  'acceptance_contract_sha256',v_child.acceptance_contract_sha256,
+  'approval_receipt_sha256',v_packet.owner_approval_receipt_sha256,
+  'scope_index',v_child.scope_index,'scope_sha256',v_child.scope_sha256,
+  'scope',v_scope,
+  'phase',v_child.phase,'child_claimed',true,'model_invoked',false,
+  'external_effect_performed',false,'original_job_completed',false,
+  'parent_obligation_remains_open',true,'production_changed',false);
+END $fn$;
+
+-- Guard both pre- and post-inference via the Reality governed gateway.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_model_scope_v1(
+ p_child_work_id text,p_claim_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_child record;v_plan record;v_packet record;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_MODEL_SCOPE_SERVICE_ONLY';END IF;
+ SELECT c.* INTO v_child FROM
+  reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.child_work_id=p_child_work_id AND c.claim_id=p_claim_id
+  AND c.claimant_worker_run_id=p_worker_run_id AND c.phase='CLAIMED';
+ IF NOT FOUND THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_CHILD_MODEL_CURRENT_CLAIM_NOT_FOUND',
+   'model_authorized',false);END IF;
+ SELECT * INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1
+  WHERE plan_id=v_child.plan_id;
+ SELECT * INTO v_packet FROM reality_internal.final_loop_child_approval_packets_v1
+  WHERE packet_id=v_child.packet_id;
+ IF v_packet.state<>'EFFECT_RESERVED_RECONCILE_ONLY'
+  OR v_packet.owner_approval_receipt_sha256 IS NULL
+  OR v_packet.acceptance_contract_sha256<>v_child.acceptance_contract_sha256
+  OR v_plan.source_manifest_sha256<>v_child.source_manifest_sha256
+  OR NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+   WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+    AND r.finished_at IS NULL)
+  OR NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shifts_v1 s
+   WHERE s.shift_id=v_child.shift_id AND s.owner_id=v_child.owner_id
+    AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL
+    AND s.planned_end_at='infinity'::timestamptz)
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_MODEL_AUTHORITY_OR_SOURCE_STALE',
+  'model_authorized',false);END IF;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK',
+  'owner_id',v_child.owner_id,'shift_id',v_child.shift_id,
+  'child_work_id',v_child.child_work_id,
+  'claim_id',v_child.claim_id,
+  'worker_run_id',p_worker_run_id,
+  'parent_original_work_id',v_child.parent_original_work_id,
+  'source_ref',v_plan.source_ref,'source_head_sha',v_child.source_head_sha,
+  'source_manifest_sha256',v_child.source_manifest_sha256,
+  'acceptance_contract_sha256',v_child.acceptance_contract_sha256,
+  'scope_sha256',v_child.scope_sha256,
+  'phase',v_child.phase,'model_response_id',v_child.model_response_id,
+  'read_only_model_execution',true,'model_authorized',true,
+  'external_effect_authorized',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.reality_prepare_final_loop_child_review_v1(
+ p_child_work_id text,p_claim_id uuid,p_worker_run_id uuid,
+ p_head_sha text,p_model_response_id text,p_review_body text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_child record;v_hash text;v_scope jsonb;v_plan record;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_PREPARE_SERVICE_ONLY';END IF;
+ IF p_child_work_id !~ '^work:[a-f0-9]{32}$'
+  OR p_claim_id IS NULL OR p_worker_run_id IS NULL
+  OR coalesce(p_head_sha,'') !~ '^[a-f0-9]{40}$'
+  OR coalesce(p_model_response_id,'') !~ '^resp_[A-Za-z0-9_-]{4,160}$'
+  OR pg_catalog.length(coalesce(p_review_body,'')) NOT BETWEEN 100 AND 4000
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_PREPARE_INVALID_SCOPE',
+  'review_prepared',false,'original_job_completed',false);END IF;
+ SELECT c.* INTO v_child
+ FROM reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.child_work_id=p_child_work_id AND c.claim_id=p_claim_id
+  AND c.claimant_worker_run_id=p_worker_run_id AND c.phase='CLAIMED'
+  AND c.source_head_sha=p_head_sha FOR UPDATE;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_ORIGINAL_CLAIM_OR_SOURCE_CHANGED',
+  'review_prepared',false,'original_job_completed',false);END IF;
+ SELECT * INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1
+ WHERE plan_id=v_child.plan_id;
+ SELECT value INTO v_scope FROM pg_catalog.jsonb_array_elements(
+  v_plan.source_plan->'bounded_scopes') item(value)
+ WHERE (item.value->>'index')::integer=v_child.scope_index;
+ IF v_scope->>'proposed_scope_sha256'<>v_child.scope_sha256 OR
+  NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(
+   v_scope->'files') item(value)
+   WHERE p_review_body LIKE '%'||(item.value->>'path')||'%') OR
+  NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+   WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+    AND r.finished_at IS NULL)
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_PREPARED_PATCH_OR_WORKER_NOT_VERIFIED',
+  'review_prepared',false,'original_job_completed',false);END IF;
+ v_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+  pg_catalog.convert_to(p_review_body,'UTF8')),'hex');
+ UPDATE reality_internal.final_loop_child_review_work_v1
+ SET phase='PREPARED',model_response_id=p_model_response_id,
+  review_body=p_review_body,review_sha256=v_hash,
+  updated_at=pg_catalog.clock_timestamp()
+ WHERE child_work_id=p_child_work_id AND phase='CLAIMED';
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED',
+  'child_work_id',p_child_work_id,'parent_original_work_id',
+   v_child.parent_original_work_id,
+  'review_sha256',v_hash,'source_head_sha',v_child.source_head_sha,
+  'review_prepared',true,'independent_verification_required',true,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
