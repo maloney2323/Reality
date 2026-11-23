@@ -4,7 +4,7 @@
 // schedules, executes, modifies ledgers or promotes an AI's assertion to truth.
 export const FINAL_LOOP_UNIVERSE_FEEDBACK_VERSION=
  'reality-final-loop-universe-feedback-v1';
-const UUID=/^[a-f0-9]{8}-(?:-[a-f0-9]{4}){3}$/i;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/;
