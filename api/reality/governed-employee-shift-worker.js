@@ -25,7 +25,9 @@ import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
 import {connectFinalLoopPrSourcePlanToSignedShift}
  from '../../src/reality-final-loop-pr-source-handoff-v1.js';
-import {classifySignedFinalLoopStagedPlanActions}
+import {classifySignedFinalLoopStagedPlanActions,
+ reconcileReviewedRecoveryToFinalLoopSource,
+ inspectFinalLoopRecoveryContinuation}
  from '../../src/reality-final-loop-staged-plan-action-router-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../../src/reality-final-loop-child-approval-request-v1.js';
@@ -2800,6 +2802,21 @@ export default async function handler(req,res){
    }
   }
 
+  // One canonical signed shift: reviewed Recovery -> qualified source ->
+  // registered continuation handler. A failed dispatch is an explicit
+  // pending obligation, never a recovered job or a completed worker result.
+  const finalLoopRecoveryCandidate=reconcileReviewedRecoveryToFinalLoopSource({
+   graph:unifiedGraph,stagedActions:finalLoopStagedActionRoutes,
+   continuityClassification:continuityRecoveryHandoffClassification,
+   registeredRouting:continuityRecoveryRegisteredRouting
+  });
+  const finalLoopRecoveryContinuation=inspectFinalLoopRecoveryContinuation({
+   candidate:finalLoopRecoveryCandidate,
+   operatingLane:signedWorkerReleaseOperatingLane,
+   approvalRequest:finalLoopChildApprovalRequest,
+   childReview:finalLoopChildReview,parentDelivery:finalLoopParentDelivery
+  });
+
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
   // Reality does not consume owner approval, write code, or settle the job.
@@ -3639,6 +3656,8 @@ export default async function handler(req,res){
     riley_pr_source_readiness:rileyPrSourceReadiness,
     final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
     final_loop_staged_action_routes:finalLoopStagedActionRoutes,
+    final_loop_recovery_source_candidate:finalLoopRecoveryCandidate,
+    final_loop_recovery_continuation:finalLoopRecoveryContinuation,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
