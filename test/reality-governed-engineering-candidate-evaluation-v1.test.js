@@ -154,6 +154,35 @@ test('actual model candidate is replayed only in an isolated temporary source fi
    status:verdict.status,case_count:verdict.probe_count,
    source_installed:false,original_job_completed:false
   }));
+  // Machine-readable independent CI result. GitHub Actions publishes this
+  // evidence artifact; no runtime or Supabase database receives a write.
+  // The owner work stays OPEN even when the regression test succeeds.
+  if(process.env.GITHUB_ACTIONS==='true'&&
+     typeof process.env.RUNNER_TEMP==='string'&&
+     process.env.RUNNER_TEMP.startsWith('/')){
+   const receipt={
+    schema:'reality-governed-engineering-ci-candidate-evaluation-v1',
+    provider:'GITHUB_ACTIONS_ISOLATED_RUNNER',
+    github_run_id:process.env.GITHUB_RUN_ID||null,
+    github_head_sha:process.env.GITHUB_SHA||null,
+    original_work_id:work,maintenance_id:maintenance,
+    source_ref:sourceRef,
+    source_blob_sha:pin.sourceBlobSha,
+    proposed_source_sha256:pin.proposedSha256,
+    candidate_receipt_sha256:pin.candidateReceiptSha256,
+    isolated_probe_receipt_sha256:verdict.isolated_probe_receipt_sha256,
+    probe_count:verdict.probe_count,
+    verdict:verdict.status,
+    next_governed_action:verdict.next_governed_action,
+    execution_authorized:false,
+    source_installed:false,
+    original_job_completed:false,
+    independent_original_acceptance_verified:false
+   };
+   writeFileSync(join(process.env.RUNNER_TEMP,
+    'reality-engineering-candidate-evidence.json'),
+    JSON.stringify(receipt,null,2)+'\\n',{mode:0o600,flag:'w'});
+  }
  }finally{
   if(existsSync(file))unlinkSync(file);
  }
