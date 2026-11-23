@@ -292,10 +292,17 @@ export function evaluateRealityFinalLoopChildRecovery({
    independentChildren.acceptance_contract_sha256!==acceptanceContractSha256||
    independentChildren.authority?.independently_verified!==true||
    independentChildren.authority?.owner_id!==ownerId||
+   independentChildren.authority?.parent_original_work_id!==parent.original_work_id||
    independentChildren.authority?.acceptance_contract_sha256!==acceptanceContractSha256||
    !digest(independentChildren.authority?.receipt_sha256)||
+   !uniqueEffects(independentChildren.authority?.permitted_effects)||
+   !uniqueEffects(independentChildren.authority?.requested_effects)||
+   independentChildren.authority.requested_effects.some(x=>
+    !independentChildren.authority.permitted_effects.includes(x))||
    independentChildren.capacity?.independently_attested!==true||
+   independentChildren.capacity?.scheduled_worker_observed!==true||
    !digest(independentChildren.capacity?.receipt_sha256)||
+   typeof independentChildren.provider_effect_uncertain!=='boolean'||
    !Array.isArray(independentChildren.children)||
    independentChildren.children.length!==sourcePlan.bounded_scope_count)
   return decide('SUSPEND','INDEPENDENTLY_VERIFY_CHILD_ACCEPTANCE_AND_CAPACITY',
@@ -309,6 +316,9 @@ export function evaluateRealityFinalLoopChildRecovery({
  for(const [i,c] of independentChildren.children.entries()){
   if(c?.index!==i||
     c.scope_sha256!==sourcePlan.bounded_scopes[i].proposed_scope_sha256||
+    c.parent_original_work_id!==parent.original_work_id||
+    c.source_manifest_sha256!==sourcePlan.source_manifest_sha256||
+    c.acceptance_contract_sha256!==acceptanceContractSha256||
     !['NOT_ADMITTED','ADMITTED','VERIFIED'].includes(c.phase))
    return decide('SUSPEND','RECONCILE_CHILD_INDEPENDENT_LINEAGE',
     'CHILD_SCOPE_OR_PHASE_UNVERIFIED',counts);
@@ -434,6 +444,10 @@ export function evaluateRealityFinalLoopEngine({
     ownerId:view.owner_id,shiftId:view.shift_id,
     acceptanceContractSha256:ledger.acceptance_contract_sha256
    });
+  if(childRecovery&&p.blocker?.provider_effect_uncertain===true)
+   return makeLoopDecision(item,'SUSPEND',
+    'RECONCILE_PARENT_PROVIDER_EFFECT_WITHOUT_REPLAY',
+    'PARENT_PROVIDER_EFFECT_UNCERTAIN_SINGLE_USE_FENCE');
   if(childRecovery&&(
     childRecovery.decision!=='ADVANCE'||
     childRecovery.next_governed_action!==
