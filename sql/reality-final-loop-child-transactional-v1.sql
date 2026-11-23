@@ -891,3 +891,77 @@ GRANT EXECUTE ON FUNCTION
  public.reality_read_final_loop_child_approval_preflight_v1(uuid),
  public.reality_read_owner_final_loop_child_approvals_v1(uuid,uuid)
  TO service_role;
+
+
+-- Governed no-provider-effect recovery for a previously claimed READ-ONLY
+-- child whose model result was never durably prepared. At most one re-entry.
+-- PREPARED, verified, published, or uncertain effects cannot use this path.
+ALTER TABLE reality_internal.final_loop_child_review_work_v1
+ ADD COLUMN IF NOT EXISTS premodel_recovery_count smallint NOT NULL DEFAULT 0
+ CHECK(premodel_recovery_count BETWEEN 0 AND 1);
+CREATE OR REPLACE FUNCTION
+ public.reality_reconcile_final_loop_child_premodel_v1(
+ p_shift_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE v_child record;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_RECOVERY_SERVICE_ONLY';END IF;
+ IF p_shift_id IS NULL OR p_worker_run_id IS NULL OR
+  NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+   WHERE r.run_id=p_worker_run_id AND r.status='STARTED'
+    AND r.finished_at IS NULL AND
+    r.started_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_RECOVERY_SIGNED_WORKER_REQUIRED',
+  'recovered',false,'original_job_completed',false);END IF;
+ SELECT c.* INTO v_child FROM
+  reality_internal.final_loop_child_review_work_v1 c
+ JOIN reality_internal.final_loop_child_approval_packets_v1 p
+  ON p.packet_id=c.packet_id
+ JOIN reality_internal.signed_worker_actual_runs_v1 prior
+  ON prior.run_id=c.claimant_worker_run_id
+ WHERE c.shift_id=p_shift_id AND c.phase='CLAIMED'
+  AND c.premodel_recovery_count=0
+  AND c.model_response_id IS NULL AND c.review_body IS NULL
+  AND c.review_sha256 IS NULL
+  AND c.independent_verifier_run_id IS NULL
+  AND c.independent_review_receipt_sha256 IS NULL
+  AND c.claimant_worker_run_id<>p_worker_run_id
+  AND c.claimed_at<pg_catalog.clock_timestamp()-interval '90 seconds'
+  AND prior.finished_at IS NOT NULL
+  AND p.state='EFFECT_RESERVED_RECONCILE_ONLY'
+  AND EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
+   WHERE r.original_work_id=c.parent_original_work_id
+    AND r.owner_id=c.owner_id AND r.shift_id=c.shift_id
+    AND r.phase='BLOCKED' AND r.provider_comment_id IS NULL
+    AND r.settlement_receipt_id IS NULL)
+ ORDER BY c.claimed_at,c.scope_index LIMIT 1 FOR UPDATE OF c SKIP LOCKED;
+ IF NOT FOUND THEN
+  RETURN pg_catalog.jsonb_build_object(
+   'status','FINAL_LOOP_NO_SAFE_PREMODEL_CHILD_RECOVERY_READY',
+   'recovered',false,'original_job_completed',false);END IF;
+ UPDATE reality_internal.final_loop_child_review_work_v1
+ SET phase='ADMITTED',premodel_recovery_count=1,
+  claim_id=pg_catalog.gen_random_uuid(),
+  claimant_worker_run_id=NULL,claimed_at=NULL,
+  updated_at=pg_catalog.clock_timestamp()
+ WHERE child_work_id=v_child.child_work_id AND phase='CLAIMED'
+  AND premodel_recovery_count=0;
+ RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_SAME_CHILD_PREMODEL_RECOVERY_DURABLY_QUALIFIED',
+  'child_work_id',v_child.child_work_id,
+  'parent_original_work_id',v_child.parent_original_work_id,
+  'previous_claim_id',v_child.claim_id,
+  'recovery_count',1,'recovered',true,
+  'same_child_original_preserved',true,
+  'owner_approval_reused_only_within_exact_scope',true,
+  'provider_effect_replay_authorized',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION
+ public.reality_reconcile_final_loop_child_premodel_v1(uuid,uuid)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION
+ public.reality_reconcile_final_loop_child_premodel_v1(uuid,uuid)
+ TO service_role;
