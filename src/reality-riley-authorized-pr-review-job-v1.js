@@ -3,6 +3,8 @@
 // shift. One OpenAI model drafts; Github readback and a service-role receipt
 // verify the effect. NO installation, branch changes, or source repair claims.
 import {createHash} from 'node:crypto';
+import {inspectLargePrSourceForBoundedReview}
+ from './reality-pr-large-source-qualification-v1.js';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {createRealityGovernedOpenAIGateway}
  from './reality-governed-openai-gateway-v1.js';
@@ -104,6 +106,7 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
   seen.add(item.source_ref);
   let status='GITHUB_PR_CURRENT_METADATA_UNVERIFIED',headSha=null;
   let changedFileCount=null,draft=null;
+  let largeSourceQualification=null;
   let sourceBlockers=Object.freeze(['GITHUB_CURRENT_SOURCE_METADATA_NOT_VERIFIED']);
   try{
    const current=await github('/pulls/'+Number(match[1]),{
@@ -138,7 +141,16 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
      current.changed_files===0?
       'SOURCE_PR_EMPTY_CHANGESET_NOT_REVIEWABLE':
       'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED';
-   }
+     // Same signed-source diagnostic: complete inventory across ALL files,
+     // proposed 8-file scopes only. No bypass of native DB admission.
+     if(current.changed_files>RILEY_PR_REVIEW_MAX_CHANGED_FILES&&
+        env.REALITY_FINAL_LOOP_LARGE_PR_QUALIFICATION_SHADOW_ENABLED==='true'){
+      largeSourceQualification=await inspectLargePrSourceForBoundedReview({
+       job:item,ownerId:graph.owner_id,shiftId:graph.shift_id,
+       metadata:current,env,fetchImpl,githubToken
+      });
+     }
+    }
   }catch{
    // Failure is unknown eligibility, not a declaration that the PR is
    // missing, complete, approved, or safe to retry.
@@ -154,6 +166,7 @@ export async function inspectCurrentRileyPrReviewSourceReadiness({
    source_requalification_required:sourceBlockers.length>0,
    eligibility_blockers:sourceBlockers,
    eligibility_status:status,
+   large_source_qualification:largeSourceQualification,
    current_provider_metadata_read:headSha!==null,
    existing_executor_can_start_from_this_observation:false,
    owner_approval_granted:false,original_job_completed:false
