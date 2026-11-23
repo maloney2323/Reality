@@ -2275,6 +2275,53 @@ export default async function handler(req,res){
    wake:wakeReceipt,graph:unifiedGraph,env:process.env,
    registeredActionKeys:registeredRecoveryActionKeys
   });
+  // Durable evidence from the ACTUAL scheduled worker, not a deployed
+  // preview's environment or a release review's self-certification.
+  // Only the isolated, opt-in, service-role path may append this receipt.
+  // No new job, model action, owner approval or provider write is possible.
+  let signedWorkerDurableReleaseWake={
+   status:'SIGNED_WORKER_RELEASE_WAKE_ATTESTATION_NOT_ENABLED',
+   release_activated:false,original_job_completed:false
+  };
+  if(process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED==='true'){
+   if(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+      db.project!==process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF||
+      signedWorkerReleaseOperatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+      signedWorkerCapabilityDelivery.status!==
+       'SIGNED_WORKER_RELEASE_AND_REGISTERED_ACTIONS_OBSERVED'){
+    signedWorkerDurableReleaseWake={
+     status:'SIGNED_WORKER_RELEASE_WAKE_ISOLATION_OR_RUNTIME_UNVERIFIED',
+     release_activated:false,original_job_completed:false
+    };
+   }else{
+    try{
+     const actual=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
+      p_worker_run_id:actualWorkerRunId,
+      p_owner_id:unifiedGraph.owner_id,p_shift_id:wakeReceipt.shift_id,
+      p_release_sha:signedWorkerCapabilityDelivery.running_release_sha,
+      p_release_ref:signedWorkerCapabilityDelivery.running_release_ref,
+      p_registered_capabilities:registeredRecoveryActionKeys
+     },{timeoutMs:6000});
+     signedWorkerDurableReleaseWake=
+      actual?.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
+      actual.worker_run_id===actualWorkerRunId&&
+      actual.shift_id===wakeReceipt.shift_id&&
+      actual.release_sha===signedWorkerCapabilityDelivery.running_release_sha&&
+      actual.release_ref===signedWorkerCapabilityDelivery.running_release_ref&&
+      actual.original_job_completed===false&&
+      actual.release_activated===false?
+       actual:{
+        status:'SIGNED_WORKER_RELEASE_WAKE_RECEIPT_UNVERIFIED',
+        release_activated:false,original_job_completed:false
+       };
+    }catch{
+     signedWorkerDurableReleaseWake={
+      status:'SIGNED_WORKER_RELEASE_WAKE_DB_OR_TRANSPORT_UNAVAILABLE',
+      release_activated:false,original_job_completed:false
+     };
+    }
+   }
+  }
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
@@ -3541,6 +3588,7 @@ export default async function handler(req,res){
     governed_continuity_registered_recovery_route:continuityRecoveryRegisteredRouting,
     signed_worker_capability_delivery:signedWorkerCapabilityDelivery,
     signed_worker_release_operating_lane:signedWorkerReleaseOperatingLane,
+    signed_worker_durable_release_wake:signedWorkerDurableReleaseWake,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
