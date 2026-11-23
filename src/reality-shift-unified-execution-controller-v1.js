@@ -179,6 +179,178 @@ const loopEnvelope=(view,ledger,decisions,status)=>{const envelope={
  });
 };
 
+// Parent-child recovery is a policy of this SAME Final Loop controller.
+// It may request independent admission, recovery and verification, but never
+// creates a child job or treats a review-plan digest as a customer receipt.
+export const REALITY_FINAL_LOOP_CHILD_POLICY_VERSION=
+ 'reality-final-loop-child-policy-v1';
+const childDecision=(parent,decision,next,reason,more={})=>Object.freeze({
+ schema:REALITY_FINAL_LOOP_CHILD_POLICY_VERSION,
+ parent_original_work_id:parent?.original_work_id??null,
+ source_ref:parent?.source_ref??null,
+ decision,next_governed_action:next,reason,
+ parent_obligation_remains_open:true,
+ child_original_admitted_by_engine:false,
+ execution_authorized:false,transition_committed:false,
+ independent_parent_outcome_verified:false,
+ parent_settlement_eligible:false,
+ original_job_completed:false,production_changed:false,...more
+});
+export function evaluateRealityFinalLoopChildRecovery({
+ parent,sourcePlan,independentChildren=null,
+ ownerId,shiftId,acceptanceContractSha256=null
+}={}){
+ const decide=(d,a,r,m)=>childDecision(parent,d,a,r,m);
+ if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull)\/[1-9]\d*$/.test(
+   parent?.source_ref||'')||
+  !digest(parent?.source_proof_sha256)||
+  (parent?.original_work_id!=null&&
+   !WORK.test(parent.original_work_id))||
+  !['NOT_ADMITTED','BLOCKED','CLAIMED','SOURCE_ADMITTED',
+    'PREPARED','PUBLISHING'].includes(parent?.phase))
+  return decide('SUSPEND','RECHECK_EXACT_PARENT_ORIGINAL',
+   'PARENT_OR_SIGNED_SHIFT_IDENTITY_UNVERIFIED');
+ if(!sourcePlan)
+  return decide('REFRESH','REQUALIFY_COMPLETE_PARENT_SOURCE',
+   'NO_INDEPENDENTLY_INSPECTED_RECOVERY_PLAN');
+ if(sourcePlan.owner_id!==ownerId||sourcePlan.shift_id!==shiftId||
+  sourcePlan.source_ref!==parent.source_ref||
+  sourcePlan.original_work_id!==(parent.original_work_id??null)||
+  sourcePlan.native_phase!==parent.phase||
+  sourcePlan.frozen_source_proof_sha256!==parent.source_proof_sha256||
+  !digest(sourcePlan.source_manifest_sha256)||
+  !/^[a-f0-9]{40}$/.test(sourcePlan.live_head_sha||'')||
+  sourcePlan.read_only!==true||sourcePlan.proposed_only!==true||
+  sourcePlan.parent_obligation_remains_open!==true||
+  sourcePlan.native_admission_unchanged!==true||
+  sourcePlan.worker_claim_consumed!==false||
+  sourcePlan.owner_approval_granted!==false||
+  sourcePlan.original_job_completed!==false||
+  sourcePlan.source_manifest_complete!==true||
+  sourcePlan.independent_review_completed!==false||
+  sourcePlan.cross_scope_review_verified!==false||
+  !Number.isInteger(sourcePlan.manifest_file_count)||
+  sourcePlan.manifest_file_count<9||
+  sourcePlan.manifest_file_count>500||
+  !Number.isInteger(sourcePlan.bounded_scope_count)||
+  sourcePlan.bounded_scope_count<2||
+  sourcePlan.bounded_scope_count>63||
+  !Array.isArray(sourcePlan.bounded_scopes)||
+  sourcePlan.bounded_scopes.length!==sourcePlan.bounded_scope_count)
+  return decide('REFRESH','REQUALIFY_PARENT_CHILD_SCOPE_AND_PROOF',
+   'PARENT_CHILD_RECOVERY_SOURCE_PLAN_MISMATCH');
+ const paths=new Set(),scopes=new Set();
+ for(const [index,scope] of sourcePlan.bounded_scopes.entries()){
+  if(scope?.index!==index||!digest(scope.proposed_scope_sha256)||
+    scopes.has(scope.proposed_scope_sha256)||
+    scope.source_head_sha!==sourcePlan.live_head_sha||
+    scope.proposed_only!==true||
+    scope.native_child_original_admitted!==false||
+    scope.child_execution_authorized!==false||
+    !Number.isInteger(scope.file_count)||scope.file_count<1||
+    scope.file_count>8||!Array.isArray(scope.files)||
+    scope.files.length!==scope.file_count)
+   return decide('REFRESH','REQUALIFY_COMPLETE_CHILD_FILE_INVENTORY',
+    'DUPLICATE_OR_INCOMPLETE_CHILD_SCOPE');
+  scopes.add(scope.proposed_scope_sha256);
+  for(const f of scope.files){
+   if(typeof f?.path!=='string'||!f.path||
+      f.path.startsWith('/')||
+      f.path.split('/').some(x=>!x||x==='.'||x==='..')||
+      paths.has(f.path)||
+      !/^[a-f0-9]{40}$/.test(f.blob_sha||'')||
+      f.patch_proof_verified!==false)
+    return decide('REFRESH','REQUALIFY_COMPLETE_CHILD_FILE_INVENTORY',
+     'DUPLICATE_OR_UNVERIFIED_CHILD_FILE');
+   paths.add(f.path);
+  }
+ }
+ if(paths.size!==sourcePlan.manifest_file_count)
+  return decide('REFRESH','REQUALIFY_COMPLETE_CHILD_FILE_INVENTORY',
+   'PARENT_SOURCE_INVENTORY_HAS_UNCOVERED_FILES');
+ const counts={source_manifest_sha256:sourcePlan.source_manifest_sha256,
+  proposed_child_scope_count:sourcePlan.bounded_scope_count};
+ if(parent.original_work_id==null)
+  return decide('SUSPEND','ADMIT_EXACT_PARENT_ORIGINAL_BEFORE_RECOVERY',
+   'UNADMITTED_SOURCE_CANNOT_CREATE_CHILDREN',counts);
+ if(parent.phase==='PREPARED'||parent.phase==='PUBLISHING')
+  return decide('SUSPEND','RECONCILE_PARENT_PROVIDER_EFFECT_WITHOUT_REPLAY',
+   'UNRESOLVED_PARENT_PROVIDER_EFFECT',counts);
+ if(independentChildren===null)
+  return decide('SUSPEND','BIND_SIGNED_PARENT_ACCEPTANCE_AND_CHILD_AUTHORITY',
+   'PROPOSED_CHILD_SCOPES_NOT_EXECUTABLE',counts);
+ if(!digest(acceptanceContractSha256)||
+   independentChildren.schema!=='reality-final-loop-independent-child-readback-v1'||
+   independentChildren.independent_service_readback_verified!==true||
+   independentChildren.owner_id!==ownerId||
+   independentChildren.shift_id!==shiftId||
+   independentChildren.parent_original_work_id!==parent.original_work_id||
+   independentChildren.parent_source_ref!==parent.source_ref||
+   independentChildren.source_manifest_sha256!==sourcePlan.source_manifest_sha256||
+   independentChildren.source_head_sha!==sourcePlan.live_head_sha||
+   independentChildren.acceptance_contract_sha256!==acceptanceContractSha256||
+   independentChildren.authority?.independently_verified!==true||
+   independentChildren.authority?.owner_id!==ownerId||
+   independentChildren.authority?.acceptance_contract_sha256!==acceptanceContractSha256||
+   !digest(independentChildren.authority?.receipt_sha256)||
+   independentChildren.capacity?.independently_attested!==true||
+   !digest(independentChildren.capacity?.receipt_sha256)||
+   !Array.isArray(independentChildren.children)||
+   independentChildren.children.length!==sourcePlan.bounded_scope_count)
+  return decide('SUSPEND','INDEPENDENTLY_VERIFY_CHILD_ACCEPTANCE_AND_CAPACITY',
+   'FOUR_PROOFS_NOT_ESTABLISHED_FOR_PARENT_CHILD_RECOVERY',counts);
+ if(independentChildren.provider_effect_uncertain===true||
+    independentChildren.children.some(c=>c?.phase==='EFFECT_UNCERTAIN'))
+  return decide('SUSPEND','RECONCILE_CHILD_PROVIDER_EFFECT_WITHOUT_REPLAY',
+   'UNCERTAIN_CHILD_EFFECT_NEEDS_INDEPENDENT_READBACK',counts);
+ const ids=new Set();
+ let verified=0,admitted=0;
+ for(const [i,c] of independentChildren.children.entries()){
+  if(c?.index!==i||
+    c.scope_sha256!==sourcePlan.bounded_scopes[i].proposed_scope_sha256||
+    !['NOT_ADMITTED','ADMITTED','VERIFIED'].includes(c.phase))
+   return decide('SUSPEND','RECONCILE_CHILD_INDEPENDENT_LINEAGE',
+    'CHILD_SCOPE_OR_PHASE_UNVERIFIED',counts);
+  if(c.phase==='NOT_ADMITTED'){
+   if(c.child_original_work_id!=null||c.independent_receipt_sha256!=null)
+    return decide('SUSPEND','RECONCILE_CHILD_INDEPENDENT_LINEAGE',
+     'UNADMITTED_CHILD_CANNOT_HAVE_FINAL_RECEIPT',counts);
+   continue;
+  }
+  if(!WORK.test(c.child_original_work_id||'')||
+     c.child_original_work_id===parent.original_work_id||
+     ids.has(c.child_original_work_id))
+   return decide('SUSPEND','RECONCILE_CHILD_INDEPENDENT_LINEAGE',
+    'DUPLICATE_OR_INVALID_CHILD_ORIGINAL',counts);
+  ids.add(c.child_original_work_id);admitted++;
+  if(c.phase==='VERIFIED'){
+   if(c.independently_verified!==true||
+      c.verifier_independent!==true||
+      !digest(c.independent_receipt_sha256))
+    return decide('SUSPEND','RECONCILE_CHILD_INDEPENDENT_LINEAGE',
+     'UNVERIFIED_CHILD_OUTCOME_CANNOT_ADVANCE_PARENT',counts);
+   verified++;
+  }
+ }
+ if(admitted!==sourcePlan.bounded_scope_count)
+  return decide('SUSPEND','INDEPENDENTLY_ADMIT_REMAINING_CHILD_SCOPES',
+   'CHILD_ADMISSION_MISSING',counts);
+ if(verified!==sourcePlan.bounded_scope_count)
+  return decide('RECOVER','CONTINUE_NEXT_AUTHORIZED_CHILD_WITH_ATOMIC_CLAIM',
+   'CHILD_ORIGINALS_PENDING_INDEPENDENT_VERIFICATION',{
+    ...counts,verified_child_count:verified
+   });
+ if(independentChildren.cross_scope?.independently_verified!==true||
+    !digest(independentChildren.cross_scope?.receipt_sha256))
+  return decide('ADVANCE','INDEPENDENTLY_VERIFY_CROSS_CHILD_INTEGRATION',
+   'CHILD_RESULTS_NEED_CROSS_SCOPE_CHECK',counts);
+ return decide('ADVANCE','INDEPENDENTLY_VERIFY_PARENT_ACCEPTANCE_AND_UNIVERSE',
+  'CHILD_RECEIPTS_DO_NOT_SETTLE_PARENT_ORIGINAL',{
+   ...counts,all_children_independently_verified:true
+  });
+}
+
 // One logical evaluation for an entire shift. A signed worker must obtain
 // 'ledger' from an authenticated, independent service-only readback; no model,
 // browser payload, PR or CI result may be passed as an authority source.
@@ -255,7 +427,26 @@ export function evaluateRealityFinalLoopEngine({
   // Independent outcome plus Universe reconciliation are required before
   // *requesting* settlement. A model, install, diagnosis or source check is
   // never an independently completed customer original.
+  const childRecovery=p.child_recovery===undefined?null:
+   evaluateRealityFinalLoopChildRecovery({
+    parent:item,sourcePlan:p.child_recovery?.source_plan??null,
+    independentChildren:p.child_recovery?.independent_children??null,
+    ownerId:view.owner_id,shiftId:view.shift_id,
+    acceptanceContractSha256:ledger.acceptance_contract_sha256
+   });
+  if(childRecovery&&(
+    childRecovery.decision!=='ADVANCE'||
+    childRecovery.next_governed_action!==
+     'INDEPENDENTLY_VERIFY_PARENT_ACCEPTANCE_AND_UNIVERSE'))
+   return makeLoopDecision(item,childRecovery.decision,
+    childRecovery.next_governed_action,childRecovery.reason,{
+     parent_obligation_remains_open:true
+    });
   const o=p.outcome;
+  if(childRecovery&&o?.status!=='INDEPENDENT_FINAL_VERIFIED')
+   return makeLoopDecision(item,'ADVANCE',
+    'INDEPENDENTLY_VERIFY_PARENT_ACCEPTANCE_AND_UNIVERSE',
+    'CHILD_RECEIPTS_REQUIRE_INDEPENDENT_PARENT_FINAL_OUTCOME');
   if(o?.status==='INDEPENDENT_FINAL_VERIFIED'){
    // A final verifier receipt cannot launder a missing authority or
    // capacity proof into a settled original. All four gates must be true
