@@ -171,6 +171,8 @@ import {planGovernedCapabilitiesFromOwnerReceipts,
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
+import {inspectFinalLoopSignedWorkerOperatingLane}
+ from '../../src/reality-signed-worker-operating-lane-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 import {reconcileSignedVerifiedMaintenanceArtifact,
@@ -387,6 +389,9 @@ export default async function handler(req,res){
     staged_plan_count:linked?sourceHandoff.staging_receipts.length:0,
     durable_source_plan_readback_verified:Boolean(linked),
     final_loop_staged_action_routes:stagedActionRoutes,
+    signed_worker_release_operating_lane:inspectFinalLoopSignedWorkerOperatingLane({
+     env:e,dbProject:db.project
+    }),
     signed_worker_run_recorded:true,
     owner_approval_granted:false,child_execution_authorized:false,
     model_invoked:false,github_write_performed:false,
@@ -2264,6 +2269,9 @@ export default async function handler(req,res){
    wake:wakeReceipt,graph:unifiedGraph,env:process.env,
    registeredActionKeys:registeredRecoveryActionKeys
   });
+  const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
+   env:process.env,dbProject:db.project
+  });
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
@@ -3526,6 +3534,7 @@ export default async function handler(req,res){
     governed_continuity_recovery_handoff:continuityRecoveryHandoffClassification,
     governed_continuity_registered_recovery_route:continuityRecoveryRegisteredRouting,
     signed_worker_capability_delivery:signedWorkerCapabilityDelivery,
+    signed_worker_release_operating_lane:signedWorkerReleaseOperatingLane,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
