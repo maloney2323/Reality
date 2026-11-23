@@ -3,10 +3,14 @@
 // shift. One OpenAI model drafts; Github readback and a service-role receipt
 // verify the effect. NO installation, branch changes, or source repair claims.
 import {createHash} from 'node:crypto';
+import {inspectLargePrSourceForBoundedReview}
+ from './reality-pr-large-source-qualification-v1.js';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {createRealityGovernedOpenAIGateway}
  from './reality-governed-openai-gateway-v1.js';
 export const RILEY_AUTHORIZED_PR_REVIEW_VERSION='reality-riley-authorized-pr-review-original-v1';
+// Same bounded changed-files constraint enforced by sourceDetails and DB claim.
+export const RILEY_PR_REVIEW_MAX_CHANGED_FILES=8;
 const REPO='maloney2323/Reality';
 const ROOT='https://api.github.com/repos/'+REPO;
 const SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/([1-9]\d{0,7})$/;
@@ -59,6 +63,175 @@ async function github(relative,{fetchImpl,token,method='GET',body}={}){
  if(!response?.ok)deny(safeFailure(method,response?.status||0));
  return response.json();
 }
+// Read-only source compatibility diagnostic for the EXISTING signed PR-review
+// lane. The executor still owns claiming, writing and independent settlement.
+// This does not claim a PR is acceptable customer work merely because GitHub
+// says it is open. In particular a GitHub draft PR is not eligible for the
+// current native executor's sourceDetails() preflight.
+export async function inspectCurrentRileyPrReviewSourceReadiness({
+ graph,env=process.env,fetchImpl=fetch,
+ githubToken=env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN
+}={}){
+ const safe=(status,more={})=>Object.freeze({
+  version:'reality-riley-current-pr-source-readiness-v1',status,
+  read_only:true,source_metadata_is_not_customer_goal_acceptance:true,
+  worker_claim_consumed:false,review_generated:false,
+  github_comment_published:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false,...more
+ });
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
+    graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+    !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
+    !Array.isArray(graph.jobs)||graph.jobs.length>4||
+    typeof fetchImpl!=='function')
+  return safe('SIGNED_PR_SOURCE_PREVIEW_OR_SCOPE_UNVERIFIED');
+ const jobs=graph.jobs.filter(j=>
+  j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+  j.independent_source_proof_verified===true&&
+  j.phase!=='SETTLED');
+ if(!jobs.length)
+  return safe('NO_UNSETTLED_SIGNED_PR_REVIEW_SOURCE',{
+   owner_id:graph.owner_id,shift_id:graph.shift_id,
+   source_count:0,source_diagnostics:Object.freeze([])
+  });
+ const seen=new Set(),diagnostics=[];
+ for(const item of jobs){
+  const match=SOURCE.exec(item.source_ref||'');
+  if(!match||seen.has(item.source_ref)||
+     (item.original_work_id!=null&&!WORK.test(item.original_work_id))||
+     !HASH.test(item.source_proof_sha256||'')||
+     !/^[A-Z][A-Z0-9_]{6,130}$/.test(item.next_governed_action||''))
+   return safe('SIGNED_PR_SOURCE_NATIVE_IDENTITY_INVALID');
+  seen.add(item.source_ref);
+  let status='GITHUB_PR_CURRENT_METADATA_UNVERIFIED',headSha=null;
+  let changedFileCount=null,draft=null;
+  let largeSourceQualification=null;
+  let sourceBlockers=Object.freeze(['GITHUB_CURRENT_SOURCE_METADATA_NOT_VERIFIED']);
+  try{
+   const current=await github('/pulls/'+Number(match[1]),{
+    fetchImpl,token:githubToken,method:'GET'
+   });
+   if(current?.number===Number(match[1])&&
+      current.html_url===item.source_ref&&
+      SHA.test(current.head?.sha||'')&&
+      typeof current.draft==='boolean'&&
+      Number.isInteger(current.changed_files)&&
+      current.changed_files>=0&&current.changed_files<=100000&&
+      ['open','closed'].includes(current.state)){
+    headSha=current.head.sha;
+    draft=current.draft;
+    changedFileCount=current.changed_files;
+    const incompatible=[
+     ...(current.state==='closed'?['SOURCE_PR_NOT_OPEN']:[]),
+     ...(current.draft?['DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR']:[]),
+     ...(current.changed_files<1?['SOURCE_HAS_NO_CHANGED_FILES']:[]),
+     ...(current.changed_files>RILEY_PR_REVIEW_MAX_CHANGED_FILES?
+      ['CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW']:[]),
+     ...(item.phase==='BLOCKED'?['EXISTING_ORIGINAL_BLOCKED_REQUIRES_DURABLE_RECONCILIATION']:[]),
+     ...(item.original_work_id===null?['SOURCE_NOT_ADMITTED_AS_ORIGINAL']:[])
+    ];
+    sourceBlockers=Object.freeze(incompatible);
+    status=current.state!=='open'?
+     'SOURCE_PR_CLOSED_REQUIRES_REQUALIFICATION':
+     current.draft?
+      'SOURCE_PR_DRAFT_INCOMPATIBLE_WITH_EXISTING_REVIEW_EXECUTOR':
+     current.changed_files>RILEY_PR_REVIEW_MAX_CHANGED_FILES?
+      'SOURCE_PR_TOO_LARGE_FOR_NATIVE_BOUNDED_REVIEW':
+     current.changed_files===0?
+      'SOURCE_PR_EMPTY_CHANGESET_NOT_REVIEWABLE':
+      'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED';
+     // Same signed-source diagnostic: complete inventory across ALL files,
+     // proposed 8-file scopes only. No bypass of native DB admission.
+     if(current.changed_files>RILEY_PR_REVIEW_MAX_CHANGED_FILES&&
+        env.REALITY_FINAL_LOOP_LARGE_PR_QUALIFICATION_SHADOW_ENABLED==='true'){
+      largeSourceQualification=await inspectLargePrSourceForBoundedReview({
+       job:item,ownerId:graph.owner_id,shiftId:graph.shift_id,
+       metadata:current,env,fetchImpl,githubToken
+      });
+     }
+    }
+  }catch{
+   // Failure is unknown eligibility, not a declaration that the PR is
+   // missing, complete, approved, or safe to retry.
+  }
+  diagnostics.push(Object.freeze({
+   source_ref:item.source_ref,original_work_id:item.original_work_id??null,
+   native_phase:item.phase,
+   native_next_governed_action:item.next_governed_action,
+   github_source_head_sha:headSha,
+   current_github_changed_file_count:changedFileCount,
+   current_github_draft:draft,
+   native_max_complete_review_files:RILEY_PR_REVIEW_MAX_CHANGED_FILES,
+   source_requalification_required:sourceBlockers.length>0,
+   eligibility_blockers:sourceBlockers,
+   eligibility_status:status,
+   large_source_qualification:largeSourceQualification,
+   current_provider_metadata_read:headSha!==null,
+   existing_executor_can_start_from_this_observation:false,
+   owner_approval_granted:false,original_job_completed:false
+  }));
+ }
+ return safe('SIGNED_PR_SOURCE_COMPATIBILITY_OBSERVED_READ_ONLY',{
+  owner_id:graph.owner_id,shift_id:graph.shift_id,
+  source_count:diagnostics.length,
+  draft_incompatible_count:diagnostics.filter(d=>
+   d.eligibility_blockers.includes('DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR')).length,
+  oversized_changeset_count:diagnostics.filter(d=>
+   d.eligibility_blockers.includes('CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW')).length,
+  blocked_original_count:diagnostics.filter(d=>
+   d.eligibility_blockers.includes('EXISTING_ORIGINAL_BLOCKED_REQUIRES_DURABLE_RECONCILIATION')).length,
+  source_diagnostics:Object.freeze(diagnostics),
+  next_read_only_governed_step:diagnostics.some(d=>
+   d.eligibility_status!==
+    'SOURCE_PR_OPEN_NON_DRAFT_PATCH_PREFLIGHT_STILL_REQUIRED')?
+   'REQUALIFY_EXACT_SOURCE_ELIGIBILITY_WITHOUT_REPLAY':
+   'USE_EXISTING_EXACT_CLAIM_AND_FULL_PATCH_PREFLIGHT_ONLY_AFTER_OWNER_PROOF'
+ });
+}
+// Only suppress a redundant pre-provider claim if every active signed PR
+// original has CURRENT provider evidence that it is incompatible and every
+// original is pre-provider BLOCKED or not admitted. Never fence PREPARED or
+// PUBLISHING: those must retain the provider-effect reconciliation path.
+export function shouldFenceRileyPrClaimForObservedIncompatibility({
+ graph,inspection
+}={}){
+ if(inspection?.status!=='SIGNED_PR_SOURCE_COMPATIBILITY_OBSERVED_READ_ONLY'||
+    inspection.read_only!==true||
+    inspection.worker_claim_consumed!==false||
+    inspection.original_job_completed!==false||
+    inspection.owner_id!==graph?.owner_id||
+    inspection.shift_id!==graph?.shift_id||
+    !Array.isArray(graph?.jobs)||
+    !Array.isArray(inspection.source_diagnostics)||
+    inspection.source_diagnostics.length===0||
+    inspection.source_diagnostics.length>4)
+  return false;
+ const exact=graph.jobs.filter(j=>
+  j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+  j.independent_source_proof_verified===true&&
+  j.phase!=='SETTLED');
+ if(exact.length!==inspection.source_diagnostics.length)return false;
+ const seen=new Set();
+ return exact.every(j=>{
+  if(!['BLOCKED','NOT_ADMITTED'].includes(j.phase)||
+     seen.has(j.source_ref))return false;
+  seen.add(j.source_ref);
+  return inspection.source_diagnostics.filter(d=>
+   d.source_ref===j.source_ref&&
+   d.original_work_id===(j.original_work_id??null)&&
+   d.native_phase===j.phase&&
+   d.native_next_governed_action===j.next_governed_action&&
+   d.current_provider_metadata_read===true&&
+   Array.isArray(d.eligibility_blockers)&&
+   d.eligibility_blockers.some(b=>[
+    'DRAFT_SOURCE_NOT_ACCEPTED_BY_NATIVE_REVIEW_EXECUTOR',
+    'CHANGED_FILE_COUNT_EXCEEDS_NATIVE_BOUNDED_REVIEW'
+   ].includes(b))&&
+   d.existing_executor_can_start_from_this_observation===false
+  ).length===1;
+ });
+}
 async function sourceDetails(c,{fetchImpl,token}){
  const id=Number(SOURCE.exec(c.source_ref)[1]);
  const [pr,files]=await Promise.all([
@@ -68,7 +241,7 @@ async function sourceDetails(c,{fetchImpl,token}){
  if(pr?.number!==id||pr?.html_url!==c.source_ref||
   pr.state!=='open'||pr.draft===true||
   !SHA.test(pr.head?.sha||'')||
-  !Array.isArray(files)||files.length<1||files.length>8||
+  !Array.isArray(files)||files.length<1||files.length>RILEY_PR_REVIEW_MAX_CHANGED_FILES||
   pr.changed_files!==files.length||
   files.some(f=>!/^[-_./a-zA-Z0-9]+$/.test(f.filename||'')||
     f.filename.includes('..')||

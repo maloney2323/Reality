@@ -21,7 +21,10 @@ const signed=(sha=next,actions=[action])=>attest({
 });
 const candidate={sha:next,branch,shift_id:shift,
  capability_key:action,environment:'ISOLATED_PREVIEW',
- provider_deployment_ready:true,preview_only:true,production_changed:false};
+ provider_deployment_ready:true,preview_only:true,production_changed:false,
+ operating_lane:'NORMAL_SIGNED_SHIFT',source_staging_only:false,
+ isolated_database_independently_verified:true,
+ owner_packet_handler_registered:true};
 const ci={status:'INDEPENDENT_FROZEN_CI_PASSED',release_sha:next,
  independently_verified:true,test_source_pinned:true,run_id:2026};
 const approval={status:'EXACT_PREVIEW_RELEASE_OWNER_APPROVED',
@@ -254,4 +257,32 @@ test('even independently verified alias activation waits for signed worker',asyn
  assert.equal(v.original_job_completed,false);
  assert.equal(v.model_tool_permission_granted,false);
  assert.equal(writes,1);assert.equal(reads,3);
+});
+
+
+test('staging-only candidate cannot be installed even with matching CI and owner claim',async()=>{
+ let claims=0,writes=0;
+ const r=await deliver(deliveryArgs({
+  releaseCandidate:{...candidate,operating_lane:'STAGING_ONLY',
+   source_staging_only:true},
+  claimApprovedRelease:async()=>{claims++;return authorizedClaim},
+  assignAlias:async()=>{writes++}
+ }));
+ assert.equal(r.status,'SIGNED_CAPABILITY_DELIVERY_PINNED_CI_OR_RELEASE_UNVERIFIED');
+ assert.equal(r.provider_assignment_attempted,false);
+ assert.equal(claims,0);assert.equal(writes,0);
+});
+test('unverified database isolation or unregistered packet handler bars cutover',async()=>{
+ for(const bad of [
+  {isolated_database_independently_verified:false},
+  {owner_packet_handler_registered:false}
+ ]){
+  let writes=0;
+  const r=await deliver(deliveryArgs({
+   releaseCandidate:{...candidate,...bad},
+   assignAlias:async()=>{writes++}
+  }));
+  assert.equal(r.status,'SIGNED_CAPABILITY_DELIVERY_PINNED_CI_OR_RELEASE_UNVERIFIED');
+  assert.equal(writes,0);
+ }
 });

@@ -97,3 +97,45 @@ test('original Home and other route visibility gates actually allow the lifted M
  assert.match(connectCss,/main>:not\(\.top\):not\(#realityUnifiedView\):not\(#realityTimeHorizon\)/);
  assert.match(css,/#realityTimeHorizon\[hidden\]\{display:none!important\}/);
 });
+
+
+test('one independently reviewed blocker guides Past Present Future and CEO without changing counts or authority',()=>{
+ assert.match(api,/final_loop_recovery_guidance:finalLoopRecoveryGuidance/);
+ assert.match(api,/projectFinalLoopOwnerReviewedRecoveryGuidance/);
+ assert.match(ui,/data\.final_loop_recovery_guidance/);
+ assert.match(ui,/FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY/);
+ assert.match(ui,/continuity_head_sha256===horizon\.continuity_head_sha256/);
+ assert.match(ui,/recovery\.future\?\.automatically_executable===false/);
+ assert.match(ui,/recovery\.recovery_verified===false/);
+ assert.match(ui,/recovery\.present\?\.original_settled===false/);
+ assert.match(ui,/recovery\.ceo\?\.autonomous_authority_granted===false/);
+ assert.match(ui,/Future \/ CEO next permitted step:/);
+ assert.doesNotMatch(ui,/fetch\(.*reality_owner_approve_final_loop_child_v1/);
+});
+
+
+test('Universe feedback shows verified outcomes without treating Future as authority',()=>{
+ assert.match(api,/projectFinalLoopUniverseFeedback/);
+ assert.match(api,/final_loop_universe_feedback:finalLoopUniverseFeedback/);
+ assert.match(ui,/data\.final_loop_universe_feedback/);
+ assert.match(ui,/FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY/);
+ assert.match(ui,/universe\.continuity_head_sha256===horizon\.continuity_head_sha256/);
+ assert.match(ui,/universe\.universe_readback_verified===true/);
+ assert.match(ui,/universe\.future_is_not_execution_authority===true/);
+ assert.match(ui,/universe\.execution_authorized===false/);
+ assert.match(ui,/Universe continuity/);
+ assert.doesNotMatch(ui,/reality_record_final_loop_parent_settlement_v1/);
+});
+
+
+test('exact same original engineering proof informs CEO but never authorizes',()=>{
+ assert.match(api,/inspectFinalLoopGovernedEngineering/);
+ assert.match(api,/reality_read_same_original_postmaintenance_gate_v1/);
+ assert.match(api,/final_loop_governed_engineering:finalLoopGovernedEngineering/);
+ assert.match(ui,/data\.final_loop_governed_engineering/);
+ assert.match(ui,/ENGINEERING_EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED/);
+ assert.match(ui,/engineering\.continuity_head_sha256===horizon\?\.continuity_head_sha256/);
+ assert.match(ui,/engineering\.engineering_handler_dispatch_authorized===false/);
+ assert.match(ui,/engineering\.original_job_completed===false/);
+ assert.match(ui,/Next required engineering proof:/);
+});

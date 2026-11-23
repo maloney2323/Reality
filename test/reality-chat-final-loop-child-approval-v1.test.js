@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const source=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+test('owner Chat uses one exact source-bound approval on the existing shift',()=>{
+ const ui=source('reality-chat-final-loop-child-approval-v1.js');
+ const index=source('index.html');
+ assert.match(index,/<script defer src="\/reality-chat-final-loop-child-approval-v1\.js"><\/script>/);
+ assert.match(ui,/realityChatPanelWork/);
+ assert.match(ui,/APPROVE_READ_ONLY_INTERNAL_PR_REVIEW/);
+ assert.match(ui,/source_manifest_sha256/);
+ assert.match(ui,/proposal_fingerprint/);
+ assert.match(ui,/readPackets\(exact\.shift_id\)/);
+ assert.match(ui,/readPackets\(exact\.shift_id\)/g);
+ assert.match(ui,/uncertain=true/);
+ assert.match(ui,/parent_original_work_id/);
+ assert.doesNotMatch(ui,/innerHTML|document\.write|autoApprove|onload\s*=\s*approve/);
+});
+test('approval API binds one owner session and cannot install, publish or execute itself',()=>{
+ const api=source('api/reality/owner-final-loop-child-approval.js');
+ assert.match(api,/authenticatedChatSession\(req,res\)/);
+ assert.match(api,/session\.user_id/);
+ assert.match(api,/REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED/);
+ assert.match(api,/reality_owner_approve_final_loop_child_v1/);
+ assert.match(api,/p_owner_id:session\.user_id/);
+ assert.match(api,/p_manifest_sha256:b\.source_manifest_sha256/);
+ assert.match(api,/p_approval_request_id:approvalRequestId/);
+ assert.match(api,/execution_authorized:false/);
+ assert.match(api,/parent_obligation_remains_open:true/);
+ assert.match(api,/original_job_completed:false/);
+ assert.doesNotMatch(api,/reality_claim_final_loop_child_review_v1|reality_settle_authorized_riley_pr_review_v1/);
+});
+test('verified signed goal proposal requires actual owner consent before child work',()=>{
+ const sql=source('sql/reality-final-loop-child-transactional-v1.sql');
+ assert.match(sql,/FINAL_LOOP_INDEPENDENT_PARENT_ACCEPTANCE_OR_SOURCE_NOT_VERIFIED/);
+ assert.match(sql,/final_loop_pr_review_acceptance_digest_v1/);
+ assert.match(sql,/AWAITING_EXACT_OWNER_APPROVAL/);
+ assert.match(sql,/final_loop_pr_review_acceptance_digest_v1/);
+ assert.match(sql,/final_loop_child_approval_packets_v1/);
+ assert.match(sql,/owner_approval_receipt_sha256/);
+ assert.match(sql,/EFFECT_RESERVED_RECONCILE_ONLY/);
+ assert.match(sql,/premodel_recovery_count=0/);
+ assert.match(sql,/provider_effect_replay_authorized',false/);
+});

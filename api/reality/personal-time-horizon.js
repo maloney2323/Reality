@@ -4,6 +4,13 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {projectOwnerFinalLoopTimeReadback,
+ projectFinalLoopOwnerReviewedRecoveryGuidance}
+ from '../../src/reality-final-loop-owner-time-bridge-v1.js';
+import {projectFinalLoopUniverseFeedback}
+ from '../../src/reality-final-loop-universe-feedback-v1.js';
+import {inspectFinalLoopGovernedEngineering}
+ from '../../src/reality-final-loop-governed-engineering-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -102,7 +109,9 @@ function futureDiscoveryProjection(value,now){
 
 // Shared owner-scoped readback for Home and employee inquiry context.
 // This reads existing ledgers; it cannot qualify, approve, create or dispatch work.
-export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now=Date.now()}={}){
+export async function readOwnerTimeHorizonEvidence({
+ ownerId,db,call=shiftRpc,now=Date.now(),env=process.env
+}={}){
  if(!UUID.test(ownerId||'')||!db||!Number.isFinite(now))
   throw Error('REALITY_TIME_OWNER_READ_INPUT_UNVERIFIED');
   const checks=await Promise.allSettled([
@@ -120,6 +129,273 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
   const potential=checks[2].status==='fulfilled'&&
    checks[2].value?.owner_id===ownerId?
    futureDiscoveryProjection(checks[2].value,now):null;
+  // Existing owner-visible Past / Present / Future remains sourced from
+  // the original three readbacks. This optional FOURTH read is a strict
+  // same-owner, same-active-shift Final Loop proof projection, not a new
+  // customer job, active worker or CEO agent. It cannot change card counts.
+  let finalLoopOwner={
+   status:'FINAL_LOOP_OWNER_TIME_VIEW_NOT_ENABLED',
+   read_only:true,owner_scope_verified:false,
+   executive:null,time_horizon:null,
+   original_job_completed:false,external_execution_authorized:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'){
+   try{
+    const shifts=checks[1].status==='fulfilled'?
+     assertShiftReadback(checks[1].value).shifts:[];
+    const active=shifts.filter(s=>shiftStillActive(s,now));
+    if(active.length!==1){
+     finalLoopOwner={
+      status:active.length===0?
+       'FINAL_LOOP_NO_ACTIVE_SIGNED_OWNER_SHIFT':
+       'FINAL_LOOP_MULTIPLE_ACTIVE_SHIFT_SCOPE_UNVERIFIED',
+      read_only:true,owner_scope_verified:false,
+      executive:null,time_horizon:null,
+      original_job_completed:false,external_execution_authorized:false
+     };
+    }else{
+     const proof=await call(db,
+      'reality_read_current_final_loop_proof_envelope_v1',
+      {p_shift_id:active[0].shift_id},{timeoutMs:6000});
+     finalLoopOwner=projectOwnerFinalLoopTimeReadback({
+      ownerId,shiftId:active[0].shift_id,
+      expectedPlanFingerprint:active[0].plan_fingerprint,
+      proof,independentHistory:past,now
+     });
+    }
+   }catch{
+    finalLoopOwner={
+     status:'FINAL_LOOP_CANONICAL_PROOF_READER_NOT_INSTALLED_OR_UNAVAILABLE',
+     read_only:true,owner_scope_verified:false,
+     executive:null,time_horizon:null,
+     original_job_completed:false,external_execution_authorized:false
+    };
+   }
+  }
+  // Optional same-owner, same-frozen-shift source-plan readback.
+  // Proposed eight-file scopes remain Present evidence obligations, NEVER
+  // accepted originals, approved Future work or independently settled Past.
+  let finalLoopSourcePlans={
+   status:'FINAL_LOOP_SOURCE_PLAN_OWNER_VIEW_NOT_ENABLED',
+   read_only:true,owner_scope_verified:false,
+   plans:[],execution_authorized:false,child_originals_admitted:0,
+   original_job_completed:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'&&
+     env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED==='true'&&
+     finalLoopOwner?.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopOwner.owner_scope_verified===true){
+   try{
+    const p=await call(db,'reality_read_final_loop_pr_source_plans_v1',{
+     p_shift_id:finalLoopOwner.shift_id
+    },{timeoutMs:6000});
+    const expected=finalLoopOwner.time_horizon?.present?.obligations||[];
+    if(p?.schema==='reality-final-loop-pr-source-plans-readback-v1'&&
+       p.status==='FINAL_LOOP_PROPOSED_SOURCE_PLANS_NOT_EXECUTABLE'&&
+       p.owner_id===ownerId&&
+       p.shift_id===finalLoopOwner.shift_id&&
+       p.plan_fingerprint===finalLoopOwner.time_horizon?.present?.plan_fingerprint&&
+       p.read_only===true&&p.execution_authorized===false&&
+       p.original_job_completed===false&&
+       p.child_originals_admitted===0&&
+       Array.isArray(p.plans)&&p.plans.length<=32&&
+       p.plans.every(x=>
+        expected.some(j=>j.source_ref===x.source_ref&&
+         (j.original_work_id??null)===(x.parent_original_work_id??null))&&
+        x.state==='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION'&&
+        x.independent_source_review_verified===false&&
+        x.owner_acceptance_verified===false&&
+        x.child_originals_admitted===0&&
+        /^sha256:[a-f0-9]{64}$/.test(x.source_manifest_sha256||'')&&
+        /^[a-f0-9]{40}$/.test(x.source_head_sha||'')&&
+        Number.isSafeInteger(x.file_count)&&x.file_count>=9&&x.file_count<=500&&
+        Number.isSafeInteger(x.proposed_scope_count)&&
+        x.proposed_scope_count>=2&&x.proposed_scope_count<=63)){
+     finalLoopSourcePlans={
+      status:'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY',
+      owner_id:ownerId,shift_id:p.shift_id,
+      read_only:true,owner_scope_verified:true,
+      plans:p.plans,
+      execution_authorized:false,child_originals_admitted:0,
+      original_job_completed:false
+     };
+    }
+   }catch{
+    finalLoopSourcePlans={
+     status:'FINAL_LOOP_SOURCE_PLAN_PROOF_READER_NOT_INSTALLED',
+     read_only:true,owner_scope_verified:false,
+     plans:[],execution_authorized:false,child_originals_admitted:0,
+     original_job_completed:false
+    };
+   }
+  }
+  // Read the SAME signed shift's verified recovery and owner-packet evidence
+  // into Past/Present/Future and CEO guidance. Do not change canonical
+  // completion or authorization, and never self-certify this as settlement.
+  let finalLoopRecoveryGuidance={
+   status:'FINAL_LOOP_OWNER_RECOVERY_GUIDANCE_NOT_ENABLED',
+   read_only:true,original_job_completed:false,authority_granted:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_OWNER_TIME_VIEW_ENABLED==='true'&&
+     env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_OWNER_VIEW_ENABLED==='true'&&
+     env.REALITY_FINAL_LOOP_RECOVERY_OWNER_GUIDANCE_ENABLED==='true'&&
+     finalLoopOwner.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopSourcePlans.status===
+      'FINAL_LOOP_SAME_OWNER_PENDING_SOURCE_PLANS_VERIFIED_READ_ONLY'){
+   try{
+    const [preflight,recoveryActions,ownerPackets]=await Promise.all([
+     call(db,'reality_read_final_loop_child_approval_preflight_v1',{
+      p_shift_id:finalLoopOwner.shift_id},{timeoutMs:6000}),
+     call(db,'reality_read_owner_signed_shift_recovery_actions_v1',{
+      p_owner_id:ownerId},{timeoutMs:6000}),
+     call(db,'reality_read_owner_final_loop_child_approvals_v1',{
+      p_owner_id:ownerId,p_shift_id:finalLoopOwner.shift_id
+     },{timeoutMs:6000})
+    ]);
+    finalLoopRecoveryGuidance=projectFinalLoopOwnerReviewedRecoveryGuidance({
+     ownerView:finalLoopOwner,sourcePlans:finalLoopSourcePlans,
+     preflight,recoveryActions,ownerPackets
+    });
+    if(finalLoopRecoveryGuidance.status===
+       'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY')
+     finalLoopOwner=Object.freeze({...finalLoopOwner,
+      recovery_guidance:finalLoopRecoveryGuidance});
+   }catch{
+    finalLoopRecoveryGuidance={
+     status:'FINAL_LOOP_OWNER_RECOVERY_GUIDANCE_INDEPENDENT_READBACK_FAILED',
+     read_only:true,original_job_completed:false,authority_granted:false
+    };
+   }
+  }
+  // Separately verified native+Universe parent settlement becomes Past
+  // evidence. Pending parent delivery remains Present, never invented Past.
+  let finalLoopParentOutcomes={
+   status:'FINAL_LOOP_PARENT_OUTCOME_OWNER_VIEW_NOT_ENABLED',
+   owner_scope_verified:false,read_only:true,outcomes:[],
+   parent_delivery_count:null,verified_parent_count:null,
+   unfinished_parent_count:null,execution_authorized:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_PARENT_OUTCOME_OWNER_VIEW_ENABLED==='true'&&
+     checks[1].status==='fulfilled'){
+   try{
+    const shifts=assertShiftReadback(checks[1].value).shifts;
+    const active=shifts.filter(v=>shiftStillActive(v,now));
+    if(active.length===1){
+     const r=await call(db,
+      'reality_read_owner_final_loop_parent_outcomes_v1',{
+       p_owner_id:ownerId,p_shift_id:active[0].shift_id
+      },{timeoutMs:6000});
+     const items=r?.outcomes;
+     const valid=r?.status==='FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY'&&
+      r.owner_id===ownerId&&r.shift_id===active[0].shift_id&&
+      r.owner_scope_verified===true&&r.read_only===true&&
+      r.execution_authorized===false&&r.shift_completed_by_read===false&&
+      Array.isArray(items)&&items.length<=16&&
+      Number.isSafeInteger(r.parent_delivery_count)&&
+      r.parent_delivery_count===items.length&&
+      Number.isSafeInteger(r.verified_parent_count)&&
+      Number.isSafeInteger(r.unfinished_parent_count)&&
+      r.verified_parent_count+r.unfinished_parent_count===items.length&&
+      r.verified_parent_count===
+       items.filter(x=>x.original_job_completed===true).length&&
+      items.every(x=>
+       WORK.test(x.original_work_id||'')&&
+       /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(
+        x.source_ref||'')&&
+       SHA.test(x.source_manifest_sha256||'')&&
+       typeof x.independent_universe_verified==='boolean'&&
+       x.independent_universe_verified===x.original_job_completed&&
+       (x.original_job_completed?
+        x.status==='INDEPENDENTLY_SETTLED_UNIVERSE_PAST'&&
+        /^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*#issuecomment-[1-9]\d*$/.test(
+         x.verified_provider_comment_url||'')&&
+        UUID.test(x.verified_universe_outcome_event_id||'')&&
+        UUID.test(x.parent_settlement_receipt_id||''):
+        x.status==='PARENT_DELIVERY_UNFINISHED_PRESENT'&&
+        x.verified_provider_comment_url==null&&
+        x.verified_universe_outcome_event_id==null));
+     if(valid)finalLoopParentOutcomes={
+      status:'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ',
+      owner_id:ownerId,shift_id:r.shift_id,
+      owner_scope_verified:true,read_only:true,
+      outcomes:items,parent_delivery_count:r.parent_delivery_count,
+      verified_parent_count:r.verified_parent_count,
+      unfinished_parent_count:r.unfinished_parent_count,
+      execution_authorized:false
+     };
+    }
+   }catch{
+    finalLoopParentOutcomes={
+     status:'FINAL_LOOP_PARENT_OUTCOME_PROOF_NOT_INSTALLED_OR_UNAVAILABLE',
+     owner_scope_verified:false,read_only:true,outcomes:[],
+     parent_delivery_count:null,verified_parent_count:null,
+     unfinished_parent_count:null,execution_authorized:false
+    };
+   }
+  }
+  // One owner/shift/root-bound Universe feedback projection over the
+  // INDEPENDENT native+Universe settlement reader and canonical Continuity.
+  // The same result can inform CEO and Chat, but grants no new authority.
+  let finalLoopUniverseFeedback={
+   status:'FINAL_LOOP_UNIVERSE_FEEDBACK_NOT_ENABLED',
+   read_only:true,universe_readback_verified:false,
+   execution_authorized:false,original_job_completed:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'&&
+     finalLoopOwner.status===
+      'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopParentOutcomes.status===
+      'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ'){
+   finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
+    canonicalView:finalLoopOwner,parentOutcomes:finalLoopParentOutcomes,
+    recoveryGuidance:finalLoopRecoveryGuidance
+   });
+   if(finalLoopUniverseFeedback.status===
+      'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY')
+    finalLoopOwner=Object.freeze({...finalLoopOwner,
+     universe_feedback:finalLoopUniverseFeedback});
+  }
+
+  // Same original-work service-role maintenance reader already installed
+  // in Reality. No new database table, work queue, model, or authority.
+  // The original stays open if the business warrant or frozen RED is missing.
+  let finalLoopGovernedEngineering={
+   status:'ENGINEERING_OWNER_EVIDENCE_VIEW_NOT_ENABLED',
+   read_only:true,original_job_completed:false,
+   engineering_handler_dispatch_authorized:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_GOVERNED_ENGINEERING_VIEW_ENABLED==='true'&&
+     finalLoopOwner.status===
+      'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'){
+   try{
+    const gate=await call(db,
+     'reality_read_same_original_postmaintenance_gate_v1',{
+      p_shift_id:finalLoopOwner.shift_id
+     },{timeoutMs:6000});
+    finalLoopGovernedEngineering=inspectFinalLoopGovernedEngineering({
+     canonicalView:finalLoopOwner,maintenanceGate:gate
+    });
+    if(['ENGINEERING_EXACT_BUSINESS_ORIGINAL_WARRANT_REQUIRED',
+        'ENGINEERING_INDEPENDENT_FROZEN_RED_STILL_REQUIRED',
+        'ENGINEERING_CASE_CI_VERIFIED_ORIGINAL_STILL_OPEN'].includes(
+       finalLoopGovernedEngineering.status))
+     finalLoopOwner=Object.freeze({...finalLoopOwner,
+      governed_engineering:finalLoopGovernedEngineering});
+   }catch{
+    finalLoopGovernedEngineering={
+     status:'ENGINEERING_OWNER_ORIGINAL_MAINTENANCE_RPC_UNAVAILABLE',
+     read_only:true,original_job_completed:false,
+     engineering_handler_dispatch_authorized:false
+    };
+   }
+  }
+
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -129,6 +405,12 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
    past:past||{status:'PAST_RECEIPTS_NOT_VERIFIED'},
    present:present||{status:'PRESENT_SHIFT_NOT_VERIFIED'},
    future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
+   final_loop_owner:finalLoopOwner,
+   final_loop_source_plans:finalLoopSourcePlans,
+   final_loop_parent_outcomes:finalLoopParentOutcomes,
+   final_loop_universe_feedback:finalLoopUniverseFeedback,
+   final_loop_recovery_guidance:finalLoopRecoveryGuidance,
+   final_loop_governed_engineering:finalLoopGovernedEngineering,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null

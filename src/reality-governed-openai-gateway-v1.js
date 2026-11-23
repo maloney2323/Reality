@@ -159,6 +159,219 @@ export function createRealityGovernedOpenAIGateway({
     production_changed:false,
     full_continuity_verified:false,model_granted_authority:false});
   },
+  // Same canonical governed inference boundary for proposed child reviews.
+  // Exact service-only child claim, frozen parent acceptance and current
+  // GitHub source are re-read BOTH before and after the provider call.
+  // This route is advisory only: no tools, installation, publication,
+  // self-approval, independent verification, or parent settlement.
+  async finalLoopChildReadOnlyAdvisory({
+   scope,mode,request,readCurrentChild,readCurrentSource
+  }={}){
+   if(!['PREPARE','INDEPENDENT_REVIEW'].includes(mode)||
+      typeof readCurrentChild!=='function'||
+      typeof readCurrentSource!=='function'||
+      !UUID.test(scope?.owner_id||'')||
+      !UUID.test(scope?.shift_id||'')||
+      !UUID.test(scope?.worker_run_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(scope?.child_work_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(scope?.parent_original_work_id||'')||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(
+       scope?.source_ref||'')||
+      !/^[a-f0-9]{40}$/.test(scope?.source_head_sha||'')||
+      !SHA.test(scope?.source_manifest_sha256)||
+      !SHA.test(scope?.scope_sha256)||
+      !SHA.test(scope?.acceptance_contract_sha256)||
+      (mode==='PREPARE'&&!UUID.test(scope?.claim_id||''))||
+      !request||request.model!==model||
+      request.tool_choice!=='none'||Object.hasOwn(request,'tools')||
+      Object.hasOwn(request,'previous_response_id')||
+      !Array.isArray(request.input)||request.input.length!==2||
+      request.input[0]?.role!=='system'||request.input[1]?.role!=='user'||
+      !Number.isSafeInteger(request.max_output_tokens)||
+      request.max_output_tokens<1||request.max_output_tokens>1800||
+      JSON.stringify(request).length>26000)
+    fail('FINAL_LOOP_CHILD_EXACT_SIGNED_ADVISORY_REQUIRED');
+   const verify=async()=>{
+    const [state,source]=await Promise.all([
+     readCurrentChild(Object.freeze({...scope})),
+     readCurrentSource(Object.freeze({...scope}))
+    ]);
+    if(state?.status!==(mode==='PREPARE'?
+       'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK':
+       'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE')||
+       state.owner_id!==scope.owner_id||
+       state.shift_id!==scope.shift_id||
+       state.child_work_id!==scope.child_work_id||
+       state.parent_original_work_id!==scope.parent_original_work_id||
+       state.source_ref!==scope.source_ref||
+       state.source_head_sha!==scope.source_head_sha||
+       state.source_manifest_sha256!==scope.source_manifest_sha256||
+       state.scope_sha256!==scope.scope_sha256||
+       state.acceptance_contract_sha256!==scope.acceptance_contract_sha256||
+       (mode==='PREPARE'&&(
+        state.claim_id!==scope.claim_id||
+        state.worker_run_id!==scope.worker_run_id||
+        state.phase!=='CLAIMED'||state.model_response_id!==null||
+        state.model_authorized!==true))||
+       (mode==='INDEPENDENT_REVIEW'&&(
+        state.independent_verifier_run_id!==scope.worker_run_id||
+        state.original_generation_worker_run_id===scope.worker_run_id||
+        !SHA.test(state.review_sha256||'')||
+        state.read_only!==true))||
+       state.original_job_completed!==false||
+       state.production_changed!==false||
+       source?.source_ref!==scope.source_ref||
+       source.head_sha!==scope.source_head_sha||
+       source.manifest_sha256!==scope.source_manifest_sha256||
+       source.scope_sha256!==scope.scope_sha256||
+       source.independently_read!==true||
+       source.all_patches_present!==true||
+       source.read_only!==true||
+       source.production_changed!==false)
+     fail('FINAL_LOOP_CHILD_AUTHORITY_OR_PROVIDER_DRIFT');
+    return state;
+   };
+   const first=await verify();
+   let response;
+   try{
+    response=await fetchImpl('https://api.openai.com/v1/responses',{
+     method:'POST',redirect:'error',cache:'no-store',
+     signal:AbortSignal.timeout(20000),
+     headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
+     body:JSON.stringify(request)
+    });
+   }catch{
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'FINAL_LOOP_CHILD_MODEL_PROVIDER_REQUEST_UNVERIFIED'});
+   }
+   if(!response?.ok)return Object.freeze({
+    status:'UNAVAILABLE',reason:safeReason(Number(response.status))
+   });
+   let data;try{data=await response.json()}catch{
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'FINAL_LOOP_CHILD_MODEL_PROVIDER_RESPONSE_INVALID'});
+   }
+   if(data?.status!=='completed'||!Array.isArray(data.output)||
+      data.output.length>12||data.output.some(x=>
+       ['function_call','tool_search_call'].includes(x?.type))||
+      !/^resp_[a-zA-Z0-9_-]{4,160}$/.test(data.id||'')||
+      (mode==='INDEPENDENT_REVIEW'&&data.id===first.model_response_id))
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'FINAL_LOOP_CHILD_MODEL_RESPONSE_OR_INDEPENDENCE_INVALID'});
+   const after=await verify();
+   if(mode==='INDEPENDENT_REVIEW'&&
+      after.review_sha256!==first.review_sha256)
+    fail('FINAL_LOOP_CHILD_REVIEW_ARTIFACT_CHANGED_DURING_VERIFICATION');
+   return Object.freeze({
+    status:'CURRENT_FINAL_LOOP_CHILD_ADVISORY_UNTRUSTED',
+    data,child_work_id:scope.child_work_id,
+    model_authority_granted:false,independent_verification_committed:false,
+    original_job_completed:false,production_changed:false
+   });
+  },
+  // The same governed model boundary also handles independent parent
+  // integration batches. It rechecks immutable child receipts from the
+  // canonical service and current GitHub head before/after inference.
+  // The model cannot self-certify acceptance, execution or parent settlement.
+  async finalLoopParentIntegrationAdvisory({
+   scope,request,readCurrentIntegration,readCurrentSource
+  }={}){
+   if(typeof readCurrentIntegration!=='function'||
+      typeof readCurrentSource!=='function'||
+      !UUID.test(scope?.owner_id||'')||
+      !UUID.test(scope?.shift_id||'')||
+      !UUID.test(scope?.batch_id||'')||
+      !UUID.test(scope?.claim_id||'')||
+      !UUID.test(scope?.worker_run_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(scope?.parent_original_work_id||'')||
+      !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(
+       scope?.source_ref||'')||
+      !/^[a-f0-9]{40}$/.test(scope?.source_head_sha||'')||
+      !/^[a-f0-9]{40}$/.test(scope?.source_base_sha||'')||
+      !SHA.test(scope?.source_manifest_sha256)||
+      !SHA.test(scope?.verified_child_receipts_sha256)||
+      !SHA.test(scope?.acceptance_contract_sha256)||
+      !Number.isInteger(scope?.batch_index)||
+      scope.batch_index<0||scope.batch_index>12||
+      !request||request.model!==model||
+      request.tool_choice!=='none'||Object.hasOwn(request,'tools')||
+      Object.hasOwn(request,'previous_response_id')||
+      !Array.isArray(request.input)||request.input.length!==2||
+      request.input[0]?.role!=='system'||request.input[1]?.role!=='user'||
+      !Number.isSafeInteger(request.max_output_tokens)||
+      request.max_output_tokens<1||request.max_output_tokens>1300||
+      JSON.stringify(request).length>30000)
+    fail('FINAL_LOOP_INTEGRATION_EXACT_SIGNED_ADVISORY_REQUIRED');
+   const verify=async()=>{
+    const [state,source]=await Promise.all([
+     readCurrentIntegration(Object.freeze({...scope})),
+     readCurrentSource(Object.freeze({...scope}))
+    ]);
+    if(state?.status!=='CURRENT_INDEPENDENT_PARENT_INTEGRATION_SCOPE'||
+       state.owner_id!==scope.owner_id||
+       state.shift_id!==scope.shift_id||
+       state.batch_id!==scope.batch_id||
+       state.claim_id!==scope.claim_id||
+       state.worker_run_id!==scope.worker_run_id||
+       state.parent_original_work_id!==scope.parent_original_work_id||
+       state.source_ref!==scope.source_ref||
+       state.source_head_sha!==scope.source_head_sha||
+       state.source_base_sha!==scope.source_base_sha||
+       state.source_manifest_sha256!==scope.source_manifest_sha256||
+       state.acceptance_contract_sha256!==scope.acceptance_contract_sha256||
+       state.verified_child_receipts_sha256!==
+        scope.verified_child_receipts_sha256||
+       state.batch_index!==scope.batch_index||
+       state.read_only!==true||
+       state.integration_model_authorized!==true||
+       state.original_job_completed!==false||
+       state.production_changed!==false||
+       !Array.isArray(state.reviews)||state.reviews.length<1||
+       state.reviews.length>6||
+       source?.source_ref!==scope.source_ref||
+       source.head_sha!==scope.source_head_sha||
+       source.base_sha!==scope.source_base_sha||
+       source.manifest_sha256!==scope.source_manifest_sha256||
+       source.current_provider_readback!==true||
+       source.read_only!==true||source.production_changed!==false)
+     fail('FINAL_LOOP_INTEGRATION_AUTHORITY_CHILD_OR_SOURCE_DRIFT');
+    return state;
+   };
+   await verify();
+   let response;
+   try{
+    response=await fetchImpl('https://api.openai.com/v1/responses',{
+     method:'POST',redirect:'error',cache:'no-store',
+     signal:AbortSignal.timeout(20000),
+     headers:{authorization:'Bearer '+apiKey,'content-type':'application/json'},
+     body:JSON.stringify(request)
+    });
+   }catch{
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'FINAL_LOOP_INTEGRATION_MODEL_PROVIDER_REQUEST_UNVERIFIED'});
+   }
+   if(!response?.ok)
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:safeReason(Number(response.status))});
+   let data;
+   try{data=await response.json()}catch{
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'FINAL_LOOP_INTEGRATION_MODEL_PROVIDER_RESPONSE_INVALID'});
+   }
+   if(data?.status!=='completed'||!Array.isArray(data.output)||
+      data.output.length>12||data.output.some(x=>
+       ['function_call','tool_search_call'].includes(x?.type))||
+      !/^resp_[a-zA-Z0-9_-]{4,160}$/.test(data.id||''))
+    return Object.freeze({status:'UNAVAILABLE',
+     reason:'FINAL_LOOP_INTEGRATION_MODEL_RESPONSE_UNVERIFIED'});
+   await verify();
+   return Object.freeze({
+    status:'CURRENT_FINAL_LOOP_INTEGRATION_ADVISORY_UNTRUSTED',
+    data,model_granted_authority:false,
+    independent_verification_committed:false,
+    original_job_completed:false,production_changed:false
+   });
+  },
   // This second mode is the ONLY gateway method that may expose a capability
   // to a model, and it runs through the existing independently verified
   // Continuity/broker + fenced sandbox adapter, never employee prompt text.

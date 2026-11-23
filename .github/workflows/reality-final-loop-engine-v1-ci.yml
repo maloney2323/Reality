@@ -1,0 +1,254 @@
+name: Reality Final Loop Engine lifecycle acceptance
+on:
+  push:
+    paths:
+      - 'src/reality-shift-unified-execution-controller-v1.js'
+      - 'src/reality-final-loop-time-horizon-v1.js'
+      - 'src/reality-final-loop-executive-brief-v1.js'
+      - 'src/reality-final-loop-owner-time-bridge-v1.js'
+      - 'src/reality-final-loop-universe-feedback-v1.js'
+      - 'src/reality-final-loop-governed-engineering-v1.js'
+      - 'src/reality-governed-engineering-candidate-evaluation-v1.js'
+      - 'src/reality-final-loop-canonical-handoff-v1.js'
+      - 'api/reality/personal-time-horizon.js'
+      - 'api/reality/personal-chat.js'
+      - 'reality-past-present-future-v1.js'
+      - 'src/reality-riley-authorized-pr-review-job-v1.js'
+      - 'src/reality-pr-large-source-qualification-v1.js'
+      - 'src/reality-final-loop-pr-source-handoff-v1.js'
+      - 'src/reality-final-loop-staged-plan-action-router-v1.js'
+      - 'src/reality-signed-worker-operating-lane-v1.js'
+      - 'test/reality-signed-worker-operating-lane-v1.test.js'
+      - 'src/reality-signed-worker-capability-delivery-v1.js'
+      - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
+      - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
+      - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
+      - 'sql/reality-governed-worker-release-schedule-read-v1.sql'
+      - 'sql/reality-final-loop-signed-worker-release-wakes-v1.sql'
+      - 'test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js'
+      - 'src/reality-signed-worker-scheduled-release-verifier-v1.js'
+      - 'src/reality-governed-release-independent-qualification-v1.js'
+      - 'test/reality-governed-release-independent-qualification-v1.test.js'
+      - 'api/reality/governed-worker-release-control-plane.js'
+      - 'test/reality-governed-worker-release-control-plane-v1.test.js'
+      - 'test/reality-signed-worker-scheduled-release-verifier-v1.test.js'
+      - 'test/reality-governed-signed-worker-release-switch-trigger-v1.test.js'
+      - 'test/reality-signed-worker-capability-delivery-v1.test.js'
+      - 'test/reality-final-loop-staged-plan-action-router-v1.test.js'
+      - 'src/reality-final-loop-child-review-worker-v1.js'
+      - 'src/reality-final-loop-child-approval-request-v1.js'
+      - 'api/reality/owner-final-loop-child-approval.js'
+      - 'sql/reality-final-loop-child-transactional-v1.sql'
+      - 'test/reality-final-loop-child-transactional-v1.test.js'
+      - 'sql/reality-final-loop-parent-integration-v1.sql'
+      - 'test/sql/reality-final-loop-signed-transaction-smoke-v1.sql'
+      - 'src/reality-final-loop-parent-integration-worker-v1.js'
+      - 'test/reality-final-loop-parent-integration-v1.test.js'
+      - 'sql/reality-final-loop-parent-delivery-v1.sql'
+      - 'src/reality-final-loop-parent-delivery-worker-v1.js'
+      - 'api/reality/owner-final-loop-parent-delivery.js'
+      - 'reality-chat-final-loop-parent-delivery-v1.js'
+      - 'test/reality-final-loop-parent-delivery-v1.test.js'
+      - 'test/sql/reality-final-loop-parent-delivery-smoke-v1.sql'
+      - 'index.html'
+      - 'reality-chat-final-loop-child-approval-v1.js'
+      - 'test/reality-chat-final-loop-child-approval-v1.test.js'
+      - 'src/reality-governed-openai-gateway-v1.js'
+      - 'sql/reality-final-loop-pr-source-plans-v1.sql'
+      - 'test/reality-final-loop-pr-source-handoff-v1.test.js'
+      - 'src/reality-final-loop-signed-worker-bridge-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'test/reality-final-loop-engine-v1.test.js'
+      - 'test/reality-final-loop-time-horizon-v1.test.js'
+      - 'test/reality-final-loop-executive-brief-v1.test.js'
+      - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
+      - 'test/reality-final-loop-universe-feedback-v1.test.js'
+      - 'test/reality-final-loop-governed-engineering-v1.test.js'
+      - 'test/reality-governed-engineering-candidate-evaluation-v1.test.js'
+      - 'test/reality-final-loop-canonical-handoff-v1.test.js'
+      - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
+      - 'test/reality-pr-source-readiness-final-loop-v1.test.js'
+      - 'test/reality-final-loop-signed-worker-bridge-v1.test.js'
+      - 'test/reality-final-loop-db-contract-v1.test.js'
+      - 'sql/reality-final-loop-canonical-continuity-v1.sql'
+      - 'test/reality-unified-shift-execution-controller-v1.test.js'
+      - '.github/workflows/reality-final-loop-engine-v1-ci.yml'
+  pull_request:
+    paths:
+      - 'src/reality-shift-unified-execution-controller-v1.js'
+      - 'src/reality-final-loop-time-horizon-v1.js'
+      - 'src/reality-final-loop-executive-brief-v1.js'
+      - 'src/reality-final-loop-owner-time-bridge-v1.js'
+      - 'src/reality-final-loop-universe-feedback-v1.js'
+      - 'src/reality-final-loop-canonical-handoff-v1.js'
+      - 'api/reality/personal-time-horizon.js'
+      - 'api/reality/personal-chat.js'
+      - 'reality-past-present-future-v1.js'
+      - 'src/reality-riley-authorized-pr-review-job-v1.js'
+      - 'src/reality-pr-large-source-qualification-v1.js'
+      - 'src/reality-final-loop-pr-source-handoff-v1.js'
+      - 'src/reality-final-loop-staged-plan-action-router-v1.js'
+      - 'src/reality-signed-worker-operating-lane-v1.js'
+      - 'test/reality-signed-worker-operating-lane-v1.test.js'
+      - 'src/reality-signed-worker-capability-delivery-v1.js'
+      - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
+      - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
+      - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
+      - 'sql/reality-governed-worker-release-schedule-read-v1.sql'
+      - 'sql/reality-final-loop-signed-worker-release-wakes-v1.sql'
+      - 'test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js'
+      - 'src/reality-signed-worker-scheduled-release-verifier-v1.js'
+      - 'src/reality-governed-release-independent-qualification-v1.js'
+      - 'test/reality-governed-release-independent-qualification-v1.test.js'
+      - 'api/reality/governed-worker-release-control-plane.js'
+      - 'test/reality-governed-worker-release-control-plane-v1.test.js'
+      - 'test/reality-signed-worker-scheduled-release-verifier-v1.test.js'
+      - 'test/reality-governed-signed-worker-release-switch-trigger-v1.test.js'
+      - 'test/reality-signed-worker-capability-delivery-v1.test.js'
+      - 'test/reality-final-loop-staged-plan-action-router-v1.test.js'
+      - 'src/reality-final-loop-child-review-worker-v1.js'
+      - 'src/reality-final-loop-child-approval-request-v1.js'
+      - 'api/reality/owner-final-loop-child-approval.js'
+      - 'sql/reality-final-loop-child-transactional-v1.sql'
+      - 'test/reality-final-loop-child-transactional-v1.test.js'
+      - 'sql/reality-final-loop-parent-integration-v1.sql'
+      - 'test/sql/reality-final-loop-signed-transaction-smoke-v1.sql'
+      - 'src/reality-final-loop-parent-integration-worker-v1.js'
+      - 'test/reality-final-loop-parent-integration-v1.test.js'
+      - 'sql/reality-final-loop-parent-delivery-v1.sql'
+      - 'src/reality-final-loop-parent-delivery-worker-v1.js'
+      - 'api/reality/owner-final-loop-parent-delivery.js'
+      - 'reality-chat-final-loop-parent-delivery-v1.js'
+      - 'test/reality-final-loop-parent-delivery-v1.test.js'
+      - 'test/sql/reality-final-loop-parent-delivery-smoke-v1.sql'
+      - 'index.html'
+      - 'reality-chat-final-loop-child-approval-v1.js'
+      - 'test/reality-chat-final-loop-child-approval-v1.test.js'
+      - 'src/reality-governed-openai-gateway-v1.js'
+      - 'sql/reality-final-loop-pr-source-plans-v1.sql'
+      - 'test/reality-final-loop-pr-source-handoff-v1.test.js'
+      - 'src/reality-final-loop-signed-worker-bridge-v1.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'test/reality-final-loop-engine-v1.test.js'
+      - 'test/reality-final-loop-time-horizon-v1.test.js'
+      - 'test/reality-final-loop-executive-brief-v1.test.js'
+      - 'test/reality-final-loop-owner-time-endpoint-v1.test.js'
+      - 'test/reality-final-loop-universe-feedback-v1.test.js'
+      - 'test/reality-final-loop-canonical-handoff-v1.test.js'
+      - 'test/reality-final-loop-cross-surface-continuity-v1.test.js'
+      - 'test/reality-pr-source-readiness-final-loop-v1.test.js'
+      - 'test/reality-final-loop-signed-worker-bridge-v1.test.js'
+      - 'test/reality-final-loop-db-contract-v1.test.js'
+      - 'sql/reality-final-loop-canonical-continuity-v1.sql'
+      - 'test/reality-unified-shift-execution-controller-v1.test.js'
+      - '.github/workflows/reality-final-loop-engine-v1-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  final-loop-lifecycle-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check complete controller and acceptance syntax
+        run: |
+          node --check src/reality-shift-unified-execution-controller-v1.js
+          node --check src/reality-final-loop-time-horizon-v1.js
+          node --check src/reality-final-loop-executive-brief-v1.js
+          node --check src/reality-final-loop-owner-time-bridge-v1.js
+          node --check src/reality-final-loop-universe-feedback-v1.js
+          node --check src/reality-final-loop-governed-engineering-v1.js
+          node --check src/reality-governed-engineering-candidate-evaluation-v1.js
+          node --check src/reality-final-loop-canonical-handoff-v1.js
+          node --check api/reality/personal-time-horizon.js
+          node --check api/reality/personal-chat.js
+          node --check reality-past-present-future-v1.js
+          node --check src/reality-riley-authorized-pr-review-job-v1.js
+          node --check src/reality-pr-large-source-qualification-v1.js
+          node --check src/reality-final-loop-pr-source-handoff-v1.js
+          node --check src/reality-final-loop-staged-plan-action-router-v1.js
+          node --check src/reality-signed-worker-operating-lane-v1.js
+          node --check src/reality-signed-worker-capability-delivery-v1.js
+          node --check src/reality-governed-signed-worker-release-switch-trigger-v1.js
+          node --check src/reality-governed-signed-worker-control-plane-adapters-v1.js
+          node --check test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
+          node --check test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js
+          node --check src/reality-signed-worker-scheduled-release-verifier-v1.js
+          node --check src/reality-governed-release-independent-qualification-v1.js
+          node --check api/reality/governed-worker-release-control-plane.js
+          node --check test/reality-governed-release-independent-qualification-v1.test.js
+          node --check test/reality-governed-worker-release-control-plane-v1.test.js
+          node --check test/reality-signed-worker-scheduled-release-verifier-v1.test.js
+          node --check test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
+          node --check test/reality-signed-worker-operating-lane-v1.test.js
+          node --check test/reality-signed-worker-capability-delivery-v1.test.js
+          node --check src/reality-final-loop-child-review-worker-v1.js
+          node --check src/reality-final-loop-child-approval-request-v1.js
+          node --check api/reality/owner-final-loop-child-approval.js
+          node --check src/reality-governed-openai-gateway-v1.js
+          node --check test/reality-final-loop-child-transactional-v1.test.js
+          node --check src/reality-final-loop-parent-integration-worker-v1.js
+          node --check test/reality-final-loop-parent-integration-v1.test.js
+          node --check src/reality-final-loop-parent-delivery-worker-v1.js
+          node --check api/reality/owner-final-loop-parent-delivery.js
+          node --check reality-chat-final-loop-parent-delivery-v1.js
+          node --check test/reality-final-loop-parent-delivery-v1.test.js
+          node --check reality-chat-final-loop-child-approval-v1.js
+          node --check test/reality-chat-final-loop-child-approval-v1.test.js
+          node --check test/reality-final-loop-pr-source-handoff-v1.test.js
+          node --check src/reality-final-loop-signed-worker-bridge-v1.js
+          node --check src/reality-governed-shift-boundary-v1.js
+          node --check api/reality/governed-employee-shift-worker.js
+          node --check test/reality-unified-shift-execution-controller-v1.test.js
+          node --check test/reality-final-loop-engine-v1.test.js
+          node --check test/reality-final-loop-signed-worker-bridge-v1.test.js
+          node --check test/reality-final-loop-db-contract-v1.test.js
+          node --check test/reality-final-loop-owner-time-endpoint-v1.test.js
+          node --check test/reality-final-loop-universe-feedback-v1.test.js
+          node --check test/reality-final-loop-governed-engineering-v1.test.js
+      - name: Run existing controller and new Final Loop Engine invariants
+        run: |
+          node --test test/reality-unified-shift-execution-controller-v1.test.js
+          node --test test/reality-final-loop-engine-v1.test.js
+          node --test test/reality-final-loop-time-horizon-v1.test.js
+          node --test test/reality-final-loop-executive-brief-v1.test.js
+          node --test test/reality-final-loop-owner-time-endpoint-v1.test.js
+          node --test test/reality-final-loop-universe-feedback-v1.test.js
+          node --test test/reality-final-loop-governed-engineering-v1.test.js
+          node --test test/reality-governed-engineering-candidate-evaluation-v1.test.js
+          node --test test/reality-final-loop-canonical-handoff-v1.test.js
+          node --test test/reality-final-loop-cross-surface-continuity-v1.test.js
+          node --test test/reality-pr-source-readiness-final-loop-v1.test.js
+          node --test test/reality-final-loop-pr-source-handoff-v1.test.js
+          node --test test/reality-final-loop-staged-plan-action-router-v1.test.js
+          node --test test/reality-signed-worker-operating-lane-v1.test.js
+          node --test test/reality-signed-worker-capability-delivery-v1.test.js
+          node --test test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
+          node --test test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
+          node --test test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js
+          node --test test/reality-signed-worker-scheduled-release-verifier-v1.test.js
+          node --test test/reality-governed-release-independent-qualification-v1.test.js
+          node --test test/reality-governed-worker-release-control-plane-v1.test.js
+          node --test test/reality-final-loop-child-transactional-v1.test.js
+          node --test test/reality-final-loop-parent-integration-v1.test.js
+          node --test test/reality-final-loop-parent-delivery-v1.test.js
+          node --test test/reality-chat-final-loop-child-approval-v1.test.js
+          node --test test/reality-past-present-future-time-map-v1.test.js
+          node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
+          node --test test/reality-final-loop-db-contract-v1.test.js
+
+      - name: Preserve independent Reality coding evaluation receipt
+        if: ${{ success() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reality-governed-engineering-candidate-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/reality-engineering-candidate-evidence.json
+          if-no-files-found: error
+          retention-days: 3

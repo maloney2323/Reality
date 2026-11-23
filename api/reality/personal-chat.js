@@ -9,6 +9,8 @@ import {readRealitySelfVisibilityForChat,reconcileOwnerOriginalStatesForChat}
  from '../../src/reality-chat-self-visibility-v1.js';
 import {projectOwnerRealityUniverseForChat}
  from '../../src/reality-chat-universe-cognitive-projection-v1.js';
+import {readOwnerTimeHorizonEvidence}
+ from './personal-time-horizon.js';
 import {resolveReliabilityBenchmarkDb} from '../../src/reality-reliability-db-boundary-v0.1.js';
 import {readVerifiedMarketStageForChat}
  from '../../src/reality-market-stage-chat-context-v1.js';
@@ -319,6 +321,23 @@ export default async function handler(req,res){
    {id:'originals',read:()=>readOwnerOriginalWorkForChat({session}),
       validate:v=>v?.status==='OWNER_SCOPED_ORIGINAL_WORK_INDEPENDENT_READBACK',
       fallback:null},
+   // Bounded optional Universe feedback from SAME owner, signed shift,
+   // canonical Continuity and independently verified Final Loop settlement.
+   // An unavailable read is UNKNOWN; it never blocks ordinary owner Chat.
+   {id:'final_loop_universe',read:()=>process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_UNIVERSE_CHAT_CONTEXT_ENABLED==='true'?
+      readOwnerTimeHorizonEvidence({
+       ownerId:session.user_id,db:isolated,env:process.env
+      }):null,
+    validate:x=>x?.status==='REALITY_OWNER_TIME_HORIZON_READ_ONLY'&&
+     x.owner_scope_verified===true&&
+     x.final_loop_universe_feedback?.status===
+      'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY'&&
+     x.final_loop_universe_feedback.owner_id===session.user_id&&
+     x.final_loop_universe_feedback.read_only===true&&
+     x.final_loop_universe_feedback.execution_authorized===false&&
+     x.final_loop_universe_feedback.original_job_completed===false,
+    fallback:null},
    {id:'weekly_queue',read:()=>readOwnerWeeklyCandidateQueueForChat({session}),
       validate:v=>typeof v?.status==='string'&&
        (v.status.startsWith('CHAT_WEEKLY_QUEUE_')||
@@ -458,8 +477,29 @@ export default async function handler(req,res){
    execution_authorized:false,installation_authorized:false,
    production_changed:false
   }):null;
+  const feedback=optionalContext.values.final_loop_universe
+   ?.final_loop_universe_feedback;
+  const finalLoopUniverseObservations=
+   feedback?.status===
+     'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY'&&
+   feedback.owner_id===session.user_id&&
+   feedback.shift_id===verifiedOwnerShift?.active_owner_shift_id&&
+   feedback.read_only===true&&feedback.execution_authorized===false&&
+   feedback.original_job_completed===false&&
+   feedback.future_is_not_execution_authority===true&&
+   Array.isArray(feedback.observations)&&
+   feedback.observations.length<=24&&
+   feedback.observations.every(x=>
+    x?.execution_authorized===false&&
+    x.installation_authorized===false&&
+    x.production_changed===false&&
+    ['CANONICAL_FINAL_LOOP_ATOMIC_UNIVERSE_SETTLEMENT_READBACK',
+     'CANONICAL_SIGNED_FINAL_LOOP_UNFINISHED_READBACK'].includes(
+      x.source_kind))?
+   feedback.observations:[];
   const ownerCurrentUniverseObservations=[
    ...(primaryMissionObservation?[primaryMissionObservation]:[]),
+   ...finalLoopUniverseObservations,
    buildRealityProposedEmployeeRoleDiscussionContext(),
    ...native263TemporalObservations,...ownerCompletedWorkObservations,
    ...marketStageObservations,...verifiedUpgradeObservations,

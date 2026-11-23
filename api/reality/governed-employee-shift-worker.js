@@ -23,7 +23,28 @@ import {createRileyServiceOriginalRuntime}
  from '../../src/reality-riley-service-original-runtime-v1.js';
 import {createRileyTrustedOriginalDriver}
  from '../../src/reality-riley-trusted-original-driver-bridge-v1.js';
-import {runAuthorizedRileyPrReview}
+import {connectFinalLoopPrSourcePlanToSignedShift}
+ from '../../src/reality-final-loop-pr-source-handoff-v1.js';
+import {projectFinalLoopUniverseFeedback}
+ from '../../src/reality-final-loop-universe-feedback-v1.js';
+import {inspectFinalLoopGovernedEngineering}
+ from '../../src/reality-final-loop-governed-engineering-v1.js';
+import {classifySignedFinalLoopStagedPlanActions,
+ reconcileReviewedRecoveryToFinalLoopSource,
+ inspectFinalLoopRecoveryContinuation,
+ verifyFinalLoopRecoveryContinuityReadback}
+ from '../../src/reality-final-loop-staged-plan-action-router-v1.js';
+import {requestFinalLoopChildApprovalFromAcceptedOriginal}
+ from '../../src/reality-final-loop-child-approval-request-v1.js';
+import {advanceOneFinalLoopChildReview}
+ from '../../src/reality-final-loop-child-review-worker-v1.js';
+import {advanceOneFinalLoopParentIntegration}
+ from '../../src/reality-final-loop-parent-integration-worker-v1.js';
+import {advanceOneFinalLoopParentDelivery}
+ from '../../src/reality-final-loop-parent-delivery-worker-v1.js';
+import {runAuthorizedRileyPrReview,
+ inspectCurrentRileyPrReviewSourceReadiness,
+ shouldFenceRileyPrClaimForObservedIncompatibility}
  from '../../src/reality-riley-authorized-pr-review-job-v1.js';
 import {executeExactlyPreparedRileyReviewViaReality}
  from '../../src/reality-riley-governed-pr-provider-bridge-v1.js';
@@ -49,6 +70,9 @@ import {attestCurrentRileyCandidate263}
  from '../../src/reality-riley-current-shift-candidate-verifier-v2.js';
 import {assertRealityUnifiedShiftGraph}
  from '../../src/reality-shift-unified-execution-controller-v1.js';
+import {inspectFinalLoopOnExistingSignedWorker,
+ recordOneFinalLoopEvidenceCheckpoint}
+ from '../../src/reality-final-loop-signed-worker-bridge-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
  reconcileVerifiedCurrentShiftCommitTriage}
  from '../../src/reality-shift-commit-triage-handoff-v1.js';
@@ -56,6 +80,8 @@ import {reconcileRealityMixedShiftReceipts}
  from '../../src/reality-mixed-shift-receipts-v1.js';
 import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
+import {projectRealityFinalLoopExecutiveBrief}
+ from '../../src/reality-final-loop-executive-brief-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
 import {automaticallyQualifyVerifiedRepairOpportunity,
@@ -152,6 +178,8 @@ import {planGovernedCapabilitiesFromOwnerReceipts,
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
+import {inspectFinalLoopSignedWorkerOperatingLane}
+ from '../../src/reality-signed-worker-operating-lane-v1.js';
 import {continueSignedMaintenanceCaseCiVerification}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 import {reconcileSignedVerifiedMaintenanceArtifact,
@@ -260,6 +288,131 @@ export default async function handler(req,res){
      realRun.installation_authorized!==false||
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
+  // Explicitly authenticated, preview-only source staging for the SAME
+  // signed worker and its durable lease/run. This is NOT a second worker
+  // and never invokes a model, approves work, or publishes to a provider.
+  // Normal signed-shift wakes are unchanged when this flag is absent.
+  if(process.env.REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY==='true'){
+   workerStage='FINAL_LOOP_SOURCE_PLAN_PREVIEW_ONLY';
+   const e=process.env;
+   if(e.VERCEL_ENV!=='preview'||
+      e.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_LARGE_PR_QUALIFICATION_SHADOW_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED!=='true'||
+      e.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'||
+      e.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+      e.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'||
+      db.project!==e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||
+      db.project!==e.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+    throw Error('FINAL_LOOP_SOURCE_PREVIEW_AUTHORITY_FENCE');
+   const sourceGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+    'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID
+    });
+   if(sourceGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+      sourceGraph.owner_id!==e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||
+      sourceGraph.shift_id!==e.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID||
+      sourceGraph.installation_authorized!==false||
+      sourceGraph.production_changed!==false)
+    throw Error('FINAL_LOOP_SOURCE_PREVIEW_SIGNED_SCOPE_MISMATCH');
+   const sourceInspection=await inspectCurrentRileyPrReviewSourceReadiness({
+    graph:sourceGraph,env:e,fetchImpl:fetch
+   });
+   const sourceHandoff=await connectFinalLoopPrSourcePlanToSignedShift({
+    db,graph:sourceGraph,inspection:sourceInspection,
+    workerRunId:actualWorkerRunId,env:e,fetchImpl:fetch
+   });
+   // Source inspection failure may NOT be reported as a successful stage.
+   // A missing manifest or refused write is a bounded diagnostic, not work.
+   const expectedStatus='FINAL_LOOP_PROPOSED_SOURCE_PLANS_DURABLY_STAGED_NOT_EXECUTABLE';
+   const staged=sourceHandoff.status===expectedStatus&&
+    sourceHandoff.owner_id===sourceGraph.owner_id&&
+    sourceHandoff.shift_id===sourceGraph.shift_id&&
+    sourceHandoff.staging_target==='SHARED_BENCHMARK_PROPOSALS_ONLY'&&
+    sourceHandoff.child_execution_authorized===false&&
+    sourceHandoff.owner_approval_granted===false&&
+    sourceHandoff.original_job_completed===false&&
+    Array.isArray(sourceHandoff.staging_receipts)&&
+    sourceHandoff.staging_receipts.length>0&&
+    sourceHandoff.staging_receipts.every(x=>x.source_plan_staged===true);
+   // Independent service-role readback; the model and staging worker
+   // cannot self-certify a durable plan from a local return object.
+   const [plansReadback,approvalPreflight]=await Promise.all([
+    shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{
+     p_shift_id:sourceGraph.shift_id
+    },{timeoutMs:6000}),
+    shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{
+     p_shift_id:sourceGraph.shift_id
+    },{timeoutMs:6000}).catch(()=>null)
+   ]);
+   const stagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
+    graph:sourceGraph,staged:plansReadback,preflight:approvalPreflight
+   });
+   const linked=staged&&
+    plansReadback?.shift_id===sourceGraph.shift_id&&
+    plansReadback?.owner_id===sourceGraph.owner_id&&
+    plansReadback?.read_only===true&&
+    Array.isArray(plansReadback?.plans)&&
+    sourceHandoff.staging_receipts.every(s=>plansReadback.plans.some(p=>
+     p.plan_id===s.plan_id&&p.source_ref===s.source_ref));
+   // Return a safe diagnostic if the preflight cannot stage; never
+   // synthesize owner approval or continue into other worker lanes.
+   const attested=await shiftRpc(db,
+    'reality_record_signed_worker_actual_run_v1',{
+     p_run_id:actualWorkerRunId,p_status:'COMPLETED',
+     p_stage:workerStage
+    });
+   workerCompletionAttestedBeforeResponse=
+    attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+    attested.run_id===actualWorkerRunId&&
+    attested.original_job_completed===false&&
+    attested.installation_authorized===false&&
+    attested.production_changed===false;
+   if(!workerCompletionAttestedBeforeResponse)
+    throw Error('FINAL_LOOP_PREVIEW_SIGNED_WORKER_ATTESTATION_UNVERIFIED');
+   const released=await shiftRpc(db,
+    'reality_release_governed_shift_worker_run_v1',{
+     p_claim_id:governedWakeClaimId
+    });
+   wakeLeaseReleasedBeforeResponse=
+    released?.status==='WAKE_RELEASED'&&
+    released.original_job_completed===false&&
+    released.installation_authorized===false;
+   if(!wakeLeaseReleasedBeforeResponse)
+    throw Error('FINAL_LOOP_PREVIEW_WORKER_LEASE_RELEASE_UNVERIFIED');
+   return res.status(200).json({
+    status:linked?'FINAL_LOOP_SIGNED_SOURCE_PLANS_STAGED_AND_READ_BACK':
+     'FINAL_LOOP_SIGNED_SOURCE_PLAN_STAGING_UNVERIFIED',
+    source_inspection_status:sourceInspection?.status||null,
+    source_diagnostics:(sourceInspection?.source_diagnostics||[]).map(x=>({
+     source_ref:x.source_ref,
+     eligibility_status:x.eligibility_status,
+     source_manifest_status:x.large_source_qualification?.status||null,
+     source_manifest_complete:x.large_source_qualification?.source_manifest_complete===true
+    })),
+    final_loop_source_handoff_status:sourceHandoff.status,
+    staging_target:'SHARED_BENCHMARK_PROPOSALS_ONLY',
+    staged_plan_count:linked?sourceHandoff.staging_receipts.length:0,
+    durable_source_plan_readback_verified:Boolean(linked),
+    final_loop_staged_action_routes:stagedActionRoutes,
+    final_loop_governed_engineering:{
+     status:'ENGINEERING_SIGNED_CODING_WORKER_NOT_REACHED_STAGING_ONLY',
+     read_only:true,model_invoked:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     next_governed_action:
+      'VERIFY_SIGNED_ENGINEERING_WORKER_RELEASE_AND_CANONICAL_ORIGINAL_WARRANT'
+    },
+    signed_worker_release_operating_lane:inspectFinalLoopSignedWorkerOperatingLane({
+     env:e,dbProject:db.project
+    }),
+    signed_worker_run_recorded:true,
+    owner_approval_granted:false,child_execution_authorized:false,
+    model_invoked:false,github_write_performed:false,
+    original_job_completed:false,shift_completed:false,
+    production_changed:false
+   });
+  }
   // Existing owner-shift continuation, never another start or approval:
   // independently verify same installed Git/Vercel commit and TWO distinct
   // source+original acceptance CI runs before recording the final receipt.
@@ -2065,6 +2218,19 @@ export default async function handler(req,res){
   if(initialGraph.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
      unifiedGraph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY')
    throw Error('UNIFIED_WORK_SCOPE_CHANGED_DURING_SHIFT_TICK');
+  // Existing worker + existing exact shift; never a second orchestrator.
+  // Shadow diagnostics only until independently bound canonical acceptance,
+  // one-use transition CAS and final settlement writers are deployed.
+  const finalLoopEngineShadow=await inspectFinalLoopOnExistingSignedWorker({
+   db,wake:wakeReceipt,graph:unifiedGraph,env:process.env,fetchImpl:fetch
+  });
+  // A gated, one-use diagnostic checkpoint records only a verified
+  // missing-acceptance obligation. No model invocation, external effect,
+  // installation, original settlement or shift restart is permitted.
+  const finalLoopEvidenceCheckpoint=await recordOneFinalLoopEvidenceCheckpoint({
+   db,wake:wakeReceipt,workerRunId:actualWorkerRunId,
+   inspection:finalLoopEngineShadow,env:process.env,fetchImpl:fetch
+  });
   // The EXISTING categorizer reads the durable investigation/action/review
   // receipts, not the model's description or this wake's success status.
   // Source-bound next actions remain advisory until an installed governed
@@ -2101,8 +2267,14 @@ export default async function handler(req,res){
   // classification does not independently authorize or replay that effect.
   // Missing provider authority is a proof/owner boundary, NOT an excuse
   // to synthesize a successful repair or restart the fenced GitHub write.
+  const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
+   env:process.env,dbProject:db.project
+  });
   const registeredRecoveryActionKeys=Object.freeze([
-   'REQUALIFY_EXISTING_CONTINUITY_SOURCE'
+   'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
+   ...(signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'?
+    ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[])
   ]);
   const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
    classification:continuityRecoveryHandoffClassification,
@@ -2117,6 +2289,53 @@ export default async function handler(req,res){
    wake:wakeReceipt,graph:unifiedGraph,env:process.env,
    registeredActionKeys:registeredRecoveryActionKeys
   });
+  // Durable evidence from the ACTUAL scheduled worker, not a deployed
+  // preview's environment or a release review's self-certification.
+  // Only the isolated, opt-in, service-role path may append this receipt.
+  // No new job, model action, owner approval or provider write is possible.
+  let signedWorkerDurableReleaseWake={
+   status:'SIGNED_WORKER_RELEASE_WAKE_ATTESTATION_NOT_ENABLED',
+   release_activated:false,original_job_completed:false
+  };
+  if(process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED==='true'){
+   if(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+      db.project!==process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF||
+      signedWorkerReleaseOperatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+      signedWorkerCapabilityDelivery.status!==
+       'SIGNED_WORKER_RELEASE_AND_REGISTERED_ACTIONS_OBSERVED'){
+    signedWorkerDurableReleaseWake={
+     status:'SIGNED_WORKER_RELEASE_WAKE_ISOLATION_OR_RUNTIME_UNVERIFIED',
+     release_activated:false,original_job_completed:false
+    };
+   }else{
+    try{
+     const actual=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
+      p_worker_run_id:actualWorkerRunId,
+      p_owner_id:unifiedGraph.owner_id,p_shift_id:wakeReceipt.shift_id,
+      p_release_sha:signedWorkerCapabilityDelivery.running_release_sha,
+      p_release_ref:signedWorkerCapabilityDelivery.running_release_ref,
+      p_registered_capabilities:registeredRecoveryActionKeys
+     },{timeoutMs:6000});
+     signedWorkerDurableReleaseWake=
+      actual?.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
+      actual.worker_run_id===actualWorkerRunId&&
+      actual.shift_id===wakeReceipt.shift_id&&
+      actual.release_sha===signedWorkerCapabilityDelivery.running_release_sha&&
+      actual.release_ref===signedWorkerCapabilityDelivery.running_release_ref&&
+      actual.original_job_completed===false&&
+      actual.release_activated===false?
+       actual:{
+        status:'SIGNED_WORKER_RELEASE_WAKE_RECEIPT_UNVERIFIED',
+        release_activated:false,original_job_completed:false
+       };
+    }catch{
+     signedWorkerDurableReleaseWake={
+      status:'SIGNED_WORKER_RELEASE_WAKE_DB_OR_TRANSPORT_UNAVAILABLE',
+      release_activated:false,original_job_completed:false
+     };
+    }
+   }
+  }
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
@@ -2412,6 +2631,279 @@ export default async function handler(req,res){
   const hasReview=unifiedGraph.jobs.some(x=>
    x.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
    x.independent_source_proof_verified===true&&x.phase!=='SETTLED');
+  // Observe real GitHub source eligibility before treating the next
+  // original PR review as a recoverable provider/LLM job. Draft sources
+  // are incompatible with the existing executor's sourceDetails gate.
+  // This is a read-only, preview-only shadow diagnostic; existing claims,
+  // owner authority and worker dispatch are left entirely unchanged.
+  let rileyPrSourceReadiness={
+   status:'SIGNED_PR_SOURCE_READINESS_SHADOW_DISABLED',
+   read_only:true,original_job_completed:false,
+   production_changed:false
+  };
+  if(hasReview&&process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   try{
+    rileyPrSourceReadiness=
+     await inspectCurrentRileyPrReviewSourceReadiness({
+      graph:unifiedGraph,env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    rileyPrSourceReadiness={
+     status:'SIGNED_PR_SOURCE_CURRENT_PROVIDER_READ_UNAVAILABLE',
+     read_only:true,original_job_completed:false,
+     production_changed:false
+    };
+   }
+  }
+
+
+  // Native signed PR source inspection -> scoped parent-bound evidence
+  // handoff. The preview branch is read-only by default. Even when an
+  // explicitly isolated DB is configured, staging never creates executable
+  // children, changes draft status, consumes approval or settles a parent.
+  let finalLoopPrSourcePlanHandoff={
+   status:'FINAL_LOOP_CHILD_SOURCE_HANDOFF_NOT_ENABLED',
+   read_only:true,child_original_admitted:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(hasReview&&process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   try{
+    finalLoopPrSourcePlanHandoff=
+     await connectFinalLoopPrSourcePlanToSignedShift({
+      db,graph:unifiedGraph,inspection:rileyPrSourceReadiness,
+      workerRunId:actualWorkerRunId,env:process.env,
+      fetchImpl:fetch
+     });
+   }catch{
+    finalLoopPrSourcePlanHandoff={
+     status:'FINAL_LOOP_CHILD_SOURCE_HANDOFF_OR_DB_PROOF_UNAVAILABLE',
+     read_only:true,child_original_admitted:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
+
+  // The signed categorizer consumes TWO independent service-role reads:
+  // durable source plans and original-goal acceptance preflight. The result
+  // selects a registered capability TYPE; it cannot authorize its effect.
+  let finalLoopStagedActionRoutes={
+   status:'FINAL_LOOP_STAGED_ACTION_ROUTING_NOT_ENABLED',
+   action_dispatched:false,owner_approval_granted:false,
+   model_execution_authorized:false,original_job_completed:false
+  };
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+   try{
+    const [staged,preflight]=await Promise.all([
+     shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000}),
+     shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000})
+    ]);
+    finalLoopStagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
+     graph:unifiedGraph,staged,preflight
+    });
+   }catch{
+    finalLoopStagedActionRoutes={
+     status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
+     action_dispatched:false,owner_approval_granted:false,
+     model_execution_authorized:false,original_job_completed:false
+    };
+   }
+  }
+  // The existing signed worker advances the SAME Final Loop child
+  // lifecycle: exact parent goal acceptance -> itemized owner approval ->
+  // one-use child claim -> governed model -> separate-run verifier.
+  // There is no new scheduler or separate approval authority.
+  let finalLoopChildApprovalRequest={
+   status:'FINAL_LOOP_CHILD_APPROVAL_REQUEST_NOT_ENABLED',
+   execution_authorized:false,original_job_completed:false
+  };
+  let finalLoopChildReview={
+   status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',
+   original_job_completed:false,production_changed:false
+  };
+  let finalLoopParentIntegration={
+   status:'FINAL_LOOP_PARENT_INTEGRATION_NOT_ENABLED',
+   original_job_completed:false,production_changed:false
+  };
+  let finalLoopParentDelivery={
+   status:'FINAL_LOOP_PARENT_DELIVERY_NOT_ENABLED',
+   original_job_completed:false,universe_reconciled:false,
+   production_changed:false
+  };
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   // An exact packet is never an execution warrant. The registered handler
+   // independently checks its isolated DB fence and signed source proof.
+   if(signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'&&
+      registeredRecoveryActionKeys.includes('PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
+      finalLoopStagedActionRoutes.status===
+       'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
+      finalLoopStagedActionRoutes.routes.some(r=>
+       r.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
+      (process.env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED==='true'||
+       process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true')){
+    try{
+     finalLoopChildApprovalRequest=
+      await requestFinalLoopChildApprovalFromAcceptedOriginal({
+       db,graph:unifiedGraph,workerRunId:actualWorkerRunId,
+       env:process.env,fetchImpl:fetch
+      });
+    }catch{
+     finalLoopChildApprovalRequest={
+      status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_OR_OWNER_PACKET_UNVERIFIED',
+      execution_authorized:false,original_job_completed:false
+     };
+    }
+   }
+   if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
+    try{
+     finalLoopChildReview=await advanceOneFinalLoopChildReview({
+     db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     env:process.env,fetchImpl:fetch
+    });
+   }catch{
+    finalLoopChildReview={
+     status:'FINAL_LOOP_CHILD_SIGNED_EXECUTION_OR_VERIFICATION_BLOCKED',
+     original_job_completed:false,production_changed:false
+    };
+   }
+   // The same authorized signed worker handles bounded integration AFTER
+   // child verification, never a new background orchestrator.
+   try{
+    finalLoopParentIntegration=
+     await advanceOneFinalLoopParentIntegration({
+      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+      env:process.env,fetchImpl:fetch
+     });
+   }catch{
+    finalLoopParentIntegration={
+     status:'FINAL_LOOP_INDEPENDENT_PARENT_INTEGRATION_BLOCKED',
+     original_job_completed:false,production_changed:false
+    };
+   }
+   }
+  }
+
+  // Same signed shift wake carries the final parent proof obligation. This
+  // never bypasses parent source, exact owner effect or independent verifier.
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+    process.env.VERCEL_ENV==='preview'&&
+    process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+    process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'){
+   try{
+    finalLoopParentDelivery=await advanceOneFinalLoopParentDelivery({
+     db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     env:process.env,fetchImpl:fetch
+    });
+   }catch{
+    finalLoopParentDelivery={
+     status:'FINAL_LOOP_PARENT_PROVIDER_OR_UNIVERSE_NOT_VERIFIED',
+     original_job_completed:false,universe_reconciled:false,
+     production_changed:false
+    };
+   }
+  }
+
+  // One canonical signed shift: reviewed Recovery -> qualified source ->
+  // registered continuation handler. A failed dispatch is an explicit
+  // pending obligation, never a recovered job or a completed worker result.
+  const finalLoopRecoveryCandidate=reconcileReviewedRecoveryToFinalLoopSource({
+   graph:unifiedGraph,stagedActions:finalLoopStagedActionRoutes,
+   continuityClassification:continuityRecoveryHandoffClassification,
+   registeredRouting:continuityRecoveryRegisteredRouting
+  });
+  const finalLoopRecoveryContinuation=inspectFinalLoopRecoveryContinuation({
+   candidate:finalLoopRecoveryCandidate,
+   operatingLane:signedWorkerReleaseOperatingLane,
+   approvalRequest:finalLoopChildApprovalRequest,
+   childReview:finalLoopChildReview,parentDelivery:finalLoopParentDelivery
+  });
+
+  // Read the current canonical Continuity head after any verified packet
+  // preparation. A packet receipt is durable progress in its own approval
+  // ledger, but it must not be treated as original recovery or settlement.
+  let finalLoopRecoveryContinuityReadback={
+   status:'FINAL_LOOP_RECOVERY_CONTINUITY_READBACK_NOT_TRIGGERED',
+   read_only:true,recovery_verified:false,original_job_completed:false
+  };
+  if(finalLoopRecoveryContinuation.handler_result_verified===true&&
+     finalLoopRecoveryCandidate.status===
+      'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE'){
+   try{
+    const currentProof=await shiftRpc(db,
+     'reality_read_current_final_loop_proof_envelope_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000});
+    finalLoopRecoveryContinuityReadback=
+     verifyFinalLoopRecoveryContinuityReadback({
+      candidate:finalLoopRecoveryCandidate,
+      before:finalLoopEngineShadow.canonical_continuity_handoff,
+      after:currentProof
+     });
+   }catch{
+    finalLoopRecoveryContinuityReadback={
+     status:'FINAL_LOOP_RECOVERY_CONTINUITY_AFTER_ACTION_NOT_OBSERVED',
+     read_only:true,recovery_verified:false,original_job_completed:false
+    };
+   }
+  }
+
+  // Universe feedback is independently read from the SAME service-owned
+  // signed shift, original obligations, and parent/Universe settlement RPC.
+  // This is operational context only; neither the model nor a Universe
+  // projection can dispatch, certify an outcome, grant approval, or restart.
+  let finalLoopUniverseFeedback={
+   status:'FINAL_LOOP_UNIVERSE_FEEDBACK_NOT_ENABLED',
+   read_only:true,universe_readback_verified:false,
+   execution_authorized:false,original_job_completed:false
+  };
+  if(process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'&&
+     finalLoopEngineShadow.status===
+       'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'&&
+     finalLoopEngineShadow.canonical_continuity_handoff
+      ?.canonical_handoff_verified===true){
+   try{
+    const universeOutcomes=await shiftRpc(db,
+     'reality_read_owner_final_loop_parent_outcomes_v1',{
+      p_owner_id:unifiedGraph.owner_id,
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000});
+    finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
+     canonicalView:finalLoopEngineShadow,
+     parentOutcomes:universeOutcomes
+    });
+   }catch{
+    finalLoopUniverseFeedback={
+     status:'FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE',
+     read_only:true,universe_readback_verified:false,
+     execution_authorized:false,original_job_completed:false
+    };
+   }
+  }
+
+  // Reuse Reality's ACTUAL signed engineering candidate, independent
+  // target review and case CI as an exact Final Loop original continuation.
+  // The independent original-work warrant is enforced before any case
+  // is considered eligible. Do not treat model code as a tested repair.
+  const finalLoopGovernedEngineering=inspectFinalLoopGovernedEngineering({
+   canonicalView:finalLoopEngineShadow,
+   maintenanceGate:sameOriginalPostmaintenanceGate,
+   modelCandidate:signedMaintenanceRepairModelCandidate,
+   independentTargetReview:signedMaintenanceCandidateTargetReview,
+   caseCi:signedMaintenanceCaseCiReconciliation,
+   releaseLane:signedWorkerReleaseOperatingLane
+  });
 
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
@@ -2561,7 +3053,18 @@ export default async function handler(req,res){
   // Any uncertain GitHub write is fenced in the database and never re-POSTed.
   let rileyOriginalReview;
   try{
+   const incompatiblePreclaim=hasReview&&
+    shouldFenceRileyPrClaimForObservedIncompatibility({
+     graph:unifiedGraph,inspection:rileyPrSourceReadiness
+    });
    rileyOriginalReview=hasReview?
+    incompatiblePreclaim?{
+     status:'PR_REVIEW_SIGNED_SOURCES_INCOMPATIBLE_NO_CLAIM_OR_RETRY',
+     source_diagnostics:rileyPrSourceReadiness.source_diagnostics,
+     owner_approval_granted:false,worker_claim_consumed:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    }:
     await runAuthorizedRileyPrReview({db,env:process.env}):
     {status:'NO_CURRENT_UNSETTLED_OWNER_PR_REVIEW',
      original_job_completed:false,installation_authorized:false,
@@ -3084,6 +3587,15 @@ export default async function handler(req,res){
     };
    }
   }
+  // A single CEO-style overview of the same governed signed shift.
+  // It reads both the existing automatic supervisor and Final Loop
+  // temporal projection. No separate agent, job, warrant, or action.
+  const finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({
+   timeHorizon:finalLoopEngineShadow?.time_horizon||null,
+   supervisor:automaticWorkSupervisor?.status===
+    'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
+    automaticWorkSupervisor:null
+  });
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -3180,6 +3692,8 @@ export default async function handler(req,res){
     governed_continuity_recovery_handoff:continuityRecoveryHandoffClassification,
     governed_continuity_registered_recovery_route:continuityRecoveryRegisteredRouting,
     signed_worker_capability_delivery:signedWorkerCapabilityDelivery,
+    signed_worker_release_operating_lane:signedWorkerReleaseOperatingLane,
+    signed_worker_durable_release_wake:signedWorkerDurableReleaseWake,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,
     signed_employee_inquiry_scope:signedEmployeeInquiryScope,
@@ -3211,6 +3725,9 @@ export default async function handler(req,res){
     chat_work_claim_reconciliation:chatClaimReconciliation,
     current_shift_verified_auto_admission:shiftVerifiedAutoAdmission,
     completion_bound_work:completionClose,
+    final_loop_engine_shadow:finalLoopEngineShadow,
+    final_loop_executive_brief:finalLoopExecutiveBrief,
+    final_loop_evidence_checkpoint:finalLoopEvidenceCheckpoint,
     unified_execution_graph:{
      status:unifiedGraph.status,shift_id:unifiedGraph.shift_id,
      next_action:unifiedGraph.next_action,
@@ -3224,6 +3741,18 @@ export default async function handler(req,res){
     commit_reference_triage_qualification:commitTriageHandoff.qualification,
     commit_reference_triage_original:commitTriageHandoff.original,
     commit_reference_triage_settlement:commitTriageSettlement,
+    riley_pr_source_readiness:rileyPrSourceReadiness,
+    final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
+    final_loop_staged_action_routes:finalLoopStagedActionRoutes,
+    final_loop_recovery_source_candidate:finalLoopRecoveryCandidate,
+    final_loop_recovery_continuation:finalLoopRecoveryContinuation,
+    final_loop_recovery_continuity_readback:finalLoopRecoveryContinuityReadback,
+    final_loop_governed_engineering:finalLoopGovernedEngineering,
+    final_loop_universe_feedback:finalLoopUniverseFeedback,
+    final_loop_child_approval_request:finalLoopChildApprovalRequest,
+    final_loop_child_review:finalLoopChildReview,
+    final_loop_parent_integration:finalLoopParentIntegration,
+    final_loop_parent_delivery:finalLoopParentDelivery,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
