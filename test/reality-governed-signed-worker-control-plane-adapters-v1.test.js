@@ -37,6 +37,8 @@ function fixture({config={},cron=schedule,wrongProject=false,
   calls.push({url,method,body:options.body});
   if(url.includes('/rest/v1/rpc/reality_read_governed_worker_release_schedule_v1'))
    return {ok:true,json:async()=>cron};
+  if(url.includes('/rest/v1/rpc/reality_read_governed_signed_worker_release_approval_v1'))
+   return {ok:true,json:async()=>({status:'EXACT_PREVIEW_RELEASE_OWNER_APPROVED'})};
   if(url.includes('/rest/v1/rpc/reality_claim_governed_signed_worker_release_v1'))
    return {ok:true,json:async()=>({status:'EXACT_SIGNED_CAPABILITY_DELIVERY_CLAIMED'})};
   if(url.includes('/v4/aliases/'))
@@ -77,6 +79,7 @@ test('read-only scheduled worker verification uses DB and current Vercel identit
  assert.equal(v.signed_worker_target_verified,true);
  assert.equal(f.calls.filter(x=>x.method==='POST').length,1);
  assert.ok(f.calls.every(x=>!x.url.includes(db.secretKey)));
+ assert.ok(f.calls[0].url.startsWith(url+'rest/v1/rpc/'));
 });
 test('a mismatched Vercel project cannot certify the scheduler',async()=>{
  const f=fixture({wrongProject:true});
@@ -123,4 +126,22 @@ test('ambiguous provider result is never automatically retried',async()=>{
   claim_id:'cccccccc-cccc-4ccc-cccc-cccccccccccc'
  }),/ambiguous provider timeout/);
  assert.equal(f.calls.filter(x=>x.url.includes('/v2/deployments/')).length,1);
+});
+
+test('owner release approval is independently read via exact service RPC',async()=>{
+ const f=fixture();
+ const a=await f.adapter.readApprovedRelease({
+  owner_id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+  shift_id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+  release_sha:sha,scheduled_alias:alias,
+  capability_key:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'
+ });
+ assert.equal(a.status,'EXACT_PREVIEW_RELEASE_OWNER_APPROVED');
+ assert.equal(f.calls.filter(x=>x.url.includes('release_approval_v1')).length,1);
+ await assert.rejects(()=>f.adapter.readApprovedRelease({
+  owner_id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+  shift_id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+  release_sha:oldSha,scheduled_alias:alias,
+  capability_key:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'
+ }),/SIGNED_RELEASE_APPROVAL_READ_SCOPE_UNVERIFIED/);
 });
