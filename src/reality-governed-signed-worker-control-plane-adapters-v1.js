@@ -6,6 +6,7 @@ const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const BRANCH=/^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$/;
 const HOST=/^[a-z0-9-]{6,145}\.vercel\.app$/;
 const ID=/^[A-Za-z0-9_-]{8,80}$/;
+const REPO=/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const ROUTE='/api/reality/governed-employee-shift-worker';
 const KEY=/^[A-Z][A-Z0-9_]{3,110}$/;
 const projectRef=url=>{
@@ -24,6 +25,7 @@ function validEnv(env,db){
   typeof db.secretKey==='string'&&db.secretKey.length>=20&&
   db.project===projectRef(db.url)&&
   db.project===env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&
+  REPO.test(env.REALITY_VERIFIED_GITHUB_REPOSITORY||'')&&
   ID.test(env.REALITY_VERIFIED_VERCEL_PROJECT_ID||'')&&
   ID.test(env.REALITY_VERIFIED_VERCEL_TEAM_ID||'')&&
   typeof env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN==='string'&&
@@ -86,9 +88,11 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    api+'/v13/deployments/'+encodeURIComponent(id)+'?teamId='+team,
    {method:'GET',headers:providerHeaders});
   const info=d.deployment??d;
-  if(info.id!==id||info.project?.id!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
-    info.meta?.githubOrg!=='maloney2323'||
-    info.meta?.githubRepo!=='Reality'||
+  const expectedRepo=env.REALITY_VERIFIED_GITHUB_REPOSITORY.split('/');
+  if(info.id!==id||
+    (info.project?.id??info.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
+    info.meta?.githubOrg!==expectedRepo[0]||
+    info.meta?.githubRepo!==expectedRepo[1]||
     !SHA.test(info.meta?.githubCommitSha||'')||
     !BRANCH.test(info.meta?.githubCommitRef||'')||
     info.state!=='READY'||info.target==='production')
