@@ -93,6 +93,10 @@ export function assessSignedWorkerCapabilityActivation({
   candidate.preview_only!==true||
   candidate.provider_deployment_ready!==true||
   candidate.environment!=='ISOLATED_PREVIEW'||
+  candidate.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+  candidate.source_staging_only!==false||
+  candidate.isolated_database_independently_verified!==true||
+  candidate.owner_packet_handler_registered!==true||
   !UUID.test(candidate.shift_id||'')||
   candidate.shift_id!==attestation.shift_id||
   !KEY.test(candidate.capability_key||'')||
