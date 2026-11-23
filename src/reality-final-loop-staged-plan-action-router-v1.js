@@ -273,3 +273,57 @@ export function inspectFinalLoopRecoveryContinuation({
   original_obligation_remains_open:true
  });
 }
+
+
+// The signed worker re-reads the SAME canonical Continuity head after a
+// registered action. A delivered packet is not an independently verified
+// recovered original, and a changed head is not a final settlement receipt.
+export function verifyFinalLoopRecoveryContinuityReadback({
+ candidate,before,after
+}={}){
+ const base={
+  schema:'reality-final-loop-recovery-continuity-readback-v1',
+  read_only:true,original_job_completed:false,
+  recovery_verified:false,independent_original_outcome_verified:false,
+  owner_approval_granted:false,execution_authorized:false,
+  production_changed:false
+ };
+ const result=(status,more={})=>Object.freeze({...base,status,...more});
+ if(candidate?.status!==
+  'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE')
+  return result('FINAL_LOOP_RECOVERY_CONTINUITY_NO_QUALIFIED_ORIGINAL');
+ if(before?.status!=='CANONICAL_HANDOFF_CARRIED_WITH_UNFINISHED_PROOFS'||
+  before.canonical_handoff_verified!==true||
+  !UUID.test(before.continuity_root_id||'')||
+  !HASH.test(before.continuity_head_sha256||'')||
+  !Number.isSafeInteger(before.revision)||before.revision<1)
+  return result('FINAL_LOOP_RECOVERY_CONTINUITY_BASELINE_UNVERIFIED');
+ if(after?.schema!=='reality-final-loop-canonical-proof-readback-v1'||
+  after.status!=='FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'||
+  after.read_only!==true||after.independent_owner_scope_verified!==true||
+  after.owner_id!==candidate.owner_id||
+  after.shift_id!==candidate.shift_id||
+  after.continuity_root_id!==before.continuity_root_id||
+  after.original_job_completed!==false||
+  !HASH.test(after.continuity_head_sha256||'')||
+  !Number.isSafeInteger(after.revision)||after.revision<before.revision)
+  return result('FINAL_LOOP_RECOVERY_CONTINUITY_INDEPENDENT_READBACK_UNVERIFIED');
+ if(after.revision===before.revision&&
+    after.continuity_head_sha256!==before.continuity_head_sha256)
+  return result('FINAL_LOOP_RECOVERY_CONTINUITY_HEAD_CHANGED_WITHOUT_REVISION');
+ if(after.revision>before.revision&&
+    after.continuity_head_sha256===before.continuity_head_sha256)
+  return result('FINAL_LOOP_RECOVERY_CONTINUITY_REVISION_CHANGED_WITHOUT_HEAD');
+ return result(after.revision===before.revision?
+  'FINAL_LOOP_RECOVERY_CONTINUITY_NO_STATE_CHANGE_ORIGINAL_OPEN':
+  'FINAL_LOOP_RECOVERY_CONTINUITY_NEW_REVISION_ORIGINAL_STILL_OPEN',{
+  owner_id:candidate.owner_id,shift_id:candidate.shift_id,
+  original_work_id:candidate.original_work_id,
+  continuity_root_id:before.continuity_root_id,
+  previous_head_sha256:before.continuity_head_sha256,
+  current_head_sha256:after.continuity_head_sha256,
+  previous_revision:before.revision,current_revision:after.revision,
+  continuity_state_changed:after.revision>before.revision,
+  next_governed_action:'VERIFY_INDEPENDENT_ORIGINAL_OUTCOME_BEFORE_RECOVERY_SETTLEMENT'
+ });
+}
