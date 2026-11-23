@@ -237,6 +237,43 @@
     ' parent deliverable(s) still open (Present). '+
     'No predicted Future work is automatically authorized.';
   }
+  // Same canonical Continuity: the independently reviewed blocker, exact
+  // source candidate and next permitted preparation are visible to the CEO
+  // without changing Past receipts, Present jobs or Future authority.
+  const recovery=data.final_loop_recovery_guidance;
+  const horizon=data.final_loop_owner;
+  const g=recovery?.status===
+    'FINAL_LOOP_OWNER_CANONICAL_RECOVERY_GUIDANCE_READY'&&
+   recovery.read_only===true&&recovery.authority_granted===false&&
+   recovery.action_dispatched===false&&
+   recovery.recovery_verified===false&&
+   recovery.original_job_completed===false&&
+   recovery.production_changed===false&&
+   horizon?.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+   horizon.owner_scope_verified===true&&
+   recovery.owner_id===horizon.owner_id&&
+   recovery.shift_id===horizon.shift_id&&
+   recovery.continuity_head_sha256===horizon.continuity_head_sha256&&
+   recovery.incident_causal_lineage_independently_verified===false&&
+   recovery.past?.reviewed_recovery_is_not_original_settlement===true&&
+   recovery.present?.original_settled===false&&
+   recovery.future?.automatically_executable===false&&
+   recovery.future?.original_outcome_verified===false&&
+   recovery.ceo?.autonomous_authority_granted===false&&
+   recovery.ceo?.required_next_action===
+    recovery.future?.next_governed_action&&
+   ['PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET',
+    'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT',
+    'RECONCILE_EXACT_APPROVAL_AND_SIGNED_CHILD_CLAIM'].includes(
+     recovery.future?.next_governed_action);
+  if(g){
+   const next=recovery.future.next_governed_action
+    .replaceAll('_',' ').toLowerCase();
+   executive.textContent+=' Continuity recovery · Past: corrective action independently reviewed, not original settlement. '+
+    'Present: exact source-bound original remains open. '+
+    'Future / CEO next permitted step: '+next+
+    '. Owner authority and independent outcome proof are still required.';
+  }
   return true;
  }
  async function load(){
