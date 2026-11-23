@@ -27,6 +27,8 @@ import {connectFinalLoopPrSourcePlanToSignedShift}
  from '../../src/reality-final-loop-pr-source-handoff-v1.js';
 import {projectFinalLoopUniverseFeedback}
  from '../../src/reality-final-loop-universe-feedback-v1.js';
+import {inspectFinalLoopGovernedEngineering}
+ from '../../src/reality-final-loop-governed-engineering-v1.js';
 import {classifySignedFinalLoopStagedPlanActions,
  reconcileReviewedRecoveryToFinalLoopSource,
  inspectFinalLoopRecoveryContinuation,
@@ -2883,6 +2885,19 @@ export default async function handler(req,res){
    }
   }
 
+  // Reuse Reality's ACTUAL signed engineering candidate, independent
+  // target review and case CI as an exact Final Loop original continuation.
+  // The independent original-work warrant is enforced before any case
+  // is considered eligible. Do not treat model code as a tested repair.
+  const finalLoopGovernedEngineering=inspectFinalLoopGovernedEngineering({
+   canonicalView:finalLoopEngineShadow,
+   maintenanceGate:sameOriginalPostmaintenanceGate,
+   modelCandidate:signedMaintenanceRepairModelCandidate,
+   independentTargetReview:signedMaintenanceCandidateTargetReview,
+   caseCi:signedMaintenanceCaseCiReconciliation,
+   releaseLane:signedWorkerReleaseOperatingLane
+  });
+
   // The same owner-authorized #263 original is now read-only preflighted
   // against its frozen tested source and exact existing-file preview baseline.
   // Reality does not consume owner approval, write code, or settle the job.
@@ -3725,6 +3740,7 @@ export default async function handler(req,res){
     final_loop_recovery_source_candidate:finalLoopRecoveryCandidate,
     final_loop_recovery_continuation:finalLoopRecoveryContinuation,
     final_loop_recovery_continuity_readback:finalLoopRecoveryContinuityReadback,
+    final_loop_governed_engineering:finalLoopGovernedEngineering,
     final_loop_universe_feedback:finalLoopUniverseFeedback,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
