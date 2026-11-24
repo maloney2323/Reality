@@ -215,6 +215,12 @@ export async function inspectFinalLoopOnExistingSignedWorker({
       g.frozen_shift_scope_sha256!==p.frozen_shift_scope_sha256||
       g.revision!==p.revision||
       !HASH.test(g.handoff_observation_sha256||'')||
+      g.first_signal_anchor_verified!==true||
+      g.worldline_parent_links_verified!==true||
+      g.shift_scope_authority_event_present!==true||
+      !Number.isSafeInteger(g.verified_evidence_event_count)||
+      g.verified_evidence_event_count<1||
+
       g.read_only!==true||g.execution_authorized!==false||
       g.transition_committed!==false||g.executor_invoked!==false||
       g.installation_authorized!==false||
@@ -247,7 +253,8 @@ export async function inspectFinalLoopOnExistingSignedWorker({
          o.execution_permitted_by_handoff!==false)
        return safe('FINAL_LOOP_SHARED_CONTINUITY_UNADMITTED_SOURCE_NOT_FENCED');
     }else if(!/^work:[a-f0-9]{32}$/.test(j.original_work_id)||
-       o.qualifier_digest_verified!==true||
+       o.qualifier_digest_verified!==true||       o.original_work_universe_event_verified!==true||
+
        !HASH.test(o.qualifier_receipt_sha256||'')||
        !Array.isArray(o.unresolved_proof_gates)||
        o.unresolved_proof_gates.length>20||
