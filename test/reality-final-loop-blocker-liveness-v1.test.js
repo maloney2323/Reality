@@ -99,6 +99,48 @@ test('unregistered acquisition remains a due action, not a completed capability'
  assert.equal(v.capability_execution_ready,false);
  assert.equal(v.capability_acquired,false);
 });
+test('external technical proof advances only machine-owned business qualification, not full-loop RED',()=>{
+ const r=classify(args({technicalCiObservation:{
+  status:'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING',
+  contract_id:sha('a'),owner_id:owner,shift_id:shift,
+  obligation_id:work,source_ref:source,
+  independent_technical_ci_verified:true,frozen_technical_red_verified:true,
+  original_business_case_red_verified:false,business_original_warrant_verified:false,
+  original_job_completed:false,execution_authorized:false,
+  github_artifact_digest:sha('f'),github_run_id:33012345
+ }}));
+ assert.equal(r.status,
+  'RECOVERY_TECHNICAL_PROOF_OBSERVED_BUSINESS_LINEAGE_STILL_DUE');
+ assert.equal(r.next_actor,'REALITY');
+ assert.equal(r.technical_ci_verified,true);
+ assert.equal(r.business_original_red_verified,false);
+ assert.equal(r.continuation_verified,false);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.next_governed_action,
+  'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED');
+});
+test('forged technical CI from PR308 or unsupported business claim cannot advance',()=>{
+ const proof={
+  status:'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING',
+  contract_id:sha('a'),owner_id:owner,shift_id:shift,
+  obligation_id:work,source_ref:source,
+  independent_technical_ci_verified:true,frozen_technical_red_verified:true,
+  original_business_case_red_verified:false,business_original_warrant_verified:false,
+  original_job_completed:false,execution_authorized:false,
+  github_artifact_digest:sha('f'),github_run_id:33012345
+ };
+ for(const invalid of [
+  {...proof,source_ref:'https://github.com/maloney2323/Reality/pull/308'},
+  {...proof,original_business_case_red_verified:true},
+  {...proof,github_artifact_digest:null},
+  {...proof,contract_id:sha('0')}
+ ]){
+  const r=classify(args({technicalCiObservation:invalid}));
+  assert.notEqual(r.status,
+   'RECOVERY_TECHNICAL_PROOF_OBSERVED_BUSINESS_LINEAGE_STILL_DUE');
+  assert.equal(r.original_job_completed,false);
+ }
+});
 test('every actual signed worker wake exposes the liveness next action',()=>{
  const code=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',
   import.meta.url),'utf8');
