@@ -530,3 +530,28 @@ test('shared guard is enforced by the existing checkpoint writer, not by a model
  assert.doesNotMatch(file,/net\.http_post|cron\.unschedule/);
  assert.doesNotMatch(file,/github\.com\/maloney2323\/Reality\/pull\/307/);
 });
+
+
+test('signed worker connects the same Continuity/verifier BEFORE its first operational executor and AFTER Universe return',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const boundary=readFileSync(new URL(
+  '../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ const i=worker.indexOf("workerStage='CONTINUOUS_QUALIFICATION_INBOX_RECONCILIATION'");
+ const q=worker.indexOf("workerStage='CONTINUITY_QUALIFICATION_GOVERNED_ROUTE'");
+ const gate=worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_PREEXECUTION_FENCE'");
+ const effect=worker.indexOf("workerStage='EXACT_APPROVED_BUSINESS_EFFECT_SIGNED_HANDOFF'");
+ const maintenance=worker.indexOf("workerStage='SIGNED_MAINTENANCE_REGISTERED_EXECUTOR_HANDOFF'");
+ const universe=worker.indexOf("workerStage='SIGNED_MAINTENANCE_POSTINSTALL_UNIVERSE_RECONCILIATION'");
+ const returnFence=worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'");
+ const publish=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'");
+ assert.ok(i>0&&i<q&&q<gate&&gate<effect&&effect<maintenance);
+ assert.ok(universe>maintenance&&returnFence>universe&&publish>returnFence);
+ assert.match(worker,/FINAL_LOOP_SHARED_CONTINUITY_PREEXECUTION_FENCE_REJECTED/);
+ assert.match(worker,/FINAL_LOOP_SHARED_CONTINUITY_RETURN_FENCE_REJECTED/);
+ assert.match(worker,/final_loop_continuity_ingress:finalLoopContinuityIngress/);
+ assert.match(worker,/final_loop_continuity_return:finalLoopContinuityReturn/);
+ assert.match(boundary,/read_final_loop_shared_continuity_guard_v1/);
+ assert.match(boundary,/read_final_loop_event_resume_shadow_v1/);
+ assert.doesNotMatch(worker,/strictContinuityCycle\s*\?\s*true/);
+});
