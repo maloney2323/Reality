@@ -83,7 +83,7 @@
  function showExisting(s,trigger){
   draft=null;approve.hidden=true;scheduling.hidden=true;edit.hidden=false;reset.hidden=true;
   info.textContent='An existing employee shift is already authorized ('+s.status+
-   '). '+triggerMessage(trigger)+' Reality will not create a second shift.';
+   '). '+triggerMessage(trigger)+' Reality will not create a second shift. Altering live work requires a governed amendment.';
   work.replaceChildren(x('p','Existing shift · '+s.shift_id));
   if(Array.isArray(s.steps)){
    const list=x('ul');for(const st of s.steps.filter(z=>URL.test(z.source_ref||''))){
@@ -93,7 +93,7 @@
   }
  }
  async function load(){
-  if(processing)return;processing=true;prepare.disabled=true;approve.hidden=true;
+  if(processing)return;processing=true;prepare.disabled=true;approve.hidden=true;scheduling.hidden=true;
   work.replaceChildren();info.textContent='Checking existing authorization, prior settlements and employee assignments…';
   try{
    const data=await request('/api/reality/personal-governed-employee-shift?hours=8');

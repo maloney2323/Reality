@@ -25,7 +25,7 @@ test('Chat prepares an exact source-bound draft without model-generated work aut
  assert.match(main,/p\.owner_approval_created===false/);
  assert.match(main,/tasks\.operating_model==='ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT'/);
  assert.match(main,/new Set\(\['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'\]\)/);
- assert.match(main,/if\(existing\)\{showExisting\(existing\);return;\}/);
+ assert.match(main,/if\(existing\)\{showExisting\(existing,data\.governed_auto_trigger\);return;\}/);
  assert.match(main,/No job has started/);
 });
 test('Only explicit click approves the current fingerprint; edits revoke that approval path',()=>{
@@ -43,11 +43,13 @@ test('Only explicit click approves the current fingerprint; edits revoke that ap
  assert.doesNotMatch(main,/install_approval_authorized_by_triage:true|installation_authorized:true/);
  assert.match(main,/governed amendment/);
 });
-test('Shift planner stays in the optional Work panel instead of pushing saved Chat messages down',()=>{
- assert.match(main,/const workPanel=document\.getElementById\('realityChatPanelWork'\)/);
- assert.match(main,/workPanel\.prepend\(block\)/);
- assert.doesNotMatch(main,/transcript\.insertAdjacentElement\('beforebegin',block\)/);
- assert.match(main,/const openWork=document\.getElementById\('realityChatOpenInspector'\)/);
+test('The single shift control is directly in Chat, outside the saved transcript, with optional scheduling',()=>{
+ assert.match(main,/const panel=document\.getElementById\('realityChatConversation'\)/);
+ assert.match(main,/panel\.insertBefore\(block,composer\)/);
+ assert.doesNotMatch(main,/workPanel\.prepend\(block\)|transcript\.insertAdjacentElement\('beforebegin',block\)/);
+ assert.match(main,/Authorize & Start Shift/);
+ assert.match(main,/Schedule for later \(optional\)/);
+ assert.match(main,/start_mode:startAt\.value\?'SCHEDULE':'START_NOW'/);
  assert.match(main,/window\.addEventListener\('hashchange',revealLinkedShift\)/);
  assert.match(main,/Your previously authorized shift is not cancelled/);
  assert.doesNotMatch(main,/\binstallCapability\s*\(|\bstartJob\s*\(/);
