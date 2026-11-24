@@ -1696,6 +1696,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <label for="privateMissionText">Confirm your permanent mission</label>
    <textarea id="privateMissionText" minlength="12" maxlength="700" style="width:100%;min-height:150px" placeholder="Describe the long-term mission for your business."></textarea>
    <button id="privateMissionConfirm" type="button">Save permanent business mission to my account</button>
+   <p id="privateMissionCount" class="muted" aria-live="polite"></p>
+   <button id="privateMissionVerify" type="button" class="simple-secondary">Check saved mission</button>
    <button id="privateMissionAdoptHere" type="button" class="simple-secondary">Use saved mission for work in this conversation</button>
    <p class="muted" style="font-size:12px">The mission remains saved across conversations. Using it for an individual conversation requires an explicit owner-confirmed goal binding; this alone never starts or approves work.</p>
    <hr style="margin:18px 0;border-color:#30465d">
@@ -6754,6 +6756,10 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  let confirmedActiveGoal=null;
  const realityProposedPermanentMission="Build Reality into a trustworthy, profitable Personal Operational Intelligence business. Prove value by operating Reality as Customer Zero, then serving owner-operated residential remodeling and construction companies. Continuously assess launch readiness, customers, finances, risks, and unfinished work. Each AI employee investigates its own authorized sources, qualifies useful jobs, and coordinates through one continuity ledger. Advance authorized work, recover safely, independently verify outcomes, and produce durable receipts measuring cost, time, and ROI where proven. Keep improving launch, customer value, retention, and growth, with owner control and clear Past, Present, and Future.";
  let confirmedPermanentMission=null;
+ const updateMissionCount=()=>{el('privateMissionCount').textContent=el('privateMissionText').value.length+' / 700 characters';};
+ el('privateMissionText').addEventListener('input',updateMissionCount);
+ el('privateMissionVerify').onclick=async()=>{const b=el('privateMissionVerify');b.disabled=true;b.textContent='Checking…';try{await loadPermanentMission()}finally{b.disabled=false;b.textContent='Check saved mission';updateMissionCount()}};
+ updateMissionCount();
  async function loadPermanentMission(){
   const banner=el('privateMissionBannerText'),state=el('privateMissionStatus');
   try{
@@ -6774,7 +6780,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     banner.textContent='SAVED ACROSS YOUR ACCOUNT · '+g.title;
     state.textContent='Confirmed account-wide mission · Continuity receipt: '+
       String(g.last_transition_receipt_id||'not returned');
-    el('privateMissionText').value=g.title;
+    if(!el('privateMissionText').value.trim()||el('privateMissionText').readOnly)el('privateMissionText').value=g.title;
+    updateMissionCount();
     el('privateMissionAdoptHere').disabled=false;
    }else{
     confirmedPermanentMission=null;
@@ -6783,6 +6790,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     state.textContent='No owner-confirmed permanent mission recorded. This proposal is NOT yet your active account mission.';
     if(!el('privateMissionText').value.trim())
      el('privateMissionText').value=realityProposedPermanentMission;
+    updateMissionCount();
    }
   }catch(e){
    confirmedPermanentMission=null;
@@ -6821,6 +6829,9 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   if(!confirm('Confirm this exact mission as your permanent Reality business objective across all conversations? This does not authorize any work, payments, releases, or external actions.'))
    return;
   const button=el('privateMissionConfirm');button.disabled=true;
+  button.textContent='Saving and verifying…';
+  el('privateMissionStatus').textContent='Saving your mission and checking the independent Continuity receipt…';
+  el('privateMissionText').readOnly=true;
   try{
    const saved=await saveGoalCommand('SET_ACTIVE',message,null,'account');
    if(saved.goal_scope!=='OWNER_ACCOUNT_PRIMARY_MISSION'||
@@ -6832,8 +6843,11 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    if(confirmedPermanentMission?.text!==message)
     throw Error('ACCOUNT_MISSION_PERSISTED_SOURCE_MISMATCH');
    status('Permanent business mission independently saved to your account. It will remain visible across conversations. No new shift or installation was authorized.');
-  }catch(e){status('Permanent mission not confirmed: '+String(e.message||'UNAVAILABLE'))}
-  finally{button.disabled=false}
+  }catch(e){
+   el('privateMissionStatus').textContent='Save not independently confirmed. Your text is preserved. Check saved mission before submitting again. '+String(e.message||'UNAVAILABLE');
+   status('Permanent mission verification pending.');
+  }
+  finally{button.disabled=false;button.textContent='Save permanent business mission to my account';field.readOnly=false}
  };
  async function loadGoals(){
   void loadPermanentMission();
