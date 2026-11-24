@@ -4,6 +4,10 @@ ALTER TABLE reality_internal.owner_internal_maintenance_jobs_v1
  ADD COLUMN IF NOT EXISTS build_attempt_receipts jsonb NOT NULL DEFAULT '[]'::jsonb,
  ADD COLUMN IF NOT EXISTS build_reentry_not_before timestamptz,
  ADD COLUMN IF NOT EXISTS build_recovery_decisions jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE reality_internal.owner_internal_maintenance_jobs_v1
+ ADD CONSTRAINT signed_builder_recovery_state_v1 CHECK(recovery_state IN ('READY_FOR_BUILD','CLAIM_ACTIVE','FAILED_PENDING_TRIAGE','REENTRY_AUTHORIZED','CANDIDATE_READY','TERMINAL_BOUNDARY')),
+ ADD CONSTRAINT signed_builder_attempt_history_v1 CHECK(jsonb_typeof(build_attempt_receipts)='array' AND jsonb_array_length(build_attempt_receipts)<=3),
+ ADD CONSTRAINT signed_builder_decision_history_v1 CHECK(jsonb_typeof(build_recovery_decisions)='array' AND jsonb_array_length(build_recovery_decisions)<=3);
 ALTER TABLE reality_internal.owner_shift_continuity_incidents_v1 DROP CONSTRAINT owner_shift_continuity_incidents_v1_kind_check;
 ALTER TABLE reality_internal.owner_shift_continuity_incidents_v1 ADD CONSTRAINT owner_shift_continuity_incidents_v1_kind_check CHECK(kind IN (
  'ELIGIBLE_WORK_NO_DISPATCH','EMPLOYEE_INQUIRY_CLAIM_STALE','QUALIFIED_EVIDENCE_JOB_BLOCKED','EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
@@ -185,6 +189,17 @@ RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
 DECLARE i record;m record;v jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'CONTINUITY_INVESTIGATION_SIGNED_SERVICE_REQUIRED';END IF;
+ -- An expired claim is not proof of no provider effect. Preserve it, and
+ -- report the unresolved outcome; never automatically reissue the call.
+ FOR m IN SELECT * FROM reality_internal.owner_internal_maintenance_jobs_v1
+ WHERE claimed_shift_id=p_shift_id AND recovery_state='CLAIM_ACTIVE' AND original_job_completed=false
+ AND (frozen_test_build->>'claimed_at')::timestamptz<pg_catalog.clock_timestamp()-interval '3 minutes'
+ FOR UPDATE SKIP LOCKED LOOP
+  v:=reality_internal.signed_frozen_test_build_scope_v1(p_shift_id,m.incident_id,p_worker_run_id,m.frozen_test_build->'scope'->>'release_sha');
+  IF v IS NULL OR v->>'authority_receipt_sha256' IS DISTINCT FROM m.frozen_test_build->'scope'->>'authority_receipt_sha256' THEN CONTINUE;END IF;
+  UPDATE reality_internal.owner_internal_maintenance_jobs_v1 SET recovery_state='TERMINAL_BOUNDARY'
+   WHERE incident_id=m.incident_id;
+ END LOOP;
  FOR m IN SELECT * FROM reality_internal.owner_internal_maintenance_jobs_v1
  WHERE claimed_shift_id=p_shift_id AND recovery_state='FAILED_PENDING_TRIAGE' AND original_job_completed=false
  ORDER BY (frozen_test_build->>'recorded_at') DESC NULLS LAST,incident_id FOR UPDATE SKIP LOCKED LOOP
@@ -225,7 +240,31 @@ BEGIN
  IF pg_catalog.jsonb_typeof(p_observation) IS DISTINCT FROM 'object' OR length(p_observation::text)>1500 OR
  coalesce(cl,'') NOT IN ('PROVIDER_READY','AUTH_OR_SECRET_MISSING','QUOTA_EXHAUSTED','RATE_LIMIT','TRANSIENT_INFRA','MODEL_CONFIG_OR_SCHEMA','UNKNOWN_PROVIDER_OUTCOME','SPEC_OR_TEST_FAILURE')
  OR coalesce(p_observation->>'model','') !~ '^[A-Za-z0-9._-]{3,80}$' OR coalesce(p_observation->>'probe_kind','')<>'BOUNDED_RESPONSES_SCHEMA_DIAGNOSTIC'
- OR (cl='PROVIDER_READY' AND (p_observation->>'http_status' IS DISTINCT FROM '200' OR coalesce(p_observation->>'response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}$'))
+ OR (cl='PROVIDER_READY' AND (p_observation->>'http_status' IS DISTINCT FROM '200' OR coalesce(p_observation->>'response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}
+ THEN RAISE EXCEPTION 'BUILDER_RECOVERY_OBSERVATION_INVALID';END IF;
+ strategy:=CASE WHEN cl='PROVIDER_READY' THEN 'RETRY_AFTER_FRESH_PROVIDER_PROOF' WHEN cl IN ('RATE_LIMIT','TRANSIENT_INFRA') THEN 'BOUNDED_DELAYED_PROVIDER_RETRY' ELSE 'NO_REPLAY_EVIDENCE_BOUNDARY' END;
+ decision:=CASE WHEN pg_catalog.jsonb_array_length(m.build_attempt_receipts)>=3 OR m.frozen_test_build->>'state'='INSUFFICIENT_EVIDENCE' OR cl NOT IN ('PROVIDER_READY','RATE_LIMIT','TRANSIENT_INFRA') THEN 'TERMINAL_BOUNDARY' ELSE 'REENTRY_AUTHORIZED' END;
+ until_at:=CASE WHEN decision='REENTRY_AUTHORIZED' THEN pg_catalog.clock_timestamp()+interval '5 minutes' ELSE NULL END;
+ d:=pg_catalog.jsonb_build_object('incident_id',p_incident_id,'attempt_id',m.frozen_test_build->>'request_id','prior_receipt_sha256',m.frozen_test_build->>'receipt_sha256',
+ 'observation',p_observation,'strategy',strategy,'strategy_fingerprint','sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(strategy||':'||cl||':'||coalesce(p_observation->>'model','')||':'||(m.frozen_test_build->>'receipt_sha256'),'UTF8')),'hex'),
+ 'state',decision,'remaining_build_attempts',greatest(0,3-pg_catalog.jsonb_array_length(m.build_attempt_receipts)),'not_before',until_at,
+ 'original_job_completed',false,'installation_authorized',false,'production_changed',false);
+ receipt:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(d::text,'UTF8')),'hex');
+ UPDATE reality_internal.owner_internal_maintenance_jobs_v1 SET recovery_state=decision,build_reentry_not_before=until_at,
+ build_recovery_decisions=build_recovery_decisions||pg_catalog.jsonb_build_array(d||pg_catalog.jsonb_build_object('receipt_sha256',receipt)) WHERE incident_id=m.incident_id;
+ UPDATE reality_internal.owner_shift_continuity_incidents_v1 SET phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',diagnosis='Bounded same-provider diagnostic: '||cl,
+ proposed_upgrade=strategy,independent_test_requirement='Independent original frozen CI and settlement remain required.',
+ limitations='Provider readback does not independently prove the repair or original work.',investigation_receipt_sha256=receipt,investigated_at=pg_catalog.clock_timestamp() WHERE incident_id=p_incident_id;
+ RETURN pg_catalog.jsonb_build_object('status','SIGNED_BUILDER_RECOVERY_DECISION_RECORDED','incident_id',p_incident_id,'maintenance_id',m.incident_id,
+ 'recovery_state',decision,'error_class',cl,'strategy',strategy,'receipt_sha256',receipt,'not_before',until_at,
+ 'original_job_completed',false,'installation_authorized',false,'production_changed',false,'execution_authorized',false);
+END $fn$;
+REVOKE ALL ON FUNCTION reality_internal.admit_signed_builder_failure_v1(),public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid),
+ public.reality_record_signed_builder_recovery_decision_v1(uuid,uuid,uuid,uuid,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION reality_internal.admit_signed_builder_failure_v1(),public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid),
+ public.reality_record_signed_builder_recovery_decision_v1(uuid,uuid,uuid,uuid,jsonb) TO service_role;))
+ OR (cl='RATE_LIMIT' AND p_observation->>'http_status' IS DISTINCT FROM '429')
+ OR (cl='TRANSIENT_INFRA' AND coalesce(p_observation->>'http_status','') NOT IN ('408','500','502','503','504'))
  THEN RAISE EXCEPTION 'BUILDER_RECOVERY_OBSERVATION_INVALID';END IF;
  strategy:=CASE WHEN cl='PROVIDER_READY' THEN 'RETRY_AFTER_FRESH_PROVIDER_PROOF' WHEN cl IN ('RATE_LIMIT','TRANSIENT_INFRA') THEN 'BOUNDED_DELAYED_PROVIDER_RETRY' ELSE 'NO_REPLAY_EVIDENCE_BOUNDARY' END;
  decision:=CASE WHEN pg_catalog.jsonb_array_length(m.build_attempt_receipts)>=3 OR m.frozen_test_build->>'state'='INSUFFICIENT_EVIDENCE' OR cl NOT IN ('PROVIDER_READY','RATE_LIMIT','TRANSIENT_INFRA') THEN 'TERMINAL_BOUNDARY' ELSE 'REENTRY_AUTHORIZED' END;
