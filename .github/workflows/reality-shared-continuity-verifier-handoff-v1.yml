@@ -20,6 +20,7 @@ on:
       - 'supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql'
       - 'supabase/migrations/20261124015400_final_loop_evidence_checkpoint_atomic_resume_rebind_v1.sql'
       - 'supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql'
+      - 'supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql'
       - 'test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -41,6 +42,7 @@ on:
       - 'supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql'
       - 'supabase/migrations/20261124015400_final_loop_evidence_checkpoint_atomic_resume_rebind_v1.sql'
       - 'supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql'
+      - 'supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql'
       - 'test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -78,6 +80,7 @@ jobs:
           node --test test/reality-final-loop-existing-case-ci-bridge-v1.test.js
           node --test test/reality-final-loop-blocker-liveness-v1.test.js
           node --test test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js
+          node --test test/reality-final-loop-technical-ci-continuity-writer-v1.test.js
           node --test test/reality-final-loop-staged-plan-action-router-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js
           node --test test/reality-final-loop-executive-brief-v1.test.js
