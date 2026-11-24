@@ -436,3 +436,80 @@ test('event-driven Final Loop schema records receipts but never invents executio
  assert.doesNotMatch(sql,/net\.http_post|send_governed_wake_hint_v1|cron\.unschedule/);
  assert.doesNotMatch(sql,/github\.com\/maloney2323\/Reality\/pull\/307/);
 });
+
+
+test('same-ledger cross-layer guard requires independent receipts and denies invented authority',async()=>{
+ const guard={
+  schema:'reality-shared-cross-layer-continuity-handoff-v1',
+  status:'FINAL_LOOP_SHARED_CONTINUITY_CHECKED',
+  owner_id:owner,shift_id:shift,
+  continuity_root_id:pendingEnvelope.continuity_root_id,
+  continuity_head_sha256:pendingEnvelope.continuity_head_sha256,
+  frozen_shift_scope_sha256:pendingEnvelope.frozen_shift_scope_sha256,
+  revision:pendingEnvelope.revision,handoff_observation_sha256:sha('8'),
+  read_only:true,no_new_executable_authority:true,
+  unverified_handoffs:0,transition_committed:false,
+  executor_invoked:false,execution_authorized:false,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false,
+  obligations:[{
+   source_ref:source,original_work_id:work,
+   status:'CONTINUITY_OPEN_PENDING_PROOFS',
+   source_proof_verified:true,continuity_identity_verified:true,
+   qualifier_digest_verified:true,qualifier_receipt_sha256:sha('9'),
+   unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED'],
+   internal_maintenance_independent_frozen_ci_verified:false,
+   original_claim_admitted:false,
+   independent_original_outcome_verified:false,
+   universe_return_verified:false,
+   executor_authorized_by_observation:false,
+   execution_permitted_by_handoff:false
+  }]
+ };
+ const state={...env,REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED:'true'};
+ const load=async(db,name)=>{
+  if(name==='reality_read_current_shift_execution_graph_v1')return rawGraph();
+  if(name==='reality_read_current_final_loop_proof_envelope_v1')
+   return pendingEnvelope;
+  if(name==='reality_read_final_loop_shared_continuity_guard_v1')
+   return guard;
+  throw Error('UNEXPECTED_RPC_'+name);
+ };
+ const good=await caller(load,{env:state});
+ assert.equal(good.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ assert.equal(good.shared_continuity_guard.status,
+  'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY');
+ assert.equal(good.shared_continuity_guard.handoffs[0].original_work_id,work);
+ assert.equal(good.shared_continuity_guard.handoffs[0].universe_return_verified,false);
+ assert.equal(good.executor_invoked,false);
+ for(const [mutation,expected] of [
+  [{...guard,execution_authorized:true},
+   'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
+  [{...guard,continuity_head_sha256:sha('f')},
+   'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
+  [{...guard,revision:2},
+   'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
+  [{...guard,obligations:[{...guard.obligations[0],
+    original_work_id:'work:'+'f'.repeat(32)}]},
+   'FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_IDENTITY_MISMATCH'],
+  [{...guard,obligations:[{...guard.obligations[0],
+    qualifier_digest_verified:false}]},
+   'FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_PROOF_NOT_VERIFIED'],
+  [{...guard,obligations:[{...guard.obligations[0],
+    universe_return_verified:true}]},
+   'FINAL_LOOP_SHARED_CONTINUITY_VERIFIER_OR_AUTHORITY_CONFLICT']
+ ]){
+  const r=await caller(async(db,name)=>name===
+    'reality_read_final_loop_shared_continuity_guard_v1'?mutation:
+    load(db,name),{env:state});
+  assert.equal(r.status,expected);
+  assert.equal(r.original_job_completed,false);
+  assert.equal(r.transition_committed,false);
+ }
+ const down=await caller(async(db,name)=>{
+  if(name==='reality_read_final_loop_shared_continuity_guard_v1')
+   throw Error('TEMPORARY_READ_UNAVAILABLE');
+  return load(db,name);
+ },{env:state});
+ assert.equal(down.status,'FINAL_LOOP_SHARED_CONTINUITY_GUARD_READ_UNAVAILABLE');
+});
