@@ -203,3 +203,18 @@ test('Universe rejects settlement not reconciled by the shared continuity verifi
   sharedContinuityGuard:{...guard,continuity_head_sha256:hash('2')}});
  assert.equal(foreign.status,'FINAL_LOOP_UNIVERSE_SHARED_CONTINUITY_PROOF_MISMATCH');
 });
+
+
+test('owner Chat and temporal Universe readback require same service-only Continuity guard',()=>{
+ const ownerTime=readFileSync(new URL(
+  '../api/reality/personal-time-horizon.js',import.meta.url),'utf8');
+ const chat=readFileSync(new URL(
+  '../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.match(ownerTime,/reality_read_final_loop_shared_continuity_guard_v1/);
+ assert.match(ownerTime,/final_loop_shared_continuity_guard:finalLoopSharedContinuityGuard/);
+ assert.match(ownerTime,/sharedContinuityGuard:finalLoopSharedContinuityGuard\.status/);
+ assert.match(ownerTime,/REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED/);
+ assert.match(chat,/x\.final_loop_shared_continuity_guard\?\.status/);
+ assert.match(chat,/feedback\.shared_continuity_guard_crosschecked===true/);
+ assert.doesNotMatch(ownerTime,/cron\.schedule\(|net\.http_post/);
+});
