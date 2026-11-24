@@ -964,7 +964,23 @@ export default async function handler(req,res){
   const status=Number(e.status)||503;
   const underlying=String(e?.message||'');
   // Never reflect arbitrary provider/database errors or user content.
-  const code=/^[A-Z][A-Z0-9_]{3,119}$/.test(underlying)?underlying:'CHAT_RESPONSE_UNAVAILABLE';
+  // Only fixed categories are exposed; raw provider messages can contain secrets.
+  let code=/^[A-Z][A-Z0-9_]{3,119}$/.test(underlying)?underlying:'CHAT_RESPONSE_UNAVAILABLE';
+  if(stage==='READ_ONLY_MODEL_COGNITION' && code==='CHAT_RESPONSE_UNAVAILABLE'){
+   const providerCode=String(e?.provider_error||'');
+   if(providerCode==='insufficient_quota')code='CHAT_MODEL_INSUFFICIENT_QUOTA';
+   else if(providerCode==='model_not_found')code='CHAT_MODEL_NOT_AVAILABLE';
+   else if(status===401)code='CHAT_MODEL_AUTHENTICATION_FAILED';
+   else if(status===403)code='CHAT_MODEL_PERMISSION_DENIED';
+   else if(status===429)code='CHAT_MODEL_RATE_LIMITED';
+   else if(status===400||status===422)code='CHAT_MODEL_REQUEST_REJECTED';
+   else if(status===404)code='CHAT_MODEL_NOT_AVAILABLE';
+   else if(e?.name==='TimeoutError'||e?.name==='AbortError')code='CHAT_MODEL_REQUEST_TIMEOUT';
+   else if(Number(e?.status)>=500)code='CHAT_MODEL_PROVIDER_UNAVAILABLE';
+   else if(e?.name==='TypeError')code='CHAT_MODEL_TRANSPORT_OR_RUNTIME_FAILURE';
+   else if(e?.name==='SyntaxError')code='CHAT_MODEL_RESPONSE_PARSE_FAILED';
+   else code='CHAT_MODEL_UNCLASSIFIED_FAILURE';
+  }
   console.warn('REALITY_CHAT_STAGE_FAILURE',stage,code,
    'elapsed_ms',Date.now()-chatStartedAt);
   return res.status(status).json({ok:false,error:code,
