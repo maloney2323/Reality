@@ -280,6 +280,9 @@ export async function inspectFinalLoopOnExistingSignedWorker({
       [...o.unresolved_proof_gates]),
      independent_internal_ci_verified:
       o.internal_maintenance_independent_frozen_ci_verified===true,
+     internal_maintenance_verifier_receipt_sha256:
+      o.internal_maintenance_independent_frozen_ci_verified===true?
+       o.internal_maintenance_verifier_receipt_sha256:null,
      original_claim_admitted:o.original_claim_admitted===true,
      independent_original_outcome_verified:
       o.independent_original_outcome_verified===true,

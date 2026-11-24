@@ -92,6 +92,7 @@ export async function continueSignedMaintenanceCaseCiVerification({
   error('EXACT_MAINTENANCE_INDEPENDENT_FROZEN_RECEIPT_INVALID');
  return Object.freeze({
   status:r.status,shift_id:shiftId,maintenance_id:r.maintenance_id,
+  ...(resumeEvent?{resume_event_id:r.resume_event_id,source_ref:r.source_ref}:{}),
   github_run_id:r.github_run_id,
   case_specific_ci_receipt_sha256:r.case_specific_ci_receipt_sha256,
   case_specific_frozen_red_attested:true,

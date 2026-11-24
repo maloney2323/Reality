@@ -166,6 +166,8 @@ test('current exact proof-change signal routes to the existing signed case verif
  };
  const r=await continueSignedMaintenanceCaseCiVerification({...args,fetchImpl});
  assert.equal(calls,1);
+ assert.equal(r.resume_event_id,eventId);
+ assert.equal(r.source_ref,source);
  assert.equal(r.case_specific_frozen_red_attested,true);
  assert.equal(r.installation_authorized,false);
  await assert.rejects(continueSignedMaintenanceCaseCiVerification({...args,

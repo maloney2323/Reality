@@ -73,7 +73,7 @@ import {assertRealityUnifiedShiftGraph}
 import {inspectFinalLoopOnExistingSignedWorker,
  recordOneFinalLoopEvidenceCheckpoint}
  from '../../src/reality-final-loop-signed-worker-bridge-v1.js';
-import {evaluateRealityWholeCycleAcceptance}
+import {evaluateRealityWholeCycleAcceptance,reconcileVerifiedFinalLoopContinuation}
  from '../../src/reality-final-loop-whole-cycle-acceptance-v1.js';
 import {projectRecoveryContractFromFinalLoop}
  from '../../src/reality-final-loop-proof-carrying-recovery-v1.js';
@@ -3867,10 +3867,12 @@ export default async function handler(req,res){
    ownerPackets:finalLoopOwnerPacketReadback,
    recovery:finalLoopRecoveryContinuation,
    parentReturn:finalLoopVerifiedCanonicalReturn,
-   // A read-only event-subscription shadow is not a verified action
-   // execution receipt. This remains unproved until a separate signed
-   // next-action verifier records the actual outcome.
-   verifiedContinuation:null
+   // Consume the independently recorded outcome from the existing signed
+   // event handler only if the same canonical post-action readback agrees.
+   verifiedContinuation:reconcileVerifiedFinalLoopContinuation({
+    graph:unifiedGraph,trigger:finalLoopGovernedResumeTrigger,
+    caseCi:signedMaintenanceCaseCiReconciliation,
+    continuityReturn:finalLoopContinuityReturn})
   });
 
   // Reuse the SAME original, current source and independent Continuity

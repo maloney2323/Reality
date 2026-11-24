@@ -15,6 +15,55 @@ const base=Object.freeze({
 });
 const result=(status,extra={})=>Object.freeze({...base,status,...extra});
 const stage=(name,status,verified=false)=>Object.freeze({name,status,verified});
+// The existing event-triggered signed CI verifier already records an independent
+// source-bound effect. Join its result to the SAME canonical post-action
+// Continuity readback; a wake, queue acknowledgement, or technical-only
+// recovery artifact cannot stand in for an executed original continuation.
+export function reconcileVerifiedFinalLoopContinuation({graph,trigger,caseCi,continuityReturn}={}){
+ const g=continuityReturn?.shared_continuity_guard;
+ const t=trigger,r=caseCi;
+ if(graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+  !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
+  t?.status!=='FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY'||
+  t.dispatch_permitted!==true||t.execution_authorized_by_trigger!==false||
+  t.next_action!=='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC'||
+  t.owner_id!==graph.owner_id||t.shift_id!==graph.shift_id||
+  !UUID.test(t.event_id||'')||!WORK.test(t.original_work_id||'')||
+  !PR.test(t.source_ref||'')||!UUID.test(t.continuity_root_id||'')||
+  !HASH.test(t.continuity_head_sha256||'')||
+  !Number.isSafeInteger(t.continuity_revision)||t.continuity_revision<1||
+  t.resume_event?.event_id!==t.event_id||t.resume_event?.source_ref!==t.source_ref||
+  r?.status!=='EXACT_SIGNED_MAINTENANCE_SOURCE_CI_RED_GREEN_INDEPENDENTLY_ATTESTED'||
+  r.shift_id!==t.shift_id||r.resume_event_id!==t.event_id||r.source_ref!==t.source_ref||
+  !HASH.test(r.case_specific_ci_receipt_sha256||'')||
+  r.case_specific_frozen_red_attested!==true||r.code_regression_green_verified!==true||
+  r.repair_executed!==false||r.repair_installed!==false||
+  r.original_job_completed!==false||r.installation_authorized!==false||
+  r.production_changed!==false||r.new_shift_started!==false||
+  g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+  g.owner_id!==t.owner_id||g.shift_id!==t.shift_id||
+  g.continuity_root_id!==t.continuity_root_id||
+  g.continuity_head_sha256!==t.continuity_head_sha256||
+  g.revision!==t.continuity_revision||
+  continuityReturn.owner_id!==t.owner_id||continuityReturn.shift_id!==t.shift_id||
+  g.read_only!==true||g.execution_authorized!==false||
+  !Array.isArray(g.handoffs)||!Array.isArray(graph.jobs))return null;
+ const jobs=graph.jobs.filter(j=>j.original_work_id===t.original_work_id&&
+  j.source_ref===t.source_ref&&j.independent_source_proof_verified===true);
+ const matches=g.handoffs.filter(h=>h.original_work_id===t.original_work_id&&
+  h.source_ref===t.source_ref&&h.continuity_identity_verified===true&&
+  h.qualifier_digest_verified===true&&h.independent_internal_ci_verified===true&&
+  h.internal_maintenance_verifier_receipt_sha256===r.case_specific_ci_receipt_sha256);
+ if(jobs.length!==1||matches.length!==1)return null;
+ return Object.freeze({
+  status:'FINAL_LOOP_INDEPENDENT_NEXT_ACTION_EXECUTED_AND_VERIFIED',
+  owner_id:t.owner_id,shift_id:t.shift_id,original_work_id:t.original_work_id,
+  source_ref:t.source_ref,continuity_root_id:t.continuity_root_id,
+  resume_event_id:t.event_id,independent_resume_receipt_sha256:r.case_specific_ci_receipt_sha256,
+  independent_resume_receipt_verified:true,execution_authorized:false,
+  original_job_completed:false,production_changed:false
+ });
+}
 export function evaluateRealityWholeCycleAcceptance({
  graph,ingress,continuityReturn,ownerPackets,recovery,
  parentReturn,verifiedContinuation

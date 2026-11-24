@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {evaluateRealityWholeCycleAcceptance as assess}
+import {evaluateRealityWholeCycleAcceptance as assess,reconcileVerifiedFinalLoopContinuation as reconcile}
  from '../src/reality-final-loop-whole-cycle-acceptance-v1.js';
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -135,7 +135,8 @@ test('live signed worker publishes whole-cycle verdict AFTER independent return 
   s.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'"));
  assert.match(s,/reality_read_owner_final_loop_child_approvals_v1/);
  assert.match(s,/final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance/);
- assert.match(s,/verifiedContinuation:null/);
+ assert.match(s,/verifiedContinuation:reconcileVerifiedFinalLoopContinuation\(\{/);
+ assert.doesNotMatch(s,/verifiedContinuation:null/);
 });
 
 
@@ -153,4 +154,41 @@ test('verified review approval does not hide a separate business warrant mismatc
  assert.equal(r.original_reports[0].next_recovery_action,'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC');
  assert.equal(r.full_cycle_accepted,false);
  assert.equal(r.authority_extended,false);
+});
+
+test('existing event-triggered independent CI result is bound to exact canonical continuation, no synthetic receipt',()=>{
+ const event='99999999-9999-4999-8999-999999999999';
+ const trigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY',
+  dispatch_permitted:true,execution_authorized_by_trigger:false,
+  next_action:'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC',
+  owner_id:owner,shift_id:shift,event_id:event,original_work_id:original,
+  source_ref:src,continuity_root_id:root,continuity_revision:2,
+  continuity_head_sha256:digest('b'),resume_event:{event_id:event,source_ref:src}};
+ const caseCi={status:'EXACT_SIGNED_MAINTENANCE_SOURCE_CI_RED_GREEN_INDEPENDENTLY_ATTESTED',
+  shift_id:shift,resume_event_id:event,source_ref:src,case_specific_ci_receipt_sha256:digest('f'),
+  case_specific_frozen_red_attested:true,code_regression_green_verified:true,
+  repair_executed:false,repair_installed:false,original_job_completed:false,
+  installation_authorized:false,production_changed:false,new_shift_started:false};
+ const full={...handoff,independent_internal_ci_verified:true,
+  internal_maintenance_verifier_receipt_sha256:digest('f'),
+  original_claim_admitted:true,independent_original_outcome_verified:true,
+  universe_return_verified:true};
+ const current={...checkpoint,shared_continuity_guard:{...verifiedGuard,
+  owner_id:owner,shift_id:shift,read_only:true,execution_authorized:false,handoffs:[full]}};
+ const inputs={graph,trigger,caseCi,continuityReturn:current};
+ const proof=reconcile(inputs);
+ assert.equal(proof.independent_resume_receipt_verified,true);
+ assert.equal(proof.independent_resume_receipt_sha256,digest('f'));
+ const verdict=assess({...args,verifiedContinuation:proof,continuityReturn:current,
+  ownerPackets:{...packets,packets:[{...packets.packets[0],state:'APPROVED_ONCE',approved:true}]}});
+ assert.equal(verdict.full_cycle_accepted,true);
+ for(const change of [
+  {trigger:{...trigger,dispatch_permitted:false}},
+  {caseCi:{...caseCi,resume_event_id:null}},
+  {caseCi:{...caseCi,case_specific_ci_receipt_sha256:digest('e')}},
+  {caseCi:{...caseCi,production_changed:true}},
+  {continuityReturn:{...current,shared_continuity_guard:{...current.shared_continuity_guard,revision:3}}},
+  {continuityReturn:{...current,shared_continuity_guard:{...current.shared_continuity_guard,
+    handoffs:[{...full,independent_internal_ci_verified:false}]}}}
+ ])assert.equal(reconcile({...inputs,...change}),null);
 });
