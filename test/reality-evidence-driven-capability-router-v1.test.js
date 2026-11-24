@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {planGovernedCapabilitiesFromOwnerReceipts,
- invokeOneRegisteredSignedCapability}
+ invokeOneRegisteredSignedCapability,projectSignedOperationalTimeHorizon}
  from '../src/reality-evidence-driven-capability-router-v1.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const shift='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
@@ -211,4 +211,47 @@ test('worker binds registered CI dispatch to independently re-read signed graph 
  assert.doesNotMatch(ci,/graph:\s*unifiedGraph\b/);
  assert.ok(source.indexOf('const unifiedGraph=')>end,
   'later broad employee execution graph must not be used during CI dispatch');
+});
+
+const temporalSource=(source_ref,builder_state,repair=false)=>({
+ source_ref,maintenance_id:UUID,
+ past:{independent_baseline_receipt_sha256:HASH,last_builder_receipt_sha256:builder_state?HASH:null,
+  last_builder_outcome:builder_state,last_builder_recorded_at:builder_state?'2026-11-21T13:40:00Z':null,
+  independent_repair_receipt_sha256:repair?HASH:null},
+ present:{phase:repair?'INTERNAL_REPAIR_VERIFIED_CLOSED':'OPEN_NEEDS_BUSINESS_WORK_ROOT_CAUSE',
+  handling_state:'FAILURE_BASELINE_REPRODUCED_NEEDS_CI_RED',builder_state,
+  original_job_completed:false,repair_independently_verified:repair,independent_frozen_red_verified:repair},
+ future:{next_required_action:repair?'RECONCILE_SEPARATE_ORIGINAL_JOB_ACCEPTANCE':
+  'INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY',expected_outcome_verified:false,execution_authorized:false,installation_authorized:false}
+});
+test('temporal grounding uses recorded failure rather than repeating obsolete missing capability recommendation',()=>{
+ const health={...base,operational_temporal_coverage:'BOUNDED_CURRENT_SIGNED_MAINTENANCE_SOURCES',
+  operational_temporal_evidence:[temporalSource(scope.source_ref,'PROVIDER_UNVERIFIED'),
+   temporalSource(base.maintenance_handoffs[0].source_ref,'PROVIDER_UNVERIFIED'),
+   temporalSource(base.maintenance_handoffs[1].source_ref,null,true)]};
+ const p=planGovernedCapabilitiesFromOwnerReceipts({health,ownerId:owner,shiftId:shift});
+ assert.equal(p.operational_time_horizon.status,'OPERATIONAL_TIME_EVIDENCE_PROJECTED');
+ assert.equal(p.recovery_investigation_count,2);
+ assert.equal(p.missing_capability_count,0);
+ assert.equal(p.executable_registered_count,0);
+ assert.equal(p.owner_decision_count,0);
+ assert.ok(p.source_actions.every(a=>a.next_action==='INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY'&&a.blocked_attempt_receipt_sha256===HASH));
+ const repaired=p.operational_time_horizon.items[2];
+ assert.equal(repaired.present.repair_independently_verified,true);
+ assert.equal(repaired.present.original_job_completed,false);
+ assert.equal(repaired.future.expected_outcome_verified,false);
+ assert.equal(p.original_job_completed,false);
+});
+test('temporal projection rejects wrong scope, receiptless failed attempt, and future authority inflation',()=>{
+ const good=temporalSource(scope.source_ref,'PROVIDER_UNVERIFIED');
+ for(const item of [{...good,source_ref:'https://example.org/not-in-scope'},
+  {...good,past:{...good.past,last_builder_receipt_sha256:null}},
+  {...good,future:{...good.future,execution_authorized:true}},
+  {...good,future:{...good.future,next_required_action:'RECONCILE_EXISTING_FINAL_RECEIPT_NO_REPLAY'}}]){
+  const r=projectSignedOperationalTimeHorizon({health:{...base,
+   operational_temporal_coverage:'BOUNDED_CURRENT_SIGNED_MAINTENANCE_SOURCES',operational_temporal_evidence:[item]},
+   ownerId:owner,shiftId:shift});
+  assert.equal(r.status,'OPERATIONAL_TIME_EVIDENCE_UNVERIFIED');
+  assert.equal(r.original_job_completed,false);
+ }
 });
