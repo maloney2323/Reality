@@ -878,6 +878,7 @@ BEGIN
    'requested_effects',pg_catalog.jsonb_build_array('READ')),
   'capacity',pg_catalog.jsonb_build_object(
    'independently_attested',v_capacity,
+   'signed_worker_observed',v_capacity,
    'scheduled_worker_observed',v_capacity,
    'receipt_sha256',v_capacity_receipt),
   'provider_effect_uncertain',EXISTS(SELECT 1 FROM

@@ -300,7 +300,8 @@ export function evaluateRealityFinalLoopChildRecovery({
    independentChildren.authority.requested_effects.some(x=>
     !independentChildren.authority.permitted_effects.includes(x))||
    independentChildren.capacity?.independently_attested!==true||
-   independentChildren.capacity?.scheduled_worker_observed!==true||
+   (independentChildren.capacity?.signed_worker_observed??
+    independentChildren.capacity?.scheduled_worker_observed)!==true||
    !digest(independentChildren.capacity?.receipt_sha256)||
    typeof independentChildren.provider_effect_uncertain!=='boolean'||
    !Array.isArray(independentChildren.children)||
@@ -480,7 +481,7 @@ export function evaluateRealityFinalLoopEngine({
    if(c?.status!=='SIGNED_WORKER_HANDLER_ATTESTED'||
       c.independently_attested!==true||
       !digest(c.receipt_sha256)||
-      c.scheduled_worker_observed!==true)
+      (c.signed_worker_observed??c.scheduled_worker_observed)!==true)
     return makeLoopDecision(item,'SUSPEND',
      'RECHECK_INDEPENDENT_EXECUTION_CAPACITY_BEFORE_SETTLEMENT',
      'FINAL_RECEIPT_CANNOT_SUBSTITUTE_FOR_CAPACITY_PROOF');
@@ -549,7 +550,7 @@ export function evaluateRealityFinalLoopEngine({
   if(p.capacity?.status!=='SIGNED_WORKER_HANDLER_ATTESTED'||
    p.capacity.independently_attested!==true||
    !digest(p.capacity.receipt_sha256)||
-   p.capacity.scheduled_worker_observed!==true)
+   (p.capacity.signed_worker_observed??p.capacity.scheduled_worker_observed)!==true)
    return makeLoopDecision(item,'REFRESH',
     'ATTEST_ACTUAL_SCHEDULED_WORKER_HANDLER',
     'CAPACITY_NOT_INDEPENDENTLY_VERIFIED');

@@ -134,3 +134,12 @@ test('owner intent is not a 12-hour lease; live signed capacity and exact accept
  assert.match(sql,/'signed_worker_observed',v_capacity/);
  assert.doesNotMatch(claim,/cron\.job|cron\.schedule/);
 });
+
+
+test('independent capacity may come from an actual signed worker rather than scheduling',()=>{
+ const src=readFileSync(new URL('../src/reality-shift-unified-execution-controller-v1.js',import.meta.url),'utf8');
+ assert.match(src,/signed_worker_observed\?\?/);
+ const sql=readFileSync(new URL('../sql/reality-final-loop-child-transactional-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/signed_worker_actual_runs_v1/);
+ assert.match(sql,/'signed_worker_observed',v_capacity/);
+});
