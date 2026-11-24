@@ -3,7 +3,7 @@
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 import {projectRecoveryContractFromFinalLoop}
  from './reality-final-loop-proof-carrying-recovery-v1.js';
-const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}-[a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const KEY=/^[A-Z][A-Z0-9_]{2,100}$/;
 const CAP='REPRODUCE_CASE_SPECIFIC_FROZEN_RED';
