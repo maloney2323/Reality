@@ -4,7 +4,7 @@
  'use strict';
  if(!/^\/chat\/?$/.test(window.location.pathname))return;
  const find=id=>document.getElementById(id);
- const ready=find('privateReady'),thread=find('privateTranscript');
+ const ready=find('privateReady'),thread=find('realityChatPanelWork');
  if(!ready||!thread||find('realityHandoffHealthInChat'))return;
  const URL='/api/reality/personal-handoff-health';
  const REF=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/;

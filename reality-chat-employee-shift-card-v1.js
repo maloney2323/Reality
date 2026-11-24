@@ -18,7 +18,8 @@
  const title=x('h3','Your automated employee shift');
  const detail=x('p','Reality uses your existing employee roles and source-backed backlog. Review and adjust the proposal in Chat; starting work takes one explicit approval.');
  const actions=x('div');actions.className='reality-shift-plan-actions';
- const prepare=x('button','Prepare or refresh my shift');
+ const prepare=x('button','Check shift status');
+ const close=x('button','Close');close.type='button';close.addEventListener('click',()=>{block.hidden=true;});
  const approve=x('button','Authorize & Start Shift');approve.hidden=true;approve.disabled=true;
  const scheduling=x('details');scheduling.hidden=true;
  const scheduleSummary=x('summary','Schedule for later (optional)');
@@ -31,13 +32,16 @@
  const info=x('p','Planning is not work authorization. Existing shifts remain authorized; do not start a duplicate.');
  info.setAttribute('role','status');info.setAttribute('aria-live','polite');
  const work=x('div');work.className='reality-shift-plan-assignments';
- actions.append(prepare,edit,reset,approve);
+ actions.append(prepare,edit,reset,approve,close);
  block.append(title,detail,actions,scheduling,info,work);
  // One compact operational card directly in Chat, outside transcript replacement.
  // The Work panel keeps its read-only evidence; never duplicate the start control.
  const composer=document.getElementById('realityChatComposer');
  if(!composer||composer.parentNode!==panel)return;
- panel.insertBefore(block,composer);
+ block.hidden=true;
+ function showPlan(){block.hidden=false;if(!transcript.contains(block))transcript.append(block);}
+ window.addEventListener('reality:open-shift-plan',()=>{showPlan();void load();});
+ new MutationObserver(()=>{if(!block.hidden&&!transcript.contains(block))transcript.append(block);}).observe(transcript,{childList:true});
  const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/;
@@ -84,7 +88,7 @@
   draft=null;approve.hidden=true;scheduling.hidden=true;edit.hidden=false;reset.hidden=true;
   info.textContent='An existing employee shift is already authorized ('+s.status+
    '). '+triggerMessage(trigger)+' Reality will not create a second shift. Altering live work requires a governed amendment.';
-  work.replaceChildren(x('p','Existing shift · '+s.shift_id));
+  work.replaceChildren();
   if(Array.isArray(s.steps)){
    const list=x('ul');for(const st of s.steps.filter(z=>URL.test(z.source_ref||''))){
     const line=x('li',String(st.source_title||st.source_ref).slice(0,250)+
@@ -194,7 +198,7 @@
  function revealLinkedShift(){
   if(location.hash!=='#realityCreateShift')return;
   // A direct link opens the SAME Chat card; it never authorizes work.
-  block.scrollIntoView({block:'start'});
+  showPlan();block.scrollIntoView({block:'nearest'});
   // A deep link must not ask the shift API before Chat has restored its
   // authenticated session. This is a read-only wait, not an approval.
   const ready=document.getElementById('privateReady');

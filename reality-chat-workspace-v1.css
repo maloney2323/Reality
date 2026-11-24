@@ -335,3 +335,16 @@ body[data-reality-route="chat"] #privateTranscript
   display:block!important;margin-left:auto;min-height:42px;
  }
 }
+
+/* Conversation-first control center: explicit work/history disclosures, not permanent sidebars. */
+body[data-reality-route="chat"] .reality-chat-workspace{grid-template-columns:minmax(0,1fr);max-width:1000px;margin-inline:auto;gap:0;}
+body[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-sidebar,body[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-inspector,body[data-reality-route="chat"] .reality-chat-panel-scrim,body[data-reality-route="chat"] #realityChatFocusToggle{display:none!important;}
+body[data-reality-route="chat"] .reality-chat-mobile-tool{display:inline-flex;}
+body[data-reality-route="chat"] #privateTranscript .reality-chat-inline-panels .reality-chat-sidebar,body[data-reality-route="chat"] #privateTranscript .reality-chat-inline-panels .reality-chat-inspector{position:static!important;display:flex!important;inset:auto!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;z-index:auto!important;border:0!important;box-shadow:none!important;}
+body[data-reality-route="chat"] #privateTranscript .reality-chat-inline-panels .reality-chat-panel-close{display:block!important;align-self:flex-end;}
+body[data-reality-route="chat"] #realityChatComposer .reality-chat-status-bar{min-height:0;padding:4px 0 8px;border:0;background:transparent;box-shadow:none;}
+body[data-reality-route="chat"] #realityChatComposer .reality-chat-status-bar[hidden],body[data-reality-route="chat"] #realityCreateShift[hidden]{display:none!important;}
+body[data-reality-route="chat"] #realityChatComposer #realityChatStatusSummary{display:block;max-height:none;-webkit-line-clamp:unset;overflow:visible;line-height:1.4;font-size:12px;}
+body[data-reality-route="chat"] #realityCreateShift{align-self:flex-start;width:100%;max-width:760px;box-sizing:border-box;margin:0;}
+body[data-reality-route="chat"] .reality-chat-plan-action{background:#d6eff9!important;color:#102d40!important;font-weight:750;}
+body[data-reality-route="chat"] .reality-chat-typing-note{display:none;}

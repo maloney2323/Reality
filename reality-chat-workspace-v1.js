@@ -69,7 +69,7 @@
   quickWork.type='button';
   quickWork.addEventListener('click',()=>{
     selectTab('work');
-    if(window.matchMedia('(max-width:950px)').matches)openPanel('work');
+    openPanel('work');
   });
   quickNav.insertBefore(quickWork,quickNav.lastChild);
   sidebar.append(quickNav);
@@ -121,7 +121,7 @@
   threadTitle.append(node('span','reality-chat-premium-eyebrow',
     'REALITY · CONTINUITY-AWARE CHAT'));
   threadTitle.append(node('strong', '', 'Reality'));
-  threadTitle.append(node('small', '', 'Chat · Your workspace'));
+  threadTitle.append(node('small', '', 'Tell Reality what you need.'));
   const threadButtons = node('div', 'reality-chat-thread-buttons');
   // Redundant direct navigation is intentional: a signed-in user should
   // never depend on scrolling past an operational card to leave the chat.
@@ -154,7 +154,7 @@
   });
   const smallScreen = () => window.matchMedia('(max-width:600px)').matches;
   function updateFocusLabel(){
-    inspectorToggle.textContent = smallScreen() ? 'Work' : 'Work & approvals';
+    inspectorToggle.textContent = 'Work details';
     if(smallScreen()){
       const expanded = !document.body.classList.contains('reality-chat-compact');
       focusToggle.textContent = expanded ? 'Minimize' : 'Expand chat';
@@ -180,7 +180,10 @@
   window.addEventListener('resize', updateFocusLabel);
   // On mobile Chat is ALWAYS fullscreen; no confusing "Minimize" path.
   // Preserve the desktop focus toggle for larger screens.
-  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, focusToggle);
+  const planShift=node('button','reality-chat-plan-action','Plan a shift');
+  planShift.type='button';
+  planShift.addEventListener('click',()=>{closePanel();window.dispatchEvent(new Event('reality:open-shift-plan'));});
+  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, planShift, focusToggle);
   threadHeader.append(threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
 
@@ -208,7 +211,7 @@
   // Project genuine delivery/verification feedback as a plain in-thread
   // message, reattached after saved-history rerenders. This read-only
   // projection never triggers a work request, approval or second API call.
-  const statusBar = node('article','bubble reality-chat-status-bar');
+  const statusBar = node('div','reality-chat-status-bar');
   statusBar.id='realityChatInlineStatus';
   statusBar.hidden=true;
   statusBar.setAttribute('role','status');
@@ -222,8 +225,7 @@
   inlinePanels.hidden=true;
   inlinePanels.setAttribute('aria-label','Conversation controls and verified work');
   const attachInlineStatus=()=>{
-    if(!statusBar.hidden&&!transcript.contains(statusBar))
-      transcript.append(statusBar);
+    if(!composer.contains(statusBar)) composer.prepend(statusBar);
   };
   if(originalStatus){
     const syncStatus=()=>{
@@ -396,7 +398,7 @@
   // Small-screen Chats and Work are expandable IN the transcript. Never
   // display a fixed overlay, scrim, modal or mid-chat pop-up. Move the
   // original nodes, keeping every authenticated handler and approval intact.
-  const inlineScreen=()=>window.matchMedia('(max-width:950px)').matches;
+  const inlineScreen=()=>true;
   function restorePanelNodes(){
     if(sidebar.parentElement===inlinePanels)
       workspace.insertBefore(sidebar,conversation);
