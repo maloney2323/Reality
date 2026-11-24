@@ -301,7 +301,10 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
  if(c?.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
     !signedShiftUUID.test(shiftId||'')||c.shift_id!==shiftId||
     !signedShiftUUID.test(c.owner_id||'')||
-    c.execution_authorized!==false||c.original_job_completed!==false||
+    c.read_only!==true||c.transition_committed!==false||
+    c.executor_invoked!==false||c.owner_approval_granted!==false||
+    c.installation_authorized!==false||c.production_changed!==false||
+    c.original_job_completed!==false||c.execution_authorized===true||
     g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
     g.shift_id!==shiftId||g.owner_id!==c.owner_id||g.read_only!==true||
     g.execution_authorized!==false||g.original_job_completed!==false||

@@ -102,7 +102,9 @@ test('Final Loop auto trigger rejects ambiguous, stale or unauthorized proof eve
   continuity_head_sha256:head,next_qualified_action:action,
   would_resume_suspended_obligation:true,executor_invoked:false,execution_authorized:false};
  const c={status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',owner_id:owner,shift_id:shiftId,
-  execution_authorized:false,original_job_completed:false,revision:2,continuity_head_sha256:head,
+  read_only:true,transition_committed:false,executor_invoked:false,owner_approval_granted:false,
+  installation_authorized:false,production_changed:false,
+  original_job_completed:false,revision:2,continuity_head_sha256:head,
   shared_continuity_guard:{status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
    owner_id:owner,shift_id:shiftId,continuity_root_id:root,revision:2,
    continuity_head_sha256:head,read_only:true,execution_authorized:false,
