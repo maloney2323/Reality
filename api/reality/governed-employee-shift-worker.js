@@ -447,7 +447,7 @@ export default async function handler(req,res){
   const shiftContinuityInvestigation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await investigateOneSignedShiftContinuityIncident({
-     db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+     db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
     }).catch(error=>({
      status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
      failure_code:classifySignedContinuityClaimTransportError(error),
