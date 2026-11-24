@@ -448,6 +448,10 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
   frozen_shift_scope_sha256:pendingEnvelope.frozen_shift_scope_sha256,
   revision:pendingEnvelope.revision,handoff_observation_sha256:sha('8'),
   read_only:true,no_new_executable_authority:true,
+  first_signal_anchor_verified:true,
+  worldline_parent_links_verified:true,
+  shift_scope_authority_event_present:true,
+  verified_evidence_event_count:2,
   unverified_handoffs:0,transition_committed:false,
   executor_invoked:false,execution_authorized:false,
   installation_authorized:false,original_job_completed:false,
@@ -456,6 +460,7 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
    source_ref:source,original_work_id:work,
    status:'CONTINUITY_OPEN_PENDING_PROOFS',
    source_proof_verified:true,continuity_identity_verified:true,
+   original_work_universe_event_verified:true,
    qualifier_digest_verified:true,qualifier_receipt_sha256:sha('9'),
    unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED'],
    internal_maintenance_independent_frozen_ci_verified:false,
@@ -486,6 +491,10 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
   [{...guard,execution_authorized:true},
    'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
   [{...guard,continuity_head_sha256:sha('f')},
+   'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
+  [{...guard,first_signal_anchor_verified:false},
+   'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
+  [{...guard,worldline_parent_links_verified:false},
    'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
   [{...guard,revision:2},
    'FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID'],
@@ -554,4 +563,18 @@ test('signed worker connects the same Continuity/verifier BEFORE its first opera
  assert.match(boundary,/read_final_loop_shared_continuity_guard_v1/);
  assert.match(boundary,/read_final_loop_event_resume_shadow_v1/);
  assert.doesNotMatch(worker,/strictContinuityCycle\s*\?\s*true/);
+});
+
+
+test('first layer was observed in same Universe worldline, not inferred from a digest',()=>{
+ const migration=readFileSync(new URL(
+  '../supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(migration,/first_signal_anchor_verified/);
+ assert.match(migration,/worldline_parent_links_verified/);
+ assert.match(migration,/original_work_universe_event_verified/);
+ assert.match(migration,/parent_event_id/);
+ assert.match(migration,/v_broken_links/);
+ assert.match(migration,/FINAL_LOOP_SHARED_CONTINUITY_FIRST_SIGNAL_OR_WORLDLINE_UNVERIFIED/);
+ assert.doesNotMatch(migration,/net\.http_post|cron\.unschedule/);
 });
