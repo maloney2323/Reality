@@ -150,6 +150,29 @@ on:
 permissions:
   contents: read
 jobs:
+  pr307-frozen-technical-recovery:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/final-loop-governed-qualification-handoff-20261123'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Independently exercise existing source-bound PR307 technical recovery RED and GREEN
+        run: node scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs reality-final-loop-recovery-case-specs/pr307-uncertain-provider-technical-recovery-v1.json
+      - name: Preserve technical proof only (not original business admission or settlement)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr307-technical-recovery-proof-${{ github.run_id }}
+          path: artifact/reality-final-loop-technical-frozen-case-*.json
+          if-no-files-found: error
+          retention-days: 7
   final-loop-lifecycle-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 10
