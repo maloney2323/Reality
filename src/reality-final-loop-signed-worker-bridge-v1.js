@@ -363,10 +363,19 @@ export async function inspectFinalLoopOnExistingSignedWorker({
         (e.event_state!=='SHADOW_PENDING'||!e.source_current)))
       return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
     if(e.would_resume_suspended_obligation){
+      const subscriptions=eventRead.subscriptions.filter(s=>
+       s.original_work_id===e.original_work_id&&s.source_ref===e.source_ref&&
+       s.condition_kind===e.event_kind&&s.continuity_revision===e.continuity_revision);
+      if(subscriptions.length!==1)
+       return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
       ready.push(Object.freeze({
        event_id:e.event_id,source_ref:e.source_ref,
        original_work_id:e.original_work_id,event_kind:e.event_kind,
        event_causality_sha256:e.event_causality_sha256,
+       source_receipt_sha256:e.source_receipt_sha256,
+       continuity_revision:e.continuity_revision,
+       continuity_head_sha256:p.continuity_head_sha256,
+       next_qualified_action:subscriptions[0].next_qualified_action,
        would_resume_suspended_obligation:true,
        executor_invoked:false,execution_authorized:false
       }));

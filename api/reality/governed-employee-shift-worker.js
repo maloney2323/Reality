@@ -201,7 +201,7 @@ import {reconcileSignedVerifiedMaintenanceArtifact,
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
-import {routeSignedMaintenanceContinuityTrigger}
+import {routeSignedMaintenanceContinuityTrigger,routeVerifiedFinalLoopResumeTrigger}
  from '../../src/reality-governed-auto-trigger-v1.0.js';
 import {advanceVerifiedMaintenanceOriginalHandoff}
  from '../../src/reality-signed-maintenance-original-return-handoff-v1.js';
@@ -584,6 +584,7 @@ export default async function handler(req,res){
       guard.continuity_root_id!==prior?.continuity_root_id||
       !Number.isSafeInteger(fresh.revision)||fresh.revision<prior.revision||
       guard.revision!==fresh.revision||
+      (fresh.revision===prior.revision&&guard.continuity_head_sha256!==prior.continuity_head_sha256)||
       guard.continuity_head_sha256!==fresh.continuity_head_sha256||
       guard.execution_authorized!==false||
       guard.original_job_completed!==false)
@@ -1230,17 +1231,31 @@ export default async function handler(req,res){
   // Current proof-change event chooses the exact original for the existing
   // verifier. No extra dispatch or new authority; the broker revalidates.
   let signedCaseCiResumeEvent=null;
+  let finalLoopGovernedResumeTrigger=null;
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     strictContinuityCycle){
+   try{
+    finalLoopGovernedResumeTrigger=routeVerifiedFinalLoopResumeTrigger({
+     continuity:await requireFreshFinalLoopContinuity(),shiftId:wakeReceipt.shift_id});
+    if(finalLoopGovernedResumeTrigger.dispatch_permitted===true)
+     signedCaseCiResumeEvent=finalLoopGovernedResumeTrigger.resume_event;
+   }catch{
+    finalLoopGovernedResumeTrigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_FRESH_READ_FAILED',
+     dispatch_permitted:false,execution_authorized_by_trigger:false};
+   }
+  }else if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   // Legacy read-only reconciliation lane, not effect-capable strict mode.
    try{
     signedCaseCiResumeEvent=selectSignedCaseCiResumeEvent(
      await shiftRpc(db,'reality_read_final_loop_event_resume_shadow_v1',{
       p_shift_id:wakeReceipt.shift_id
      },{timeoutMs:6000}),wakeReceipt.shift_id);
-   }catch{/* Existing signed evidence reconciliation remains available. */}
+   }catch{/* Legacy verifier independently rechecks its warrant. */}
   }
   const signedMaintenanceCaseCiReconciliation=
-   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+    (!strictContinuityCycle||finalLoopGovernedResumeTrigger?.dispatch_permitted===true)?
     await continueSignedMaintenanceCaseCiVerification({
      db,env:process.env,shiftId:wakeReceipt.shift_id,
      workerRunId:actualWorkerRunId,resumeEvent:signedCaseCiResumeEvent,fetchImpl:fetch
@@ -4053,6 +4068,7 @@ export default async function handler(req,res){
     signed_maintenance_case_ci_dispatch:signedMaintenanceCaseCi,
     signed_maintenance_case_ci_independent_review:signedMaintenanceCaseCiIndependentReview,
     signed_maintenance_sourcecase_ci_reconciliation:signedMaintenanceCaseCiReconciliation,
+     final_loop_governed_resume_trigger:finalLoopGovernedResumeTrigger,
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,

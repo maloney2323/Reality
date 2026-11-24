@@ -77,6 +77,7 @@ jobs:
           node --check src/reality-final-loop-executive-brief-v1.js
       - name: Verify source identity, Continuity head, verifier and Universe fences
         run: |
+          node --test test/reality-governed-auto-trigger-v1.0.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-final-loop-shared-owner-packet-v1.test.js
           node --test test/reality-final-loop-whole-cycle-acceptance-v1.test.js

@@ -287,3 +287,78 @@ export function routeSignedMaintenanceContinuityTrigger({
   production_changed:false
  });
 }
+
+
+// Existing governor: choose only an independently verified, current event.
+// The service broker remains responsible for its own atomic warrant and proof.
+export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
+ const safe=(status,extra={})=>Object.freeze({status,...extra,
+  execution_authorized_by_trigger:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false,new_shift_started:false});
+ const reject=reason=>safe('FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED',{
+  reason,dispatch_permitted:false,resume_event:null});
+ const g=c?.shared_continuity_guard,e=c?.event_resume_shadow;
+ if(c?.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+    !signedShiftUUID.test(shiftId||'')||c.shift_id!==shiftId||
+    !signedShiftUUID.test(c.owner_id||'')||
+    c.execution_authorized!==false||c.original_job_completed!==false||
+    g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+    g.shift_id!==shiftId||g.owner_id!==c.owner_id||g.read_only!==true||
+    g.execution_authorized!==false||g.original_job_completed!==false||
+    !signedShiftUUID.test(g.continuity_root_id||'')||
+    !signedShiftSHA.test(g.continuity_head_sha256||'')||
+    g.continuity_head_sha256!==c.continuity_head_sha256||
+    !Number.isSafeInteger(g.revision)||g.revision<1||g.revision!==c.revision||
+    !Array.isArray(g.handoffs)||!Array.isArray(c.governed_qualification_handoffs))
+  return reject('FRESH_CANONICAL_CONTINUITY_REQUIRED');
+ if(e?.status!=='FINAL_LOOP_VERIFIED_EVENT_SHADOW_CONSUMED_NO_DISPATCH'||
+    e.event_dispatch_enabled!==false||e.execution_authorized!==false||
+    !Array.isArray(e.ready_event_refs)||
+    e.shadow_ready_event_count!==e.ready_event_refs.length)
+  return reject('INDEPENDENT_EVENT_READBACK_REQUIRED');
+ if(e.ready_event_refs.length===0)return reject('NO_CURRENT_VERIFIED_EVENT');
+ if(e.ready_event_refs.length!==1)return reject('AMBIGUOUS_EVENT_SCOPE');
+ const r=e.ready_event_refs[0];
+ if(!r||!signedShiftUUID.test(r.event_id||'')||
+    !signedShiftWORK.test(r.original_work_id||'')||
+    !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(r.source_ref||'')||
+    !signedShiftSHA.test(r.event_causality_sha256||'')||
+    !signedShiftSHA.test(r.source_receipt_sha256||'')||
+    r.continuity_revision!==g.revision||
+    r.continuity_head_sha256!==g.continuity_head_sha256||
+    r.would_resume_suspended_obligation!==true||
+    r.executor_invoked!==false||r.execution_authorized!==false)
+  return reject('EVENT_IDENTITY_OR_REVISION_UNVERIFIED');
+ const matches=g.handoffs.filter(h=>h?.source_ref===r.source_ref&&
+  h.original_work_id===r.original_work_id);
+ if(matches.length!==1||matches[0].continuity_identity_verified!==true||
+    matches[0].qualifier_digest_verified!==true||
+    matches[0].execution_authorized!==false||
+    matches[0].original_job_completed!==false)
+  return reject('ORIGINAL_HANDOFF_UNVERIFIED');
+ const h=matches[0],base={owner_id:c.owner_id,shift_id:shiftId,
+  original_work_id:r.original_work_id,source_ref:r.source_ref,
+  continuity_root_id:g.continuity_root_id,continuity_revision:g.revision,
+  continuity_head_sha256:g.continuity_head_sha256,event_id:r.event_id};
+ if(r.event_kind==='INDEPENDENT_FROZEN_CI_RECEIPT'){
+  if(h.independent_internal_ci_verified!==true)return reject('CI_PROOF_NOT_RECONCILED');
+  return safe('FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE',{
+   ...base,dispatch_permitted:false,resume_event:null,
+   next_action:'RECONCILE_SIGNED_RED_RECEIPT_WITH_DURABLE_RECOVERY_CONTRACT'});
+ }
+ const qualified=c.governed_qualification_handoffs.filter(q=>
+  q?.source_ref===r.source_ref&&q.original_work_id===r.original_work_id);
+ const action='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC';
+ if(r.event_kind!=='QUALIFIER_PROOF_CHANGED'||
+    r.next_qualified_action!==action||
+    h.qualifier_receipt_sha256!==r.source_receipt_sha256||
+    qualified.length!==1||qualified[0].qualifier_receipt_sha256!==r.source_receipt_sha256||
+    qualified[0].next_qualified_action!==action||
+    !Array.isArray(h.unresolved_proof_gates)||
+    !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
+    h.independent_internal_ci_verified!==false)
+  return reject('CURRENT_QUALIFIED_ACTION_OR_PROOF_MISMATCH');
+ return safe('FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY',{
+  ...base,dispatch_permitted:true,next_action:action,
+  resume_event:Object.freeze({event_id:r.event_id,source_ref:r.source_ref})});
+}
