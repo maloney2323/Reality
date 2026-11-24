@@ -46,7 +46,7 @@ function exact(c,r){
 // this does NOT claim an adapter exists or the work actually resumed.
 export function classifyFinalLoopBlockerLiveness({
  contractProposal,existingCiRoute,signedRecovery,budgetState,technicalCiObservation,
- originalLineageEvidence
+ originalLineageEvidence,technicalCiAttachment
 }={}){
  const c=contractProposal?.contract_candidate;
  if(contractProposal?.status!==
@@ -85,6 +85,54 @@ export function classifyFinalLoopBlockerLiveness({
    next_actor:'REALITY',next_governed_action:
     'RECONCILE_EXISTING_SIGNED_MAINTENANCE_SOURCE_AND_WARRANT'});
  const s=existingCiRoute.status;
+ // Independently re-read GitHub's exact branch/commit, frozen test job and
+ // immutable artifact against this SAME original. Technical RED/GREEN is
+ // progress on recovery engineering, never admission of customer work.
+ const technicalProofCurrent=technicalCiObservation?.status===
+    'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING'&&
+    technicalCiObservation.contract_id===c.contract_id&&
+    technicalCiObservation.source_revision===c.source_revision&&
+    technicalCiObservation.obligation_id===c.obligation_id&&
+    technicalCiObservation.source_ref===c.source_ref&&
+    technicalCiObservation.shift_id===c.shift_id&&
+    technicalCiObservation.owner_id===c.owner_id&&
+    technicalCiObservation.independent_technical_ci_verified===true&&
+    technicalCiObservation.frozen_technical_red_verified===true&&
+    technicalCiObservation.original_business_case_red_verified===false&&
+    technicalCiObservation.business_original_warrant_verified===false&&
+    technicalCiObservation.original_job_completed===false&&
+    technicalCiObservation.execution_authorized===false&&
+    technicalCiObservation.production_changed===false&&
+    Number.isSafeInteger(technicalCiObservation.github_run_id)&&technicalCiObservation.github_run_id>0&&
+    HASH.test(technicalCiObservation.github_artifact_digest||'');
+ if(technicalProofCurrent){
+  const attached=technicalCiAttachment;
+  const durable=['RECOVERY_TECH_CI_OBSERVATION_DURABLY_RECONCILED',
+    'RECOVERY_TECH_CI_DURABLE_OBSERVATION_ALREADY_RECONCILED'].includes(attached?.status)&&
+    attached.technical_observation_recorded===true&&
+    attached.contract_id===c.contract_id&&attached.obligation_id===c.obligation_id&&
+    attached.source_ref===c.source_ref&&attached.owner_id===c.owner_id&&
+    attached.shift_id===c.shift_id&&
+    attached.github_run_id===technicalCiObservation.github_run_id&&
+    attached.github_artifact_digest===technicalCiObservation.github_artifact_digest&&
+    HASH.test(attached.observation_receipt_sha256||'')&&
+    attached.original_business_red_verified===false&&attached.original_job_completed===false&&
+    attached.execution_authorized===false&&attached.production_changed===false;
+  return out('RECOVERY_TECHNICAL_PROOF_OBSERVED_BUSINESS_LINEAGE_STILL_DUE',{
+   ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
+   technical_provider_run_id:technicalCiObservation.github_run_id,
+   technical_ci_digest:technicalCiObservation.github_artifact_digest,
+   technical_ci_verified:true,
+   technical_ci_durable_attachment_verified:durable,
+   technical_ci_observation_receipt_sha256:durable?attached.observation_receipt_sha256:null,
+   repeat_prior_ci_dispatch_permitted:false,
+   business_original_red_verified:false,
+   next_governed_action:
+    durable?'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED':
+     'RECONCILE_EXISTING_TECHNICAL_CI_WITH_SIGNED_CONTINUITY',
+   next_recovery_action:'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'
+  });
+ }
  // The signed lineage reader has already resolved the original identity.
  // Do not treat that verified observation as a business warrant, or request
  // another case-construction cycle while this exact admission gap is open.
@@ -115,32 +163,6 @@ export function classifyFinalLoopBlockerLiveness({
    repeat_prior_ci_dispatch_permitted:false,
    next_governed_action:'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION',
    next_recovery_action:'QUALIFY_DISTINCT_FROZEN_CASE_SPEC_AND_RED_TEST_FROM_EXISTING_DIAGNOSTIC'
-  });
- // Independently re-read GitHub's exact branch/commit, frozen test job and
- // immutable artifact against this SAME original. Technical RED/GREEN is
- // progress on recovery engineering, never admission of customer work.
- if(technicalCiObservation?.status===
-    'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING'&&
-    technicalCiObservation.contract_id===c.contract_id&&
-    technicalCiObservation.obligation_id===c.obligation_id&&
-    technicalCiObservation.source_ref===c.source_ref&&
-    technicalCiObservation.shift_id===c.shift_id&&
-    technicalCiObservation.owner_id===c.owner_id&&
-    technicalCiObservation.independent_technical_ci_verified===true&&
-    technicalCiObservation.frozen_technical_red_verified===true&&
-    technicalCiObservation.original_business_case_red_verified===false&&
-    technicalCiObservation.business_original_warrant_verified===false&&
-    technicalCiObservation.original_job_completed===false&&
-    technicalCiObservation.execution_authorized===false&&
-    HASH.test(technicalCiObservation.github_artifact_digest||''))
-  return out('RECOVERY_TECHNICAL_PROOF_OBSERVED_BUSINESS_LINEAGE_STILL_DUE',{
-   ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
-   technical_provider_run_id:technicalCiObservation.github_run_id,
-   technical_ci_digest:technicalCiObservation.github_artifact_digest,
-   technical_ci_verified:true,
-   business_original_red_verified:false,
-   next_governed_action:
-    'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'
   });
  if(s===SAME){
   if(existingCiRoute.prior_diagnostic_verified!==true||

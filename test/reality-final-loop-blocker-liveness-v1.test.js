@@ -106,7 +106,7 @@ test('external technical proof advances only machine-owned business qualificatio
   obligation_id:work,source_ref:source,
   independent_technical_ci_verified:true,frozen_technical_red_verified:true,
   original_business_case_red_verified:false,business_original_warrant_verified:false,
-  original_job_completed:false,execution_authorized:false,
+  original_job_completed:false,execution_authorized:false,production_changed:false,
   github_artifact_digest:sha('f'),github_run_id:33012345
  }}));
  assert.equal(r.status,
@@ -117,7 +117,9 @@ test('external technical proof advances only machine-owned business qualificatio
  assert.equal(r.continuation_verified,false);
  assert.equal(r.original_job_completed,false);
  assert.equal(r.next_governed_action,
-  'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED');
+  'RECONCILE_EXISTING_TECHNICAL_CI_WITH_SIGNED_CONTINUITY');
+ assert.equal(r.technical_ci_durable_attachment_verified,false);
+ assert.equal(r.repeat_prior_ci_dispatch_permitted,false);
 });
 test('forged technical CI from PR308 or unsupported business claim cannot advance',()=>{
  const proof={
@@ -126,7 +128,7 @@ test('forged technical CI from PR308 or unsupported business claim cannot advanc
   obligation_id:work,source_ref:source,
   independent_technical_ci_verified:true,frozen_technical_red_verified:true,
   original_business_case_red_verified:false,business_original_warrant_verified:false,
-  original_job_completed:false,execution_authorized:false,
+  original_job_completed:false,execution_authorized:false,production_changed:false,
   github_artifact_digest:sha('f'),github_run_id:33012345
  };
  for(const invalid of [
@@ -179,4 +181,45 @@ test('existing signed lineage evidence routes the actual admission boundary befo
   assert.notEqual(r.status,v.status);
   assert.equal(r.execution_authorized,false);
  }
+});
+
+test('current technical CI proof supersedes a stale case-construction recommendation; only durable exact attachment advances reconciliation',()=>{
+ const root='36f0ad48-f391-549f-8622-66cd493977e7';
+ const maintenance='b7181e5b-a01c-4cb2-b191-10dea9dbe04f';
+ const revision='ef66038297480f5da9444072e5e79f5c59b27184';
+ const proof={status:'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING',
+  contract_id:sha('a'),owner_id:owner,shift_id:shift,obligation_id:work,source_ref:source,
+  source_revision:revision,independent_technical_ci_verified:true,frozen_technical_red_verified:true,
+  original_business_case_red_verified:false,business_original_warrant_verified:false,
+  original_job_completed:false,execution_authorized:false,production_changed:false,
+  github_artifact_digest:sha('f'),github_run_id:33012345};
+ const lineage={status:'SIGNED_ORIGINAL_LINEAGE_EXISTING_EVIDENCE_INDEPENDENTLY_READ',
+  source_reconciled:true,owner_id:owner,shift_id:shift,original_work_id:work,source_ref:source,
+  continuity_root_id:root,maintenance_id:maintenance,evidence_sha256:sha('d'),
+  continuity_fact:'CURRENT_ORIGINAL_REMAINS_UNFINISHED',customer_original_verified:false,
+  original_claim_admitted:false,original_job_completed:false,installation_authorized:false,
+  production_changed:false,independent_review_required:true,
+  next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'};
+ const attachment={status:'RECOVERY_TECH_CI_OBSERVATION_DURABLY_RECONCILED',
+  technical_observation_recorded:true,contract_id:sha('a'),obligation_id:work,
+  source_ref:source,owner_id:owner,shift_id:shift,github_run_id:proof.github_run_id,
+  github_artifact_digest:proof.github_artifact_digest,observation_receipt_sha256:sha('e'),
+  original_business_red_verified:false,original_job_completed:false,execution_authorized:false,production_changed:false};
+ const input=args({contractProposal:{...contract,contract_candidate:{...contract.contract_candidate,
+  source_revision:revision,continuity_root_id:root}},existingCiRoute:{...route,maintenance_id:maintenance},
+  originalLineageEvidence:lineage,technicalCiObservation:proof});
+ const pending=classify(input);
+ assert.equal(pending.next_governed_action,'RECONCILE_EXISTING_TECHNICAL_CI_WITH_SIGNED_CONTINUITY');
+ assert.equal(pending.repeat_prior_ci_dispatch_permitted,false);
+ const done=classify({...input,technicalCiAttachment:attachment});
+ assert.equal(done.technical_ci_durable_attachment_verified,true);
+ assert.equal(done.next_governed_action,'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED');
+ assert.equal(done.original_job_completed,false);
+ assert.equal(done.execution_authorized,false);
+ for(const wrong of [{...attachment,github_artifact_digest:sha('0')},
+  {...attachment,source_ref:'https://github.com/maloney2323/Reality/pull/308'},
+  {...attachment,original_job_completed:true},{...attachment,observation_receipt_sha256:null}]){
+  assert.equal(classify({...input,technicalCiAttachment:wrong}).technical_ci_durable_attachment_verified,false);
+ }
+ assert.equal(classify({...input,technicalCiObservation:{...proof,source_revision:'0'.repeat(40)}}).technical_ci_verified,undefined);
 });

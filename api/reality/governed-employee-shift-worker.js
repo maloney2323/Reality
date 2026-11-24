@@ -3999,6 +3999,7 @@ export default async function handler(req,res){
    signedRecovery:finalLoopSignedProofRecovery,
    budgetState:finalLoopSignedProofRecovery,
    technicalCiObservation:finalLoopTechnicalCiProviderVerification,
+   technicalCiAttachment:finalLoopTechnicalCiContinuityAttachment,
    originalLineageEvidence:signedOriginalLineageEvidence
   });
 
