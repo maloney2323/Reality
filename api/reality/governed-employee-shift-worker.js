@@ -75,6 +75,8 @@ import {inspectFinalLoopOnExistingSignedWorker,
  from '../../src/reality-final-loop-signed-worker-bridge-v1.js';
 import {evaluateRealityWholeCycleAcceptance}
  from '../../src/reality-final-loop-whole-cycle-acceptance-v1.js';
+import {projectRecoveryContractFromFinalLoop}
+ from '../../src/reality-final-loop-proof-carrying-recovery-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
  reconcileVerifiedCurrentShiftCommitTriage}
  from '../../src/reality-shift-commit-triage-handoff-v1.js';
@@ -3778,6 +3780,18 @@ export default async function handler(req,res){
    verifiedContinuation:null
   });
 
+  // Reuse the SAME original, current source and independent Continuity
+  // verifier readbacks to identify a recovery proof contract. A proposed
+  // contract is NEVER a durable freeze, executor warrant, frozen RED,
+  // authority extension, model effect or settlement. The existing signed
+  // service-role CAS writer must persist it before a recovery claim is valid.
+  const finalLoopProofCarryingRecovery=projectRecoveryContractFromFinalLoop({
+   graph:unifiedGraph,
+   continuityReturn:finalLoopContinuityReturn,
+   stagedRoutes:finalLoopStagedActionRoutes,
+   ownerPackets:finalLoopOwnerPacketReadback
+  });
+
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -3934,6 +3948,7 @@ export default async function handler(req,res){
     final_loop_continuity_ingress:finalLoopContinuityIngress,
     final_loop_continuity_return:finalLoopContinuityReturn,
     final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance,
+    final_loop_proof_carrying_recovery:finalLoopProofCarryingRecovery,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
