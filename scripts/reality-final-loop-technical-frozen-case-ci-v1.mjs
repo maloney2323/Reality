@@ -160,7 +160,7 @@ const output='artifact/reality-final-loop-technical-frozen-case-'+
 writeFileSync(output,JSON.stringify(receipt,null,2)+'\n');
 console.log('REALITY_FROZEN_TECHNICAL_RECOVERY_RED_GREEN_VERIFIED',JSON.stringify({
  original_work_id:spec.original_work_id,source_ref:spec.source_ref,
- historical_red:historical.failed,corrected_green:corrected.passed,
+ historical_red_failures:red.failed,corrected_green_passes:green.passed,
  frozen_test_sha256:receipt.frozen_test_sha256,
  receipt_sha256:sha(JSON.stringify(receipt)),
  business_original_red_proven:false,
