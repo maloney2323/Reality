@@ -104,16 +104,16 @@ BEGIN
   'original_job_completed',false,'execution_authorized',false);END IF;
  -- The worker's provider observation is a technical proof, not a model-
  -- generated certificate of the original job or its independent RED gate.
- IF p_proof->>'status'<>
+ IF p_proof->>'status' IS DISTINCT FROM 
    'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING' OR
-  p_proof->>'contract_id'<>p_contract_id OR
-  p_proof->>'independent_technical_ci_verified'<>'true' OR
-  p_proof->>'frozen_technical_red_verified'<>'true' OR
-  p_proof->>'original_business_case_red_verified'<>'false' OR
-  p_proof->>'business_original_warrant_verified'<>'false' OR
-  p_proof->>'original_job_completed'<>'false' OR
-  p_proof->>'execution_authorized'<>'false' OR
-  p_proof->>'production_changed'<>'false' OR
+  p_proof->>'contract_id' IS DISTINCT FROM p_contract_id OR
+  p_proof->>'independent_technical_ci_verified' IS DISTINCT FROM 'true' OR
+  p_proof->>'frozen_technical_red_verified' IS DISTINCT FROM 'true' OR
+  p_proof->>'original_business_case_red_verified' IS DISTINCT FROM 'false' OR
+  p_proof->>'business_original_warrant_verified' IS DISTINCT FROM 'false' OR
+  p_proof->>'original_job_completed' IS DISTINCT FROM 'false' OR
+  p_proof->>'execution_authorized' IS DISTINCT FROM 'false' OR
+  p_proof->>'production_changed' IS DISTINCT FROM 'false' OR
   coalesce(p_proof->>'source_revision','') !~ '^[a-f0-9]{40}$' OR
   coalesce(p_proof->>'github_release_sha','') !~ '^[a-f0-9]{40}$' OR
   coalesce(p_proof->>'github_artifact_digest','') !~
@@ -131,11 +131,11 @@ BEGIN
  v_artifact_id:=(p_proof->>'github_artifact_id')::bigint;
  SELECT * INTO c FROM reality_internal.final_loop_recovery_contracts_v1
  WHERE contract_id=p_contract_id FOR UPDATE;
- IF NOT FOUND OR c.owner_id::text<>p_proof->>'owner_id' OR
-  c.shift_id::text<>p_proof->>'shift_id' OR
-  c.obligation_id<>p_proof->>'obligation_id' OR
-  c.source_ref<>p_proof->>'source_ref' OR
-  c.source_revision<>p_proof->>'source_revision' OR
+ IF NOT FOUND OR c.owner_id::text IS DISTINCT FROM p_proof->>'owner_id' OR
+  c.shift_id::text IS DISTINCT FROM p_proof->>'shift_id' OR
+  c.obligation_id IS DISTINCT FROM p_proof->>'obligation_id' OR
+  c.source_ref IS DISTINCT FROM p_proof->>'source_ref' OR
+  c.source_revision IS DISTINCT FROM p_proof->>'source_revision' OR
   c.phase<>'FROZEN_EVIDENCE_ONLY' THEN
   RETURN pg_catalog.jsonb_build_object(
    'status','RECOVERY_TECH_CI_FROZEN_CONTRACT_MISMATCH_NO_WRITE',
@@ -166,7 +166,7 @@ BEGIN
   AND a.state='COMPLETED'
   AND a.ci_independent_diagnostic_receipt_sha256 IS NOT NULL
   AND m.original_job_completed=false AND m.production_changed=false;
- IF NOT FOUND OR v_maintenance.ci_proof<>
+ IF NOT FOUND OR v_maintenance.ci_proof IS DISTINCT FROM 
   p_proof->>'existing_diagnostic_receipt_sha256' THEN
   RETURN pg_catalog.jsonb_build_object(
    'status','RECOVERY_TECH_CI_EXISTING_MAINTENANCE_IDENTITY_CHANGED',
