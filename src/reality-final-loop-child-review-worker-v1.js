@@ -3,7 +3,7 @@
 // Only internal read-only draft artifacts; no GitHub comments/publish/install.
 import {createHash} from 'node:crypto';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
-import {createRealityGovernedOpenAIGateway}
+import {createRealityGovernedOpenAIGateway,FINAL_LOOP_CHILD_MAX_REQUEST_CHARS}
  from './reality-governed-openai-gateway-v1.js';
 import {inspectLargePrSourceForBoundedReview}
  from './reality-pr-large-source-qualification-v1.js';
@@ -83,6 +83,33 @@ async function gh(relative,{fetchImpl,token}){
  if(!response?.ok)deny('GITHUB_PROVIDER_READ_UNAVAILABLE');
  return response.json();
 }
+// A provider's truncated patch is not a complete source review. Verify every
+// hunk and the pinned file's addition/deletion counts before model work.
+// Preserve the existing approved file partition and exact parent identity.
+export function verifyFinalLoopChildPatch(patch,file){
+ if(typeof patch!=='string'||patch.length<20||patch.length>40000||
+    !Number.isSafeInteger(file?.additions)||file.additions<0||
+    !Number.isSafeInteger(file?.deletions)||file.deletions<0)return false;
+ let added=0,removed=0,old=null,next=null;
+ const lines=patch.split('\n');
+ if(lines.at(-1)==='')lines.pop();
+ for(const line of lines){
+  const h=/^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@.*$/.exec(line);
+  if(h){
+   if(old!==null&&(old!==0||next!==0))return false;
+   old=Number(h[1]??1);next=Number(h[2]??1);
+   if(!Number.isSafeInteger(old)||!Number.isSafeInteger(next))return false;
+   continue;
+  }
+  if(old===null)return false;
+  if(line.startsWith('+')){added++;next--;}
+  else if(line.startsWith('-')){removed++;old--;}
+  else if(line.startsWith(' ')){old--;next--;}
+  else if(line!=='\\ No newline at end of file')return false;
+  if(old<0||next<0)return false;
+ }
+ return old===0&&next===0&&added===file.additions&&removed===file.deletions;
+}
 async function readPinnedScope(c,{fetchImpl,githubToken,env}){
  const number=Number(PR.exec(c.source_ref)[1]);
  const meta=await gh('/pulls/'+number,{fetchImpl,token:githubToken});
@@ -113,10 +140,10 @@ async function readPinnedScope(c,{fetchImpl,githubToken,env}){
      (page<pages&&files.length!==100))deny('CURRENT_PATCH_PAGE_MISSING');
   for(const f of files){
    if(!wanted.has(f.filename))continue;
-   if(observed.has(f.filename)||
-    !c.scope.files.some(x=>x.path===f.filename&&x.blob_sha===f.sha)||
-    typeof f.patch!=='string'||!f.patch.includes('@@')||
-    f.patch.length>18000||f.patch.trim().length<20)
+   const pinned=c.scope.files.find(x=>x.path===f.filename);
+   if(observed.has(f.filename)||!pinned||pinned.blob_sha!==f.sha||
+    pinned.status!==f.status||pinned.additions!==f.additions||
+    pinned.deletions!==f.deletions||!verifyFinalLoopChildPatch(f.patch,pinned))
     deny('INDEPENDENT_SCOPE_PATCH_NOT_AVAILABLE');
    observed.set(f.filename,{path:f.filename,
     sha:f.sha,status:f.status,patch:f.patch});
@@ -131,20 +158,20 @@ async function readPinnedScope(c,{fetchImpl,githubToken,env}){
     end.draft!==meta.draft||end.state!=='open')
   deny('SOURCE_MOVED_DURING_PATCH_READ');
  const patches=c.scope.files.map(f=>observed.get(f.path));
+ const providerEvidence=digest(JSON.stringify({
+  manifest:c.source_manifest_sha256,head:c.source_head_sha,
+  scope:c.scope_sha256,patches
+ }));
  const current=Object.freeze({
   source_ref:c.source_ref,head_sha:c.source_head_sha,
   manifest_sha256:c.source_manifest_sha256,
   scope_sha256:c.scope_sha256,
   independently_read:true,all_patches_present:true,read_only:true,
-  production_changed:false
+  provider_evidence_sha256:providerEvidence,production_changed:false
  });
- return {current,patches,
-  provider_evidence_sha256:digest(JSON.stringify({
-   manifest:c.source_manifest_sha256,head:c.source_head_sha,
-   scope:c.scope_sha256,patches
-  }))};
+ return {current,patches,provider_evidence_sha256:providerEvidence};
 }
-const scopeFor=c=>Object.freeze({
+const scopeFor=(c,providerEvidence)=>Object.freeze({
  owner_id:c.owner_id,shift_id:c.shift_id,
  worker_run_id:c.claimant_worker_run_id||c.independent_verifier_run_id,
  child_work_id:c.child_work_id,
@@ -153,11 +180,12 @@ const scopeFor=c=>Object.freeze({
  source_manifest_sha256:c.source_manifest_sha256,
  scope_sha256:c.scope_sha256,
  acceptance_contract_sha256:c.acceptance_contract_sha256,
+ provider_evidence_sha256:providerEvidence,
  ...(c.claim_id?{claim_id:c.claim_id}:{})
 });
 function modelRequest(c,patches,model,kind){
  const source=patches.map(x=>({
-  path:x.path,status:x.status,patch_excerpt:x.patch.slice(0,1750)
+  path:x.path,status:x.status,patch:x.patch
  }));
  const verify=kind==='VERIFY';
  return {
@@ -171,7 +199,7 @@ function modelRequest(c,patches,model,kind){
     source_ref:c.source_ref,source_head_sha:c.source_head_sha,
     scope_sha256:c.scope_sha256,files:source,
     ...(verify?{prepared_review:c.review_body}: {})
-   }).slice(0,21000)}]}
+   })}]}
   ]
  };
 }
@@ -239,7 +267,7 @@ export async function advanceOneFinalLoopChildReview({
  const gateway=createRealityGovernedOpenAIGateway({
   apiKey:key,model,fetchImpl
  });
- const scope=scopeFor(c);
+ const scope=scopeFor(c,fresh.provider_evidence_sha256);
  const modeName=mode==='VERIFY'?'INDEPENDENT_REVIEW':'PREPARE';
  const readCurrentChild=async()=>{
   if(mode==='VERIFY'){
@@ -253,11 +281,17 @@ export async function advanceOneFinalLoopChildReview({
  };
  const readCurrentSource=async()=>
   (await readPinnedScope(c,{fetchImpl,githubToken:token,env})).current;
+ const request=modelRequest(c,fresh.patches,model,mode);
+ // A larger review is still bounded. Never silently truncate a file or
+ // let a partial prompt certify complete patch evidence.
+ if(JSON.stringify(request).length>FINAL_LOOP_CHILD_MAX_REQUEST_CHARS)
+  return no('FINAL_LOOP_CHILD_COMPLETE_SOURCE_EXCEEDS_GOVERNED_REQUEST_BUDGET',{
+   child_work_id:c.child_work_id
+  });
  let modelResult;
  try{
   modelResult=await gateway.finalLoopChildReadOnlyAdvisory({
-   scope,mode:modeName,
-   request:modelRequest(c,fresh.patches,model,mode),
+   scope,mode:modeName,request,
    readCurrentChild,readCurrentSource
   });
  }catch{

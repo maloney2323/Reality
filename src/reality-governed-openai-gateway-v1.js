@@ -11,6 +11,9 @@ import {runGovernedToolSession}
 
 export const REALITY_GOVERNED_OPENAI_GATEWAY_VERSION =
  'reality-governed-openai-gateway-read-only-v1';
+// Bounded full-source payload for the existing read-only child review only.
+// Other gateway routes retain their own limits.
+export const FINAL_LOOP_CHILD_MAX_REQUEST_CHARS=110000;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SRC=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d{0,15}$/;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -181,6 +184,7 @@ export function createRealityGovernedOpenAIGateway({
       !SHA.test(scope?.source_manifest_sha256)||
       !SHA.test(scope?.scope_sha256)||
       !SHA.test(scope?.acceptance_contract_sha256)||
+      !SHA.test(scope?.provider_evidence_sha256||'')||
       (mode==='PREPARE'&&!UUID.test(scope?.claim_id||''))||
       !request||request.model!==model||
       request.tool_choice!=='none'||Object.hasOwn(request,'tools')||
@@ -189,7 +193,7 @@ export function createRealityGovernedOpenAIGateway({
       request.input[0]?.role!=='system'||request.input[1]?.role!=='user'||
       !Number.isSafeInteger(request.max_output_tokens)||
       request.max_output_tokens<1||request.max_output_tokens>1800||
-      JSON.stringify(request).length>26000)
+      JSON.stringify(request).length>FINAL_LOOP_CHILD_MAX_REQUEST_CHARS)
     fail('FINAL_LOOP_CHILD_EXACT_SIGNED_ADVISORY_REQUIRED');
    const verify=async()=>{
     const [state,source]=await Promise.all([
@@ -226,6 +230,7 @@ export function createRealityGovernedOpenAIGateway({
        source.scope_sha256!==scope.scope_sha256||
        source.independently_read!==true||
        source.all_patches_present!==true||
+       source.provider_evidence_sha256!==scope.provider_evidence_sha256||
        source.read_only!==true||
        source.production_changed!==false)
      fail('FINAL_LOOP_CHILD_AUTHORITY_OR_PROVIDER_DRIFT');

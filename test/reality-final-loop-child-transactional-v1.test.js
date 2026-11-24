@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {advanceOneFinalLoopChildReview}
+import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch}
  from '../src/reality-final-loop-child-review-worker-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../src/reality-final-loop-child-approval-request-v1.js';
@@ -40,12 +40,22 @@ const fullFiles=()=>Array.from({length:17},(_,i)=>({
  status:'modified',sha:'a'.repeat(40),additions:1,deletions:1,
  patch:'@@ -1 +1 @@\n-old\n+new '+i
 }));
-const provider=output=>async(url,options)=>{
+// Reproduce the oversized PR307 patch class without a provider call.
+const largePatch='@@ -0,0 +1,695 @@\n'+Array.from({length:695},
+ (_,i)=>'+.row-'+i+'{color:inherit;display:flex;gap:12px}').join('\n');
+const completeLargeFiles=()=>{
+ const files=fullFiles();
+ files[0]={...files[0],status:'added',additions:695,deletions:0,
+  patch:largePatch};
+ return files;
+};
+const provider=(output,files=fullFiles(),checkRequest=()=>{})=>async(url,options)=>{
  if(url==='https://api.openai.com/v1/responses'){
   assert.equal(options.method,'POST');
   const request=JSON.parse(options.body);
   assert.equal(request.tool_choice,'none');
   assert.equal(request.tools,undefined);
+  checkRequest(request);
   return {ok:true,status:200,json:async()=>({
    id:output.id,status:'completed',
    output:[{type:'message',content:[{type:'output_text',text:output.text}]}]
@@ -54,14 +64,14 @@ const provider=output=>async(url,options)=>{
  assert.match(url,/^https:\/\/api\.github\.com\/repos\/maloney2323\/Reality\/pulls\/1001/);
  assert.equal(options.method,'GET');
  return {ok:true,status:200,json:async()=>url.includes('/files?')?
-  fullFiles():meta()};
+  files:meta()};
 };
-async function sourcePlan(){
+async function sourcePlan(files=fullFiles()){
  return inspectLargePrSourceForBoundedReview({
   job:{source_ref:pr,source_proof_sha256:sourceHash,
    original_work_id:parent,phase:'BLOCKED'},
   ownerId:owner,shiftId:shift,metadata:meta(),
-  env,fetchImpl:provider({id:'resp_a1234',text:''})
+  env,fetchImpl:provider({id:'resp_a1234',text:''},files)
  });
 }
 const graph={status:'UNIFIED_OWNER_JOB_CONTROL_READY',
@@ -147,15 +157,21 @@ test('verified source-bound goal proposal creates exact owner approval request, 
  assert.equal(r.owner_approval_granted,false);
  assert.equal(r.execution_authorized,false);
 });
-test('exact approved child claim becomes a prepared draft only via governed model readback',async()=>{
- const plan=await sourcePlan();
+test('exact approved child with oversized complete patch reaches governed model without truncation',async()=>{
+ const files=completeLargeFiles();
+ assert.ok(largePatch.length>18000);
+ const plan=await sourcePlan(files);
  assert.equal(plan.source_manifest_complete,true);
  const scope=plan.bounded_scopes[0];
  const text='Source reviewed: '+scope.files.map(f=>f.path).join(' ; ')+
   '. The patch changes old to new; test each changed behavior and independent regression.';
  const modelId='resp_generated12345';
  let providerCalls=0,prepare=0;
- const mockProvider=provider({id:modelId,text});
+ const mockProvider=provider({id:modelId,text},files,request=>{
+  const input=JSON.parse(request.input[1].content[0].text);
+  assert.equal(input.files[0].patch,largePatch);
+  assert.ok(JSON.stringify(request).length>26000);
+ });
  const mock=async(url,options)=>{providerCalls++;return mockProvider(url,options)};
  const claim={
   status:'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',
@@ -199,8 +215,9 @@ test('exact approved child claim becomes a prepared draft only via governed mode
  assert.equal(r.parent_original_completed,false);
  assert.equal(r.external_effect_performed,false);
 });
-test('separate signed verifier only verifies the exact pinned source and draft',async()=>{
- const plan=await sourcePlan(),scope=plan.bounded_scopes[0];
+test('separate signed verifier only verifies the exact pinned full source and draft',async()=>{
+ const files=completeLargeFiles();
+ const plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
  const paths=scope.files.map(f=>f.path);
  const body='Review of '+paths.join(', ')+
   '. Test the change independently and verify regression behavior.';
@@ -226,7 +243,9 @@ test('separate signed verifier only verifies the exact pinned source and draft',
  let receipts=0;
  const r=await advanceOneFinalLoopChildReview({
   db,env,shiftId:shift,workerRunId:other,
-  fetchImpl:provider({id:verifierId,text:modelText}),
+  fetchImpl:provider({id:verifierId,text:modelText},files,request=>{
+   assert.equal(JSON.parse(request.input[1].content[0].text).files[0].patch,largePatch);
+  }),
   call:async(_db,name,args)=>{
    if(name==='reality_reconcile_final_loop_child_premodel_v1')
     return {status:'FINAL_LOOP_NO_SAFE_PREMODEL_CHILD_RECOVERY_READY'};
@@ -292,4 +311,12 @@ test('unverified recovery cannot be used to mint a second child claim',async()=>
  assert.equal(r.status,'FINAL_LOOP_CHILD_PREMODEL_RECOVERY_SCOPE_UNVERIFIED');
  assert.equal(r.parent_original_completed,false);
  assert.equal(r.external_effect_performed,false);
+});
+
+test('truncated, mismatched and oversized patches do not qualify as full source',()=>{
+ const file=completeLargeFiles()[0];
+ assert.equal(verifyFinalLoopChildPatch(file.patch,file),true);
+ assert.equal(verifyFinalLoopChildPatch(file.patch.split('\n').slice(0,-1).join('\n'),file),false);
+ assert.equal(verifyFinalLoopChildPatch(file.patch,{...file,additions:694}),false);
+ assert.equal(verifyFinalLoopChildPatch('x'.repeat(40001),file),false);
 });
