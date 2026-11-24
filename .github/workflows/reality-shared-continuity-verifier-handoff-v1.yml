@@ -10,6 +10,8 @@ on:
       - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
+      - 'supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql'
+      - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   pull_request:
     paths:
@@ -19,6 +21,8 @@ on:
       - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
+      - 'supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql'
+      - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   workflow_dispatch:
 permissions:
