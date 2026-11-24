@@ -630,3 +630,47 @@ test('independent provider settlement returns to the ORIGINAL canonical Continui
  assert.doesNotMatch(bridge,/net\.http_post|cron\.schedule|cron\.unschedule/);
  assert.doesNotMatch(bridge,/github\.com\/maloney2323\/Reality\/pull\/307/);
 });
+
+
+test('signed checkpoint acknowledges only independently rebounded event subscriptions',async()=>{
+ const strict={...checkpointEnv,
+  REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED:'true'};
+ const verified={
+  ...receipt,shared_continuity_guard_verified:true,
+  shared_continuity_observation_sha256:sha('e'),
+  next_continuity_revision:2,
+  event_subscriptions_rebound_to_next_revision:2
+ };
+ const good=await record({
+  db,wake,workerRunId:run,inspection:expectedInspection,env:strict,
+  call:async()=>verified
+ });
+ assert.equal(good.status,'FINAL_LOOP_EVIDENCE_ONLY_CHECKPOINT_INDEPENDENTLY_ACKNOWLEDGED');
+ assert.equal(good.next_continuity_revision,2);
+ assert.equal(good.event_subscriptions_rebound_to_next_revision,2);
+ assert.equal(good.executor_invoked,false);
+ for(const response of [
+  {...verified,next_continuity_revision:3},
+  {...verified,event_subscriptions_rebound_to_next_revision:-1},
+  {...verified,shared_continuity_guard_verified:false},
+  {...verified,shared_continuity_observation_sha256:'UNVERIFIED'}
+ ]){
+  const result=await record({
+   db,wake,workerRunId:run,inspection:expectedInspection,env:strict,
+   call:async()=>response
+  });
+  assert.equal(result.status,
+   'FINAL_LOOP_DURABLE_CHECKPOINT_SUBSCRIPTION_CAS_UNVERIFIED_NO_REPLAY');
+  assert.equal(result.original_job_completed,false);
+ }
+ const writer=readFileSync(new URL(
+  '../supabase/migrations/20261124015400_final_loop_evidence_checkpoint_atomic_resume_rebind_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(writer,/FINAL_LOOP_EVENT_SUBSCRIPTION_CAUSAL_RECONCILIATION_REQUIRED/);
+ assert.match(writer,/FINAL_LOOP_ATOMIC_SUBSCRIPTION_REVISION_REBIND_FAILED/);
+ assert.match(writer,/continuity_revision=p_expected_revision\+1/);
+ assert.match(writer,/event_subscriptions_rebound_to_next_revision/);
+ assert.doesNotMatch(writer,/net\.http_post|cron\.unschedule/);
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/finalLoopEvidenceCheckpoint\?\.evidence_checkpoint_acknowledged!==true/);
+});
