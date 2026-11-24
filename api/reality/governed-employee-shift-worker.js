@@ -494,6 +494,49 @@ export default async function handler(req,res){
       model_execution_authorized:false,owner_approval_granted:false,
       new_original_admitted:false,new_shift_started:false,
       installation_authorized:false,production_changed:false};
+  // PRE-EFFECT BOUNDARY: after Reality's actual continuous intake and
+  // qualifier, but BEFORE its business/maintenance executors and models.
+  // Consume the EXISTING Continuity root and independent qualifier/verifier
+  // source proof. This is a prerequisite, never a new approval or authority.
+  workerStage='SHARED_CONTINUITY_VERIFIER_PREEXECUTION_FENCE';
+  const strictContinuityCycle=
+   process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true';
+  let finalLoopContinuityIngress={
+   status:'SHARED_CONTINUITY_PREEXECUTION_FENCE_NOT_ENABLED',
+   read_only:true,execution_authorized:false,
+   original_job_completed:false
+  };
+  if(strictContinuityCycle&&
+     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+   const ingressGraph=assertRealityUnifiedShiftGraph(
+    await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:wakeReceipt.shift_id
+    });
+   finalLoopContinuityIngress=await inspectFinalLoopOnExistingSignedWorker({
+    db,wake:wakeReceipt,graph:ingressGraph,env:process.env,fetchImpl:fetch
+   });
+   if(finalLoopContinuityIngress.status!==
+       'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+      finalLoopContinuityIngress.shared_continuity_guard?.status!==
+       'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+      finalLoopContinuityIngress.owner_id!==ingressGraph.owner_id||
+      finalLoopContinuityIngress.shift_id!==wakeReceipt.shift_id||
+      finalLoopContinuityIngress.shared_continuity_guard.shift_id!==
+       wakeReceipt.shift_id||
+      finalLoopContinuityIngress.shared_continuity_guard.owner_id!==
+       ingressGraph.owner_id||
+      finalLoopContinuityIngress.shared_continuity_guard.revision!==
+       finalLoopContinuityIngress.revision||
+      finalLoopContinuityIngress.shared_continuity_guard.continuity_head_sha256!==
+       finalLoopContinuityIngress.continuity_head_sha256||
+      finalLoopContinuityIngress.shared_continuity_guard.execution_authorized!==false||
+      finalLoopContinuityIngress.shared_continuity_guard.original_job_completed!==false)
+    throw Error('FINAL_LOOP_SHARED_CONTINUITY_PREEXECUTION_FENCE_REJECTED');
+  }
+  if(strictContinuityCycle&&
+     wakeReceipt.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
+   throw Error('FINAL_LOOP_SHARED_CONTINUITY_NO_SIGNED_WORKER_SCOPE');
+
   // Existing signed worker performs ONLY independent readback before choosing
   // a registered business executor. Owner approval never directly invokes it.
   // An installed handler must independently check the one-use claim.
@@ -3602,6 +3645,41 @@ export default async function handler(req,res){
     'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
     automaticWorkSupervisor:null
   });
+  // POST-EFFECT BOUNDARY: after signed execution, provider verification,
+  // Universe and executive projections, read the same authoritative
+  // Continuity again. A changed head must be reverified; a previous wake
+  // or LLM conclusion is not proof of a settled original. No new effect.
+  workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE';
+  let finalLoopContinuityReturn={
+   status:'SHARED_CONTINUITY_RETURN_FENCE_NOT_ENABLED',
+   read_only:true,execution_authorized:false,
+   original_job_completed:false
+  };
+  if(strictContinuityCycle){
+   const returnGraph=assertRealityUnifiedShiftGraph(await shiftRpc(db,
+    'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:wakeReceipt.shift_id
+    });
+   finalLoopContinuityReturn=await inspectFinalLoopOnExistingSignedWorker({
+    db,wake:wakeReceipt,graph:returnGraph,env:process.env,fetchImpl:fetch
+   });
+   if(finalLoopContinuityReturn.status!==
+      'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+      finalLoopContinuityReturn.shared_continuity_guard?.status!==
+      'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+      finalLoopContinuityReturn.owner_id!==finalLoopContinuityIngress.owner_id||
+      finalLoopContinuityReturn.shift_id!==finalLoopContinuityIngress.shift_id||
+      finalLoopContinuityReturn.shared_continuity_guard.continuity_root_id!==
+       finalLoopContinuityIngress.shared_continuity_guard.continuity_root_id||
+      finalLoopContinuityReturn.shared_continuity_guard.revision!==
+       finalLoopContinuityReturn.revision||
+      finalLoopContinuityReturn.shared_continuity_guard.continuity_head_sha256!==
+       finalLoopContinuityReturn.continuity_head_sha256||
+      finalLoopContinuityReturn.shared_continuity_guard.execution_authorized!==false||
+      finalLoopContinuityReturn.shared_continuity_guard.original_job_completed!==false)
+    throw Error('FINAL_LOOP_SHARED_CONTINUITY_RETURN_FENCE_REJECTED');
+  }
+
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -3755,6 +3833,8 @@ export default async function handler(req,res){
     final_loop_recovery_continuity_readback:finalLoopRecoveryContinuityReadback,
     final_loop_governed_engineering:finalLoopGovernedEngineering,
     final_loop_universe_feedback:finalLoopUniverseFeedback,
+    final_loop_continuity_ingress:finalLoopContinuityIngress,
+    final_loop_continuity_return:finalLoopContinuityReturn,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
