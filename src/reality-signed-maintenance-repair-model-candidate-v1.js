@@ -15,6 +15,32 @@ const SOURCE=/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/;
 const TARGET=/^(?:src|api\/reality)\/[a-zA-Z0-9_./-]+\.js$/;
 const RESPONSE=/^resp_[A-Za-z0-9_-]{4,160}$/;
 const fail=x=>{throw Error('SIGNED_MAINTENANCE_MODEL_'+x)};
+// Fixed taxonomy only: never store provider messages, secrets, response body,
+// source content or headers. A failed/unknown call is not a successful receipt.
+export async function classifySignedModelProviderFailure(response,error=null){
+ const status=Number.isInteger(response?.status)?response.status:null;
+ let code=null;
+ if(response&&!response.ok){
+  const body=await response.json().catch(()=>null);
+  const value=body?.error?.code;
+  if(['invalid_api_key','insufficient_quota','rate_limit_exceeded','model_not_found',
+    'invalid_request_error','unsupported_parameter','invalid_json_schema','context_length_exceeded',
+    'billing_hard_limit_reached','server_error','permission_denied','invalid_model'].includes(value))code=value;
+ }
+ const error_class=[401,403].includes(status)?'AUTH_OR_SECRET_MISSING':
+  ['insufficient_quota','billing_hard_limit_reached'].includes(code)?'QUOTA_EXHAUSTED':
+  status===429?'RATE_LIMIT':
+  [408,500,502,503,504].includes(status)?'TRANSIENT_INFRA':
+  [400,404,422].includes(status)?'MODEL_CONFIG_OR_SCHEMA':'UNKNOWN_PROVIDER_OUTCOME';
+ return Object.freeze({error_class,http_status:status,provider_code:code,
+  transport_failure:error?.name==='TimeoutError'||error?.name==='AbortError'?'TIMEOUT_OUTCOME_UNKNOWN':error?'TRANSPORT_OUTCOME_UNKNOWN':null});
+}
+async function throwSignedProviderFailure(response,error,reason){
+ const e=new Error('SIGNED_MAINTENANCE_MODEL_'+reason);
+ e.provider_diagnostic=await classifySignedModelProviderFailure(response,error);
+ throw e;
+}
+
 const digest=s=>'sha256:'+createHash('sha256').update(s).digest('hex');
 const blob=buf=>createHash('sha1').update('blob '+buf.length+'\0')
  .update(buf).digest('hex');
@@ -63,7 +89,8 @@ export async function sourceBroker(mode,{db,claim,fetchImpl,path=null,testDraft=
 // Same bounded source reader/model transport as maintenance code candidates.
 // A test proposal is inert data, not executable code, a proof, or authority.
 async function askFrozenTest({apiKey,model,claim,source,path,fetchImpl}){
- const r=await fetchImpl('https://api.openai.com/v1/responses',{
+ let r;
+ try{r=await fetchImpl('https://api.openai.com/v1/responses',{
   method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(18000),
   headers:{authorization:'Bearer '+apiKey,'content-type':'application/json',
    'x-client-request-id':claim.request_id+':frozen-test'},
@@ -82,7 +109,8 @@ async function askFrozenTest({apiKey,model,claim,source,path,fetchImpl}){
     'Candidate is not independent RED, GREEN, installation, or completion.'}]},
     {role:'user',content:[{type:'input_text',text:JSON.stringify({scope:claim,target_path:path,source})}]}]
   })});
- if(!r.ok)fail('FROZEN_TEST_PROVIDER_UNVERIFIED');
+ }catch(e){await throwSignedProviderFailure(null,e,'FROZEN_TEST_PROVIDER_UNVERIFIED')}
+ if(!r?.ok)await throwSignedProviderFailure(r,null,'FROZEN_TEST_PROVIDER_UNVERIFIED');
  const d=await r.json();if(d.status!=='completed'||!RESPONSE.test(d.id||''))fail('FROZEN_TEST_MODEL_RESPONSE_UNVERIFIED');
  let v;try{v=JSON.parse(outputText(d))}catch{fail('FROZEN_TEST_MODEL_JSON_UNVERIFIED')}
  if(!v||!['DRAFT','INSUFFICIENT_EVIDENCE'].includes(v.state)||typeof v.test_source!=='string'||typeof v.expected_failure!=='string')
@@ -140,7 +168,8 @@ export async function generateOneSignedMaintenanceFrozenTestDraft({
    {state:'INSUFFICIENT_EVIDENCE',expected_failure:v.expected_failure.slice(0,1000),model_response_id:v.model_response_id};
  }catch(e){
   const code=String(e?.message||'');
-  candidate={state:'PROVIDER_UNVERIFIED',reason:/^SIGNED_MAINTENANCE_MODEL_[A-Z0-9_]{5,110}$/.test(code)?code:'FROZEN_TEST_SOURCE_OR_PROVIDER_UNVERIFIED'};
+  candidate={state:'PROVIDER_UNVERIFIED',reason:/^SIGNED_MAINTENANCE_MODEL_[A-Z0-9_]{5,110}$/.test(code)?code:'FROZEN_TEST_SOURCE_OR_PROVIDER_UNVERIFIED',
+   provider_diagnostic:e?.provider_diagnostic||{error_class:'UNKNOWN_PROVIDER_OUTCOME',http_status:null,provider_code:null,transport_failure:null}};
  }
  // Never retry uncertain persistence; read back this maintenance obligation.
  const out=await call(db,'reality_record_signed_maintenance_frozen_test_draft_v1',{
@@ -185,8 +214,8 @@ async function ask({apiKey,model,requestId,role,input,fetchImpl}){
     {role:'user',content:[{type:'input_text',text:input}]}
    ]
   })
- })}catch{fail('MODEL_PROVIDER_UNVERIFIED')}
- if(!r?.ok)fail('MODEL_PROVIDER_UNVERIFIED');
+ })}catch(e){await throwSignedProviderFailure(null,e,'MODEL_PROVIDER_UNVERIFIED')}
+ if(!r?.ok)await throwSignedProviderFailure(r,null,'MODEL_PROVIDER_UNVERIFIED');
  const data=await r.json().catch(()=>null);
  if(data?.status!=='completed'||!RESPONSE.test(data.id||''))
   fail('MODEL_COMPLETION_UNVERIFIED');
