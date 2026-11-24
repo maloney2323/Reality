@@ -30,10 +30,20 @@ const strategy=(hyp='ISOLATED_SOURCE_REPRODUCTION',overrides={})=>({
  environment_proof:{source:'INDEPENDENT_SIGNED_SOURCE_EPOCH_READBACK',
   independent_verified:true,source_revision:rev,env_state_hash:sha('1'),
   receipt_sha256:sha('2')},...overrides});
-const input=(c=contract(),more={})=>({contract:c,durableFreeze:frozen(c),
- strategy:strategy(),proofReceipts:[],failedAttempts:[],
- diagnosticWarrant:warrant(),mutationWarrant:null,
- registeredCapabilities:['RUN_CASE_SPECIFIC_FROZEN_RED'],...more});
+const input=(c=contract(),more={})=>{
+ const attempts=more.failedAttempts||[];
+ const budgetLedger={source:'INDEPENDENT_SIGNED_RECOVERY_BUDGET_LEDGER_READBACK',
+  independent_verified:true,contract_id:c.contract_id,obligation_id:work,
+  continuity_root_id:root,receipt_sha256:sha('b'),
+  total_attempts:attempts.length,
+  spent_wall_seconds:attempts.reduce((n,x)=>n+x.wall_seconds,0),
+  spent_cost_units:attempts.reduce((n,x)=>n+x.cost_units,0),
+  cumulative_touched_files:attempts.reduce((n,x)=>n+x.changed_files,0)};
+ return {contract:c,durableFreeze:frozen(c),
+  strategy:strategy(),proofReceipts:[],failedAttempts:[],
+  budgetLedger,diagnosticWarrant:warrant(),mutationWarrant:null,
+  registeredCapabilities:['RUN_CASE_SPECIFIC_FROZEN_RED'],...more};
+};
 const failed=(c,s,failure_class='WRONG_TARGET')=>({
  contract_id:c.contract_id,obligation_id:work,
  strategy_fingerprint:fingerprintRecoveryStrategy(c,s),failure_class,
@@ -92,6 +102,21 @@ test('identical failed strategy is blocked and a distinct hypothesis can pivot',
  assert.equal(pivot.status,'RECOVERY_SIGNED_CAPABILITY_CLAIM_ELIGIBLE_NOT_DISPATCHED');
  assert.notEqual(pivot.strategy_fingerprint,old.strategy_fingerprint);
 });
+test('budget ledger is mandatory and counts previous successful substeps',()=>{
+ const c=contract();
+ assert.equal(decideNextRecoveryTransition(input(c,{budgetLedger:null})).status,
+  'RECOVERY_BUDGET_LEDGER_UNVERIFIED');
+ assert.equal(decideNextRecoveryTransition(input(c,{budgetLedger:{
+  ...input(c).budgetLedger,total_attempts:3,spent_wall_seconds:100,
+  spent_cost_units:20,cumulative_touched_files:0
+ }})).status,'RECOVERY_BUDGET_EXHAUSTED');
+ assert.equal(decideNextRecoveryTransition(input(c,{budgetLedger:{
+  ...input(c).budgetLedger,total_attempts:1,spent_wall_seconds:200,
+  spent_cost_units:15,cumulative_touched_files:1
+ },strategy:strategy('EXPENSIVE_RETRY',{estimated_cost_units:6})})).status,
+  'RECOVERY_PROPOSED_STRATEGY_EXCEEDS_BUDGET');
+});
+
 test('hash-only fake environment mutation cannot defeat anti-loop',()=>{
  const c=contract(),s=strategy(),a=failed(c,s);
  const r=decideNextRecoveryTransition(input(c,{failedAttempts:[a],
