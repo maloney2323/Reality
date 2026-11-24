@@ -59,5 +59,6 @@ jobs:
       - name: Verify source identity, Continuity head, verifier and Universe fences
         run: |
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
+          node --test test/reality-final-loop-shared-owner-packet-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js
           node --test test/reality-final-loop-executive-brief-v1.test.js
