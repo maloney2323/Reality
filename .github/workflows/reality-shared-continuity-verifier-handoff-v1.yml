@@ -9,6 +9,9 @@ on:
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
+      - 'test/reality-frozen-regressions/reality-final-loop-*.test.js'
+      - 'reality-final-loop-recovery-case-specs/**'
+      - 'scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs'
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
       - 'supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql'
       - 'supabase/migrations/20261124013500_final_loop_original_source_identity_guard_v1.sql'
@@ -27,6 +30,9 @@ on:
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
+      - 'test/reality-frozen-regressions/reality-final-loop-*.test.js'
+      - 'reality-final-loop-recovery-case-specs/**'
+      - 'scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs'
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
       - 'supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql'
       - 'supabase/migrations/20261124013500_final_loop_original_source_identity_guard_v1.sql'
@@ -49,6 +55,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
@@ -73,6 +80,21 @@ jobs:
           node --test test/reality-final-loop-staged-plan-action-router-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js
           node --test test/reality-final-loop-executive-brief-v1.test.js
+
+      - name: Execute genuine historical RED and corrected GREEN for source-bound technical blocker
+        env:
+          GITHUB_ACTIONS: "true"
+        run: |
+          node --check scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs
+          node scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs reality-final-loop-recovery-case-specs/pr307-uncertain-provider-technical-recovery-v1.json
+      - name: Preserve case-specific RED and GREEN proof as CI artifact only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reality-final-loop-technical-recovery-frozen-red-green
+          path: artifact/reality-final-loop-technical-frozen-case-*.json
+          if-no-files-found: error
+          retention-days: 14
+
 
   prove-recovery-ledger-postgres:
     runs-on: ubuntu-latest
