@@ -2881,7 +2881,10 @@ export default async function handler(req,res){
      },{timeoutMs:6000});
     finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
      canonicalView:finalLoopEngineShadow,
-     parentOutcomes:universeOutcomes
+     parentOutcomes:universeOutcomes,
+     sharedContinuityGuard:finalLoopEngineShadow.shared_continuity_guard?.status===
+      'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'?
+      finalLoopEngineShadow.shared_continuity_guard:null
     });
    }catch{
     finalLoopUniverseFeedback={
@@ -3592,6 +3595,9 @@ export default async function handler(req,res){
   // temporal projection. No separate agent, job, warrant, or action.
   const finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({
    timeHorizon:finalLoopEngineShadow?.time_horizon||null,
+   sharedContinuityGuard:finalLoopEngineShadow?.shared_continuity_guard?.status===
+     'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'?
+      finalLoopEngineShadow.shared_continuity_guard:null,
    supervisor:automaticWorkSupervisor?.status===
     'AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'?
     automaticWorkSupervisor:null
