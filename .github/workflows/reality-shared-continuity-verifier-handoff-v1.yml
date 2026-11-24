@@ -6,6 +6,8 @@ on:
     paths:
       - 'src/reality-final-loop-*.js'
       - 'api/reality/governed-employee-shift-worker.js'
+      - 'api/reality/personal-time-horizon.js'
+      - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'src/reality-final-loop-*.js'
       - 'api/reality/governed-employee-shift-worker.js'
+      - 'api/reality/personal-time-horizon.js'
+      - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -33,6 +37,8 @@ jobs:
       - name: Parse signed worker and continuity projections
         run: |
           node --check api/reality/governed-employee-shift-worker.js
+          node --check api/reality/personal-time-horizon.js
+          node --check api/reality/personal-chat.js
           node --check src/reality-final-loop-signed-worker-bridge-v1.js
           node --check src/reality-final-loop-universe-feedback-v1.js
           node --check src/reality-final-loop-executive-brief-v1.js
