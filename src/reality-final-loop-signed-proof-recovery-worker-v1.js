@@ -18,7 +18,7 @@ const no=(status,extra={})=>Object.freeze({
 });
 export async function advanceOneSignedProofRecovery({
  db,env=process.env,wake,graph,continuityReturn,stagedRoutes,
- ownerPackets,workerRunId,call=shiftRpc
+ ownerPackets,workerRunId,existingCiRoute=null,call=shiftRpc
 }={}){
  const proposal=projectRecoveryContractFromFinalLoop({
   graph,continuityReturn,stagedRoutes,ownerPackets});
@@ -119,6 +119,33 @@ export async function advanceOneSignedProofRecovery({
    freeze_receipt_sha256:durable.durableFreeze.freeze_receipt_sha256,
    next_governed_action:'RECONCILE_REGISTERED_CAPABILITY_EVIDENCE'});
  }
+ // This is an EXISTING registered source/CI transport, not a new LLM
+ // capability. A completed signed diagnostic must never be replayed.
+ // The separate Recovery registry remains disabled until a case-specific
+ // frozen RED spec is independently qualified and registered.
+ if(existingCiRoute?.status===
+   'RECOVERY_REUSE_VERIFIED_CI_DIAGNOSTIC_FROZEN_CASE_SPEC_MISSING'&&
+   existingCiRoute.contract_id===c.contract_id&&
+   existingCiRoute.obligation_id===c.obligation_id&&
+   existingCiRoute.source_ref===c.source_ref&&
+   existingCiRoute.shift_id===graph.shift_id&&
+   existingCiRoute.owner_id===graph.owner_id&&
+   existingCiRoute.registered_existing_capability===
+     'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'&&
+   existingCiRoute.prior_diagnostic_verified===true&&
+   existingCiRoute.repeat_prior_ci_dispatch_permitted===false&&
+   existingCiRoute.case_specific_frozen_red_verified===false)
+  return no('RECOVERY_EXISTING_REGISTERED_CI_CASE_SPEC_PROOF_REQUIRED',{
+   contract_id:c.contract_id,contract_frozen:true,
+   freeze_receipt_sha256:durable.durableFreeze.freeze_receipt_sha256,
+   existing_signed_maintenance_id:existingCiRoute.maintenance_id,
+   existing_diagnostic_receipt_sha256:
+    existingCiRoute.existing_diagnostic_receipt_sha256,
+   repeat_ci_dispatch_permitted:false,
+   next_required_proof:'RED',
+   next_governed_action:
+    'QUALIFY_DISTINCT_FROZEN_CASE_SPEC_AND_RED_TEST_FROM_EXISTING_DIAGNOSTIC'});
+
  if(cap?.status!=='RECOVERY_CAPABILITY_SIGNED_REGISTRATION_EXISTS'||
   cap.capability_id!==CAP||
   cap.effect_kind!=='EVIDENCE_ONLY_FROZEN_CI_REPRODUCTION'||
