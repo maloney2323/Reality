@@ -364,6 +364,12 @@ export async function readOwnerTimeHorizonEvidence({
        raw.frozen_shift_scope_sha256===current?.frozen_shift_scope_sha256&&
        raw.revision===current?.revision&&
        SHA.test(raw.handoff_observation_sha256||'')&&
+       raw.first_signal_anchor_verified===true&&
+       raw.worldline_parent_links_verified===true&&
+       raw.shift_scope_authority_event_present===true&&
+       Number.isSafeInteger(raw.verified_evidence_event_count)&&
+       raw.verified_evidence_event_count>=1&&
+
        raw.read_only===true&&raw.no_new_executable_authority===true&&
        raw.execution_authorized===false&&raw.transition_committed===false&&
        raw.original_job_completed===false&&raw.installation_authorized===false&&
@@ -377,7 +383,9 @@ export async function readOwnerTimeHorizonEvidence({
          g.continuity_identity_verified===true&&
          g.execution_permitted_by_handoff===false&&
          g.source_proof_verified===true&&
-         (g.original_work_id===null||g.qualifier_digest_verified===true)
+         (g.original_work_id===null||
+          (g.qualifier_digest_verified===true&&
+           g.original_work_universe_event_verified===true))
        ).length===1)){
       finalLoopSharedContinuityGuard=Object.freeze({
        status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
