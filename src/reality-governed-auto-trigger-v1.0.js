@@ -380,6 +380,8 @@ export function finalLoopEventTriggerEnabled(db,env=process.env){
   db?.strictSecrets===true&&typeof db.project==='string'&&
   db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
   db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&
+  typeof env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF==='string'&&
+  env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF.length>0&&
   db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
   db.url==='https://'+db.project+'.supabase.co';
 }
@@ -436,4 +438,18 @@ export async function readFinalLoopGovernedShiftStart({db,ownerId,shift,env=proc
    worker_observed:r.status==='GOVERNED_START_WORKER_OBSERVED',
    queued_at:r.queued_at||null,last_worker_seen_at:r.last_worker_seen_at||null});
  }catch{return safe('GOVERNED_START_READBACK_UNAVAILABLE');}
+}
+
+// The server clock, not a phone's clock, defines an immediate start.
+// Legacy callers keep their supplied timestamp; scheduling remains explicit.
+export function resolveFinalLoopShiftStart(mode,plannedStart,nowMs=Date.now()){
+ if(![undefined,'START_NOW','SCHEDULE'].includes(mode)||
+    typeof plannedStart!=='string'||!Number.isFinite(nowMs))
+  fail('START_MODE_INVALID');
+ const chosen=new Date(mode==='START_NOW'?nowMs:plannedStart);
+ if(!Number.isFinite(chosen.valueOf())||
+    chosen.valueOf()<nowMs-120000||chosen.valueOf()>nowMs+7*86400000||
+    (mode==='SCHEDULE'&&chosen.valueOf()<=nowMs))
+  fail('START_TIME_INVALID');
+ return chosen;
 }

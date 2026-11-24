@@ -30,7 +30,10 @@ BEGIN
  -- event after its lease is released, not after an arbitrary cooldown.
  SELECT * INTO l FROM reality_internal.governed_preview_shift_worker_leases_v1
  WHERE worker_key='preview-governed-employee-shift-worker' FOR UPDATE;
- IF FOUND AND l.lease_expires_at>now_at THEN RETURN NULL;END IF;
+ -- Refresh the clock after waiting for the lease row: a release may have
+ -- committed while this notifier was waiting for that same row lock.
+ IF FOUND AND l.lease_expires_at>pg_catalog.clock_timestamp() THEN RETURN NULL;END IF;
+ now_at:=pg_catalog.clock_timestamp();
  IF (SELECT count(*) FROM reality_internal.governed_employee_shifts_v1 s
      JOIN reality_internal.governed_employee_completion_warrants_v1 x
        ON x.shift_id=s.shift_id AND x.owner_id=s.owner_id AND x.plan_fingerprint=s.plan_fingerprint

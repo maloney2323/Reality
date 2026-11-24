@@ -36,7 +36,7 @@ import {classifyRealityGovernedContinuityEvidence}
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
-import {readFinalLoopGovernedShiftStart} from '../../src/reality-governed-auto-trigger-v1.0.js';
+import {readFinalLoopGovernedShiftStart,resolveFinalLoopShiftStart} from '../../src/reality-governed-auto-trigger-v1.0.js';
 export const maxDuration=60;
 // An owner-authorized shift must begin with the work Reality already knows.
 // These are read-only source priorities; no issue, legacy queue or model
@@ -671,13 +671,15 @@ export default async function handler(req,res){
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    return res.status(415).json({ok:false,error:'SHIFT_JSON_REQUIRED'});
   const b=req.body||{},keys=Object.keys(b);
+  const coreKeys=keys.filter(k=>k!=='start_mode');
   if(!b||typeof b!=='object'||Array.isArray(b)||
-   ![3,4,5].includes(keys.length)||
+   ![3,4,5].includes(coreKeys.length)||
    keys.some(x=>!['action','expected_fingerprint','planned_start_at',
-     'requested_hours','completion_bound'].includes(x))||
+     'requested_hours','completion_bound','start_mode'].includes(x))||
+   (b.start_mode!==undefined&&(!['START_NOW','SCHEDULE'].includes(b.start_mode)||b.completion_bound!==true))||
    (b.completion_bound!==undefined&&b.completion_bound!==true)||
    (b.completion_bound===true&&
-     (keys.length!==5||b.requested_hours!==8))||
+     (coreKeys.length!==5||b.requested_hours!==8))||
    (b.completion_bound!==true&&
      (keys.length!==3&&keys.length!==4||
       (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
@@ -690,11 +692,12 @@ export default async function handler(req,res){
     (b.completion_bound!==true||b.requested_hours!==8))||
    !SHA.test(b.expected_fingerprint||''))
    return res.status(400).json({ok:false,error:'SHIFT_EXACT_APPROVAL_REQUIRED'});
-  const start=new Date(b.planned_start_at);
-  if(typeof b.planned_start_at!=='string'||!/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ/.test(b.planned_start_at)||
-   !Number.isFinite(start.valueOf())||
-   start.getTime()<Date.now()-120000||start.getTime()>Date.now()+7*86400000)
-   return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});
+  let start;
+  try{
+   if(typeof b.planned_start_at!=='string'||!/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ/.test(b.planned_start_at))
+    throw Error('SHIFT_START_INVALID');
+   start=resolveFinalLoopShiftStart(b.start_mode,b.planned_start_at);
+  }catch{return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});}
   if(b.action==='AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'){
    // Never trust browser-supplied owner or incident IDs. Bind all selected
    // obligations to the authenticated owner and newly fingerprinted work.

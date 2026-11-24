@@ -172,6 +172,7 @@
     body:JSON.stringify({action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT',
      expected_fingerprint:p.expected_fingerprint,
      planned_start_at:requestedStart.toISOString(),
+     start_mode:startAt.value?'SCHEDULE':'START_NOW',
      completion_bound:true,requested_hours:8})
    });
    if(!['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(after.status)||

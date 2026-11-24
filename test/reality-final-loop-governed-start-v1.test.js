@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {finalLoopEventTriggerEnabled,parseFinalLoopGovernedWake,
- verifyFinalLoopGovernedWakeScope,readFinalLoopGovernedShiftStart} from '../src/reality-governed-auto-trigger-v1.0.js';
+ verifyFinalLoopGovernedWakeScope,readFinalLoopGovernedShiftStart,resolveFinalLoopShiftStart} from '../src/reality-governed-auto-trigger-v1.0.js';
 const owner='11111111-1111-4111-8111-111111111111',shift='22222222-2222-4222-8222-222222222222';
 const fingerprint='sha256:'+'a'.repeat(64);
 const db={strictSecrets:true,project:'isolated',url:'https://isolated.supabase.co'};
@@ -18,6 +18,7 @@ test('event transport is isolated and uses the exact existing shift only',()=>{
  assert.equal(finalLoopEventTriggerEnabled(db,env),true);
  for(const change of [{VERCEL_ENV:'production'},{REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED:'false'},
   {REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY:'true'},{REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:'isolated'},
+  {REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:undefined},
   {REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED:'false'}])
   assert.equal(finalLoopEventTriggerEnabled(db,{...env,...change}),false);
  const headers={'x-reality-governed-owner-id':owner,'x-reality-governed-shift-id':shift,
@@ -56,6 +57,14 @@ test('Chat preserves one explicit exact start and truthful queued readback',()=>
  assert.match(worker,/GOVERNED_AUTO_TRIGGER_WAKE_SCOPE_CHANGED/);
  const sql=readFileSync(new URL('../sql/reality-final-loop-governed-auto-trigger-transport-v1.sql',import.meta.url),'utf8');
  assert.doesNotMatch(sql,/cron\.job|cron\.schedule/);
- assert.match(sql,/lease_expires_at>now_at THEN RETURN NULL/);
+ assert.match(sql,/lease_expires_at>pg_catalog\.clock_timestamp\(\) THEN RETURN NULL/);
  assert.match(sql,/AFTER UPDATE OF released_at/);
+});
+
+test('manual start uses server time; a selected schedule remains a future timestamp',()=>{
+ const now=Date.parse('2026-11-24T12:00:00Z');
+ assert.equal(resolveFinalLoopShiftStart('START_NOW','2026-11-24T12:05:00.000Z',now).toISOString(),'2026-11-24T12:00:00.000Z');
+ assert.equal(resolveFinalLoopShiftStart('SCHEDULE','2026-11-24T12:05:00.000Z',now).toISOString(),'2026-11-24T12:05:00.000Z');
+ assert.throws(()=>resolveFinalLoopShiftStart('SCHEDULE','2026-11-24T11:59:59.000Z',now));
+ assert.throws(()=>resolveFinalLoopShiftStart('UNRECOGNIZED','2026-11-24T12:05:00.000Z',now));
 });
