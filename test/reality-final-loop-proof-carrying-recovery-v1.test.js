@@ -50,8 +50,14 @@ const proof=(c,gate,last=null,more={})=>({
  source:'INDEPENDENT_SIGNED_VERIFIER_LEDGER_READBACK',
  independent_verified:true,proof_delta_verified:true,
  test_reproduces_exact_failure:gate==='RED',
+ frozen_red_test_status:gate==='RED'?'FAILED_AS_EXPECTED':null,
  isolated_write_quarantined:gate==='REPAIR_ISOLATED',
+ touched_file_count:gate==='REPAIR_ISOLATED'?1:0,
+ isolated_candidate_receipt_sha256:sha('a'),
+ frozen_red_test_passed_after_repair:gate==='GREEN',
+ same_isolated_repair_artifact_sha256:sha('5'),
  regression_isolation_verified:gate==='REGRESSION',
+ protected_regression_suite_passed:gate==='REGRESSION',
  canonical_continuity_return_verified:gate==='CONTINUATION',
  independent_next_action_receipt_sha256:sha('8'),
  ...(last?{previous_gate_receipt_sha256:last.receipt_sha256}:{}),...more});
@@ -137,6 +143,25 @@ test('exhaustion and missing registered capability produce bounded transitions',
   strategy:strategy('NEW_SOURCE',{source_revision:'0'.repeat(40)})})).status,
   'RECOVERY_SOURCE_EPOCH_CHANGED_REFREEZE_REQUIRED');
 });
+test('fake GREEN or failed protected regression cannot advance proof delta',()=>{
+ const c=contract(),red=proof(c,'RED'),repair=proof(c,'REPAIR_ISOLATED',red);
+ const green=proof(c,'GREEN',repair,{
+  same_frozen_red_artifact_sha256:red.artifact_sha256});
+ assert.equal(decideNextRecoveryTransition(input(c,{proofReceipts:[
+  red,repair,{...green,frozen_red_test_passed_after_repair:false}]})).status,
+  'RECOVERY_INDEPENDENT_PROOF_DELTA_UNVERIFIED');
+ const regress=proof(c,'REGRESSION',green,{protected_regression_suite_passed:false});
+ assert.equal(decideNextRecoveryTransition(input(c,{proofReceipts:[
+  red,repair,green,regress]})).status,'RECOVERY_INDEPENDENT_PROOF_DELTA_UNVERIFIED');
+ assert.equal(decideNextRecoveryTransition(input(c,{
+  proofReceipts:[red],
+  strategy:strategy('REPAIR_FROM_RED',{
+   capability_id:'ISOLATED_REPAIR_CANDIDATE',proposed_changed_files:0}),
+  registeredCapabilities:['ISOLATED_REPAIR_CANDIDATE'],
+  mutationWarrant:warrant('ISOLATED_REPAIR_CANDIDATE_ONLY')
+ })).status,'RECOVERY_REPAIR_SCOPE_HAS_NO_CHANGED_FILES');
+});
+
 test('ordered five-gate proof chain does not itself certify original settlement',()=>{
  const c=contract(),chain=[];
  for(const gate of CASE_REPAIR_PROOFS){
