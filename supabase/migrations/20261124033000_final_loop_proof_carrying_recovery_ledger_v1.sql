@@ -119,6 +119,13 @@ BEGIN
  IF p_shift_id IS NULL OR p_worker_run_id IS NULL OR
   coalesce(p_original_work_id,'') !~ '^work:[a-f0-9]{32}$' OR
   pg_catalog.jsonb_typeof(p_contract)<>'object' OR
+  NOT pg_catalog.coalesce(p_contract ?& ARRAY[
+   'version','owner_id','shift_id','obligation_id','source_ref',
+   'source_revision','continuity_root_id','continuity_head_sha256',
+   'blocker_evidence_sha256','blocker_class','blocker_kind',
+   'failure_signature','frozen_scope','contract_id',
+   'contract_fingerprint','freeze_state','ledger_freeze_verified',
+   'required_proofs','budget'],false) OR
   p_contract->>'version'<>'reality-final-loop-proof-carrying-recovery-v1' OR
   p_contract->>'freeze_state'<>'CANDIDATE_NOT_DURABLE' OR
   p_contract->>'ledger_freeze_verified'<>'false' OR
@@ -192,7 +199,9 @@ BEGIN
   v_handoff->>'continuity_identity_verified'<>'true' OR
   v_handoff->>'qualifier_receipt_sha256'<>p_contract->>'blocker_evidence_sha256' OR
   NOT(v_handoff->'unresolved_proof_gates' ? 'CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED') OR
-  p_contract->>'owner_id'<>s.owner_id::text
+  p_contract->>'owner_id'<>s.owner_id::text OR
+  v_job->>'source_proof_sha256' IS NULL OR
+  v_handoff->>'qualifier_receipt_sha256' IS NULL
  THEN RETURN pg_catalog.jsonb_build_object('status','RECOVERY_FROZEN_ORIGINAL_OR_PROOF_CHANGED',
   'execution_authorized',false,'original_job_completed',false);END IF;
  SELECT * INTO v_plan FROM reality_internal.final_loop_pr_source_plans_v1
