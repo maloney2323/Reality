@@ -45,7 +45,8 @@ function exact(c,r){
 // All actionable statuses are based only on independently observed receipts;
 // this does NOT claim an adapter exists or the work actually resumed.
 export function classifyFinalLoopBlockerLiveness({
- contractProposal,existingCiRoute,signedRecovery,budgetState,technicalCiObservation
+ contractProposal,existingCiRoute,signedRecovery,budgetState,technicalCiObservation,
+ originalLineageEvidence
 }={}){
  const c=contractProposal?.contract_candidate;
  if(contractProposal?.status!==
@@ -84,6 +85,37 @@ export function classifyFinalLoopBlockerLiveness({
    next_actor:'REALITY',next_governed_action:
     'RECONCILE_EXISTING_SIGNED_MAINTENANCE_SOURCE_AND_WARRANT'});
  const s=existingCiRoute.status;
+ // The signed lineage reader has already resolved the original identity.
+ // Do not treat that verified observation as a business warrant, or request
+ // another case-construction cycle while this exact admission gap is open.
+ if(['SIGNED_ORIGINAL_LINEAGE_EXISTING_EVIDENCE_INDEPENDENTLY_READ',
+     'SIGNED_ORIGINAL_LINEAGE_EVIDENCE_STAGED_INDEPENDENTLY_READ'].includes(
+      originalLineageEvidence?.status)&&
+    originalLineageEvidence.source_reconciled===true&&
+    originalLineageEvidence.owner_id===c.owner_id&&
+    originalLineageEvidence.shift_id===c.shift_id&&
+    originalLineageEvidence.original_work_id===c.obligation_id&&
+    originalLineageEvidence.source_ref===c.source_ref&&
+    originalLineageEvidence.continuity_root_id===c.continuity_root_id&&
+    originalLineageEvidence.maintenance_id===existingCiRoute.maintenance_id&&
+    HASH.test(originalLineageEvidence.evidence_sha256||'')&&
+    originalLineageEvidence.continuity_fact==='CURRENT_ORIGINAL_REMAINS_UNFINISHED'&&
+    originalLineageEvidence.customer_original_verified===false&&
+    originalLineageEvidence.original_claim_admitted===false&&
+    originalLineageEvidence.original_job_completed===false&&
+    originalLineageEvidence.installation_authorized===false&&
+    originalLineageEvidence.production_changed===false&&
+    originalLineageEvidence.independent_review_required===true&&
+    originalLineageEvidence.next_action==='VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI')
+  return out('RECOVERY_VERIFIED_LINEAGE_ORIGINAL_AUTHORITY_RECONCILIATION_DUE',{
+   ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
+   original_lineage_evidence_sha256:originalLineageEvidence.evidence_sha256,
+   original_lineage_packet_id:originalLineageEvidence.packet_id,
+   original_lineage_verified:true,business_original_warrant_verified:false,
+   repeat_prior_ci_dispatch_permitted:false,
+   next_governed_action:'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION',
+   next_recovery_action:'QUALIFY_DISTINCT_FROZEN_CASE_SPEC_AND_RED_TEST_FROM_EXISTING_DIAGNOSTIC'
+  });
  // Independently re-read GitHub's exact branch/commit, frozen test job and
  // immutable artifact against this SAME original. Technical RED/GREEN is
  // progress on recovery engineering, never admission of customer work.

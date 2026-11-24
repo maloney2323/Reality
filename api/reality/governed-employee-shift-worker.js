@@ -1020,6 +1020,7 @@ export default async function handler(req,res){
     await stageVerifiedSignedOriginalLineagePacket({
      db,env:process.env,gate:sameOriginalPostmaintenanceGate,
      shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     expectedContinuityRootId:finalLoopContinuityIngress.shared_continuity_guard?.continuity_root_id??null,
      fetchImpl:fetch
     }).catch(()=>({
       status:'SIGNED_ORIGINAL_LINEAGE_PROVIDER_OR_SOURCE_UNVERIFIED',
@@ -3969,7 +3970,8 @@ export default async function handler(req,res){
    existingCiRoute:finalLoopExistingCaseCiRecovery,
    signedRecovery:finalLoopSignedProofRecovery,
    budgetState:finalLoopSignedProofRecovery,
-   technicalCiObservation:finalLoopTechnicalCiProviderVerification
+   technicalCiObservation:finalLoopTechnicalCiProviderVerification,
+   originalLineageEvidence:signedOriginalLineageEvidence
   });
 
   workerStage='WORKER_RESPONSE_PUBLICATION';

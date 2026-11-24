@@ -87,6 +87,7 @@ jobs:
           node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
           node --test test/reality-signed-maintenance-repair-model-candidate-v1.test.js
           node --test test/reality-final-loop-blocker-liveness-v1.test.js
+          node --test test/reality-signed-original-lineage-packet-v1.test.js
           node --test test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js
           node --test test/reality-final-loop-technical-ci-continuity-writer-v1.test.js
           node --test test/reality-final-loop-staged-plan-action-router-v1.test.js

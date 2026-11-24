@@ -150,3 +150,33 @@ test('every actual signed worker wake exposes the liveness next action',()=>{
  assert.ok(i>code.indexOf("workerStage='FINAL_LOOP_EXISTING_CASE_CI_RECOVERY_CLASSIFICATION'"));
  assert.ok(i<code.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'"));
 });
+
+test('existing signed lineage evidence routes the actual admission boundary before repeating CI',()=>{
+ const root='36f0ad48-f391-549f-8622-66cd493977e7';
+ const maintenance='b7181e5b-a01c-4cb2-b191-10dea9dbe04f';
+ const lineage={status:'SIGNED_ORIGINAL_LINEAGE_EXISTING_EVIDENCE_INDEPENDENTLY_READ',
+  source_reconciled:true,owner_id:owner,shift_id:shift,original_work_id:work,
+  source_ref:source,continuity_root_id:root,maintenance_id:maintenance,
+  packet_id:'a9c70bb0-dc74-4ef6-aec2-d3ab053eeaf8',evidence_sha256:sha('d'),
+  continuity_fact:'CURRENT_ORIGINAL_REMAINS_UNFINISHED',customer_original_verified:false,
+  original_claim_admitted:false,original_job_completed:false,installation_authorized:false,
+  production_changed:false,independent_review_required:true,
+  next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'};
+ const input=args({contractProposal:{...contract,contract_candidate:{
+  ...contract.contract_candidate,continuity_root_id:root}},
+  existingCiRoute:{...route,maintenance_id:maintenance},originalLineageEvidence:lineage});
+ const v=classify(input);
+ assert.equal(v.status,'RECOVERY_VERIFIED_LINEAGE_ORIGINAL_AUTHORITY_RECONCILIATION_DUE');
+ assert.equal(v.original_lineage_verified,true);
+ assert.equal(v.repeat_prior_ci_dispatch_permitted,false);
+ assert.equal(v.next_governed_action,'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION');
+ assert.equal(v.original_job_completed,false);
+ assert.equal(v.execution_authorized,false);
+ for(const bad of [{...lineage,continuity_root_id:shift},{...lineage,maintenance_id:shift},
+  {...lineage,source_ref:'https://github.com/maloney2323/Reality/pull/308'},
+  {...lineage,customer_original_verified:true},{...lineage,evidence_sha256:null}]){
+  const r=classify({...input,originalLineageEvidence:bad});
+  assert.notEqual(r.status,v.status);
+  assert.equal(r.execution_authorized,false);
+ }
+});
