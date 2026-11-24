@@ -13,6 +13,21 @@ const STATES=['NO_SHIFT_AUTHORIZED','QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_
  'ENDED_WITH_BLOCKED_WORK','ENDED_WITH_VERIFIED_JOB','ENDED_READ_ONLY','ESCALATED'];
 const EVENTS=['SOURCE_VALIDATED','ORIGINAL_RECEIPT_MATCHED','STEP_BLOCKED','HISTORICAL_NOOP_VERIFIED','SHIFT_REPORT_RECORDED'];
 let busy=false,last=null,loggedIn=false;
+const HASH=/^sha256:[a-f0-9]{64}$/;
+const WORK=/^work:[a-f0-9]{32}$/;
+function finalReceiptValid(b,s){
+ const f=b.final_receipt,c=s?.close_report,n=b.verified_final_original_job_count;
+ return b.complete_shift_proven===true&&b.status==='ENDED_WITH_VERIFIED_JOB'&&b.completion_bound===true&&s?.planned_end_at==='infinity'&&
+  f?.status==='EMPLOYEE_SHIFT_EVIDENCE_REPORT'&&f.shift_id===b.shift_id&&f.completion_bound===true&&
+  f.completion_reason==='ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED'&&f.production_changed===false&&
+  Number.isSafeInteger(n)&&n>=1&&n<=4&&f.authorized_source_job_count===n&&f.original_jobs_independently_settled_in_this_shift===n&&b.verified_original_job_receipts===n&&
+  Array.isArray(f.verified_original_receipts)&&f.verified_original_receipts.length===n&&
+  new Set(f.verified_original_receipts.map(x=>x.original_work_id)).size===n&&
+  f.verified_original_receipts.every(x=>x.independent_final_receipt_verified===true&&WORK.test(x.original_work_id||'')&&HASH.test(x.source_proof_sha256||''))&&
+  c?.shift_id===f.shift_id&&c.completion_reason===f.completion_reason&&c.production_changed===false&&c.authorized_source_job_count===n&&c.original_jobs_independently_settled_in_this_shift===n&&
+  Array.isArray(c.verified_original_receipts)&&c.verified_original_receipts.length===n&&
+  f.verified_original_receipts.every(x=>c.verified_original_receipts.some(y=>y.original_work_id===x.original_work_id&&y.source_proof_sha256===x.source_proof_sha256&&y.independent_final_receipt_verified===true));
+}
 function valid(d){
  const b=d?.shift_briefing;
  if(d?.ok!==true||d.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
@@ -20,7 +35,7 @@ function valid(d){
   !Array.isArray(d.shifts)||d.shifts.length>5||
   !b||b.version!=='reality-shift-conversation-v1'||
   !STATES.includes(b.status)||b.read_only!==true||b.production_changed!==false||
-  b.complete_shift_proven!==false||b.verified_human_hours_saved!==null||
+  typeof b.complete_shift_proven!=='boolean'||b.verified_human_hours_saved!==null||
   !Number.isSafeInteger(b.verified_source_checks)||
   !Number.isSafeInteger(b.verified_original_job_receipts)||
   b.verified_original_job_receipts>4||
@@ -34,18 +49,36 @@ function valid(d){
     (e.source_url!==null&&!SRC.test(e.source_url))||
     (e.proof_sha256!==null&&!/^sha256:[a-f0-9]{64}$/.test(e.proof_sha256))))
   return false;
- if(b.status==='NO_SHIFT_AUTHORIZED')return b.shift_id===null&&d.shifts.length===0;
- return UUID.test(b.shift_id||'')&&d.shifts.some(s=>
-  s.shift_id===b.shift_id&&s.status===b.status&&
-  s.planned_start_at===b.planned_start_at);
+ if(b.status==='NO_SHIFT_AUTHORIZED')return b.shift_id===null&&d.shifts.length===0&&b.complete_shift_proven===false;
+ const s=d.shifts.find(s=>s.shift_id===b.shift_id&&s.status===b.status&&s.planned_start_at===b.planned_start_at);
+ if(!UUID.test(b.shift_id||'')||!s)return false;
+ return b.complete_shift_proven?finalReceiptValid(b,s):b.final_receipt==null;
 }
 function el(tag,text){
  const n=document.createElement(tag);
  if(text!==undefined)n.textContent=text;
  return n;
 }
+const compact=el('p');compact.id='realityChatCompactShiftState';compact.hidden=true;compact.setAttribute('role','status');compact.setAttribute('aria-live','polite');
+const thread=$('privateTranscript'),header=$('realityChatConversation')?.querySelector('.reality-chat-thread-heading');
+if(header)header.after(compact);
+const finalCard=el('article');finalCard.id='realityChatFinalShiftReceipt';finalCard.className='bubble';finalCard.hidden=true;finalCard.setAttribute('aria-label','Independently verified final shift receipt');
+function attachReceipt(){if(thread&&!finalCard.hidden&&!thread.contains(finalCard))thread.append(finalCard);}
+if(thread&&typeof MutationObserver==='function')new MutationObserver(attachReceipt).observe(thread,{childList:true});
+function clearCompact(){compact.hidden=true;finalCard.hidden=true;finalCard.remove();}
+function compactRender(b){
+ if(b.status==='NO_SHIFT_AUTHORIZED'){clearCompact();return;}
+ const labels={QUEUED:'Authorized · waiting for worker',RUNNING:'Shift in progress',AWAITING_EXACT_ORIGINAL_WORK:'Shift open · original work not yet settled',ESCALATED:'Shift needs recovery',ENDED_WITH_BLOCKED_WORK:'Shift ended · unfinished work',ENDED_READ_ONLY:'Shift ended · read-only',ENDED_WITH_VERIFIED_JOB:'Shift ended · review receipts'};
+ compact.hidden=false;compact.textContent=b.complete_shift_proven?'Shift complete · '+b.verified_final_original_job_count+' independently verified job receipt(s)':labels[b.status]||'Shift status unverified';
+ if(!b.complete_shift_proven){finalCard.hidden=true;finalCard.remove();return;}
+ finalCard.hidden=false;
+ const evidence=el('details');evidence.append(el('summary','View independent receipt evidence'));
+ for(const r of b.final_receipt.verified_original_receipts)evidence.append(el('p',r.original_work_id+' · '+r.source_proof_sha256));
+ finalCard.replaceChildren(el('strong','Shift complete · verified receipt'),el('p',b.verified_final_original_job_count+' authorized job(s) independently settled. All selected work is accounted for.'),evidence,el('p','Human time savings are not measured.'));
+ attachReceipt();
+}
 function render(b,supervisor=null){
- last=b;
+ last=b;compactRender(b);
  let triage='';
  if(supervisor?.status==='AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'&&
     supervisor.read_only===true&&supervisor.production_changed===false&&
@@ -98,6 +131,7 @@ function render(b,supervisor=null){
 async function refresh(){
  if(busy)return;
  if(ready.style.display!=='block'){
+  clearCompact();
   if(!loggedIn){
    $('realityShiftHomeNow').textContent='Sign in to see exactly what your shift did.';
    $('realityShiftHomeNext').textContent='Open Chat and sign in to view the latest verified work and next action.';
@@ -118,6 +152,7 @@ async function refresh(){
     'EXACT_OWNER_SOURCE_TRIAGE_READ_ONLY_VERIFIED'?
     data.shift_automatic_supervisor:null);
  }catch{
+  finalCard.hidden=true;finalCard.remove();compact.hidden=false;compact.textContent='Shift status unavailable · no new completion verified';
   $('realityChatShiftHeadline').textContent='Shift readback unavailable.';
   $('realityChatShiftNow').textContent='Cannot independently verify the latest state.';
   $('realityChatShiftNext').textContent='Retry the authenticated shift status check; no completion is inferred.';
@@ -159,6 +194,7 @@ if(typeof MutationObserver==='function')
  new MutationObserver(()=>{
   if(ready.style.display==='block'&&shiftVisibleRoute()&&onlineVisible())
    void refresh();
+  else if(ready.style.display!=='block')clearCompact();
  }).observe(ready,{attributes:true,attributeFilter:['style']});
 window.realityShiftRefreshBriefing=()=>void refresh();
 })();

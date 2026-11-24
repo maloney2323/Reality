@@ -45,7 +45,9 @@ test('Only explicit click approves the current fingerprint; edits revoke that ap
 });
 test('The single shift control is directly in Chat, outside the saved transcript, with optional scheduling',()=>{
  assert.match(main,/const panel=document\.getElementById\('realityChatConversation'\)/);
- assert.match(main,/panel\.insertBefore\(block,composer\)/);
+ assert.match(main,/block\.hidden=true/);
+ assert.match(main,/reality:open-shift-plan/);
+ assert.match(main,/transcript\.append\(block\)/);
  assert.doesNotMatch(main,/workPanel\.prepend\(block\)|transcript\.insertAdjacentElement\('beforebegin',block\)/);
  assert.match(main,/Authorize & Start Shift/);
  assert.match(main,/Schedule for later \(optional\)/);
