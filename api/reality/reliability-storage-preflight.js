@@ -1,5 +1,6 @@
 // Preview-only, read-only credential compatibility check. Does not mutate
 // records, enable reliability monitoring, run a model or expose any secrets.
+import crypto from 'node:crypto';
 import { resolveReliabilityBenchmarkDb } from '../../src/reality-reliability-db-boundary-v0.1.js';
 import { shiftDatabase, shiftRpc } from '../../src/reality-governed-shift-boundary-v1.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
@@ -99,8 +100,55 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
   }catch{return report('ISOLATED_SERVICE_READ_UNAVAILABLE');}
 }
 
+// One-time, protected infrastructure handoff. Not an execution or approval route.
+// Only the existing signed worker, the exact isolated deployment and a proven
+// Vercel credential can bind the two existing Vault entries. No secrets returned.
+async function bindExistingWakeTransport(req,res,env=process.env){
+  const answer=(code,status)=>res.status(code).json({ok:code===200,status,execution_authorized:false,worker_started:false});
+  if(env.VERCEL_ENV!=='preview'||env.VERCEL_GIT_COMMIT_REF!==FINAL_LOOP_BRANCH||
+    env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+    env.REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='false'||
+    Object.keys(req.query||{}).length||Object.keys(req.body||{}).length)
+    return answer(403,'WAKE_BIND_SCOPE_REJECTED');
+  const token=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
+  const supplied=String(req.headers?.authorization||'');
+  if(!/^[a-f0-9]{64}$/.test(token)||!/^Bearer [a-f0-9]{64}$/.test(supplied)||
+    !crypto.timingSafeEqual(Buffer.from(token),Buffer.from(supplied.slice(7))))
+    return answer(403,'WAKE_BIND_WORKER_AUTH_REJECTED');
+  const protection=String(req.headers?.['x-reality-transport-bypass']||'');
+  const hostname=String(env.VERCEL_URL||'');
+  if(!/^[A-Za-z0-9_-]{10,256}$/.test(protection)||
+    !/^reality-[a-z0-9]+-maloney2323-5310s-projects\.vercel\.app$/.test(hostname))
+    return answer(403,'WAKE_BIND_PROTECTION_SCOPE_REJECTED');
+  try{
+    const check=await fetch('https://'+hostname+'/api/reality/deployment-proof',{
+      headers:{'x-vercel-protection-bypass':protection},
+      redirect:'error',cache:'no-store',signal:AbortSignal.timeout(8000)});
+    const identity=await check.json().catch(()=>null);
+    if(!check.ok||identity?.deployment_id!==env.VERCEL_DEPLOYMENT_ID||
+      identity?.commit_ref!==FINAL_LOOP_BRANCH||identity?.environment!=='preview')
+      return answer(403,'WAKE_BIND_PROTECTION_UNVERIFIED');
+    const db=shiftDatabase(env);
+    if(db.project!==ISOLATED_PROJECT||db.url!=='https://'+ISOLATED_PROJECT+'.supabase.co')
+      return answer(403,'WAKE_BIND_DATABASE_REJECTED');
+    const headers={apikey:db.secretKey,'content-type':'application/json',accept:'application/json'};
+    if(!db.secretKey.startsWith('sb_'))headers.authorization='Bearer '+db.secretKey;
+    const response=await fetch(db.url+'/rest/v1/rpc/reality_bind_isolated_final_loop_wake_transport_once_v1',{
+      method:'POST',headers,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(8000),
+      body:JSON.stringify({p_worker_token:token,p_protection_credential:protection})});
+    const receipt=await response.json().catch(()=>null);
+    if(!response.ok||receipt?.execution_authorized!==false||
+      receipt.status!=='ISOLATED_WAKE_CREDENTIALS_BOUND')
+      return answer(409,'WAKE_BIND_VAULT_NOT_VERIFIED');
+    return answer(200,'ISOLATED_WAKE_CREDENTIALS_BOUND');
+  }catch{return answer(503,'WAKE_BIND_TRANSPORT_UNVERIFIED');}
+}
+
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
+  if(req.method==='POST')return bindExistingWakeTransport(req,res);
   if(req.method!=='GET')return res.status(405).json({ok:false,code:'METHOD_NOT_ALLOWED'});
   if(process.env.VERCEL_ENV==='preview' && process.env.VERCEL_GIT_COMMIT_REF===FINAL_LOOP_BRANCH)
     return isolatedCredentialPreflight(req,res);
