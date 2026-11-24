@@ -127,10 +127,10 @@ BEGIN
  SELECT frozen_test_build INTO l FROM reality_internal.owner_internal_maintenance_jobs_v1
  WHERE incident_id=p_maintenance_id FOR UPDATE;
  v:=public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(p_maintenance_id,p_request_id,p_release_sha);
- IF v->>'status'<>'SIGNED_MAINTENANCE_CANDIDATE_SOURCE_BROKER_SCOPE_VERIFIED'
+ IF v->>'status' IS DISTINCT FROM 'SIGNED_MAINTENANCE_CANDIDATE_SOURCE_BROKER_SCOPE_VERIFIED'
  THEN RETURN pg_catalog.jsonb_build_object('status','FROZEN_TEST_DRAFT_SCOPE_CHANGED_NO_WRITE');END IF;
- IF pg_catalog.jsonb_typeof(p_candidate)<>'object' OR length(p_candidate::text)>24000
- OR p_candidate->>'state' NOT IN ('DRAFT','PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE')
+ IF pg_catalog.jsonb_typeof(p_candidate) IS DISTINCT FROM 'object' OR length(p_candidate::text)>24000
+ OR coalesce(p_candidate->>'state','') NOT IN ('DRAFT','PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE')
  OR (p_candidate->>'state'='DRAFT' AND (
  coalesce(p_candidate->>'model_response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}$'
  OR coalesce(p_candidate->>'target_path','') !~ '^src/[A-Za-z0-9_./-]+[.]js$'
