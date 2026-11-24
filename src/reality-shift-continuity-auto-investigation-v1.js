@@ -1,3 +1,4 @@
+import {classifySignedModelProviderFailure} from './reality-signed-maintenance-repair-model-candidate-v1.js';
 // Existing signed shift -> autonomously investigate a DUTY-BOUND, observed
 // stall -> preserve an independent-review upgrade proposal. This code cannot
 // install an arbitrary patch, deploy, spend, or authorize customer actions.
@@ -153,8 +154,64 @@ export function parseContinuityModelInvestigation(response,roles,{guidedRecovery
   model_response_id:response.id
  });
 }
+// This typed incident does not need the same broken LLM to diagnose itself.
+// Use the existing authorized provider configuration, one tiny schema probe,
+// and the existing Continuity incident lease. No arbitrary endpoints or model
+// switching; diagnostic readback cannot certify a repair.
+export async function observeSignedBuilderProvider({env,claim,fetchImpl}){
+ const model=String(env.REALITY_OPENAI_MODEL||'gpt-4.1-mini');
+ const base={probe_kind:'BOUNDED_RESPONSES_SCHEMA_DIAGNOSTIC',model:/^[A-Za-z0-9._-]{3,80}$/.test(model)?model:'INVALID_MODEL_CONFIG'};
+ const key=String(env.REALITY_STANDALONE_OPENAI_API_KEY||env.OPENAI_API_KEY||'');
+ if(claim.source_evidence.observed_state==='INSUFFICIENT_EVIDENCE')
+  return {...base,error_class:'SPEC_OR_TEST_FAILURE',http_status:null,provider_code:null};
+ if(key.length<20)return {...base,error_class:'AUTH_OR_SECRET_MISSING',http_status:null,provider_code:null};
+ if(base.model==='INVALID_MODEL_CONFIG')return {...base,error_class:'MODEL_CONFIG_OR_SCHEMA',http_status:null,provider_code:null};
+ try{
+  const r=await fetchImpl('https://api.openai.com/v1/responses',{
+   method:'POST',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000),
+   headers:{authorization:'Bearer '+key,'content-type':'application/json','x-client-request-id':claim.lease_id+':provider-diagnostic'},
+   body:JSON.stringify({model,store:false,tool_choice:'none',max_output_tokens:128,
+    input:'Return the JSON object {"ready":true}. This is an isolated provider diagnostic, not a job or a repair.',
+    text:{format:{type:'json_schema',name:'reality_provider_diagnostic',strict:true,
+     schema:{type:'object',additionalProperties:false,properties:{ready:{type:'boolean'}},required:['ready']}}}})
+  });
+  if(!r?.ok)return {...base,...await classifySignedModelProviderFailure(r)};
+  const v=await r.json().catch(()=>null);
+  let value;try{value=JSON.parse(outputText(v))}catch{}
+  if(r.status===200&&v?.status==='completed'&&/^resp_[A-Za-z0-9_-]{4,160}$/.test(v.id||'')&&value?.ready===true)
+   return {...base,error_class:'PROVIDER_READY',http_status:200,provider_code:null,response_id:v.id};
+  return {...base,error_class:'UNKNOWN_PROVIDER_OUTCOME',http_status:r.status||null,provider_code:null};
+ }catch(e){return {...base,...await classifySignedModelProviderFailure(null,e)}}
+}
+async function investigateSignedBuilderFailure({claim,db,env,shiftId,workerRunId,call,fetchImpl}){
+ const e=claim.source_evidence;
+ if(!UUID.test(workerRunId||'')||claim.shift_id!==shiftId||!UUID.test(claim.owner_id||'')||
+  !UUID.test(claim.incident_id||'')||!UUID.test(claim.lease_id||'')||!UUID.test(claim.maintenance_id||'')||
+  !HASH.test(claim.evidence_sha256||'')||e?.schema!=='reality-signed-maintenance-builder-failure-v1'||
+  e.maintenance_id!==claim.maintenance_id||!UUID.test(e.attempt_id||'')||!HASH.test(e.failure_receipt_sha256||'')||
+  !HASH.test(e.authority_receipt_sha256||'')||!['PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE'].includes(e.observed_state)||
+  e.investigation_only!==true||e.original_job_completed!==false||e.production_changed!==false||
+  e.installation_authorized!==false||claim.investigation_only!==true||claim.execution_authorized!==false||
+  claim.production_changed!==false||claim.installation_authorized!==false||
+  !Number.isInteger(claim.attempt_count)||claim.attempt_count<1||claim.attempt_count>3)
+  fail('BUILDER_FAILURE_INCIDENT_LEASE_UNVERIFIED');
+ const observation=await observeSignedBuilderProvider({env,claim,fetchImpl});
+ const result=await call(db,'reality_record_signed_builder_recovery_decision_v1',{
+  p_shift_id:shiftId,p_worker_run_id:workerRunId,p_incident_id:claim.incident_id,
+  p_lease_id:claim.lease_id,p_observation:observation
+ },{fetchImpl});
+ if(result?.status!=='SIGNED_BUILDER_RECOVERY_DECISION_RECORDED'||result.incident_id!==claim.incident_id||
+  result.maintenance_id!==claim.maintenance_id||!HASH.test(result.receipt_sha256||'')||
+  !['TERMINAL_BOUNDARY','REENTRY_AUTHORIZED'].includes(result.recovery_state)||
+  result.error_class!==observation.error_class||result.original_job_completed!==false||
+  result.installation_authorized!==false||result.production_changed!==false||result.execution_authorized!==false)
+  fail('BUILDER_RECOVERY_DECISION_UNVERIFIED');
+ return restricted(result.status,{...result,model_calls_completed:observation.error_class==='PROVIDER_READY'?1:0,
+  next_action:result.recovery_state==='REENTRY_AUTHORIZED'?'CLAIM_EXISTING_BUILDER_WHEN_REENTRY_DUE':'REPORT_EXACT_EVIDENCE_OR_RESOURCE_BOUNDARY'});
+}
+
 export async function investigateOneSignedShiftContinuityIncident({
- db,env=process.env,shiftId,call=shiftRpc,fetchImpl=fetch,
+ db,env=process.env,shiftId,workerRunId=null,call=shiftRpc,fetchImpl=fetch,
  invokeModel=null,readSource=readFreshEmployeeInquirySource,
  rolesBuilder=buildRealityProposedEmployeeRoleDiscussionContext
 }={}){
@@ -164,8 +221,10 @@ export async function investigateOneSignedShiftContinuityIncident({
   typeof fetchImpl!=='function'||typeof readSource!=='function')
   fail('ISOLATED_SIGNED_SHIFT_BOUNDARY_REQUIRED');
  const claim=await call(db,'reality_claim_next_shift_continuity_investigation_v1',{
-  p_shift_id:shiftId
+  p_shift_id:shiftId,...(workerRunId?{p_worker_run_id:workerRunId}:{})
  },{fetchImpl});
+ if(claim?.status==='SIGNED_BUILDER_FAILURE_INVESTIGATION_CLAIMED')
+  return investigateSignedBuilderFailure({claim,db,env,shiftId,workerRunId,call,fetchImpl});
  const noWork=['NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
   'NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'];
  if(noWork.includes(claim?.status)&&
