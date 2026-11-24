@@ -345,3 +345,75 @@ test('canonical Final Loop consumes current qualified next action without granti
  });
  assert.equal(swapped.status,'FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
 });
+
+
+test('signed Final Loop consumes event shadow only for the same original, never dispatches',async()=>{
+ const qualifier={
+  source_ref:source,original_work_id:work,source_step_index:2,
+  qualifier_receipt_sha256:sha('9'),
+  qualifier_checked_at:'2026-11-22T22:00:00Z',
+  qualifier_next_action:'COMPLETE_EXISTING_SIGNED_MAINTENANCE_FROZEN_CI',
+  unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED'],
+  independent_source_proof_verified:true,proposed_transition:'RECOVER',
+  reason_code:'BLOCKER_ATTESTATION_PENDING',diagnosis_consumable:true,
+  recovery_authority_scope:'INTERNAL_MAINTENANCE_ONLY',
+  registered_capability_lease:false,execution_authorized:false,
+  owner_approval_granted:false,original_job_completed:false,production_changed:false
+ };
+ const event={
+  event_id:'66666666-6666-4666-8666-666666666666',
+  original_work_id:work,source_ref:source,
+  event_kind:'INDEPENDENT_FROZEN_CI_RECEIPT',
+  source_receipt_sha256:sha('5'),
+  event_causality_sha256:sha('6'),
+  event_state:'SHADOW_PENDING',continuity_revision:1,
+  source_current:true,would_resume_suspended_obligation:true
+ };
+ const shadow={
+  schema:'reality-final-loop-event-resume-shadow-v1',
+  status:'FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY',
+  shift_id:shift,subscriptions:[{
+   original_work_id:work,source_ref:source,
+   condition_kind:'INDEPENDENT_FROZEN_CI_RECEIPT',
+   subscribed_receipt_sha256:sha('9'),state:'SHADOW_SIGNALED',
+   continuity_revision:1
+  }],events:[event],
+  event_dispatch_enabled:false,execution_authorized:false,
+  installation_authorized:false,original_job_completed:false,
+  production_changed:false
+ };
+ const pending={...pendingEnvelope,governed_qualification_handoffs:[qualifier]};
+ const state={...env,REALITY_FINAL_LOOP_EVENT_RESUME_SHADOW_ENABLED:'true'};
+ const collect=async(db,name)=>{
+  if(name==='reality_read_current_shift_execution_graph_v1')return rawGraph();
+  if(name==='reality_read_current_final_loop_proof_envelope_v1')return pending;
+  if(name==='reality_read_final_loop_event_resume_shadow_v1')return shadow;
+  throw Error('UNEXPECTED_RPC');
+ };
+ const r=await caller(collect,{env:state});
+ assert.equal(r.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ assert.equal(r.event_resume_shadow.shadow_ready_event_count,1);
+ assert.equal(r.event_resume_shadow.event_dispatch_enabled,false);
+ assert.equal(r.event_resume_shadow.ready_event_refs[0].executor_invoked,false);
+ assert.equal(r.original_job_completed,false);
+ const forged=await caller(async(db,name)=>{
+  if(name!=='reality_read_final_loop_event_resume_shadow_v1')
+   return collect(db,name);
+  return {...shadow,event_dispatch_enabled:true};
+ },{env:state});
+ assert.equal(forged.status,'FINAL_LOOP_EVENT_RESUME_SCOPE_OR_AUTHORITY_INVALID');
+ const foreign=await caller(async(db,name)=>{
+  if(name!=='reality_read_final_loop_event_resume_shadow_v1')
+   return collect(db,name);
+  return {...shadow,events:[{...event,original_work_id:'work:'+'f'.repeat(32)}]};
+ },{env:state});
+ assert.equal(foreign.status,'FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+ const stale=await caller(async(db,name)=>{
+  if(name!=='reality_read_final_loop_event_resume_shadow_v1')
+   return collect(db,name);
+  return {...shadow,events:[{...event,event_state:'SHADOW_STALE',
+   source_current:false,would_resume_suspended_obligation:false}]};
+ },{env:state});
+ assert.equal(stale.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ assert.equal(stale.event_resume_shadow.shadow_ready_event_count,0);
+});
