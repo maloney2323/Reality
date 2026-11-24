@@ -1,6 +1,7 @@
 // Preview-only, read-only credential compatibility check. Does not mutate
 // records, enable reliability monitoring, run a model or expose any secrets.
 import { resolveReliabilityBenchmarkDb } from '../../src/reality-reliability-db-boundary-v0.1.js';
+import { shiftDatabase, shiftRpc } from '../../src/reality-governed-shift-boundary-v1.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 const ALLOWED_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
 const FINAL_LOOP_BRANCH='feature/final-loop-governed-qualification-handoff-20261123';
@@ -26,6 +27,24 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
     return report('ISOLATED_PREFLIGHT_SCOPE_REJECTED');
   let db;
   try{
+    if(env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'){
+      // Verify the actual deployed worker binding rather than overriding the target.
+      db=shiftDatabase(env);
+      if(db.project!==ISOLATED_PROJECT||env.REALITY_PERSONAL_CHAT_SUPABASE_URL!==db.url||
+         env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED!=='false')
+        return report('ISOLATED_WORKER_BINDING_REJECTED');
+      const missing='00000000-0000-0000-0000-000000000000';
+      const proof=await shiftRpc(db,'reality_read_final_loop_governed_start_v1',{
+        p_owner_id:missing,p_shift_id:missing,p_plan_fingerprint:'sha256:'+'0'.repeat(64)
+      });
+      if(proof?.status!=='GOVERNED_START_SCOPE_UNVERIFIED')
+        return report('ISOLATED_WORKER_RPC_READBACK_UNVERIFIED');
+      return report('ISOLATED_SERVICE_READ_VERIFIED',{
+        worker_database_binding_verified:true,
+        service_role_rpc_verified:true,
+        unknown_warrant_rejected:true
+      });
+    }
     db=resolveReliabilityBenchmarkDb({...env,
       REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
       REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:ISOLATED_PROJECT,
