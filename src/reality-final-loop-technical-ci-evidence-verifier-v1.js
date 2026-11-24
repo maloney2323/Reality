@@ -172,6 +172,7 @@ export async function verifySourceBoundTechnicalRecoveryCi({
     ...base,github_run_id:run.id});
   return result('RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING',{
    ...base,independent_technical_ci_verified:true,
+   existing_diagnostic_receipt_sha256:route.existing_diagnostic_receipt_sha256,
    frozen_technical_red_verified:true,
    github_run_id:run.id,github_job_id:js[0].id,
    github_artifact_id:arts[0].id,
