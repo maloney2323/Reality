@@ -187,6 +187,89 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    verifyCanonicalQualificationHandoffs(p,refreshed);
   if(governedQualificationHandoffs===null)
    return safe('FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
+
+  // The Final Loop's durable event inbox lives in the same service-only
+  // continuity database. The event is an observation, never an execution
+  // instruction: no provider call, lease, retry or installation is granted.
+  let eventResumeShadow={
+   status:'FINAL_LOOP_EVENT_RESUME_SHADOW_DISABLED',
+   shadow_ready_event_count:0,subscribed_obligation_count:0,
+   event_dispatch_enabled:false,execution_authorized:false
+  };
+  if(env.REALITY_FINAL_LOOP_EVENT_RESUME_SHADOW_ENABLED==='true'){
+   let eventRead;
+   try{
+    eventRead=await read(db,
+     'reality_read_final_loop_event_resume_shadow_v1',
+     {p_shift_id:wake.shift_id},{fetchImpl,timeoutMs:6000});
+   }catch{
+    return safe('FINAL_LOOP_EVENT_RESUME_READBACK_UNAVAILABLE',{
+     owner_id:graph.owner_id,shift_id:wake.shift_id
+    });
+   }
+   if(eventRead?.schema!=='reality-final-loop-event-resume-shadow-v1'||
+      eventRead.status!=='FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY'||
+      eventRead.shift_id!==wake.shift_id||
+      eventRead.event_dispatch_enabled!==false||
+      eventRead.execution_authorized!==false||
+      eventRead.installation_authorized!==false||
+      eventRead.original_job_completed!==false||
+      eventRead.production_changed!==false||
+      !Array.isArray(eventRead.subscriptions)||
+      !Array.isArray(eventRead.events)||
+      eventRead.subscriptions.length>p.jobs.length*3||
+      eventRead.events.length>128)
+    return safe('FINAL_LOOP_EVENT_RESUME_SCOPE_OR_AUTHORITY_INVALID');
+   const known=new Set(p.jobs.filter(j=>
+    /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+    j.independent_source_proof_verified===true)
+    .map(j=>j.source_ref+'|'+j.original_work_id));
+   const ready=[];
+   for(const s of eventRead.subscriptions){
+    if(!known.has(s?.source_ref+'|'+s?.original_work_id)||
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT'].includes(
+        s.condition_kind)||
+       !['SUSPENDED','SHADOW_SIGNALED'].includes(s.state)||
+       !HASH.test(s.subscribed_receipt_sha256||'')||
+       !Number.isSafeInteger(s.continuity_revision)||
+       s.continuity_revision!==p.revision)
+      return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
+   }
+   for(const e of eventRead.events){
+    if(!UUID.test(e?.event_id||'')||
+       !known.has(e.source_ref+'|'+e.original_work_id)||
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT'].includes(
+        e.event_kind)||
+       !['SHADOW_PENDING','SHADOW_OBSERVED','SHADOW_STALE'].includes(
+        e.event_state)||
+       !HASH.test(e.source_receipt_sha256||'')||
+       !HASH.test(e.event_causality_sha256||'')||
+       e.continuity_revision!==p.revision||
+       typeof e.source_current!=='boolean'||
+       typeof e.would_resume_suspended_obligation!=='boolean'||
+       (e.would_resume_suspended_obligation&&
+        (e.event_state!=='SHADOW_PENDING'||!e.source_current)))
+      return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+    if(e.would_resume_suspended_obligation){
+      ready.push(Object.freeze({
+       event_id:e.event_id,source_ref:e.source_ref,
+       original_work_id:e.original_work_id,event_kind:e.event_kind,
+       event_causality_sha256:e.event_causality_sha256,
+       would_resume_suspended_obligation:true,
+       executor_invoked:false,execution_authorized:false
+      }));
+    }
+   }
+   eventResumeShadow=Object.freeze({
+    status:'FINAL_LOOP_VERIFIED_EVENT_SHADOW_CONSUMED_NO_DISPATCH',
+    shadow_ready_event_count:ready.length,
+    subscribed_obligation_count:eventRead.subscriptions.length,
+    ready_event_refs:Object.freeze(ready),
+    event_dispatch_enabled:false,execution_authorized:false,
+    installation_authorized:false,original_job_completed:false
+   });
+  }
+
   const canonicalSourceDecisions=derivePendingFinalLoopSourceDecisions(p);
   if(canonicalSourceDecisions===null)
    return safe('FINAL_LOOP_CANONICAL_SOURCE_ADMISSION_POLICY_UNVERIFIED');
@@ -223,6 +306,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    continuity_head_sha256:p.continuity_head_sha256,
    revision:p.revision,checkpoint_candidates:Object.freeze(pending),
    governed_qualification_handoffs:governedQualificationHandoffs,
+   event_resume_shadow:eventResumeShadow,
    next_governed_action:governedQualificationHandoffs.length>0?
     governedQualificationHandoffs[0].next_qualified_action:
     canonicalSourceDecisions.some(d=>
