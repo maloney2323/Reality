@@ -186,11 +186,16 @@ BEGIN
   'original_job_completed',false,'execution_authorized',false);END IF;
  v_head:=public.reality_read_current_final_loop_proof_envelope_v1(c.shift_id);
  v_continuity:=public.reality_read_final_loop_shared_continuity_guard_v1(c.shift_id);
- IF v_head->>'continuity_root_id'<>c.continuity_root_id::text OR
-  v_head->>'continuity_head_sha256'<>c.continuity_head_sha256 OR
-  (v_head->>'revision')::bigint<>c.continuity_revision OR
-  v_continuity->>'continuity_root_id'<>c.continuity_root_id::text OR
-  v_continuity->>'continuity_head_sha256'<>c.continuity_head_sha256
+ IF v_head->>'status' IS DISTINCT FROM
+    'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING' OR
+  v_continuity->>'status' IS DISTINCT FROM
+    'FINAL_LOOP_SHARED_CONTINUITY_CHECKED' OR
+  v_head->>'continuity_root_id' IS DISTINCT FROM c.continuity_root_id::text OR
+  v_head->>'continuity_head_sha256' IS DISTINCT FROM c.continuity_head_sha256 OR
+  v_head->>'revision' IS NULL OR
+  (v_head->>'revision')::bigint IS DISTINCT FROM c.continuity_revision OR
+  v_continuity->>'continuity_root_id' IS DISTINCT FROM c.continuity_root_id::text OR
+  v_continuity->>'continuity_head_sha256' IS DISTINCT FROM c.continuity_head_sha256
  THEN RETURN pg_catalog.jsonb_build_object(
   'status','RECOVERY_TECH_CI_CANONICAL_CONTINUITY_CHANGED_RECHECK',
   'original_job_completed',false,'execution_authorized',false);END IF;
