@@ -45,7 +45,7 @@ function exact(c,r){
 // All actionable statuses are based only on independently observed receipts;
 // this does NOT claim an adapter exists or the work actually resumed.
 export function classifyFinalLoopBlockerLiveness({
- contractProposal,existingCiRoute,signedRecovery,budgetState
+ contractProposal,existingCiRoute,signedRecovery,budgetState,technicalCiObservation
 }={}){
  const c=contractProposal?.contract_candidate;
  if(contractProposal?.status!==
@@ -84,6 +84,32 @@ export function classifyFinalLoopBlockerLiveness({
    next_actor:'REALITY',next_governed_action:
     'RECONCILE_EXISTING_SIGNED_MAINTENANCE_SOURCE_AND_WARRANT'});
  const s=existingCiRoute.status;
+ // Independently re-read GitHub's exact branch/commit, frozen test job and
+ // immutable artifact against this SAME original. Technical RED/GREEN is
+ // progress on recovery engineering, never admission of customer work.
+ if(technicalCiObservation?.status===
+    'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING'&&
+    technicalCiObservation.contract_id===c.contract_id&&
+    technicalCiObservation.obligation_id===c.obligation_id&&
+    technicalCiObservation.source_ref===c.source_ref&&
+    technicalCiObservation.shift_id===c.shift_id&&
+    technicalCiObservation.owner_id===c.owner_id&&
+    technicalCiObservation.independent_technical_ci_verified===true&&
+    technicalCiObservation.frozen_technical_red_verified===true&&
+    technicalCiObservation.original_business_case_red_verified===false&&
+    technicalCiObservation.business_original_warrant_verified===false&&
+    technicalCiObservation.original_job_completed===false&&
+    technicalCiObservation.execution_authorized===false&&
+    HASH.test(technicalCiObservation.github_artifact_digest||''))
+  return out('RECOVERY_TECHNICAL_PROOF_OBSERVED_BUSINESS_LINEAGE_STILL_DUE',{
+   ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
+   technical_provider_run_id:technicalCiObservation.github_run_id,
+   technical_ci_digest:technicalCiObservation.github_artifact_digest,
+   technical_ci_verified:true,
+   business_original_red_verified:false,
+   next_governed_action:
+    'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'
+  });
  if(s===SAME){
   if(existingCiRoute.prior_diagnostic_verified!==true||
      existingCiRoute.repeat_prior_ci_dispatch_permitted!==false||
