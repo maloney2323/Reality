@@ -235,9 +235,15 @@ export function inspectFinalLoopRecoveryContinuation({
    candidate_status:candidate?.status||'NOT_READ',
    next_governed_action:candidate?.next_governed_action||
     'READ_CANONICAL_RECOVERY_AND_SOURCE_REENTRY_EVIDENCE'});
+ // The existing shared benchmark may PREPARE a strictly read-only
+ // owner packet. It cannot execute child work or claim isolated capacity.
+ // Treat it as an observed prepared packet, not a release-isolation failure.
+ const packetLane=new Set([
+  'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED',
+  'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'
+ ]);
  if(operatingLane?.operating_lane!=='NORMAL_SIGNED_SHIFT'||
-    operatingLane.status!==
-      'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED')
+    !packetLane.has(operatingLane.status))
   return result('FINAL_LOOP_REENTRY_BLOCKED_WORKER_RELEASE_OR_ISOLATION',{
    incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
    source_ref:candidate.source_ref,
@@ -259,6 +265,10 @@ export function inspectFinalLoopRecoveryContinuation({
    source_ref:candidate.source_ref,packet_id:matched[0].packet_id,
    next_governed_action:'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT',
    handler_dispatched:true,handler_result_verified:true,
+   blocker_class:'EXACT_OWNER_AUTHORIZATION_REQUIRED',
+   safe_self_recovery_exhausted:false,
+   automatic_retry_without_new_evidence:false,
+   child_execution_authorized:false,
    original_obligation_remains_open:true
   });
  }
