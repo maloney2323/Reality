@@ -1,0 +1,28 @@
+name: Reality frozen Chat candidate independent behavior (NOT full original)
+on:
+  pull_request:
+    paths:
+      - 'test/fixtures/reality-chat-original-frozen-candidate-functional-v1.json'
+      - 'test/reality-chat-frozen-candidate-source-behavior-v1.test.js'
+      - '.github/workflows/reality-chat-frozen-candidate-source-behavior-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frozen-candidate-functional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout source history without persisted provider credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Node isolated behavior test
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Independently verify frozen provider commit source behavior
+        run: node --test test/reality-chat-frozen-candidate-source-behavior-v1.test.js
+      - name: Confirm scope NOT the full original goal
+        run: echo 'This only checks UTF8 and NUL behavior in the frozen candidate. The original full-goal feature acceptance and installation remain unverified.'

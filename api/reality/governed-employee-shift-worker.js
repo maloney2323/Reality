@@ -10,6 +10,8 @@ import {independentlyReviewOneStagedMaintenanceRegression,
  from '../../src/reality-signed-maintenance-external-review-v1.js';
 import {attestOneSignedMaintenanceCiSourceEpoch}
  from '../../src/reality-signed-maintenance-ci-source-epoch-v1.js';
+import {advanceInvestigatedSignedModelRejection}
+ from '../../src/reality-signed-model-rejection-reentry-v1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback,
  isShiftDatabaseTransportUnreachable}
  from '../../src/reality-governed-shift-boundary-v1.js';
@@ -56,6 +58,11 @@ import {projectRealityAutomaticShiftSupervisor}
  from '../../src/reality-automatic-shift-supervisor-v1.js';
 import {projectRealityExistingShiftIntegratedIntake}
  from '../../src/reality-existing-shift-integrated-intake-v1.js';
+import {automaticallyQualifyVerifiedRepairOpportunity,
+ canAutomaticallyQualifyResearchRepairOnSignedWake}
+ from '../../src/reality-governed-automatic-repair-qualification-v1.js';
+import {advanceSignedRepairScopeOwnerHandoff}
+ from '../../src/reality-signed-repair-scope-handoff-v1.js';
 import {runCurrentShiftWeeklyInvestigations}
  from '../../src/reality-active-weekly-source-investigator-v1.js';
 import {admitCurrentShiftInvestigatedSourceWithFrozenProof}
@@ -100,6 +107,16 @@ import {generateNextSignedChatDevelopmentDraft}
  from '../../src/reality-chat-new-development-worker-v1.js';
 import {continueChatNewDevelopmentCandidate}
  from '../../src/reality-chat-new-development-publisher-v1.js';
+import {advanceSignedChatFullGoalAcceptance}
+ from '../../src/reality-signed-chat-full-goal-acceptance-v1.js';
+import {independentlyVerifySignedRecoverySyntax}
+ from '../../src/reality-signed-chat-recovery-syntax-verifier-v1.js';
+import {requalifyOneFencedSignedChatProvider}
+ from '../../src/reality-signed-fenced-provider-requalification-v1.js';
+import {stageNextSignedChatRecoveryQuarantine}
+ from '../../src/reality-chat-recovery-quarantine-publisher-v1.js';
+import {independentlyReviewOneSignedChatRecoveryTarget,independentlyReobserveStalledRecoveryReview}
+ from '../../src/reality-signed-chat-recovery-target-review-v1.js';
 import {generateOneEmployeeTemporalInquiry}
  from '../../src/reality-dynamic-employee-inquiry-worker-v1.js';
 import {runOneStandingEmployeeDiscovery}
@@ -112,6 +129,8 @@ import {advanceOneScheduledCapabilityInquiry}
  from '../../src/reality-standing-scheduled-capability-inquiry-v1.js';
 import {investigateOneSignedShiftContinuityIncident,classifySignedContinuityClaimTransportError}
  from '../../src/reality-shift-continuity-auto-investigation-v1.js';
+import {qualifyVerifiedInvestigationRemediation}
+ from '../../src/reality-shift-investigation-remediation-v1.js';
 import {advanceOneQualifiedEmployeeEvidenceJob}
  from '../../src/reality-automatic-qualified-evidence-worker-v1.js';
 import {admitOneSignedScheduledEvidenceJob}
@@ -128,22 +147,40 @@ import {executeOneRegisteredMaintenanceAction}
  from '../../src/reality-signed-maintenance-source-requalification-executor-v1.js';
 import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
-import {continueSignedMaintenanceCaseCiVerification}
+import {planGovernedCapabilitiesFromOwnerReceipts,
+ invokeOneRegisteredSignedCapability}
+ from '../../src/reality-evidence-driven-capability-router-v1.js';
+import {continueSignedMaintenanceCaseCiVerification,selectSignedCaseCiResumeEvent}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
-import {reconcileSignedVerifiedMaintenanceArtifact}
+import {reconcileSignedVerifiedMaintenanceArtifact,
+ independentlyReviewSignedMaintenanceInstallTarget}
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
+import {continueExactOwnerApprovedMaintenanceInstall}
+ from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
+import {routeSignedMaintenanceContinuityTrigger}
+ from '../../src/reality-governed-auto-trigger-v1.0.js';
+import {advanceVerifiedMaintenanceOriginalHandoff}
+ from '../../src/reality-signed-maintenance-original-return-handoff-v1.js';
+import {enforceSignedMaintenanceReceiptContinuity}
+ from '../../src/reality-signed-maintenance-continuity-enforcement-v1.js';
+import {independentlyReconcileSignedMaintenanceInstall}
+ from '../../src/reality-signed-maintenance-postinstall-verification-bridge-v1.js';
 import {isSignedMaintenanceOriginalLineageMissing}
  from '../../src/reality-signed-maintenance-original-lineage-boundary-v1.js';
+import {stageVerifiedSignedOriginalLineagePacket}
+ from '../../src/reality-signed-original-lineage-packet-v1.js';
 import {classifyRealityGovernedContinuityEvidence}
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
-import {generateOneSignedMaintenanceRepairCandidate}
+import {generateOneSignedMaintenanceRepairCandidate,generateOneSignedMaintenanceFrozenTestDraft}
  from '../../src/reality-signed-maintenance-repair-model-candidate-v1.js';
 import {independentlyReviewSignedMaintenanceTarget}
  from '../../src/reality-signed-maintenance-candidate-target-review-v1.js';
 import {requalifyOneChangedEmployeeSource}
  from '../../src/reality-qualified-source-requalification-v1.js';
+import {probeOneSignedInternalBusinessProviderSource}
+ from '../../src/reality-signed-internal-business-source-readback-v1.js';
 export const maxDuration=60;
 function validSecret(req,env){
  const secret=String(env.REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN||'');
@@ -169,6 +206,8 @@ export default async function handler(req,res){
  let governedWakeClaimId=null;
  let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
+ let workerCompletionAttestedBeforeResponse=false;
+ let wakeLeaseReleasedBeforeResponse=false;
  let workerStage='SHIFT_DB_BOUNDARY';
  let shiftDbTransportUnreachable=false;
  try{
@@ -180,9 +219,14 @@ export default async function handler(req,res){
   // Fail closed if the claim cannot be independently read back.
   workerStage='SHIFT_WORKER_DURABLE_SINGLEFLIGHT';
   const proposedWakeClaimId=crypto.randomUUID();
+  // The database can briefly queue PostgREST requests while healthy
+  // client SQL still works. Allow one bounded 18s claim attempt, but never
+  // retry the write: a timed-out first call might have committed its lease.
+  // A missing claim receipt still fails closed; no shift or work is started.
   const governedWakeGate=await shiftRpc(
    db,'reality_claim_governed_shift_worker_run_v1',
-   {p_claim_id:proposedWakeClaimId}
+   {p_claim_id:proposedWakeClaimId},
+   {timeoutMs:18000}
   );
   if(governedWakeGate?.status==='WAKE_COALESCED_ACTIVE_OR_COOLDOWN' &&
      governedWakeGate.original_job_completed===false &&
@@ -233,14 +277,177 @@ export default async function handler(req,res){
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // Continuous, standing EVIDENCE qualification intake: all existing employee
+  // schedule, capabilities, incidents, Chat work and signed shift steps.
+  // The source-neutral database function deduplicates by authoritative ledger
+  // identity and NEVER admits a new original or changes owner authority.
+  // Its failure is visible but cannot strand an already authorized shift.
+  workerStage='CONTINUOUS_QUALIFICATION_INBOX_RECONCILIATION';
+  const continuousQualificationInbox=await shiftRpc(db,
+   'reality_reconcile_continuous_qualification_inbox_v1',
+   {p_worker_run_id:actualWorkerRunId},{timeoutMs:12000}
+  ).then(r=>{
+   if(r?.status!=='CONTINUOUS_QUALIFICATION_INBOX_DURABLY_RECONCILED'||
+      r.worker_run_id!==actualWorkerRunId||
+      r.new_shift_started!==false||
+      r.new_original_job_admitted!==false||
+      r.owner_approval_granted!==false||
+      r.execution_authorized!==false||
+      r.installation_authorized!==false||
+      r.production_changed!==false)
+    throw Error('CONTINUOUS_QUALIFIER_AUTHORITY_READBACK_INVALID');
+   return r;
+  }).catch(e=>({
+   status:'CONTINUOUS_QUALIFICATION_INBOX_RECONCILIATION_UNVERIFIED',
+   failure_code:String(e?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+     'SIGNED_DATABASE_INTAKE_UNAVAILABLE':'INTAKE_RECEIPT_UNVERIFIED',
+   new_shift_started:false,new_original_job_admitted:false,
+   execution_authorized:false,installation_authorized:false,
+   production_changed:false
+  }));
+  // Reconcile the SAME governed source identities into their next lawful
+  // Continuity transition. This is evidence-only routing, not an LLM dispatch,
+  // original admission, approval, installation, or replay. A missing receipt
+  // is visible and cannot authorize the next stage by default.
+  workerStage='CONTINUITY_QUALIFICATION_GOVERNED_ROUTE';
+  const continuityQualificationRoutes=
+    continuousQualificationInbox.status===
+     'CONTINUOUS_QUALIFICATION_INBOX_DURABLY_RECONCILED'?
+     await shiftRpc(db,'reality_reconcile_continuity_qualification_routes_v1',
+      {p_worker_run_id:actualWorkerRunId},{timeoutMs:12000})
+      .then(r=>{
+       if(r?.status!=='CONTINUITY_QUALIFICATION_ROUTES_RECONCILED'||
+          r.worker_run_id!==actualWorkerRunId||
+          r.model_execution_authorized!==false||
+          r.owner_approval_granted!==false||
+          r.new_original_admitted!==false||
+          r.new_shift_started!==false||
+          r.installation_authorized!==false||
+          r.production_changed!==false)
+        throw Error('CONTINUITY_QUALIFICATION_ROUTE_AUTHORITY_INVALID');
+       return r;
+      }).catch(e=>({
+       status:'CONTINUITY_QUALIFICATION_ROUTE_UNVERIFIED',
+       failure_code:String(e?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+        'SIGNED_CONTINUITY_DB_UNAVAILABLE':'ROUTE_PROOF_UNVERIFIED',
+       model_execution_authorized:false,owner_approval_granted:false,
+       new_original_admitted:false,new_shift_started:false,
+       installation_authorized:false,production_changed:false
+      })):
+     {status:'CONTINUITY_QUALIFICATION_INTAKE_NOT_VERIFIED',
+      model_execution_authorized:false,owner_approval_granted:false,
+      new_original_admitted:false,new_shift_started:false,
+      installation_authorized:false,production_changed:false};
+  // Existing signed worker performs ONLY independent readback before choosing
+  // a registered business executor. Owner approval never directly invokes it.
+  // An installed handler must independently check the one-use claim.
+  workerStage='EXACT_APPROVED_BUSINESS_EFFECT_SIGNED_HANDOFF';
+  const exactApprovedBusinessEffectHandoff=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await shiftRpc(db,'reality_read_next_signed_business_effect_handoff_v1',{
+    p_worker_run_id:actualWorkerRunId
+   },{timeoutMs:12000}).then(r=>{
+    if(![
+     'NO_OWNER_APPROVED_BUSINESS_EFFECT_TO_HANDOFF',
+     'SIGNED_BUSINESS_EFFECT_CURRENT_WORKER_LEASE_REQUIRED',
+     'SIGNED_BUSINESS_EFFECT_SOURCE_OR_ADAPTER_DRIFT_NO_DISPATCH',
+     'EXACT_APPROVED_BUSINESS_EFFECT_REGISTERED_HANDLER_REQUIRED'
+    ].includes(r?.status)||
+      r.execution_authorized_by_read!==false||
+      r.effect_reserved!==false||
+      r.original_job_completed!==false||
+      r.production_changed!==false)
+     throw Error('SIGNED_BUSINESS_EFFECT_HANDOFF_RECEIPT_INVALID');
+    if(r.status==='EXACT_APPROVED_BUSINESS_EFFECT_REGISTERED_HANDLER_REQUIRED'&&(
+      r.shift_id!==wakeReceipt.shift_id||
+      !/^[a-f0-9-]{36}$/i.test(r.packet_id||'')||
+      !/^work:[a-f0-9]{32}$/.test(r.original_work_id||'')||
+      !/^reality_[a-z0-9_]+_v[0-9]+$/.test(
+       r.registered_execution_adapter||'')||
+      !/^sha256:[a-f0-9]{64}$/.test(r.approval_receipt_sha256||'')||
+      r.owner_exact_one_use_approval_verified!==true||
+      r.handler_installed_and_verified_by_read!==false))
+     throw Error('SIGNED_BUSINESS_EFFECT_APPROVED_SOURCE_INVALID');
+    return r;
+   }).catch(()=>({
+    status:'EXACT_BUSINESS_EFFECT_SIGNED_SERVICE_READBACK_UNVERIFIED',
+    next_action:'RECHECK_OWNER_APPROVAL_AND_REGISTERED_EXECUTOR',
+    effect_reserved:false,original_job_completed:false,
+    execution_authorized_by_read:false,production_changed:false
+   })):
+   {status:'NO_VERIFIED_SIGNED_BUSINESS_EFFECT_WORKER_PULSE',
+    effect_reserved:false,original_job_completed:false,
+    execution_authorized_by_read:false,production_changed:false};
+  // First real INTERNAL company source connection proof: reobserve an
+  // already signed owner GitHub issue/PR with Reality's installed provider
+  // reader. This is an optional, bounded two-GET source probe, never an
+  // external customer connector or an executable original. It cannot
+  // interrupt an already warranted maintenance shift.
+  workerStage='SIGNED_INTERNAL_BUSINESS_PROVIDER_REOBSERVATION';
+  const internalBusinessProviderSource=
+   continuityQualificationRoutes.status==='CONTINUITY_QUALIFICATION_ROUTES_RECONCILED'?
+    await probeOneSignedInternalBusinessProviderSource({
+     db,env:process.env,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(e=>({
+     status:String(e?.message||'').startsWith('SHIFT_DATABASE_RPC_')?
+      'SIGNED_INTERNAL_SOURCE_DATABASE_UNAVAILABLE':
+      'SIGNED_INTERNAL_SOURCE_PROVIDER_PROOF_UNAVAILABLE',
+     internal_company_provider_source_verified:false,
+     customer_source_connection_verified:false,
+     original_job_admitted:false,owner_approval_granted:false,
+     model_execution_authorized:false,new_shift_started:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'SIGNED_CONTINUITY_SOURCE_ROUTING_NOT_PROVEN',
+     internal_company_provider_source_verified:false,
+     customer_source_connection_verified:false,
+     original_job_admitted:false,owner_approval_granted:false,
+     model_execution_authorized:false,new_shift_started:false,
+     installation_authorized:false,production_changed:false};
+  // A current provider source remains an observation until it enters exact
+  // owner-goal qualification, itemized approval, governed job execution,
+  // independent original acceptance and Universe reconciliation.
   // A detected stall is not a model guess or a reason to start another shift.
   // It is a durable independently observed incident; investigate it on THIS
   // signed wake before normal employee discovery, preserving exact authority.
+  workerStage='SIGNED_CHAT_RECOVERY_REVIEW_INCIDENT_OBSERVATION';
+  const signedChatReviewIncidentObservation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_observe_signed_chat_review_incident_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    }).then(r=>{
+     if(r?.status!=='SIGNED_CHAT_REVIEW_INCIDENTS_OBSERVED'||
+      r.worker_run_id!==actualWorkerRunId||
+      !Number.isInteger(r.new_incident_count)||r.new_incident_count<0||
+      r.new_original_admitted!==false||r.new_shift_started!==false||
+      r.execution_authorized!==false||r.installation_authorized!==false||
+      r.original_job_completed!==false||r.production_changed!==false)
+      throw Error('SIGNED_CHAT_REVIEW_INCIDENT_RECEIPT_UNVERIFIED');
+     return r;
+    }).catch(()=>({status:'SIGNED_CHAT_REVIEW_INCIDENT_OBSERVATION_UNVERIFIED',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_CURRENT_SIGNED_CHAT_REVIEW_INCIDENT_SCOPE',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
+  // An exhausted investigation is not restarted. A distinct signed wake may
+  // qualify only an independently tested, current-release correction.
+  workerStage='SIGNED_SHIFT_INVESTIGATION_REMEDIATION_QUALIFICATION';
+  const shiftInvestigationRemediation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await qualifyVerifiedInvestigationRemediation({db,env:process.env,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_SHIFT_INVESTIGATION_REMEDIATION_UNVERIFIED',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_CURRENT_SIGNED_SHIFT_REMEDIATION_SCOPE',
+     execution_authorized:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false};
   workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
   const shiftContinuityInvestigation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await investigateOneSignedShiftContinuityIncident({
-     db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+     db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
     }).catch(error=>({
      status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
      failure_code:classifySignedContinuityClaimTransportError(error),
@@ -249,6 +456,67 @@ export default async function handler(req,res){
     })):
     {status:'NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
      new_original_jobs_created:0,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  // An independently investigated rejected model proposal is unfinished work,
+  // not a terminal state. Preserve its original and all negative receipts;
+  // only current-source CI after the failure may re-enter the same spec.
+  workerStage='SIGNED_MODEL_REJECTION_CONTINUITY_REENTRY';
+  const signedModelRejectionReentry=wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await advanceInvestigatedSignedModelRejection({db,env:process.env,
+    shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+   }):{status:'NO_CURRENT_SIGNED_MODEL_REJECTION_REENTRY_SCOPE',
+    installation_authorized:false,original_job_completed:false,production_changed:false};
+  // An exact signed model decision invokes ONLY an installed governed route.
+  // A different signed worker later independently rechecks its actual effect.
+  workerStage='SIGNED_CONTINUITY_RECOVERY_INDEPENDENT_RECHECK';
+  const signedContinuityRecoveryVerification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_verify_signed_continuity_recovery_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    }).then(r=>{
+     if(![
+      'NO_CURRENT_INDEPENDENT_SIGNED_REVIEW_SCOPE',
+      'NO_DISTINCT_WORKER_RECOVERY_REVIEW_READY',
+      'SOURCE_REQUALIFICATION_VERIFIED_BUSINESS_WARRANT_STILL_MISSING',
+      'SOURCE_REQUALIFICATION_VERIFIED_ORIGINAL_STILL_UNQUALIFIED',
+      'SIGNED_SOURCE_REQUALIFICATION_VERIFIED_NEW_ORIGINAL_ADMITTED'
+     ].includes(r?.status)||r.original_resumed!==false||
+      r.execution_authorized!==false||
+      r.installation_authorized!==false||r.production_changed!==false)
+      throw Error('SIGNED_CONTINUITY_RECOVERY_REVIEW_RECEIPT_INVALID');
+     return r;
+    }).catch(()=>({
+     status:'SIGNED_CONTINUITY_RECOVERY_REVIEW_PROOF_UNAVAILABLE',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_CURRENT_INDEPENDENT_SIGNED_REVIEW_SCOPE',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false};
+  workerStage='SIGNED_CONTINUITY_GOVERNED_RECOVERY_ACTION';
+  const signedContinuityRecoveryAction=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_execute_signed_continuity_recovery_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId
+    },{timeoutMs:12000}).then(r=>{
+     if(![
+      'SIGNED_RECOVERY_CURRENT_AUTHORIZED_WORKER_REQUIRED',
+      'NO_SOURCE_VERIFIED_SIGNED_RECOVERY_INCIDENT_READY',
+      'SIGNED_RECOVERY_ACTION_ALREADY_RECORDED_NO_REPLAY',
+      'GOVERNED_RECOVERY_ACTION_HAS_NO_PROVEN_INSTALLED_ADAPTER',
+      'SIGNED_RECOVERY_SOURCE_REQUALIFICATION_EXECUTED_AWAITING_INDEPENDENT_CHECK'
+     ].includes(r?.status)||r.original_resumed!==false||
+      r.execution_authorized!==false||
+      r.installation_authorized!==false||r.production_changed!==false)
+      throw Error('SIGNED_CONTINUITY_RECOVERY_ACTION_RECEIPT_INVALID');
+     return r;
+    }).catch(()=>({
+     status:'SIGNED_CONTINUITY_RECOVERY_ACTION_PROOF_UNAVAILABLE',
+     original_resumed:false,execution_authorized:false,
+     installation_authorized:false,production_changed:false
+    })):
+    {status:'NO_SOURCE_VERIFIED_SIGNED_RECOVERY_INCIDENT_READY',
+     original_resumed:false,execution_authorized:false,
      installation_authorized:false,production_changed:false};
   // A DIFFERENT signed worker, not the diagnosing model, re-observes
   // the actual provider source for the assigned independent reviewer.
@@ -487,6 +755,28 @@ export default async function handler(req,res){
      original_job_completed:false,
      independent_final_receipt_verified:false,
      installation_authorized:false,production_changed:false};
+  // Bind only the ALREADY EXISTING source PR claim to the original-review
+  // evidence. A separate service read checks the persisted packet. This is
+  // not a new customer-original admission or an execution authorization.
+  workerStage='SIGNED_ORIGINAL_EVIDENCE_LINEAGE_BINDING';
+  const signedOriginalLineageEvidence=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   /^[a-f0-9-]{36}$/i.test(actualWorkerRunId||'')&&
+   isSignedMaintenanceOriginalLineageMissing(sameOriginalPostmaintenanceGate)?
+    await stageVerifiedSignedOriginalLineagePacket({
+     db,env:process.env,gate:sameOriginalPostmaintenanceGate,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     fetchImpl:fetch
+    }).catch(()=>({
+      status:'SIGNED_ORIGINAL_LINEAGE_PROVIDER_OR_SOURCE_UNVERIFIED',
+      packet_staged:false,source_reconciled:false,
+      original_job_completed:false,installation_authorized:false,
+      production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_ORIGINAL_LINEAGE_EVIDENCE_STAGE_DUE',
+     packet_staged:false,source_reconciled:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
   // Durable next-wake routing: the signed source-epoch is persisted, so
   // a later wake must use the database readback, not replay the attestation.
   // This is a classification receipt, NOT a claim that an executor ran.
@@ -542,7 +832,11 @@ export default async function handler(req,res){
   // Selection occurs only if the source executor returned an unclaimed
   // 'no registered handler' result. Reuse the original signed worker run.
   workerStage='SIGNED_MAINTENANCE_CASE_CI_EXECUTOR';
-  const signedMaintenanceCaseCi=
+  // A capability type is registered once. Specific work and authority are
+  // determined by signed ledger facts, never a PR number or scripted job ID.
+  const registeredMaintenanceCiAction=
+   'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED';
+  const ciRegistrationReady=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
    process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'&&
    (signedMaintenanceExecutorHandoff.status===
@@ -550,19 +844,28 @@ export default async function handler(req,res){
     (signedMaintenanceExecutorHandoff.status===
      'SIGNED_MAINTENANCE_ACTION_NOT_YET_EXECUTABLE'&&
      signedMaintenanceExecutorHandoff.next_action===
-      'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'))?
-    await executeOneRegisteredMaintenanceCiWake({
-      db,env:process.env,shiftId:wakeReceipt.shift_id,
-      workerRunId:actualWorkerRunId,fetchImpl:fetch
-    }).catch(error=>({
-     status:'SIGNED_MAINTENANCE_CASE_CI_EXECUTOR_UNVERIFIED',
-     error_code:String(error?.message||'SIGNED_CI_UNVERIFIED').slice(0,115),
-     repair_executed:false,original_job_completed:false,
-     installation_authorized:false,production_changed:false
-    })):
-    {status:'NO_AUTHORIZED_CASE_CI_RUNNER_WAKE',
-     repair_executed:false,original_job_completed:false,
-     installation_authorized:false,production_changed:false};
+      registeredMaintenanceCiAction));
+  const signedMaintenanceCaseCi=ciRegistrationReady?
+   await invokeOneRegisteredSignedCapability({
+    wake:wakeReceipt,
+     // Re-read the existing signed shift before invoking its registered
+     // capability. The later unifiedGraph declaration is not yet initialized.
+     // No new shift, job, authorization or completion is inferred here.
+     graph:assertRealityUnifiedShiftGraph(await shiftRpc(db,
+      'reality_read_current_shift_execution_graph_v1',{}),{
+       expectedShiftId:wakeReceipt.shift_id
+      }),
+    action:registeredMaintenanceCiAction,
+    authorityBasis:'SIGNED_EXISTING_WARRANT',
+    env:process.env,
+    handler:()=>executeOneRegisteredMaintenanceCiWake({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    })
+   }):
+   {status:'NO_AUTHORIZED_CASE_CI_RUNNER_WAKE',
+    repair_executed:false,original_job_completed:false,
+    installation_authorized:false,production_changed:false};
   const signedMaintenanceResult=
    signedMaintenanceCaseCi.status==='NO_AUTHORIZED_CASE_CI_RUNNER_WAKE'?
     signedMaintenanceExecutorHandoff:signedMaintenanceCaseCi;
@@ -646,6 +949,23 @@ export default async function handler(req,res){
      production_changed:false,new_shift_started:false};
   // One source-pinned LLM candidate for the existing warrant/maintenance
   // work order, never an installation, frozen CI verdict, or final receipt.
+  // Existing signed maintenance builder acquires one missing test capability
+  // per wake. The DB independently selects the current eligible source and
+  // exact authority. Draft bytes are inert; no installation or CI verdict.
+  workerStage='SIGNED_MAINTENANCE_FROZEN_TEST_CAPABILITY_BUILD';
+  const signedMaintenanceFrozenTestBuild=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'?
+    await generateOneSignedMaintenanceFrozenTestDraft({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_FROZEN_TEST_BUILD_OUTCOME_UNVERIFIED_NO_REPLAY',
+     model_generated:false,independent_ci_verified:false,
+     repair_executed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_SIGNED_FROZEN_TEST_CAPABILITY_WAKE',
+     model_generated:false,independent_ci_verified:false,
+     installation_authorized:false,original_job_completed:false,production_changed:false};
   workerStage='SIGNED_MAINTENANCE_REPAIR_MODEL_SOURCE_CANDIDATE';
   const signedMaintenanceRepairModelCandidate=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
@@ -669,11 +989,23 @@ export default async function handler(req,res){
   // warrant. It is a durable CI proof, not approval to install or a final
   // original-job completion. The earlier source-bound trigger is reused.
   workerStage='SIGNED_MAINTENANCE_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION';
+  // Use the current Continuity signal to prioritize one exact signed source.
+  // The existing broker independently checks the event and current warrant.
+  let signedCaseCiResumeEvent=null;
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'){
+   try{
+    signedCaseCiResumeEvent=selectSignedCaseCiResumeEvent(
+     await shiftRpc(db,'reality_read_final_loop_event_resume_shadow_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000}),wakeReceipt.shift_id);
+   }catch{/* Preserve existing independently scoped verification. */}
+  }
   const signedMaintenanceCaseCiReconciliation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await continueSignedMaintenanceCaseCiVerification({
      db,env:process.env,shiftId:wakeReceipt.shift_id,
-     workerRunId:actualWorkerRunId,fetchImpl:fetch
+     workerRunId:actualWorkerRunId,resumeEvent:signedCaseCiResumeEvent,fetchImpl:fetch
     }).catch(error=>({
      status:'SIGNED_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION_UNVERIFIED',
      error_code:String(error?.message||'').slice(0,100),
@@ -707,6 +1039,159 @@ export default async function handler(req,res){
     {status:'NO_SIGNED_MAINTENANCE_ARTIFACT_WORKER_WAKE',
      verified_repair_artifact:false,installation_authorized:false,
      repair_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false};
+  // Exact frozen code artifact -> independent target / rollback inspection.
+  // This is the SAME already authorized signed shift on a DIFFERENT worker
+  // from artifact acceptance. It may record a review receipt, never install.
+  workerStage='SIGNED_MAINTENANCE_INDEPENDENT_INSTALL_TARGET_REVIEW';
+  const signedMaintenanceInstallTargetReview=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReviewSignedMaintenanceInstallTarget({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({
+     status:'SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_UNVERIFIED',
+     install_target_verified:false,owner_approval_ready:false,
+     installation_authorized:false,repair_installed:false,
+     original_job_completed:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_WAKE',
+     install_target_verified:false,owner_approval_ready:false,
+     installation_authorized:false,repair_installed:false,
+     original_job_completed:false,production_changed:false,
+     new_shift_started:false};
+  // ENFORCE the existing canonical Spine before any installation effect.
+  // The independently verified exact target and one-use owner approval must
+  // be durably hash-linked and independently reread from the Universe ledger.
+  // A classifier label or successful worker wake cannot mint authority.
+  workerStage='SIGNED_VERIFIED_MAINTENANCE_CONTINUITY_RECEIPT_ADMISSION';
+  const signedMaintenanceCanonicalContinuity=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await enforceSignedMaintenanceReceiptContinuity({
+     db,env:process.env,originalGate:sameOriginalPostmaintenanceGate,
+     shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+    }).catch(error=>({
+     status:'SIGNED_CONTINUITY_RECEIPT_NOT_DURABLY_VERIFIED',
+     failure_code:/^SIGNED_CONTINUITY_[A-Z0-9_]+$/.test(
+      String(error?.message||''))?String(error.message):
+      'SIGNED_CONTINUITY_RECONCILIATION_PROVIDER_UNAVAILABLE',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     install_eligible_from_continuity:false,
+     installer_reconcile_only_from_continuity:false,
+     original_job_completed:false,new_shift_started:false,
+     production_changed:false
+    })):
+    {status:'NO_SIGNED_CONTINUITY_RECEIPT_WAKE',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     install_eligible_from_continuity:false,
+     installer_reconcile_only_from_continuity:false,
+     original_job_completed:false,new_shift_started:false,
+     production_changed:false};
+  // Reality's EXISTING governed trigger consumes the verified durable
+  // Continuity transition and routes only the NEXT eligible action.
+  // It neither grants owner authority nor authorizes a new job/shift.
+  workerStage='SIGNED_MAINTENANCE_GOVERNED_TRIGGER_ROUTING';
+  const signedMaintenanceGovernedTrigger=
+   routeSignedMaintenanceContinuityTrigger({
+    continuity:signedMaintenanceCanonicalContinuity,
+    originalGate:sameOriginalPostmaintenanceGate,
+    ownerId:sameOriginalPostmaintenanceGate?.owner_id,
+    shiftId:wakeReceipt.shift_id
+   });
+  // The existing signed worker can now advance an exact owner-approved
+  // maintenance repair WITHOUT any further human step. The privileged broker
+  // independently reads approval and atomically fences GitHub source write.
+  workerStage='EXACT_OWNER_APPROVED_MAINTENANCE_AUTOMATIC_INSTALL';
+  const signedMaintenanceApprovedInstall=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   signedMaintenanceGovernedTrigger.status==='SIGNED_MAINTENANCE_GOVERNED_TRIGGER_READY'&&
+   (signedMaintenanceGovernedTrigger.installer_dispatch_permitted===true||
+    signedMaintenanceGovernedTrigger.installer_reconcile_only===true)?
+    await continueExactOwnerApprovedMaintenanceInstall({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'EXACT_MAINTENANCE_AUTOMATIC_INSTALL_UNVERIFIED',
+     source_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_VERIFIED_CONTINUITY_AUTHORITY_FOR_INSTALL',
+     source_installed:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false};
+  // Different signed provider independently rechecks the actual installed
+  // bytes, GitHub acceptance and Vercel status BEFORE maintenance closure.
+  workerStage='EXACT_SIGNED_MAINTENANCE_INDEPENDENT_POSTINSTALL_VERIFICATION';
+  const signedMaintenanceIndependentPostinstall=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   signedMaintenanceApprovedInstall.source_installed!==true?
+    await independentlyReconcileSignedMaintenanceInstall({
+     db,env:process.env,fetchImpl:fetch
+    }).catch(()=>({
+     status:'EXACT_SIGNED_MAINTENANCE_POSTINSTALL_UNVERIFIED',
+     repair_verified:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    })):
+    {status:'NO_SIGNED_MAINTENANCE_POSTINSTALL_WAKE',
+     repair_verified:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false};
+  // After independent acceptance the SAME signed worker carries the
+  // postinstall receipt all the way through the canonical Universe ledger
+  // and back to the next unfinished original-work obligation. If the
+  // independent verifier has not accepted it, do NOT synthesize settlement.
+  workerStage='SIGNED_MAINTENANCE_POSTINSTALL_UNIVERSE_RECONCILIATION';
+  const signedMaintenanceUniverseReconciliation=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   signedMaintenanceIndependentPostinstall.repair_verified===true?
+    await enforceSignedMaintenanceReceiptContinuity({
+     db,env:process.env,originalGate:sameOriginalPostmaintenanceGate,
+     shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+    }).catch(error=>({
+     status:'INDEPENDENT_POSTINSTALL_UNIVERSE_CONTINUITY_UNVERIFIED',
+     failure_code:/^SIGNED_CONTINUITY_[A-Z0-9_]+$/.test(
+      String(error?.message||''))?String(error.message):
+      'INDEPENDENT_POSTINSTALL_UNIVERSE_PROVIDER_UNAVAILABLE',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     original_job_completed:false,production_changed:false
+    })):
+    {status:'NO_NEW_INDEPENDENT_POSTINSTALL_SETTLEMENT_RECEIPT',
+     continuity_committed:false,
+     next_authorized_action:'NO_NEW_AUTHORITY',
+     original_job_completed:false,production_changed:false};
+  // On a later signed wake the VERIFIED Universe return becomes a governed
+  // next-work trigger; the existing qualified executor independently checks
+  // original work identity and its own authority before doing anything.
+  const signedMaintenanceReturnTrigger=
+   routeSignedMaintenanceContinuityTrigger({
+    continuity:signedMaintenanceUniverseReconciliation,
+    originalGate:sameOriginalPostmaintenanceGate,
+    ownerId:sameOriginalPostmaintenanceGate?.owner_id,
+    shiftId:wakeReceipt.shift_id
+   });
+  // Consume the independently verified Universe-to-original return through
+  // the existing single-use owner/shift executor, not only a status field.
+  // The same durable obligation may be retried on a later signed wake.
+  workerStage='SIGNED_MAINTENANCE_GOVERNED_ORIGINAL_RETURN_HANDOFF';
+  const signedMaintenanceOriginalReturnDispatch=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await advanceVerifiedMaintenanceOriginalHandoff({
+     trigger:signedMaintenanceReturnTrigger.same_original_work_due===true?
+      signedMaintenanceReturnTrigger:signedMaintenanceGovernedTrigger,
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch,call:shiftRpc,
+     executeCaseCi:executeOneRegisteredMaintenanceCiWake,
+     executeSourceRequalification:executeOneRegisteredMaintenanceAction
+    }).catch(error=>({
+     status:'SIGNED_MAINTENANCE_RETURN_HANDOFF_NOT_VERIFIED',
+     failure_code:String(error?.message||'RETURN_HANDOFF_FAILED').slice(0,145),
+     executor_invoked:false,original_job_completed:false,
+     installation_authorized:false,production_changed:false,
+     new_shift_started:false
+    })):
+    {status:'NO_SIGNED_WORKER_RETURN_HANDOFF',executor_invoked:false,
+     original_job_completed:false,installation_authorized:false,
      production_changed:false,new_shift_started:false};
   // Independent verifier facts -> Reality-governed classification ->
   // existing Continuity Ledger. A classification cannot create execution
@@ -923,7 +1408,219 @@ export default async function handler(req,res){
     new_shift_started:false
    }));
   }
-  const newDevelopmentAdvanced=publisherProgress.has(chatNewPublished.status)||
+  // Missing feature acceptance MUST become a durable same-original recovery
+  // action, not another silent successful wake. The service-only SQL RPC
+  // independently checks the saved signed owner source and CI receipt.
+  // No source execution, Chat approval, re-admission, install, or settlement.
+  workerStage='CHAT_DEVELOPMENT_FULL_GOAL_ACCEPTANCE_GAP';
+  const chatFeatureGap=await shiftRpc(db,
+   'reality_record_next_chat_development_goal_gap_v1',{}
+  ).catch(()=>({
+   status:'CHAT_DEVELOPMENT_GOAL_GAP_RECEIPT_UNVERIFIED',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false
+  }));
+  const goalGapRecorded=
+   chatFeatureGap?.status==='CHAT_DEVELOPMENT_GOAL_GAP_SOURCE_BOUND_RECEIPTED'&&
+   /^work:[a-f0-9]{32}$/.test(chatFeatureGap.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(chatFeatureGap.receipt_sha256||'')&&
+   chatFeatureGap.feature_acceptance_verified===false&&
+   chatFeatureGap.original_job_completed===false&&
+   chatFeatureGap.installation_authorized===false&&
+   chatFeatureGap.production_changed===false&&
+   chatFeatureGap.new_shift_started===false;
+  // Signed recovery compiler consumes a proven CI_VERIFIED blocker from the
+  // SAME owner original. The existing capability queue stores the frozen
+  // contract; the existing Chat development worker generates a bounded source
+  // draft. The protected broker stages it into quarantine on a later wake.
+  // Neither the model nor the broker may grant installation authority.
+  // Different signed worker invocation performs independently sourced
+  // dependency review AFTER the model draft, BEFORE the protected broker.
+  // A graph hit is not feature acceptance or owner installation authority.
+  // Reality must reconcile its own prior independently claimed review.
+  // A provider/readback failure may leave a fenced lease. Requeue only
+  // after expiry under a DIFFERENT real signed worker, one time, with
+  // its failed attempt and original identity retained.
+  workerStage='SIGNED_CHAT_RECOVERY_EXPIRED_REVIEW_RECONCILIATION';
+  const signedRecoveryReviewRecovery=await shiftRpc(db,
+   'reality_reconcile_expired_signed_chat_target_review_v1',{
+    p_worker_run_id:actualWorkerRunId
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_EXPIRED_REVIEW_RECONCILIATION_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
+  workerStage='SIGNED_CHAT_RECOVERY_CONTINUITY_SOURCE_PROBE';
+  const signedRecoveryContinuityProbe=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await independentlyReobserveStalledRecoveryReview({db,env:process.env,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_CHAT_RECOVERY_CONTINUITY_SOURCE_PROBE_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_CONTINUITY_SOURCE_PROBE_SCOPE',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
+  workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW';
+  const signedRecoveryTargetReview=
+   signedRecoveryContinuityProbe.continuity_source_probe_verified===true?
+    signedRecoveryContinuityProbe:
+   await independentlyReviewOneSignedChatRecoveryTarget({
+    db,env:process.env,workerRunId:actualWorkerRunId,
+    fetchImpl:fetch
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_INDEPENDENT_TARGET_REVIEW_UNVERIFIED',
+    target_in_graph:false,installation_authorized:false,
+    original_job_completed:false,production_changed:false,
+    new_shift_started:false
+   }));
+  workerStage='SIGNED_CHAT_RECOVERY_INDEPENDENT_PARSE_ONLY';
+  const signedRecoverySyntax= wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await independentlyVerifySignedRecoverySyntax({db,env:process.env,shiftId:wakeReceipt.shift_id,
+    workerRunId:actualWorkerRunId,fetchImpl:fetch}).catch(()=>({status:'SIGNED_RECOVERY_PARSE_PROOF_UNVERIFIED'})):
+   {status:'NO_CURRENT_SIGNED_RECOVERY_PARSE_SCOPE'};
+  // A prior GitHub branch creation may have had uncertain effects. Preserve
+  // that fenced write and the same original. The independent, signed worker
+  // confirms repository/ref and live preview SHA before a single fresh source
+  // epoch is permitted; NO GitHub write is retried or performed in this step.
+  workerStage='SIGNED_CHAT_FENCED_PROVIDER_INDEPENDENT_SOURCE_REQUALIFICATION';
+  const fencedProviderRequalification=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await requalifyOneFencedSignedChatProvider({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    }).catch(()=>({status:'SIGNED_FENCED_PROVIDER_REQUALIFICATION_UNVERIFIED',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_FENCED_PROVIDER_REQUALIFICATION_SCOPE',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false};
+  workerStage='SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_READBACK';
+  const signedRecoveryQuarantine=await stageNextSignedChatRecoveryQuarantine({
+   db,env:process.env,fetchImpl:fetch
+  }).catch(()=>({
+   status:'SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_UNVERIFIED_NO_REPLAY',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  // A rejected exact-source model patch can be re-claimed ONLY after a
+  // changed verified preview release, once, while retaining its rejection
+  // memory. The owner original, diagnosis and checkpoint are unchanged.
+  // A true independent rejection can qualify a distinct, graph-constrained
+  // candidate, on the same original. Preserve the old draft/review epoch.
+  workerStage='SIGNED_CHAT_RECOVERY_REJECTED_TARGET_COMPILATION';
+  const signedRecoveryTargetRevision=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+    await shiftRpc(db,'reality_recompile_signed_rejected_chat_target_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
+     p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+    }).catch(()=>({status:'SIGNED_CHAT_RECOVERY_TARGET_COMPILATION_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false})):
+    {status:'NO_CURRENT_SIGNED_TARGET_COMPILATION_SCOPE',
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
+  workerStage='SIGNED_CHAT_RECOVERY_DISTINCT_STRATEGY_COMPILATION';
+  const signedRecoveryStrategy=await shiftRpc(db,
+   'reality_recompile_signed_chat_recovery_line_span_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_DISTINCT_COMPILER_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
+  workerStage='SIGNED_CHAT_RECOVERY_REJECTED_PATCH_RECONCILIATION';
+  const signedRecoveryRevision=await shiftRpc(db,
+   'reality_requeue_signed_chat_recovery_after_upgrade_v1',{
+    p_release_sha:process.env.VERCEL_GIT_COMMIT_SHA
+   }).catch(()=>({
+    status:'SIGNED_CHAT_RECOVERY_REVISION_UNVERIFIED',
+    installation_authorized:false,original_job_completed:false,
+    production_changed:false,new_shift_started:false
+   }));
+  workerStage='SIGNED_CHAT_RECOVERY_SPEC_COMPILATION';
+  const signedRecoverySpec=await shiftRpc(db,
+   'reality_admit_next_signed_chat_recovery_spec_v1',{}
+  ).catch(()=>({
+   status:'SIGNED_CHAT_RECOVERY_SPEC_COMPILER_UNVERIFIED',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  workerStage='SIGNED_CHAT_RECOVERY_EXISTING_MODEL_GENERATOR';
+  const signedRecoveryDraft=await generateNextSignedChatDevelopmentDraft({
+   db,env:process.env,fetchImpl:fetch,recoveryMode:true
+  }).catch(()=>({
+   status:'SIGNED_CHAT_RECOVERY_MODEL_DRAFT_UNVERIFIED',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  }));
+  const recoverySourceProgress=
+   signedRecoveryQuarantine.status===
+    'SIGNED_CHAT_RECOVERY_QUARANTINE_PROVIDER_RECEIPTED'&&
+   /^work:[a-f0-9]{32}$/.test(
+     signedRecoveryQuarantine.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     signedRecoveryQuarantine.quarantine_receipt_sha256||'')&&
+   signedRecoveryQuarantine.source_installed===false&&
+   signedRecoveryQuarantine.installation_authorized===false&&
+   signedRecoveryQuarantine.original_job_completed===false;
+  const recoverySpecProgress=
+   signedRecoverySpec.status==='SIGNED_CHAT_RECOVERY_SPEC_ATOMICALLY_FROZEN'&&
+   /^work:[a-f0-9]{32}$/.test(signedRecoverySpec.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(signedRecoverySpec.spec_sha256||'')&&
+   signedRecoverySpec.installation_authorized===false&&
+   signedRecoverySpec.original_job_completed===false;
+  const recoveryDraftProgress=
+   signedRecoveryDraft.status==='SIGNED_CHAT_RECOVERY_CODE_DRAFT_GENERATED'&&
+   /^work:[a-f0-9]{32}$/.test(signedRecoveryDraft.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     signedRecoveryDraft.candidate_sha256||'')&&
+   signedRecoveryDraft.installation_authorized===false&&
+   signedRecoveryDraft.original_job_completed===false;
+  const recoveryRevisionProgress=
+   signedRecoveryRevision.status===
+    'SIGNED_CHAT_RECOVERY_SAME_ORIGINAL_REQUEUED_ON_CHANGED_RELEASE'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryRevision.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryRevision.negative_memory_receipt_sha256||'')&&
+   signedRecoveryRevision.installation_authorized===false&&
+   signedRecoveryRevision.original_job_completed===false;
+  const recoveryStrategyProgress=
+   signedRecoveryStrategy.status===
+    'SIGNED_CHAT_RECOVERY_DISTINCT_LINE_SPAN_STRATEGY_FROZEN'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryStrategy.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryStrategy.recompiled_spec_sha256||'')&&
+   signedRecoveryStrategy.installation_authorized===false&&
+   signedRecoveryStrategy.original_job_completed===false;
+  const recoveryReviewProgress=
+   ['SIGNED_CHAT_RECOVERY_INDEPENDENT_DEPENDENCY_TARGET_VERIFIED',
+    'SIGNED_CHAT_RECOVERY_OFF_TARGET_REJECTED_WITH_RECEIPT'].includes(
+      signedRecoveryTargetReview.status)&&
+   /^work:[a-f0-9]{32}$/.test(
+     signedRecoveryTargetReview.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+     signedRecoveryTargetReview.review_receipt_sha256||'')&&
+   signedRecoveryTargetReview.installation_authorized===false&&
+   signedRecoveryTargetReview.original_job_completed===false;
+  const recoveryReviewRetryProgress=
+   signedRecoveryReviewRecovery.status===
+    'SIGNED_CHAT_RECOVERY_EXPIRED_REVIEW_REQUEUED_ON_SAME_ORIGINAL'&&
+   /^work:[a-f0-9]{32}$/.test(
+    signedRecoveryReviewRecovery.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(
+    signedRecoveryReviewRecovery.failure_receipt_sha256||'')&&
+   signedRecoveryReviewRecovery.installation_authorized===false&&
+   signedRecoveryReviewRecovery.original_job_completed===false;
+  const signedModelRejectionReentryProgress=
+   signedModelRejectionReentry.status==='SIGNED_MODEL_REJECTION_INDEPENDENTLY_QUALIFIED_SAME_ORIGINAL_REENTERED'&&
+   /^work:[a-f0-9]{32}$/.test(signedModelRejectionReentry.original_work_id||'')&&
+   /^sha256:[a-f0-9]{64}$/.test(signedModelRejectionReentry.ci_receipt_sha256||'')&&
+   signedModelRejectionReentry.installation_authorized===false&&
+   signedModelRejectionReentry.original_job_completed===false;
+  const newDevelopmentAdvanced=signedModelRejectionReentryProgress||recoveryReviewRetryProgress||
+   recoverySourceProgress||
+   recoveryDraftProgress||recoverySpecProgress||recoveryRevisionProgress||
+   recoveryStrategyProgress||recoveryReviewProgress||goalGapRecorded||
+   publisherProgress.has(chatNewPublished.status)||
    chatNewBuild.status==='CHAT_NEW_DEVELOPMENT_CODE_DRAFT_GENERATED';
   // This lane already owns its signed ledger. A successful or blocked feature
   // must not preempt the other employees in the same authorized shift.
@@ -931,8 +1628,17 @@ export default async function handler(req,res){
   if(newDevelopmentAdvanced){
    chatNewDevelopmentCheckpoint={
     status:'SIGNED_CHAT_NEW_DEVELOPMENT_LANE_ADVANCED',
-    development_result:publisherProgress.has(chatNewPublished.status)?
-     chatNewPublished:chatNewBuild,
+    development_result:signedModelRejectionReentryProgress?signedModelRejectionReentry:
+     recoverySourceProgress?signedRecoveryQuarantine:
+     recoveryReviewRetryProgress?signedRecoveryReviewRecovery:
+     recoveryDraftProgress?signedRecoveryDraft:
+      recoverySpecProgress?signedRecoverySpec:
+       recoveryRevisionProgress?signedRecoveryRevision:
+        recoveryStrategyProgress?signedRecoveryStrategy:
+         recoveryReviewProgress?signedRecoveryTargetReview:
+          goalGapRecorded?chatFeatureGap:
+        publisherProgress.has(chatNewPublished.status)?
+         chatNewPublished:chatNewBuild,
     original_job_completed:false,installation_authorized:false,
     production_changed:false,new_shift_started:false
    };
@@ -1064,6 +1770,10 @@ export default async function handler(req,res){
   // Evidence-backed transition from verified corrective CI into the same
   // original's eventual owner install decision. This READS provider evidence
   // and stages a service-only review. It never installs or creates consent.
+  workerStage='SIGNED_CHAT_FULL_GOAL_INDEPENDENT_QUALIFICATION';
+  const signedChatFullGoalAcceptance=wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
+   await advanceSignedChatFullGoalAcceptance({db,env:process.env,shiftId:wakeReceipt.shift_id,
+    workerRunId:actualWorkerRunId,fetchImpl:fetch}):{status:'NO_CURRENT_SIGNED_GOAL_ACCEPTANCE_SCOPE'};
   workerStage='GENERALIZED_ORIGINAL_INSTALL_REVIEW_PREFLIGHT';
   const generalizedInstallReview=
    await stageGeneralizedVerifiedOriginalInstallReview({
@@ -1516,6 +2226,76 @@ export default async function handler(req,res){
     integratedWorkIntakeStatus=
      /^REALITY_INTEGRATED_INTAKE_[A-Z0-9_]{4,90}$/.test(code)?
       code:'WEEKLY_AND_HOMEPAGE_INTAKE_PROVIDER_READ_UNAVAILABLE';
+   }
+  }
+  // Every signed wake independently qualifies REAL saved RED->GREEN repair
+  // opportunities against GitHub and original shift scope. Read-only: a
+  // decision packet, never a new job, approval or installation.
+  let automaticRepairOpportunityQualification={
+   status:'NO_AUTHORIZED_OWNER_SOURCE_FOR_REPAIR_QUALIFICATION',
+   reviewed_candidate_count:0,work_orders:[],
+   installation_authorized:false,production_changed:false,
+   original_job_completed:false,new_shift_started:false,read_only:true
+  };
+  // This is independent of the advisory weekly/Home intake. Its only
+  // prerequisites are this worker's signed wake, exact validated owner graph,
+  // and the independent read-only current owner/shift warrant gate.
+  // A broken optional supervisor intake must not silence a real research
+  // repair's safe next-action decision.
+  if(canAutomaticallyQualifyResearchRepairOnSignedWake({
+   wakeReceipt,graph:unifiedGraph,originalGate:sameOriginalPostmaintenanceGate
+  })){
+   try{
+    workerStage='AUTOMATIC_OWNER_REPAIR_SOURCE_AND_SCOPE_QUALIFICATION';
+    automaticRepairOpportunityQualification=
+     await automaticallyQualifyVerifiedRepairOpportunity({
+      db,env:process.env,graph:unifiedGraph,
+      originalGate:sameOriginalPostmaintenanceGate,
+      shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+      fetchImpl:fetch
+     });
+   }catch(error){
+    // A bounded diagnostic category helps Reality investigate the next
+    // blocker without disclosing provider responses, credentials or model text.
+    const code=String(error?.message||'');
+    const failureCode=/^AUTO_REPAIR_QUALIFICATION_[A-Z0-9_]{4,100}$/.test(code)||
+      code==='SHIFT_RPC_NOT_ALLOWLISTED'||
+      /^SHIFT_DATABASE_RPC_reality_read_owner_market_repair_proofs_v1_(?:TIMEOUT|UNAVAILABLE)$/.test(code)?
+      code:'REPAIR_SOURCE_OR_PROVIDER_UNVERIFIED';
+    automaticRepairOpportunityQualification={
+     status:'AUTOMATIC_REPAIR_SOURCE_SCOPE_OR_PROVIDER_UNVERIFIED',
+     failure_code:failureCode,
+     reviewed_candidate_count:0,work_orders:[],
+     installation_authorized:false,production_changed:false,
+     original_job_completed:false,new_shift_started:false,read_only:true
+    };
+   }
+  }
+  // The signed verified candidate becomes a durable exact owner decision,
+  // available in Reality Chat; once approved, the same worker independently
+  // repeats source readback on the SAME shift. No code install or final claim.
+  let signedRepairOwnerScopeHandoff={
+   status:'NO_VERIFIED_OWNER_REPAIR_SCOPE_HANDOFF',
+   installation_authorized:false,original_job_completed:false,
+   production_changed:false,new_shift_started:false
+  };
+  if(canAutomaticallyQualifyResearchRepairOnSignedWake({
+   wakeReceipt,graph:unifiedGraph,originalGate:sameOriginalPostmaintenanceGate
+  })){
+   try{
+    workerStage='SIGNED_REPAIR_SCOPE_OWNER_DECISION_AND_CONTINUATION';
+    signedRepairOwnerScopeHandoff=await advanceSignedRepairScopeOwnerHandoff({
+     db,env:process.env,graph:unifiedGraph,
+     qualification:automaticRepairOpportunityQualification,
+     shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+     fetchImpl:fetch
+    });
+   }catch{
+    signedRepairOwnerScopeHandoff={
+     status:'SIGNED_REPAIR_SCOPE_HANDOFF_OR_CONTINUATION_UNVERIFIED',
+     installation_authorized:false,original_job_completed:false,
+     production_changed:false,new_shift_started:false
+    };
    }
   }
   // Actual employee source investigations now RUN on the existing signed
@@ -2090,6 +2870,13 @@ export default async function handler(req,res){
     sameOriginalPostmaintenanceGate.production_changed===false;
    const outcomeCode=generalOriginalSettlement?.original_job_completed===true?
     'GENERAL_ORIGINAL_JOB_SETTLED_FINAL_RECEIPT_VERIFIED':
+    // A verified internal repair is not customer original work. Give the
+    // missing exact owner business-work lineage priority over a generic
+    // successful classification/routing message on the signed worker pulse.
+    (signedMaintenanceCanonicalBusinessLineageMissing||
+     signedMaintenanceOriginalReturnDispatch?.status===
+      'CANONICAL_OWNER_BUSINESS_ORIGINAL_EVIDENCE_REQUIRED')?
+    'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
     governedContinuityEvidenceClassification?.status===
      'GOVERNED_CONTINUITY_EVIDENCE_SEPARATED_AND_ROUTED'&&
     governedContinuityEvidenceClassification.lanes.some(l=>
@@ -2099,8 +2886,6 @@ export default async function handler(req,res){
     'SIGNED_MAINTENANCE_REPAIR_AND_ORIGINAL_LINEAGE_SEPARATELY_ROUTED':
     signedMaintenanceArtifactHandoff?.verified_repair_artifact===true?
     'SIGNED_MAINTENANCE_EXACT_REPAIR_ARTIFACT_REVIEW_READY':
-    signedMaintenanceCanonicalBusinessLineageMissing?
-    'SIGNED_MAINTENANCE_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_REQUIRED':
     signedMaintenanceAuthorizedCaseRedOutstanding?
     'SIGNED_MAINTENANCE_AUTHORIZED_CASE_SPECIFIC_FROZEN_RED_REQUIRED':
     signedMaintenanceAuthorizedSourceRequalificationPending?
@@ -2169,6 +2954,28 @@ export default async function handler(req,res){
       result?.status;
    const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
     outcomeCode:'RESULT_READBACK_UNVERIFIED';
+   // A signed wake is not shift progress when the same original-work
+   // blocker repeats. Route the bounded, receipt-backed signal into the
+   // EXISTING incident investigator. No approval, executor or new job here.
+   if(/(_REQUIRED|_BLOCKED|_UNVERIFIED|_NOT_READY)$/.test(safeOutcome)){
+    await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_worker_run_id:actualWorkerRunId,p_safe_result:safeOutcome
+    },{timeoutMs:8000}).then(receipt=>{
+     if(![
+      'SIGNED_SHIFT_BLOCKER_FIRST_OBSERVED',
+      'SIGNED_SHIFT_REPEATED_BLOCKER_INCIDENT_RECORDED',
+      'SIGNED_WORKER_WAKE_ALREADY_OBSERVED_NO_REPLAY'
+     ].includes(receipt?.status)||
+      receipt.new_original_admitted!==false||
+      receipt.execution_authorized!==false||
+      receipt.installation_authorized!==false||
+      receipt.production_changed!==false)
+      throw Error('SIGNED_SHIFT_NO_PROGRESS_RECEIPT_UNVERIFIED');
+    }).catch(()=>{
+     console.warn('REALITY_SIGNED_SHIFT_NO_PROGRESS_OBSERVER_UNVERIFIED');
+    });
+   }
    completedPulse=await shiftRpc(db,
     'reality_record_employee_shift_worker_pulse_v1',{
      p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
@@ -2179,19 +2986,141 @@ export default async function handler(req,res){
    durableWorkerCompletion=completedPulse;
   }
   const employeeTemporalInquiry=await employeeTemporalInquiryPromise;
+  // Cross-layer audit on the SAME signed wake. This does not promote an
+  // evidence pack, repair, or Universe entry to original-job completion.
+  // Health read failures cannot stop a governed shift.
+  let signedOwnerHandoffHealth={status:'SIGNED_OWNER_HANDOFF_HEALTH_UNVERIFIED',
+   read_only:true,installation_authorized:false,
+   original_job_completed:false,production_changed:false};
+  if(unifiedGraph?.status==='UNIFIED_OWNER_JOB_CONTROL_READY'&&
+      unifiedGraph.shift_id===wakeReceipt.shift_id){
+   try{
+    const h=await shiftRpc(db,'reality_read_owner_shift_handoff_health_v1',{
+     p_owner_id:unifiedGraph.owner_id
+    });
+    if(h?.status==='SIGNED_OWNER_SHIFT_HANDOFF_HEALTH_READ_ONLY'&&
+       h.owner_id===unifiedGraph.owner_id&&
+       h.shift_id===wakeReceipt.shift_id&&
+       h.read_only===true&&h.installation_authorized===false&&
+       h.original_job_completed===false&&h.production_changed===false&&
+       Number.isSafeInteger(h.original_claim_count)&&
+       Number.isSafeInteger(h.original_independent_final_receipt_count)&&
+       Number.isSafeInteger(h.employee_independently_verified_evidence_jobs)&&
+       Array.isArray(h.maintenance_handoffs)){
+      signedOwnerHandoffHealth={
+       status:h.status,owner_id:h.owner_id,shift_id:h.shift_id,
+       worker_status:h.worker_status,
+       employee_independently_verified_evidence_jobs:
+        h.employee_independently_verified_evidence_jobs,
+       original_claim_count:h.original_claim_count,
+       original_independent_final_receipt_count:
+        h.original_independent_final_receipt_count,
+       original_work_status:h.original_work_status,
+       repair_scope_status:h.repair_scope?.status||null,
+       maintenance_handoffs:h.maintenance_handoffs.map(x=>({
+        source_ref:x.source_ref,status:x.status,
+        next_action:x.next_action
+       })),
+       universe_verified_event_rows:h.universe_verified_event_rows,
+       ceo_operational_decision_handoff:h.ceo_operational_decision_handoff,
+       read_only:true,installation_authorized:false,
+       original_job_completed:false,production_changed:false
+      };
+    }
+   }catch{/* Signed execution continues; no guessed work status. */}
+  }
+  // Same signed wake: derive outstanding actions for ANY source-backed
+  // owner work from its independent ledger, not hardcoded job numbers.
+  // The planner cannot mutate, lease, approve, dispatch or settle jobs.
+  let governedCapabilityPlan={
+   status:'GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN_UNAVAILABLE',
+   executor_invoked:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false
+  };
+  if(signedOwnerHandoffHealth?.status===
+     'SIGNED_OWNER_SHIFT_HANDOFF_HEALTH_READ_ONLY'){
+   try{
+    const exactHealth=await shiftRpc(db,
+     'reality_read_owner_shift_handoff_health_v1',{
+      p_owner_id:unifiedGraph.owner_id
+     });
+    governedCapabilityPlan=planGovernedCapabilitiesFromOwnerReceipts({
+     health:exactHealth,ownerId:unifiedGraph.owner_id,
+     shiftId:wakeReceipt.shift_id,
+     registeredActionKeys:process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED===
+      'true'?[registeredMaintenanceCiAction]:[]
+    });
+   }catch{
+    governedCapabilityPlan={
+     status:'GOVERNED_SOURCE_RECEIPT_CAPABILITY_PLAN_UNVERIFIED',
+     executor_invoked:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false
+    };
+   }
+  }
   workerStage='WORKER_RESPONSE_PUBLICATION';
+  // Finish the signed wake lifecycle BEFORE responding: serverless execution
+  // after an HTTP response cannot guarantee release of this singleflight lease.
+  // A successful wake is still NOT original-job settlement.
+  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
+   try{
+    const attested=await shiftRpc(activePulseDb,
+     'reality_record_signed_worker_actual_run_v1',{
+      p_run_id:actualWorkerRunId,p_status:'COMPLETED',
+      p_stage:workerStage
+     });
+    workerCompletionAttestedBeforeResponse=
+     attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+     attested.run_id===actualWorkerRunId&&
+     attested.original_job_completed===false&&
+     attested.installation_authorized===false&&
+     attested.production_changed===false;
+    if(!workerCompletionAttestedBeforeResponse)
+     console.warn('REALITY_SIGNED_WORKER_PRE_RESPONSE_ATTESTATION_UNVERIFIED');
+   }catch{
+    console.warn('REALITY_SIGNED_WORKER_PRE_RESPONSE_ATTESTATION_UNAVAILABLE');
+   }
+  }
+  if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
+   try{
+    const released=await shiftRpc(activePulseDb,
+     'reality_release_governed_shift_worker_run_v1',{
+      p_claim_id:governedWakeClaimId
+     });
+    wakeLeaseReleasedBeforeResponse=
+     released?.status==='WAKE_RELEASED'&&
+     released.original_job_completed===false&&
+     released.installation_authorized===false;
+    if(!wakeLeaseReleasedBeforeResponse)
+     console.warn('REALITY_SHIFT_WORKER_PRE_RESPONSE_LEASE_NOT_RELEASED');
+   }catch{
+    console.warn('REALITY_SHIFT_WORKER_PRE_RESPONSE_LEASE_RELEASE_UNAVAILABLE');
+   }
+  }
   return res.status(200).json({...result,
     actual_worker_wake_receipt:wakeReceipt,
     actual_worker_completion_receipt:completedPulse,
+    continuous_qualification_inbox:continuousQualificationInbox,
+    continuity_qualification_routes:continuityQualificationRoutes,
+    exact_approved_business_effect_handoff:exactApprovedBusinessEffectHandoff,
     automatic_work_supervisor:automaticWorkSupervisor,
     automatic_work_supervisor_status:automaticWorkSupervisorStatus,
     integrated_work_intake:integratedWorkIntake,
+    automatic_repair_work_order_qualification:automaticRepairOpportunityQualification,
+    signed_repair_owner_scope_handoff:signedRepairOwnerScopeHandoff,
+    signed_owner_handoff_health:signedOwnerHandoffHealth,
+    governed_capability_plan:governedCapabilityPlan,
     integrated_work_intake_status:integratedWorkIntakeStatus,
     weekly_employee_source_investigations:weeklyEmployeeInvestigations,
     employee_time_inquiry_receipt:employeeTemporalInquiry,
     qualified_employee_executable_work:qualifiedEmployeeWork,
     changed_source_same_job_requalification:changedSourceRequalification,
+    signed_chat_review_incident_observation:signedChatReviewIncidentObservation,
+    signed_chat_model_rejection_reentry:signedModelRejectionReentry,
+    shift_investigation_remediation:shiftInvestigationRemediation,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
+    signed_continuity_recovery_action:signedContinuityRecoveryAction,
+    signed_continuity_recovery_verification:signedContinuityRecoveryVerification,
     shift_continuity_independent_review:continuityIndependentReview,
     independent_business_qualification_review:businessQualificationReview,
     signed_internal_maintenance_work:internalMaintenanceWork,
@@ -2201,6 +3130,7 @@ export default async function handler(req,res){
     signed_maintenance_epoch_handoff:maintenanceEpochHandoff,
     signed_external_maintenance_review:signedExternalMaintenanceReview,
     same_original_postmaintenance_gate:sameOriginalPostmaintenanceGate,
+    signed_original_lineage_evidence:signedOriginalLineageEvidence,
     durable_maintenance_handoff:durableMaintenanceHandoff,
     signed_maintenance_executor_claim:signedMaintenanceExecutorClaim,
     signed_maintenance_executor_outcome:signedMaintenanceExecutorOutcome,
@@ -2209,8 +3139,17 @@ export default async function handler(req,res){
     signed_maintenance_sourcecase_ci_reconciliation:signedMaintenanceCaseCiReconciliation,
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
+    signed_maintenance_frozen_test_build:signedMaintenanceFrozenTestBuild,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,
+    signed_maintenance_install_target_review:signedMaintenanceInstallTargetReview,
+    signed_maintenance_canonical_continuity:signedMaintenanceCanonicalContinuity,
+    signed_maintenance_governed_trigger:signedMaintenanceGovernedTrigger,
+    signed_maintenance_universe_return_trigger:signedMaintenanceReturnTrigger,
+    signed_maintenance_original_return_dispatch:signedMaintenanceOriginalReturnDispatch,
+    signed_maintenance_universe_postinstall_return:signedMaintenanceUniverseReconciliation,
+    signed_maintenance_approved_auto_install:signedMaintenanceApprovedInstall,
+    signed_maintenance_independent_postinstall:signedMaintenanceIndependentPostinstall,
     signed_maintenance_verified_artifact_ledger:signedMaintenanceArtifactLedger,
     governed_continuity_evidence_classification:governedContinuityEvidenceClassification,
     signed_schedule_evidence_admission:signedScheduleAdmission,
@@ -2226,6 +3165,10 @@ export default async function handler(req,res){
     same_original_recovery_checkpoint:sameOriginalRecoveryCheckpoint,
     same_original_recovery_ci_checkpoint:sameOriginalRecoveryCiCheckpoint,
     chat_new_development_checkpoint:chatNewDevelopmentCheckpoint,
+    signed_chat_recovery_syntax:signedRecoverySyntax,
+    signed_chat_full_goal_acceptance:signedChatFullGoalAcceptance,
+    signed_chat_fenced_provider_requalification:fencedProviderRequalification,
+    signed_chat_recovery_quarantine:signedRecoveryQuarantine,
     corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
@@ -2314,7 +3257,8 @@ export default async function handler(req,res){
  }finally{
   // Independently attest actual completion or failure even when a worker
   // response has already been sent. No false 'successful job' claim.
-  if(actualWorkerRunId&&activePulseDb&&!shiftDbTransportUnreachable){
+  if(actualWorkerRunId&&!workerCompletionAttestedBeforeResponse&&
+      activePulseDb&&!shiftDbTransportUnreachable){
    const result=res.statusCode>=500?'FAILED':'COMPLETED';
    const stage=/^[A-Z][A-Z0-9_]{5,70}$/.test(workerStage)?
     workerStage:'UNCLASSIFIED_STAGE';
@@ -2328,7 +3272,8 @@ export default async function handler(req,res){
   }
   // A failed release leaves a bounded lease, not another concurrent worker.
   // This does not settle customer work or change any authorization.
-  if(governedWakeClaimId&&activePulseDb&&!shiftDbTransportUnreachable){
+  if(governedWakeClaimId&&!wakeLeaseReleasedBeforeResponse&&
+      activePulseDb&&!shiftDbTransportUnreachable){
    try{
     const released=await shiftRpc(activePulseDb,
      'reality_release_governed_shift_worker_run_v1',

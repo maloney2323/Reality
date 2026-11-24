@@ -1,0 +1,43 @@
+name: Exact business effect authority source contract
+on:
+  pull_request:
+    branches:
+      - repair/maintenance-artifact-to-same-shift-review-20261120
+    paths:
+      - 'supabase/migrations/20261121235900_owner_exact_business_effect_preflight_v1.sql'
+      - 'supabase/migrations/20261122001000_owner_business_preclaim_approval_handoff_v2.sql'
+      - 'supabase/migrations/20261122002000_one_use_business_effect_approval_reservation_v1.sql'
+      - 'supabase/migrations/20261122003000_business_effect_exact_payload_persistence_v1.sql'
+      - 'supabase/migrations/20261122004000_signed_worker_next_approved_business_effect_v1.sql'
+      - 'supabase/migrations/20261122005000_owner_business_effect_approval_independent_readback_v1.sql'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'api/reality/personal-exact-business-effect-approval.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'test/reality-one-use-business-original-effect-approval-v1.test.js'
+      - 'api/reality/personal-business-effect-authority-preflight.js'
+      - 'src/reality-governed-shift-boundary-v1.js'
+      - 'test/reality-owner-exact-business-effect-preflight-v1.test.js'
+      - '.github/workflows/reality-owner-exact-business-effect-preflight-v1.yml'
+permissions:
+  contents: read
+concurrency:
+  group: exact-business-effect-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  exact-authority-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test authority and forged-receipt negatives
+        run: node --test test/reality-owner-exact-business-effect-preflight-v1.test.js test/reality-one-use-business-original-effect-approval-v1.test.js
+      - name: Parse exact preflight endpoint and signed RPC boundary
+        run: |
+          node --check api/reality/personal-business-effect-authority-preflight.js
+          node --check api/reality/personal-exact-business-effect-approval.js
+          node --check reality-chat-continuous-qualification-v1.js
+          node --check src/reality-governed-shift-boundary-v1.js
+          node --check api/reality/governed-employee-shift-worker.js

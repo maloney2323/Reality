@@ -34,10 +34,14 @@ function config(){
 async function rpc(c:{url:string,key:string},name:string,args:Record<string,unknown>){
  if(![
   'reality_read_signed_maintenance_repair_source_scope_v1',
+  'reality_read_signed_maintenance_frozen_test_draft_scope_v1',
   'reality_read_signed_existing_maintenance_case_ci_scope_v1',
+  'reality_read_final_loop_event_resume_shadow_v1',
   'reality_record_signed_existing_maintenance_case_ci_v1',
   'reality_read_signed_existing_maintenance_artifact_scope_v1',
-  'reality_record_signed_existing_maintenance_artifact_v1'
+  'reality_record_signed_existing_maintenance_artifact_v1',
+  'reality_read_signed_maintenance_install_target_review_v1',
+  'reality_record_signed_maintenance_install_target_review_v1'
  ].includes(name))fail('UNREGISTERED_SOURCE_RPC');
  const r=await fetch(c.url+'/rest/v1/rpc/'+name,{
   method:'POST',redirect:'error',cache:'no-store',
@@ -220,7 +224,9 @@ async function verifyOneCase(c:{url:string,key:string,github:string},
  return result;
 }
 async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
- if(Object.keys(b).sort().join(',')!=='mode,release_sha,shift_id,worker_run_id'||
+ const scoped=Object.prototype.hasOwnProperty.call(b,'resume_event_id');
+ if(Object.keys(b).sort().join(',')!==(scoped?'mode,release_sha,resume_event_id,shift_id,worker_run_id':'mode,release_sha,shift_id,worker_run_id')||
+    (scoped&&!UUID.test(b.resume_event_id||''))||
     !UUID.test(b.shift_id||'')||!UUID.test(b.worker_run_id||'')||
     !SHA.test(b.release_sha||''))
   return response(400,'CASE_CI_EXACT_SIGNED_WORKER_REQUEST_INVALID');
@@ -241,6 +247,24 @@ async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
     scope.installation_authorized!==false||
     scope.production_changed!==false)
   fail('CASE_CI_WARRANT_READBACK_INVALID');
+ let cases=scope.cases;
+ if(scoped){
+  const shadow=await rpc(c,'reality_read_final_loop_event_resume_shadow_v1',{p_shift_id:b.shift_id});
+  const events=Array.isArray(shadow?.events)?shadow.events.filter((e:any)=>
+   e.event_id===b.resume_event_id&&e.event_state==='SHADOW_PENDING'&&
+   e.source_current===true&&e.would_resume_suspended_obligation===true&&
+   ['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT'].includes(e.event_kind)&&
+   Array.isArray(shadow.subscriptions)&&shadow.subscriptions.some((s:any)=>
+    s.original_work_id===e.original_work_id&&s.source_ref===e.source_ref&&
+    s.continuity_revision===e.continuity_revision&&s.condition_kind===e.event_kind&&
+    s.next_qualified_action==='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC')):[];
+  if(shadow?.status!=='FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY'||
+     shadow.shift_id!==b.shift_id||shadow.execution_authorized!==false||events.length!==1)
+   return response(200,'NO_CURRENT_EXACT_CASE_CI_RESUME_EVENT',{reviewed_count:0});
+  cases=scope.cases.filter((x:any)=>x.source_ref===events[0].source_ref&&
+   x.owner_id===scope.owner_id&&x.shift_id===b.shift_id);
+  if(cases.length!==1)return response(200,'NO_CURRENT_EXACT_CASE_CI_RESUME_EVENT',{reviewed_count:0});
+ }
  const runs=await github(c,'/actions/runs?branch='+
    encodeURIComponent(EXECUTOR_BRANCH)+'&per_page=100');
  const matches=Array.isArray(runs?.workflow_runs)?
@@ -262,11 +286,12 @@ async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
    github(c,'/actions/runs/'+run.id+'/jobs?per_page=100'),
    github(c,'/actions/runs/'+run.id+'/artifacts?per_page=100')
  ]);
- for(const original of scope.cases){
+ for(const original of cases){
   const result=await verifyOneCase(c,b,original,run,jobs,arts);
   if(result!==null)
    return response(200,result.status,{
     maintenance_id:result.maintenance_id,shift_id:result.shift_id,
+    ...(scoped?{resume_event_id:b.resume_event_id,source_ref:original.source_ref}:{}),
     github_run_id:result.github_run_id,
     case_specific_ci_receipt_sha256:result.case_specific_ci_receipt_sha256,
     case_specific_frozen_red_attested:true,
@@ -438,6 +463,83 @@ async function verifiedArtifact(c:{url:string,key:string,github:string},b:any){
  return response(200,'NO_PINNED_VERIFIED_REPAIR_ARTIFACT_MATCHED_CASE');
 }
 
+
+const TARGET_BRANCH='reality/chat-direct-work-handoff-20261115';
+// Existing broker performs read-only GitHub target and rollback inspection;
+// its independent service-role receipt NEVER creates owner approval.
+async function verifiedTarget(c:{url:string,key:string,github:string},b:any){
+ if(!b||Object.keys(b).sort().join(',')!=='mode,release_sha,shift_id,worker_run_id'||
+  !UUID.test(b.shift_id||'')||!UUID.test(b.worker_run_id||'')||!SHA.test(b.release_sha||''))
+  return response(400,'TARGET_REVIEW_EXACT_SIGNED_REQUEST_REQUIRED');
+ const x=await rpc(c,'reality_read_signed_maintenance_install_target_review_v1',{
+  p_shift_id:b.shift_id,p_worker_run_id:b.worker_run_id});
+ if(x.status==='NO_SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_DUE'&&
+  x.installation_authorized===false&&x.repair_installed===false&&
+  x.original_job_completed===false&&x.production_changed===false)
+  return response(200,x.status);
+ if(x.status!=='SIGNED_MAINTENANCE_EXACT_INSTALL_TARGET_REVIEW_DUE'||
+  x.shift_id!==b.shift_id||!UUID.test(x.owner_id||'')||
+  !UUID.test(x.maintenance_id||'')||
+  x.reviewer_worker_run_id!==b.worker_run_id||
+  x.artifact_worker_run_id===b.worker_run_id||
+  !UUID.test(x.artifact_worker_run_id||'')||
+  x.target_branch!==TARGET_BRANCH||
+  !/^src\/[a-z0-9_./-]+\.js$/.test(x.source_path||'')||
+  x.source_path.includes('..')||
+  !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(x.source_ref||'')||
+  !SHA.test(x.candidate_commit_sha||'')||
+  !SHA.test(x.candidate_source_blob_sha||'')||
+  !SHA.test(x.historical_source_blob_sha||'')||
+  !HASH.test(x.case_ci_receipt_sha256||'')||
+  !HASH.test(x.artifact_receipt_sha256||'')||
+  x.installation_authorized!==false||x.original_job_completed!==false||
+  x.owner_approval_ready!==false||x.production_changed!==false||
+  x.new_shift_started!==false)
+  fail('TARGET_REVIEW_OWNER_WARRANT_OR_ARTIFACT_UNVERIFIED');
+ const ref=await github(c,'/git/ref/heads/'+TARGET_BRANCH);
+ if(ref.ref!=='refs/heads/'+TARGET_BRANCH||!SHA.test(ref.object?.sha||''))
+  fail('TARGET_REVIEW_TARGET_BRANCH_UNVERIFIED');
+ const [candidate,target]=await Promise.all([
+  verifiedGithubBlob(c,x.source_path,x.candidate_commit_sha),
+  verifiedGithubBlob(c,x.source_path,ref.object.sha)
+ ]);
+ if(!candidate||!target||candidate.sha!==x.candidate_source_blob_sha)
+  return response(200,'SIGNED_MAINTENANCE_INSTALL_TARGET_PROVIDER_PROOF_UNAVAILABLE',{
+   maintenance_id:x.maintenance_id});
+ if(target.sha!==x.historical_source_blob_sha)
+  return response(200,'SIGNED_MAINTENANCE_INSTALL_TARGET_SOURCE_DRIFT_REQUALIFICATION_REQUIRED',{
+   maintenance_id:x.maintenance_id});
+ const second=await github(c,'/git/ref/heads/'+TARGET_BRANCH);
+ if(second.ref!==ref.ref||second.object?.sha!==ref.object.sha)
+  return response(200,'SIGNED_MAINTENANCE_INSTALL_TARGET_SOURCE_DRIFT_REQUALIFICATION_REQUIRED',{
+   maintenance_id:x.maintenance_id});
+ const y=await rpc(c,'reality_record_signed_maintenance_install_target_review_v1',{
+  p_shift_id:b.shift_id,p_worker_run_id:b.worker_run_id,
+  p_maintenance_id:x.maintenance_id,p_candidate_blob_sha:candidate.sha,
+  p_target_branch:TARGET_BRANCH,p_target_head_sha:ref.object.sha,
+  p_target_existing_blob_sha:target.sha});
+ if(y.status!=='EXACT_SIGNED_MAINTENANCE_INSTALL_TARGET_INDEPENDENTLY_REVIEWED'||
+  y.shift_id!==b.shift_id||y.owner_id!==x.owner_id||
+  y.maintenance_id!==x.maintenance_id||
+  y.candidate_commit_sha!==x.candidate_commit_sha||
+  y.candidate_source_blob_sha!==candidate.sha||
+  y.target_branch!==TARGET_BRANCH||y.target_head_sha!==ref.object.sha||
+  y.target_existing_blob_sha!==target.sha||
+  !HASH.test(y.target_review_receipt_sha256||'')||
+  y.owner_approval_ready!==false||y.installation_authorized!==false||
+  y.repair_installed!==false||y.original_job_completed!==false||
+  y.production_changed!==false||y.new_shift_started!==false)
+  fail('TARGET_REVIEW_DURABLE_INDEPENDENT_RECEIPT_UNVERIFIED');
+ return response(200,y.status,{
+  maintenance_id:y.maintenance_id,owner_id:y.owner_id,shift_id:y.shift_id,
+  candidate_commit_sha:y.candidate_commit_sha,
+  candidate_source_blob_sha:y.candidate_source_blob_sha,
+  target_branch:y.target_branch,target_head_sha:y.target_head_sha,
+  target_existing_blob_sha:y.target_existing_blob_sha,
+  target_review_receipt_sha256:y.target_review_receipt_sha256,
+  install_target_verified:true,owner_approval_ready:false,repair_installed:false});
+}
+
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return response(405,'SIGNED_SOURCE_BROKER_POST_ONLY');
@@ -457,18 +559,24 @@ Deno.serve(async req=>{
   if(b?.mode==='artifact'){
    return await verifiedArtifact(c,b);
   }
+  if(b?.mode==='target'){
+   return await verifiedTarget(c,b);
+  }
+  const testDraft=['test_manifest','test_source'].includes(b?.mode);
+  const mode=testDraft?b.mode.slice(5):b?.mode;
   if(!b||Array.isArray(b)||typeof b!=='object'||
-     !['manifest','source'].includes(b.mode)||
+     !['manifest','source'].includes(mode)||
      !UUID.test(b.maintenance_id||'')||
      !UUID.test(b.request_id||'')||
      !SHA.test(b.release_sha||'')||
      Object.keys(b).sort().join(',')!==
-      (b.mode==='manifest'?'maintenance_id,mode,release_sha,request_id':
+      (mode==='manifest'?'maintenance_id,mode,release_sha,request_id':
        'maintenance_id,mode,release_sha,request_id,target_path')||
-     (b.mode==='source'&&(!FILE.test(b.target_path||'')||
+     (mode==='source'&&(!FILE.test(b.target_path||'')||
        b.target_path.includes('..')||b.target_path.includes('//'))))
    return response(400,'SIGNED_SOURCE_BROKER_SCOPE_INVALID');
-  const scope=await rpc(c,'reality_read_signed_maintenance_repair_source_scope_v1',{
+  const scope=await rpc(c,testDraft?'reality_read_signed_maintenance_frozen_test_draft_scope_v1':
+   'reality_read_signed_maintenance_repair_source_scope_v1',{
    p_maintenance_id:b.maintenance_id,p_request_id:b.request_id,
    p_release_sha:b.release_sha
   });
@@ -484,6 +592,32 @@ Deno.serve(async req=>{
      scope.original_job_completed!==false||
      scope.production_changed!==false)
    return response(403,'SIGNED_SOURCE_BROKER_LEDGER_SCOPE_REQUIRED');
+  // Approved repair scope can inspect only its one exact already approved blob.
+  // The maintenance warrant uses the same existing runtime-module manifest.
+  if(testDraft&&scope.authority_basis==='APPROVED_EXACT_SOURCE_SCOPE'){
+   const path=scope.approved_target_path,rev=scope.source_revision;
+   if(!FILE.test(path||'')||path.includes('..')||!SHA.test(rev||'')||
+      !SHA.test(scope.approved_target_blob_sha||'')||(mode==='source'&&b.target_path!==path))
+    return response(403,'SIGNED_FROZEN_TEST_APPROVED_TARGET_SCOPE_INVALID');
+   const file=await github(c,'/contents/'+path+'?ref='+rev);
+   if(file.path!==path||file.sha!==scope.approved_target_blob_sha||
+      file.encoding!=='base64'||typeof file.content!=='string'||
+      !Number.isSafeInteger(file.size)||file.size<300||file.size>60000)
+    fail('FROZEN_TEST_APPROVED_SOURCE_DRIFT');
+   const bytes=Uint8Array.from(atob(file.content.replace(/\s/g,'')),v=>v.charCodeAt(0));
+   if(bytes.length!==file.size||await gitBlobSha(bytes)!==file.sha)
+    fail('FROZEN_TEST_APPROVED_BLOB_HASH_MISMATCH');
+   const commit=await github(c,'/git/commits/'+rev);
+   if(commit.sha!==rev||!SHA.test(commit.tree?.sha||''))fail('FROZEN_TEST_APPROVED_COMMIT_DRIFT');
+   const id={maintenance_id:b.maintenance_id,request_id:b.request_id,
+    release_sha:b.release_sha,source_tree_sha:commit.tree.sha};
+   return mode==='manifest'?response(200,'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',{
+    ...id,runtime_imports_count:1,files:[{path,sha:file.sha,size:file.size}]}):
+    response(200,'SIGNED_MAINTENANCE_SOURCE_FILE_VERIFIED',{
+    ...id,path,sha:file.sha,size:file.size,encoding:'base64',content:file.content});
+  }
+  if(testDraft&&(scope.authority_basis!=='SIGNED_EXISTING_WARRANT'||scope.source_revision!==b.release_sha))
+   return response(403,'SIGNED_FROZEN_TEST_WARRANT_SCOPE_INVALID');
   const commit=await github(c,'/git/commits/'+b.release_sha);
   if(commit.sha!==b.release_sha||!SHA.test(commit.tree?.sha||''))
    fail('PINNED_GIT_COMMIT_DRIFT');
@@ -521,7 +655,7 @@ Deno.serve(async req=>{
   const eligible=files.filter((x:{path:string})=>imported.has(x.path));
   if(!eligible.length||eligible.length>350)
    fail('SIGNED_WORKER_EXECUTABLE_MODULE_GRAPH_UNVERIFIED');
-  if(b.mode==='manifest')
+  if(mode==='manifest')
    return response(200,'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',{
     maintenance_id:b.maintenance_id,request_id:b.request_id,
     release_sha:b.release_sha,source_tree_sha:tree.sha,

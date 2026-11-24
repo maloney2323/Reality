@@ -84,3 +84,69 @@ export async function reconcileSignedVerifiedMaintenanceArtifact({
   next_action:'INDEPENDENT_INSTALL_TARGET_AND_OWNER_APPROVAL_REVIEW_REQUIRED'
  });
 }
+
+
+// Existing signed worker delegates EXACT GitHub target/rollback inspection
+// to Reality's ALREADY credentialed, source-read-only Supabase broker. This
+// avoids copying a production GitHub secret into an isolated Vercel preview.
+// Only the existing owner/shift ledger can grant this readback and persist it.
+export async function independentlyReviewSignedMaintenanceInstallTarget({
+ db,env=process.env,shiftId,workerRunId,fetchImpl=fetch
+}={}){
+ const safe=(status,extra={})=>Object.freeze({
+  status,...extra,install_target_verified:false,owner_approval_ready:false,
+  installation_authorized:false,repair_installed:false,
+  original_job_completed:false,production_changed:false,new_shift_started:false
+ });
+ if(env.VERCEL_ENV!=='preview'||db?.strictSecrets!==true||
+  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+  db.url!=='https://'+db.project+'.supabase.co'||
+  typeof db.secretKey!=='string'||db.secretKey.length<25||
+  !UUID.test(shiftId||'')||!UUID.test(workerRunId||'')||
+  !SHA.test(env.VERCEL_GIT_COMMIT_SHA||'')||
+  typeof fetchImpl!=='function')
+  fail('INSTALL_TARGET_SIGNED_OWNER_SCOPE_REQUIRED');
+ let response;
+ try{
+  response=await fetchImpl(db.url+
+   '/functions/v1/reality-signed-maintenance-repair-source-broker-v1',{
+    method:'POST',cache:'no-store',redirect:'error',
+    signal:AbortSignal.timeout(27000),
+    headers:{apikey:db.secretKey,
+     authorization:'Bearer '+db.secretKey,'content-type':'application/json'},
+    body:JSON.stringify({mode:'target',shift_id:shiftId,
+     worker_run_id:workerRunId,release_sha:env.VERCEL_GIT_COMMIT_SHA})
+   });
+ }catch{return safe('SIGNED_MAINTENANCE_TARGET_PROVIDER_UNAVAILABLE')}
+ if(!response?.ok)return safe('SIGNED_MAINTENANCE_TARGET_BROKER_UNVERIFIED');
+ const r=await response.json().catch(()=>null);
+ if(!r||Array.isArray(r)||r.ok!==true||
+  r.source_read_only!==true||r.model_generated!==false||
+  r.independent_frozen_red_verified!==false||
+  r.independent_ci_verified!==false||
+  r.installation_authorized!==false||r.repair_executed!==false||
+  r.original_job_completed!==false||r.production_changed!==false||
+  r.new_shift_started!==false)
+  fail('INSTALL_TARGET_BROKER_AUTHORITY_INVALID');
+ if(['NO_SIGNED_MAINTENANCE_INSTALL_TARGET_REVIEW_DUE',
+  'SIGNED_MAINTENANCE_INSTALL_TARGET_SOURCE_DRIFT_REQUALIFICATION_REQUIRED',
+  'SIGNED_MAINTENANCE_INSTALL_TARGET_PROVIDER_PROOF_UNAVAILABLE'].includes(r.status))
+  return safe(r.status,{maintenance_id:r.maintenance_id||null});
+ if(r.status!=='EXACT_SIGNED_MAINTENANCE_INSTALL_TARGET_INDEPENDENTLY_REVIEWED'||
+  r.shift_id!==shiftId||!UUID.test(r.maintenance_id||'')||
+  !UUID.test(r.owner_id||'')||
+  !SHA.test(r.candidate_commit_sha||'')||
+  !SHA.test(r.candidate_source_blob_sha||'')||
+  r.target_branch!=='reality/chat-direct-work-handoff-20261115'||
+  !SHA.test(r.target_head_sha||'')||
+  !SHA.test(r.target_existing_blob_sha||'')||
+  !HASH.test(r.target_review_receipt_sha256||'')||
+  r.owner_approval_ready!==false||r.installation_authorized!==false||
+  r.repair_installed!==false||r.original_job_completed!==false||
+  r.production_changed!==false||r.new_shift_started!==false)
+  fail('INSTALL_TARGET_SIGNED_RECEIPT_INVALID');
+ return Object.freeze({...r,install_target_verified:true,
+  owner_approval_ready:false,installation_authorized:false,
+  repair_installed:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false});
+}

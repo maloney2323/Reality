@@ -85,6 +85,16 @@ export function classifyRealityGovernedContinuityEvidence({
     c?.frozen_source_red_verified===true&&
     c?.corrected_code_green_verified===true&&
     c?.repair_installed===false&&c?.original_job_completed===false);
+   // A later independent signed worker may have verified the exact preview
+   // installation target, but this is still NOT an owner approval or an install.
+   const reviewedTarget=x?.install_target_verified===true&&
+    HASH.test(x.target_review_receipt_sha256||'')&&
+    x.target_review_branch==='reality/chat-direct-work-handoff-20261115'&&
+    GIT.test(x.target_review_head_sha||'')&&
+    GIT.test(x.historical_source_blob_sha||'')&&
+    x.target_review_existing_blob_sha===x.historical_source_blob_sha;
+   const pendingTarget=x?.install_target_verified===false&&
+    x.target_review_receipt_sha256==null;
    if(!x||!UUID.test(x.maintenance_id||'')||
     x.shift_id!==shiftId||!PR.test(x.source_ref||'')||
     seen.has(x.maintenance_id)||x.maintenance_id===g.existing_maintenance_id||
@@ -96,7 +106,7 @@ export function classifyRealityGovernedContinuityEvidence({
     !HASH.test(x.github_artifact_digest||'')||
     !Number.isSafeInteger(x.github_run_id)||x.github_run_id<10000||
     !Number.isSafeInteger(x.github_artifact_id)||x.github_artifact_id<10000||
-    x.install_target_verified!==false||x.owner_approval_ready!==false||
+    (!reviewedTarget&&!pendingTarget)||x.owner_approval_ready!==false||
     x.installation_authorized!==false||x.repair_installed!==false||
     x.original_job_completed!==false){
     invalid=true;break;
@@ -109,15 +119,23 @@ export function classifyRealityGovernedContinuityEvidence({
     original_work_id:null,
     evidence_class:'INDEPENDENT_FROZEN_RED_GREEN_AND_PINNED_REPAIR_ARTIFACT',
     verified_fact:'EXACT_SOURCE_REPAIR_ARTIFACT_IN_LEDGER',
-    classified_state:'VERIFIED_ARTIFACT_INSTALL_TARGET_NOT_YET_VERIFIED',
+    classified_state:reviewedTarget?
+     'EXACT_ARTIFACT_INSTALL_TARGET_INDEPENDENTLY_VERIFIED_APPROVAL_PENDING':
+     'VERIFIED_ARTIFACT_INSTALL_TARGET_NOT_YET_VERIFIED',
     candidate_commit_sha:x.candidate_commit_sha,
     source_blob_sha:x.candidate_source_blob_sha,
     independent_evidence_receipt_sha256:x.review_receipt_sha256,
     frozen_test_receipt_sha256:x.case_ci_receipt_sha256,
     github_run_id:x.github_run_id,github_artifact_id:x.github_artifact_id,
-    next_governed_action:'INDEPENDENT_INSTALL_TARGET_AND_OWNER_APPROVAL_REVIEW_REQUIRED',
-    next_responsible_actor:'REALITY_GOVERNED_INSTALL_TARGET_REVIEW',
-    install_target_verified:false,owner_approval_ready:false
+    next_governed_action:reviewedTarget?
+     'EXACT_OWNER_APPROVAL_AND_ORIGINAL_RESUME_CONTRACT_REQUIRED':
+     'INDEPENDENT_INSTALL_TARGET_AND_OWNER_APPROVAL_REVIEW_REQUIRED',
+    next_responsible_actor:reviewedTarget?
+     'REALITY_GOVERNED_EXACT_OWNER_INSTALL_APPROVAL_GATE':
+     'REALITY_GOVERNED_INSTALL_TARGET_REVIEW',
+    install_target_verified:reviewedTarget,
+    target_review_receipt_sha256:reviewedTarget?x.target_review_receipt_sha256:null,
+    owner_approval_ready:false
    }));
   }
   if(invalid)notes.push('ARTIFACT_CROSS_LEDGER_LINEAGE_OR_AUTHORITY_CONFLICT');

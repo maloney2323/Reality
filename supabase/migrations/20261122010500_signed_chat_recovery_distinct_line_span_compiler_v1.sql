@@ -1,0 +1,104 @@
+-- Escalate the SAME existing signed Chat capability after TWO independent
+-- failed free-form find/replace attempts. This is a DIFFERENT frozen synthesis
+-- strategy, not another blind replay of the rejected candidate/environment.
+create or replace function public.reality_recompile_signed_chat_recovery_line_span_v1(
+ p_release_sha text) returns jsonb language plpgsql security invoker set search_path='' as $fn$
+declare q reality_internal.genuine_capability_queue_v1%rowtype;
+ h record; prior jsonb; revised jsonb; next_sha text; rejection_sha text;
+begin
+ if current_user<>'service_role' then
+  raise exception 'SIGNED_CHAT_RECOVERY_RECOMPILE_SERVICE_ONLY';end if;
+ if p_release_sha !~ '^[a-f0-9]{40}$' then
+  raise exception 'SIGNED_CHAT_RECOVERY_RECOMPILE_PREVIEW_SOURCE_REQUIRED';end if;
+ select * into q from reality_internal.genuine_capability_queue_v1
+ where source_kind='SIGNED_CHAT_DEVELOPMENT_RECOVERY'
+ and phase='SIGNED_CHAT_RECOVERY_MODEL_REJECTED'
+ and qualified_candidate is null and quarantine_receipt_sha256 is null
+ and recovery_spec->>'schema'='reality-recovery-compiler-capability-spec-v1'
+ and qualification_receipt->>'recovery_revision_count'='1'
+ and coalesce((qualification_receipt->>'approach_revision_count')::integer,0)=0
+ and qualification_receipt->'negative_capability_memory'->>'reason'=
+  'MODEL_BOUNDED_UNIQUE_CODE_CHANGE_NOT_VERIFIED'
+ and qualification_receipt->'negative_capability_memory'->>'spec_sha256'=
+  recovery_spec_sha256
+ and qualification_receipt->'negative_capability_memory'->>'source_env_fingerprint'
+  is distinct from p_release_sha
+ order by created_at,trigger_id limit 1 for update skip locked;
+ if q.trigger_id is null then return pg_catalog.jsonb_build_object(
+  'status','NO_VERIFIED_DISTINCT_RECOVERY_STRATEGY_DUE',
+  'installation_authorized',false,'original_job_completed',false,
+  'production_changed',false,'new_shift_started',false);end if;
+ select w.* into h from reality_internal.chat_work_handoffs_v1 w
+ join public.reality_chat_messages m on m.id=w.message_id
+ and m.role='user' and m.user_id=w.owner_id
+ and m.conversation_id=w.conversation_id and m.request_id=w.request_id
+ where w.message_id=q.source_message_id and w.owner_id=q.owner_id
+ and w.conversation_id=q.conversation_id
+ and w.message_sha256=q.source_sha256
+ and w.message_sha256=pg_catalog.encode(pg_catalog.sha256(
+  pg_catalog.convert_to(m.content,'UTF8')),'hex')
+ and w.development->>'phase'='CI_VERIFIED'
+ and w.development->>'original_work_id'=q.original_work_id
+ and w.development->'evidence'->>'goal_gap_receipt_sha256'=q.blocker_receipt_sha256
+ and w.development->>'installation_authorized'='false'
+ and w.development->>'production_changed'='false'
+ and w.development->>'original_job_completed'='false';
+ if h.message_id is null or q.recovery_spec_sha256 is distinct from
+  'sha256:'||pg_catalog.encode(extensions.digest(q.recovery_spec::text,'sha256'),'hex')
+ then raise exception 'SIGNED_CHAT_RECOVERY_RECOMPILE_ORIGINAL_OR_SPEC_DRIFT';end if;
+ prior:=q.qualification_receipt->'negative_capability_memory';
+ rejection_sha:='sha256:'||pg_catalog.encode(extensions.digest(
+  q.trigger_id::text||':'||q.recovery_spec_sha256||':'||prior::text,'sha256'),'hex');
+ revised:=q.recovery_spec||pg_catalog.jsonb_build_object(
+  'schema','reality-recovery-compiler-capability-spec-v2',
+  'patch_strategy','FROZEN_GITHUB_LINE_SPAN_INDEPENDENT_EXACT_ANCHOR',
+  'previous_spec_sha256',q.recovery_spec_sha256,
+  'rejected_previous_strategy','UNVERIFIED_FREE_FORM_EXACT_FIND_TEXT',
+  'rejection_receipt_sha256',rejection_sha,
+  'bounded_model_corrections',1,
+  'line_span_max_lines',81,
+  'source_size_max_bytes',210000,
+  'source_excerpt_max_chars',36000,
+  'source_relevance_roots',pg_catalog.jsonb_build_array(
+   'api/reality/governed-employee-shift-worker.js',
+   'api/reality/generalized-original-install-review.js',
+   'api/reality/generalized-owner-install-approval.js'),
+  'source_execution_authorized',false,
+  'full_goal_accepted',false,
+  'installation_authorized',false,
+  'original_job_completed',false,
+  'production_changed',false);
+ next_sha:='sha256:'||pg_catalog.encode(extensions.digest(revised::text,'sha256'),'hex');
+ update reality_internal.genuine_capability_queue_v1
+ set phase='SIGNED_CHAT_RECOVERY_SPEC_FROZEN',
+  claim_id=null,claim_expires_at=null,
+  recovery_spec=revised,recovery_spec_sha256=next_sha,
+  frozen_suite_ref='recovery-spec:'||next_sha,
+  qualification_receipt=qualification_receipt||
+   pg_catalog.jsonb_build_object(
+   'approach_revision_count',1,
+   'line_span_compiler_release_sha',p_release_sha,
+   'previous_free_form_spec_sha256',q.recovery_spec_sha256,
+   'latest_rejection_receipt_sha256',rejection_sha,
+   'rejection_history',coalesce(qualification_receipt->'rejection_history','[]'::jsonb)||
+       pg_catalog.jsonb_build_array(prior),
+   'line_span_strategy_compiled_at',clock_timestamp()),
+  updated_at=clock_timestamp()
+ where trigger_id=q.trigger_id
+ and phase='SIGNED_CHAT_RECOVERY_MODEL_REJECTED';
+ if not found then raise exception 'SIGNED_CHAT_RECOVERY_RECOMPILE_RACE';end if;
+ return pg_catalog.jsonb_build_object(
+  'status','SIGNED_CHAT_RECOVERY_DISTINCT_LINE_SPAN_STRATEGY_FROZEN',
+  'trigger_id',q.trigger_id,
+  'original_work_id',q.original_work_id,
+  'source_message_id',q.source_message_id,
+  'blocker_receipt_sha256',q.blocker_receipt_sha256,
+  'previous_spec_sha256',q.recovery_spec_sha256,
+  'recompiled_spec_sha256',next_sha,
+  'rejection_memory_receipt_sha256',rejection_sha,
+  'independent_full_goal_feature_acceptance',false,
+  'installation_authorized',false,'original_job_completed',false,
+  'production_changed',false,'new_shift_started',false);
+end $fn$;
+revoke all on function public.reality_recompile_signed_chat_recovery_line_span_v1(text) from public,anon,authenticated;
+grant execute on function public.reality_recompile_signed_chat_recovery_line_span_v1(text) to service_role;

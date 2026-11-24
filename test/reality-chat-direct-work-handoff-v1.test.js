@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment,readSignedChatDevelopmentStatus}
+import {inspectSavedChatWork,processSignedSavedChatWork,advanceSignedChatDevelopment,readSignedChatDevelopmentStatus,isExplicitSignedShiftContinuation}
  from '../src/reality-saved-chat-work-adapter-v1.js';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 
@@ -707,4 +707,173 @@ test('an authenticated saved build moves the handoff box into Chat progress and 
  assert.ok(card.children[4].children.some(x=>x.href===
   '/api/reality/personal-genuine-final-receipt-pdf?work_id='+encodeURIComponent(workId)));
  assert.equal(seen.filter(x=>x.method==='POST'&&x.body?.action==='ADVANCE_SIGNED_NEW_DEVELOPMENT').length,1);
+});
+
+test('existing signed shift notice has a real X; dismissal persists across saved-history hydration without deleting work',async()=>{
+ const code=readFileSync(new URL('../reality-chat-direct-work-handoff-v1.js',import.meta.url),'utf8');
+ const storage=new Map(),fetches=[];
+ const sessionStorage={
+  getItem:key=>storage.get(key)||null,
+  setItem:(key,value)=>{storage.set(key,value)}
+ };
+ const makeFixture=()=>{
+  const events=new Map(),dom={};
+  function element(tag='section'){
+   return {tagName:tag.toUpperCase(),textContent:'',hidden:false,style:{},children:[],
+    dataset:{},classList:{contains:cls=>false},parentElement:null,
+    setAttribute(){},
+    append(...nodes){
+     for(const child of nodes){this.children.push(child);child.parentElement=this}
+    },
+    replaceChildren(...nodes){this.children=[];this.append(...nodes)},
+    insertBefore(child){this.append(child)},
+    remove(){
+     if(this.parentElement){
+      const a=this.parentElement.children;
+      const i=a.indexOf(this);if(i>=0)a.splice(i,1);
+      this.parentElement=null;
+     }
+    }};
+  }
+  const ready=element(),composer=element(),container=element(),
+   transcript=element(),work=element();
+  container.append(composer);ready.contains=node=>node===composer;
+  Object.assign(dom,{
+   privateReady:ready,realityChatComposer:composer,
+   privateTranscript:transcript,realityChatPanelWork:work
+  });
+  const window={location:{pathname:'/chat'},sessionStorage,
+   realityActiveConversationId:()=>conversationId,
+   addEventListener:(n,fn)=>events.set(n,fn)};
+  runInNewContext(code,{window,document:{
+   getElementById:id=>dom[id]||null,
+   createElement:element
+  },AbortSignal,fetch:async(url,opt)=>{
+   fetches.push({url,method:opt.method,action:JSON.parse(opt.body).action});
+   return {ok:true,status:200,json:async()=>({
+    ok:true,status:'CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED',
+    capability_id:'governed-existing-shift-continuation',
+    request_id:requestId,source_ref,
+    shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+    network_request_id:19637,wake_enqueued:true,
+    last_worker_safe_result:'SIGNED_MAINTENANCE_REPAIR_AND_ORIGINAL_LINEAGE_SEPARATELY_ROUTED',
+    installation_authorized:false,production_changed:false
+   })};
+  }});
+  const rehydrate=async()=>{
+   events.get('reality:saved-chat-readback')({detail:{
+    conversation_id:conversationId,
+    messages:[{role:'user',request_id:requestId,source_ref,
+     text:'Reality, continue the existing authorized shift.',
+     created_at:'2026-11-20T23:00:00Z'}]
+   }});
+   for(let i=0;i<7;i++)await new Promise(resolve=>setImmediate(resolve));
+  };
+  return {transcript,rehydrate};
+ };
+ const first=makeFixture();
+ await first.rehydrate();
+ assert.equal(first.transcript.children.length,1);
+ const card=first.transcript.children[0];
+ const close=card.children[0].children.at(-1);
+ assert.equal(close.tagName,'BUTTON');
+ assert.equal(close.textContent,'×');
+ assert.equal(close.className,'reality-chat-shift-notice-dismiss');
+ assert.equal(close.type,'button');
+ assert.ok(fetches.every(x=>x.action==='READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS'));
+ const before=fetches.length;
+ close.onclick();
+ assert.equal(card.hidden,true);
+ assert.equal(first.transcript.children.length,0);
+ assert.equal(fetches.length,before,'dismissal must not POST or start another shift');
+ assert.equal(storage.get('reality:hide-signed-shift-note:'+requestId),'1');
+ const reloaded=makeFixture();
+ await reloaded.rehydrate();
+ assert.equal(reloaded.transcript.children.length,0,'dismissed notice stays gone after browser reload');
+ assert.ok(fetches.every(x=>x.action==='READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS'));
+});
+
+test('explicit existing-shift continuation retains safety PROHIBITIONS without authorizing installation',async()=>{
+ const signed='Reality, continue existing authorized shift "ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce".\n\n'+
+  'PR #308 is independently verified and its result has returned to the Universe. '+
+  'The remaining PR #307 original-work review is blocked because the governed original-work admission and execution trigger are missing.\n\n'+
+  'Investigate your existing authenticated Chat instructions, original-work ledger, Governed Trigger System, and work-admission pipeline. '+
+  'Determine whether a legitimate source-backed original instruction already exists for this internal development/review job.\n\n'+
+  'If verified evidence exists, reconcile and qualify it through your existing governed admission system, then continue the authorized work. '+
+  'If it does not, identify the exact missing owner authorization or source evidence.\n\n'+
+  'Do not invent customer work, restart the shift, repeat completed CI diagnostics, install code without exact authorization, or claim completion without independent verification.\n\n'+
+  'Report the actual admission result, execution result, and next governed action in this Chat.';
+ assert.equal(isExplicitSignedShiftContinuation(signed),true);
+ let continued=0,classified=0,admissions=0;
+ const r=await processSignedSavedChatWork({...args,
+  messages:[{...messages[0],text:signed}],
+  inspect:async()=>{classified++;throw Error('MUST_NOT_RECLASSIFY')},
+  admitNew:async()=>{admissions++;throw Error('MUST_NOT_CREATE_NEW_SHIFT')},
+  continueExistingShift:async()=>{
+   continued++;
+   return {status:'CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
+    shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce',
+    new_shift_started:false,installation_authorized:false,
+    original_job_completed:false,worker_execution_verified:false};
+  }
+ });
+ assert.equal(r.status,'CHAT_EXISTING_SHIFT_WAKE_ENQUEUED');
+ assert.equal(continued,1);
+ assert.equal(classified,0);
+ assert.equal(admissions,0);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(r.original_job_completed,false);
+});
+test('affirmative high-consequence actions never pass as existing-shift-only work',()=>{
+ const prefix='Reality, continue the existing authorized shift. ';
+ for(const unsafe of [
+  'Install the candidate repair now.',
+  'Deploy to production.',
+  'Please approve the patch.',
+  'Do not install, but deploy to production.',
+  'Do not install. Then approve the repair.',
+  'Do not install unless I say so.',
+  'Do not install; go ahead and deploy.',
+  'Do not install, however approve it now.',
+  'Do not install, instead deploy.',
+  'Do not install; please approve the release.'
+ ])assert.equal(isExplicitSignedShiftContinuation(prefix+unsafe),false,unsafe);
+ for(const safe of [
+  'Do not install without exact authorization.',
+  'Never deploy to production.',
+  'Do not approve any additional installation.',
+  'Do not invent customer work, restart the shift, repeat diagnostics, install code without exact authorization, or claim completion.'
+ ])assert.equal(isExplicitSignedShiftContinuation(prefix+safe),true,safe);
+});
+
+test('saved original Chat continuation offers a separate explicit existing-shift action, not a fake read-only check',()=>{
+ const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(ui,/inspect\.textContent='Check available work capability'/);
+ assert.match(ui,/continueSigned\.textContent='Continue existing signed shift'/);
+ assert.match(ui,/continueSigned\.onclick=async\(\)=>/);
+ assert.match(ui,/postWork\('PROCESS_SIGNED_WORK_REQUEST'\)/);
+ assert.match(ui,/postWork\('READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS'\)/);
+ assert.match(ui,/controls\.append\(continueSigned\)/);
+ assert.match(ui,/result\.new_shift_started!==false/);
+ assert.match(ui,/result\.installation_authorized!==false/);
+ assert.match(ui,/result\.worker_execution_verified!==false/);
+ assert.doesNotMatch(ui,/void continueSigned\.onclick\(\)/,
+  'no implicit replay of signed historical instructions or approval');
+});
+
+test('database standing-shift router accepts negated install instructions without bypassing signed owner scope',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261121021543_signed_existing_shift_continuation_accepts_negative_safety_instructions_v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/for v_clause in select/);
+ assert.match(sql,/regexp_split_to_table\(v_message\.content/);
+ assert.match(sql,/do\[\[:space:\]\]\+not/);
+ assert.match(sql,/but\|however\|instead\|then/);
+ assert.match(sql,/v_clause !~\*/);
+ assert.doesNotMatch(sql,/v_message\.content ~\* '\(\^\|\[\^a-z\]\)\(install\|deploy/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/w\.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'/);
+ assert.match(sql,/jsonb_array_length\(w\.source_scope\) between 1 and 4/);
+ assert.match(sql,/from reality_internal\.owner_chat_existing_shift_wakes_v1/);
+ assert.match(sql,/on conflict do nothing/);
+ assert.match(sql,/net\.http_post\(/);
+ assert.doesNotMatch(sql,/SECURITY DEFINER|GRANT ALL TO PUBLIC|reality_start_owner_shift/);
 });

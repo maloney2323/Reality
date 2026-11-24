@@ -1,0 +1,20 @@
+name: Reality existing signed Chat CI readback on isolated repair preview
+on:
+  pull_request:
+    paths:
+      - 'src/reality-chat-new-development-publisher-v1.js'
+      - 'supabase/functions/reality-chat-new-development-broker-v1/index.ts'
+      - 'test/reality-chat-repair-preview-frozen-original-ci-v1.test.js'
+  workflow_dispatch:
+jobs:
+  repair-preview-readback:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check src/reality-chat-new-development-publisher-v1.js
+      - run: node --test test/reality-chat-repair-preview-frozen-original-ci-v1.test.js test/reality-chat-staged-ci-frozen-release-reconciliation-v1.test.js

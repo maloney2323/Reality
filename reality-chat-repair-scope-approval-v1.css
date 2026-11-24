@@ -1,0 +1,22 @@
+.reality-repair-scope-chat-card{max-width:820px;border:1px solid rgba(122,158,213,.34);border-radius:16px;padding:18px;background:linear-gradient(145deg,rgba(21,33,58,.95),rgba(12,19,35,.92));color:#edf4ff;box-shadow:0 10px 25px rgba(0,0,0,.17);margin:12px 0;}
+.reality-repair-scope-chat-card[hidden]{display:none!important}
+.reality-repair-scope-chat-card .label{font-size:.72rem;font-weight:700;letter-spacing:.09em;color:#99c8fe;margin-bottom:8px}
+.reality-repair-scope-title{display:block;font-size:1.04rem;line-height:1.45}
+.reality-repair-scope-detail{font-size:.92rem;line-height:1.5;margin:10px 0}
+.reality-repair-scope-evidence{font-size:.8rem;line-height:1.5;color:#c1cce0;overflow-wrap:anywhere}
+.reality-repair-scope-limit{font-size:.81rem;line-height:1.5;color:#b9d6f7}
+.reality-repair-scope-buttons{display:flex;flex-wrap:wrap;gap:10px;margin:13px 0}
+.reality-repair-scope-buttons button{border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:650;border:1px solid rgba(155,193,244,.45);background:rgba(31,49,78,.8);color:white}
+.reality-repair-scope-buttons .reality-repair-scope-approve{background:#3174ce;color:white;border-color:#3174ce}
+.reality-repair-scope-buttons button:disabled{opacity:.45;cursor:default}
+.reality-repair-scope-status{font-size:.8rem;color:#b8d1ec;overflow-wrap:anywhere;line-height:1.5;margin:8px 0 0}
+@media(max-width:600px){.reality-repair-scope-chat-card{padding:14px;margin:9px 0}.reality-repair-scope-buttons{flex-direction:column}.reality-repair-scope-buttons button{width:100%;min-height:44px}}
+
+.reality-repair-scope-operational{border-top:1px solid rgba(155,193,244,.25);border-bottom:1px solid rgba(155,193,244,.25);margin:12px 0;padding:12px 0;display:grid;gap:7px}
+.reality-repair-scope-operational[hidden]{display:none!important}
+.reality-repair-scope-operational .reality-repair-scope-phase{font-size:.92rem;line-height:1.4;color:#e8f2ff}
+.reality-repair-scope-operational p{margin:0;font-size:.83rem;line-height:1.5;overflow-wrap:anywhere}
+.reality-repair-scope-last{color:#bbd4f3}
+.reality-repair-scope-done{color:#c9f4de}
+.reality-repair-scope-blocked{color:#ffdcc3}
+.reality-repair-scope-next{color:#f4f9ff}

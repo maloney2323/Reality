@@ -909,6 +909,8 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
  <link rel="stylesheet" href="/reality-connections-workspace-v1.css">
  <link rel="stylesheet" href="/reality-chat-mobile-usable-v3.css">
  <link rel="stylesheet" href="/reality-chat-maintenance-continuation-v1.css">
+  <link rel="stylesheet" href="/reality-chat-repair-scope-approval-v1.css">
+  <link rel="stylesheet" href="/reality-chat-handoff-health-v1.css">
 </head>
 <body class="reality-simple-home">
 <main>
@@ -7308,6 +7310,62 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
        inspect.disabled=false;
       }
      };
+     // A saved explicit owner instruction to CONTINUE the existing shift
+     // needs an actual, separately labeled action. "Check available work
+     // capability" above is only read-only inspection; never present it as
+     // execution. The server revalidates signed source, owner warrant,
+     // no-new-shift scope, and non-installation authority on every dispatch.
+     const signedShiftCommand=typeof message.text==='string'&&
+      /^(?:reality\s*[,.:]?\s*)?(?:please\s+)?(?:continue|resume|run|finish|execute)\s+(?:(?:the|my|our)\s+)?(?:existing\s+)?authorized\s+shift\b/i.test(message.text.trim());
+     if(signedShiftCommand){
+      const continueSigned=document.createElement('button');
+      continueSigned.type='button';
+      continueSigned.textContent='Continue existing signed shift';
+      continueSigned.setAttribute('aria-label','Continue this saved instruction in the existing authorized shift');
+      continueSigned.onclick=async()=>{
+       if(continueSigned.disabled)return;
+       continueSigned.disabled=true;
+       report.textContent='Sending this exact signed saved instruction to the existing governed worker. No new shift or installation approval.';
+       try{
+        const result=await postWork('PROCESS_SIGNED_WORK_REQUEST');
+        if(!['CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
+              'CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED'].includes(result.status)||
+           result.new_shift_started!==false||
+           result.installation_authorized!==false||
+           result.original_job_completed!==false||
+           result.worker_execution_verified!==false||
+           !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(result.shift_id||''))
+         throw Error('CHAT_EXISTING_SHIFT_WAKE_NOT_VERIFIED');
+        report.textContent='Existing signed shift '+result.shift_id+
+         ': '+(result.status==='CHAT_EXISTING_SHIFT_WAKE_ENQUEUED'?
+          'governed worker wake queued':'this saved request was already queued')+
+         '. No new approval, installation or original-job completion was inferred.';
+       }catch(error){
+        report.textContent='Existing-shift dispatch outcome unverified: '+
+         String(error.message||'UNKNOWN').slice(0,110)+
+         '. Inspect the exact saved request; do not submit another shift.';
+       }
+       // Fail closed after ambiguous dispatch. Never auto-replay a work POST.
+       const status=document.createElement('button');
+       status.type='button';status.textContent='Check this exact shift wake receipt';
+       status.onclick=async()=>{
+        status.disabled=true;
+        try{
+         const read=await postWork('READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS');
+         report.textContent=read.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED'?
+          'Original signed shift '+read.shift_id+
+          ' · request '+String(read.network_request_id||'unavailable')+
+          ' is independently recorded. Worker completion remains separately unverified.':
+          'No independently verified wake receipt yet ('+
+           String(read.status||'UNKNOWN')+'). Do not duplicate the request.';
+        }catch{
+         report.textContent='Exact signed shift wake readback unavailable. Do not duplicate the request.';
+        }finally{status.disabled=false}
+       };
+       controls.append(status);
+      };
+      controls.append(continueSigned);
+     }
      controls.append(inspect,report);card.append(controls);
      const justSaved=window.realityJustSavedWorkRequest;
      if(justSaved?.conversation_id===conversationId()&&
@@ -7429,15 +7487,21 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   if(sessionRequestInFlight)return;
   sessionRequestInFlight=true;
   const previouslyVerified=el('privateReady').style.display==='block';
+  // An expired/slow provider read must NEVER hide an already-visible email
+  // and password form. Otherwise the recovery timer traps owners behind an
+  // endless "Retry account connection" screen despite a usable login POST.
+  const loginAlreadyVisible=el('privateLogin').style.display==='block';
   if(!previouslyVerified){
-   el('privateAccountState').textContent='Checking secure account session…';
-   el('privateLogin').style.display='none';
+   el('privateAccountState').textContent=loginAlreadyVisible?
+    'Checking account connection… You can still sign in below.':
+    'Checking secure account session…';
+   if(!loginAlreadyVisible)el('privateLogin').style.display='none';
    el('privateReady').style.display='none';
   }
   el('privateRetrySession').hidden=true;
   try{
    const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin',
-    signal:AbortSignal.timeout(16500)});
+    signal:AbortSignal.timeout(23500)});
    if(!r.ok)throw Error(r.status===404?
     'Sign-in service is not installed on this preview (HTTP 404).':
     'Sign-in service returned HTTP '+r.status+'.');
@@ -7471,13 +7535,19 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      '. Your open workspace and draft are preserved. New actions still require server verification.';
     status('Connection interrupted. Your current conversation is preserved; checking secure session again.');
    }else{
+    // HTTP 503 is NOT evidence of a bad password or signed-out account.
+    // Preserve a usable manual login path; every login still requires
+    // Supabase to independently verify email, password and owner identity.
     guidedSetup.authenticated=false;
-    guidedSetup.accountError='Sign-in status unavailable. No work authorized.';
+    guidedSetup.accountError='Session readback unavailable; owner sign-in can be retried. No work authorized.';
     paintGuidedSetup();
-    el('accountShortcut').textContent='Account · Unavailable';
-    el('privateAccountState').textContent='Account connection unavailable: '+detail+
-     '. Reality will retry the secure session check. No job has started.';
-    status('Sign-in service temporarily unavailable. Retrying the secure connection.');
+    el('privateLogin').style.display='block';
+    el('privateReady').style.display='none';
+    el('accountShortcut').textContent='Account · Sign in';
+    el('privateAccountState').textContent=
+     'Account session check unavailable: '+detail+
+     '. You can try your existing Reality sign-in below or retry the connection. No job has started.';
+    status('Secure session check unavailable. Email/password sign-in remains available; no approval or job started.');
    }
    el('privateRetrySession').hidden=false;
    // Only re-issue a GET session check. NEVER replay a work/approval write.
@@ -7522,7 +7592,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   try{
    const r=await fetch(endpoint,{method:'POST',credentials:'same-origin',
     headers:{'content-type':'application/json'},
-    signal:AbortSignal.timeout(30000),
+    signal:AbortSignal.timeout(40000),
     body:JSON.stringify({email:el('privateEmail').value,password:el('privatePassword').value})});
    const data=await r.json();
    if(!r.ok)throw Error(data?.error||'CHAT_SIGN_IN_REQUEST_FAILED');
@@ -7990,12 +8060,16 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
 </script>
 <script defer src="/reality-chat-workspace-v1.js"></script>
  <script defer src="/reality-chat-maintenance-continuation-v1.js"></script>
+  <script defer src="/reality-chat-repair-scope-approval-v1.js"></script>
+  <script defer src="/reality-chat-handoff-health-v1.js"></script>
+<script defer src="/reality-chat-installation-status-v1.js"></script>
  <script defer src="/reality-chat-first-contact-v1.js"></script>
  <script defer src="/reality-chat-proactive-operational-v1.js"></script>
 <script defer src="/reality-chat-operational-incident-briefing-v1.js"></script>
 <script defer src="/reality-chat-direct-work-handoff-v1.js"></script>
 <script defer src="/reality-chat-existing-shift-status-v1.js"></script>
 <script defer src="/reality-chat-employee-shift-card-v1.js"></script>
+<script defer src="/reality-chat-continuous-qualification-v1.js"></script>
 <script defer src="/reality-chat-approved-assignments-v1.js"></script>
 <script defer src="/reality-chat-conversation-export-v1.js"></script>
 <script defer src="/reality-chat-verified-cycle-v2.js"></script>

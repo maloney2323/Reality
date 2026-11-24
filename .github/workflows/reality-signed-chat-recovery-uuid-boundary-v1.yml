@@ -1,0 +1,25 @@
+name: Reality signed review canonical UUID boundary and safe quarantine proof
+on:
+  pull_request:
+    paths:
+      - 'src/reality-signed-chat-recovery-target-review-v1.js'
+      - 'src/reality-chat-recovery-quarantine-publisher-v1.js'
+      - 'supabase/functions/reality-chat-recovery-quarantine-broker-v1/index.ts'
+      - 'test/ci/reality-signed-chat-recovery-quarantine-source-proof-v1.test.mjs'
+      - 'test/reality-signed-chat-recovery-uuid-boundary-v1.test.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-recovery-uuid-repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: node --check src/reality-signed-chat-recovery-target-review-v1.js
+      - run: node --check src/reality-chat-recovery-quarantine-publisher-v1.js
+      - run: node --test test/reality-signed-chat-recovery-uuid-boundary-v1.test.js test/reality-signed-chat-recovery-spec-target-review-v1.test.js

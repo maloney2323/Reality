@@ -1,0 +1,20 @@
+name: Reality existing original Chat recovery priority
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*existing_chat_original_reconciliation_priority_v1.sql'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'test/reality-existing-chat-original-reconciliation-priority-v1.test.js'
+  workflow_dispatch:
+jobs:
+  same-original-continuity:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check reality-chat-continuous-qualification-v1.js
+      - run: node --test test/reality-existing-chat-original-reconciliation-priority-v1.test.js test/reality-continuous-qualification-inbox-v1.test.js test/reality-qualified-chat-original-exact-approval-v1.test.js

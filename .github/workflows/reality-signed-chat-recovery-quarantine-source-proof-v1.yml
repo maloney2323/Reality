@@ -1,0 +1,35 @@
+name: Reality signed recovery quarantine independent source-only proof
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - 'repair/**'
+      - 'reality/**'
+    paths:
+      - 'evidence/reality-chat-recovery/**.json'
+permissions:
+  contents: read
+jobs:
+  independent-quarantine-source:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref,'reality/chat-recovery/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout exact candidate without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Use Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Independently validate frozen source-only quarantine
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_BRANCH: ${{ github.head_ref }}
+        run: node --test test/ci/reality-signed-chat-recovery-quarantine-source-proof-v1.test.mjs
+      - name: Never certify final goal from code quarantine
+        run: echo 'Quarantine source identity and syntax only; feature acceptance, owner install approval, postinstall outcome, and Universe settlement remain unverified.'

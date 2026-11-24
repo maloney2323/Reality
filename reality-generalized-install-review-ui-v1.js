@@ -66,7 +66,9 @@ function safe(d){
  return d?.ok===true&&
   d.status==='GENERALIZED_VERIFIED_ORIGINAL_INSTALL_REVIEW'&&
   WORK.test(d.original_work_id||'')&&
-  SOURCE.test(d.source_ref||'')&&
+  (d.source_family==='SIGNED_CHAT_DEVELOPMENT_RECOVERY'?
+    UUID.test(d.source_message_id||'')&&d.source_ref==='supabase:reality_chat_messages:'+d.source_message_id:
+    SOURCE.test(d.source_ref||''))&&
   HASH.test(d.candidate_artifact_sha256||'')&&
   SHA.test(d.candidate_commit_sha||'')&&
   SHA.test(d.expected_preinstall_blob_sha||'')&&
@@ -236,7 +238,9 @@ async function refresh(){
   const recoverButton=get('generalizedOriginalRecoveryApproveButton');
   recoverButton.hidden=!canRecover;recoverButton.disabled=!canRecover;
   activeRecovery=canRecover?d.recovery_publication:null;
-  const issue=d.source_ref.split('/').at(-1);
+  const signedChat=d.source_family==='SIGNED_CHAT_DEVELOPMENT_RECOVERY';
+  const issue=signedChat?d.original_work_id:'Original job #'+d.source_ref.split('/').at(-1);
+  const originalLabel=signedChat?'Signed Chat original '+issue:issue;
   const completed=d.phase==='ORIGINAL_SETTLED'&&
    d.original_job_completed===true&&
    UUID.test(d.final_receipt_id||'')&&
@@ -247,8 +251,8 @@ async function refresh(){
     d.phase==='READY_FOR_EXACT_OWNER_APPROVAL'?
     'Reality · your decision is needed':'Reality · original repair progress';
   get('generalizedOriginalInstallReviewStatus').textContent=completed?
-   'Original job #'+issue+' · independently verified · final receipt saved':
-   'Original job #'+issue+' · '+d.phase.replaceAll('_',' ')+
+   originalLabel+' · independently verified · final receipt saved':
+   originalLabel+' · '+d.phase.replaceAll('_',' ')+
     (d.original_job_completed?' · independently settled':
      ' · original job remains open');
   get('generalizedOriginalInstallReviewArtifact').textContent=
@@ -267,7 +271,7 @@ async function refresh(){
     recovery?.phase==='RECOVERY_WRITE_FENCED';
   get('generalizedOriginalInstallRecoveryUpdate').textContent=
     completed?
-     'Reality completed the original customer job. Verified installed commit: '+
+     (signedChat?'Reality independently accepted this original in the isolated preview. Production remains unchanged. Verified installed commit: ':'Reality completed the original customer job. Verified installed commit: ')+
      d.installed_commit_sha+'. Final receipt: '+d.final_receipt_id+
      '. ROI: NOT MEASURED (no verified human time or cost baseline yet). No additional approval is needed.':
     reviewReady?
@@ -293,7 +297,8 @@ async function refresh(){
     ' · No additional installation authorization currently available');
   const links=get('generalizedOriginalInstallReviewEvidence');
   links.replaceChildren();
-  evidenceLink(links,'Original source',d.source_ref);
+  if(signedChat)add('span',links,'Original source: authenticated saved Chat · '+d.original_work_id+' · ');
+  else evidenceLink(links,'Original source',d.source_ref);
   evidenceLink(links,'Frozen candidate tests',
    'https://github.com/maloney2323/Reality/actions/runs/'+d.independent_frozen_run_id);
   evidenceLink(links,'Integration tests',

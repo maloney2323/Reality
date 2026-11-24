@@ -185,7 +185,8 @@ test('full Past Present Future belongs to Home, never repeated on other pages',(
 
 test('the mobile session check is bounded but does not fake authenticated access',()=>{
  assert.match(html,/sessionRequestInFlight/);
- assert.match(html,/AbortSignal\.timeout\(16500\)/);
+ assert.match(html,/AbortSignal\.timeout\(23500\)/);
+ assert.match(html,/el\('privateLogin'\)\.style\.display='block'/);
  assert.match(html,/el\('privateReady'\)\.style\.display='none'/);
  assert.match(html,/showSignedIn\(data\.authenticated===true\)/);
  assert.match(html,/privateRetrySession/);

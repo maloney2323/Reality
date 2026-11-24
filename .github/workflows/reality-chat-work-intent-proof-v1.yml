@@ -22,6 +22,9 @@ on:
       - 'src/reality-chat-new-development-adapter-v1.js'
       - 'src/reality-chat-new-development-worker-v1.js'
       - 'src/reality-governed-shift-boundary-v1.js'
+      - 'src/reality-signed-chat-to-work-v1.js'
+      - 'supabase/migrations/20261121043000_signed_maintenance_chat_investigation_scope_v1.sql'
+      - 'test/reality-chat-to-governed-work-handoff-v1.test.js'
       - 'supabase/migrations/20261116131852_reality_chat_signed_source_claim_v3.sql'
       - 'src/reality-chat-new-development-publisher-v1.js'
       - 'supabase/functions/reality-chat-new-development-broker-v1/index.ts'
@@ -64,6 +67,7 @@ jobs:
           node --test test/reality-chat-work-intent-v1.test.js
           node --test test/reality-chat-proportional-readonly-v1.test.js
           node --test test/reality-saved-chat-work-adapter-v1.test.js
+          node --test test/reality-chat-to-governed-work-handoff-v1.test.js
           node --test test/reality-chat-existing-shift-adapter-v1.test.js
           node --test test/reality-chat-existing-shift-visibility-v1.test.js
           node --test test/reality-chat-scoped-engineering-continuation-v1.test.js
@@ -87,6 +91,7 @@ jobs:
           node --check src/reality-chat-new-development-adapter-v1.js
           node --check src/reality-chat-new-development-worker-v1.js
           node --check src/reality-governed-shift-boundary-v1.js
+          node --check src/reality-signed-chat-to-work-v1.js
           node --check src/reality-chat-new-development-publisher-v1.js
           node --check supabase/functions/reality-chat-new-development-broker-v1/index.ts
           node --check test/ci/reality-chat-new-development-syntax-proof-v1.mjs

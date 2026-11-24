@@ -83,7 +83,8 @@ test('settlement only indicated when a trusted same-shift receipt step is presen
 test('existing authenticated shift status and Chat display use the same recovery route',()=>{
  const api=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
  const ui=readFileSync(new URL('../reality-chat-simple.html',import.meta.url),'utf8');
- assert.match(api,/diagnoseRealityEmployeeRecovery\(\{shifts:read.shifts,handoffs\}\)/);
+ assert.match(api,/const presentationShifts=read\.shifts\.slice\(0,5\)/);
+ assert.match(api,/diagnoseRealityEmployeeRecovery\(\{shifts:presentationShifts,handoffs\}\)/);
  assert.match(api,/recovery_diagnosis,/);
  assert.match(ui,/data\.recovery_diagnosis/);
  assert.match(ui,/route\.worker_has_direct_original_job_execution_connection===false/);
