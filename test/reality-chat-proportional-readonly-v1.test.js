@@ -149,32 +149,23 @@ test('owner session and genuine saved message are prerequisites to any model cal
  }
  assert.equal(calls,0);
 });
-test('unavailable goal-state provider produces transparent non-durable advisory, not silent Chat failure',()=>{
+test('ordinary conversation is routed before operational flags and never needs goal epoch',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
- const ui=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- const read=api.indexOf("stage='READ_ONLY_OWNER_GOAL_EPOCH'");
- const model=api.indexOf("stage='READ_ONLY_MODEL_COGNITION'",read);
- const transient=api.indexOf('if(!goalEpoch){',model);
- const atomic=api.indexOf("stage='READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION'",transient);
- assert.ok(read>=0&&model>read&&transient>model&&atomic>transient,
-  'temporary answer must use the existing model and remain before atomic publication');
- const branch=api.slice(read,atomic);
- assert.ok(branch.includes('if(Number(epochError?.status)!==503)throw epochError;'));
- assert.match(branch,/readPrivateChatGoalPublicationEpoch/);
- assert.match(branch,/current_answer_persisted:false/);
- assert.match(branch,/goal_publication_atomicity:'UNAVAILABLE'/);
- assert.match(branch,/transient_answer_only:true/);
- assert.match(branch,/installation_authorized:false/);
- assert.match(branch,/reply_recovery_requires_exact_saved_request:true/);
- assert.doesNotMatch(branch,/queueOwnerGovernedBuild|approveOwnerInstall|executeOneRegisteredMaintenanceAction/);
- assert.match(ui,/REALITY · TEMPORARY ANSWER · NOT SAVED · NO EXECUTION/);
- assert.ok(ui.includes('if(transientAnswer){'));
- assert.ok(ui.includes('No work was authorized. Retry this same saved reply'));
- assert.ok(ui.includes('outcome.original_request_id===message.request_id'));
- assert.ok(ui.includes('outcome.execution?.installation_authorized===false'));
+ const classify=api.indexOf('const readOnlyTurn=isProportionalReadOnlyChat');
+ const gate=api.indexOf("fail('CHAT_ATOMIC_GOAL_PUBLICATION_REQUIRED'",classify);
+ const conversation=api.indexOf("stage='READ_ONLY_BOUNDED_CONTEXT'",gate);
+ const action=api.indexOf("stage='COGNITION_AND_RELIABILITY'",conversation);
+ assert.ok(classify>=0&&gate>classify&&conversation>gate&&action>conversation);
+ assert.match(api.slice(classify,gate),/if\(readOnlyTurn\)[\s\S]*resolvePrivateConversationDatabase\(session\)[\s\S]*else\{/);
+ const lane=api.slice(conversation,action).split('// The signed human message entered')[0];
+ assert.match(lane,/publishPrivateConversationReply/);
+ assert.match(lane,/current_answer_persisted:Boolean\(publication\)/);
+ assert.match(lane,/transient_answer_only:!publication/);
+ assert.match(lane,/temporal_intelligence/);
+ assert.doesNotMatch(lane,/readPrivateChatGoalPublicationEpoch\(|runLiveIntelligenceOrchestration\(|appendAuthenticatedUserGoalCommand\(/);
+ assert.match(lane,/external_actions_authorized:false/);
 });
-
-test('read-only HTTP publication uses existing atomic owner-goal CAS and exact RLS, not a new action engine',()=>{
+test('read-only HTTP publication preserves exact saved turn while consequential actions retain old atomic CAS',()=>{
  const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  const helper=readFileSync(new URL('../src/reality-chat-proportional-readonly-v1.js',import.meta.url),'utf8');
  const model=readFileSync(new URL('../src/reality-model-gateway-v0.1.js',import.meta.url),'utf8');
@@ -182,9 +173,9 @@ test('read-only HTTP publication uses existing atomic owner-goal CAS and exact R
  const index=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.match(api,/isProportionalReadOnlyChat/);
  assert.match(api,/generateProportionalReadOnlyReply/);
- assert.match(api,/READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION/);
+ assert.match(api,/READ_ONLY_CONVERSATION_PUBLICATION/);
  assert.match(api,/publishPrivateAssistantAtomically/);
- assert.match(api,/READ_ONLY_EXACT_REPLY_RLS_READBACK/);
+ assert.match(api,/publishPrivateConversationReply/);
  assert.match(api,/readPrivateChatRequest\(session,\{conversationId,requestId\}\)/);
  assert.match(api,/external_actions_authorized:false/);
  assert.match(api,/wantsWorkerHealth\?/);
@@ -197,4 +188,24 @@ test('read-only HTTP publication uses existing atomic owner-goal CAS and exact R
  assert.match(index,/data\.read_only_conversation===true/);
  assert.match(index,/status\('Reply saved\.'\)/);
  assert.match(index,/if\(!saved\?\.ok\|\|saved\.saved!==true\)throw intakeError/);
+});
+
+import {resolvePrivateConversationDatabase,publishPrivateConversationReply} from '../src/reality-private-chat-store-v0.1.js';
+test('conversation persistence works with operational flags disabled and cannot cross owner project',async()=>{
+ const project='abcdefghijklmnopqrst',url='https://'+project+'.supabase.co';
+ const session={user_id:owner,config:{url}};
+ const env={VERCEL_ENV:'preview',REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
+ REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:project,REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:project,
+ REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:url,REALITY_UNIVERSE_PERSISTENCE_KEY:'fixture-only',
+ REALITY_CONTINUOUS_RELIABILITY_ENABLED:'false',REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED:'false'};
+ const db=resolvePrivateConversationDatabase(session,env);
+ assert.equal(db.project,project);
+ assert.equal(resolvePrivateConversationDatabase({...session,config:{url:'https://wrong.supabase.co'}},env),null);
+ const reply=await publishPrivateConversationReply(session,{conversationId:conv,requestId:request,sourceRef:source,text:'Hello!',db},{
+ fetchImpl:async(u,o)=>{assert.equal(u,url+'/rest/v1/rpc/reality_publish_conversational_reply_v1');
+ const b=JSON.parse(o.body);assert.equal(b.p_user_id,owner);assert.equal(b.p_request_id,request);
+ assert.equal(b.p_user_message_id,source.split(':').at(-1));assert.equal(b.p_content,'Hello!');
+ assert.equal(Object.hasOwn(b,'p_expected_goal_revision'),false);
+ return {ok:true,json:async()=>request};}});
+ assert.equal(reply.conversational_reply_persisted,true);assert.equal(reply.execution_authorized,false);
 });
