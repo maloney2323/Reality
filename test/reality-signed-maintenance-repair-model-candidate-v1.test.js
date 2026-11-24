@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {generateOneSignedMaintenanceRepairCandidate} from
+import {generateOneSignedMaintenanceRepairCandidate,generateOneSignedMaintenanceFrozenTestDraft} from
  '../src/reality-signed-maintenance-repair-model-candidate-v1.js';
 const shift='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
@@ -312,4 +312,59 @@ test('SQL preserves rejected model patch and independent off-target review befor
   "revoke all on function public.reality_revise_signed_offtarget_maintenance_candidate_v1"
  ])assert.ok(sql.includes(term),term);
  assert.doesNotMatch(sql,/net\\.http_post|insert into reality_internal\\.governed_employee_shifts_v1/);
+});
+
+
+test('both exact qualified actions enter the existing signed builder, with one inert durable result and no CI or install claim',async()=>{
+ for(const approved of [true,false]){
+  const leased={...claim,status:'SIGNED_FROZEN_TEST_DRAFT_LEASED',source_revision:sha,
+   authority_receipt_sha256:hash('1'),
+   action:approved?'EXECUTE_NEW_INDEPENDENT_CASE_SPECIFIC_FROZEN_CI':'RUN_CASE_SPECIFIC_FROZEN_RED_AND_RECHECK_SOURCE',
+   authority_basis:approved?'APPROVED_EXACT_SOURCE_SCOPE':'SIGNED_EXISTING_WARRANT',
+   ...(approved?{approved_target_path:path,approved_target_blob_sha:blob}:{})};
+  const calls=[],requests=[];
+  const call=async(_db,name,args)=>{
+   calls.push({name,args});
+   if(name==='reality_claim_signed_maintenance_frozen_test_draft_v1')return leased;
+   assert.equal(name,'reality_record_signed_maintenance_frozen_test_draft_v1');
+   assert.equal(args.p_candidate.state,'DRAFT');
+   assert.equal(args.p_candidate.target_blob_sha,blob);
+   return {status:'SIGNED_FROZEN_TEST_BUILD_RESULT_RECORDED',maintenance_id:maint,request_id:req,
+    draft_state:'DRAFT',receipt_sha256:hash('9'),independent_ci_verified:false,
+    installation_authorized:false,original_job_completed:false,production_changed:false};
+  };
+  const fetchImpl=async(url,opts)=>{
+   const b=JSON.parse(opts.body);requests.push({url,b});
+   if(url.includes('/functions/v1/')){
+    const base={ok:true,maintenance_id:maint,request_id:req,release_sha:sha,
+     source_read_only:true,independent_frozen_red_verified:false,independent_ci_verified:false,
+     installation_authorized:false,original_job_completed:false,production_changed:false,new_shift_started:false};
+    assert.ok(['test_manifest','test_source'].includes(b.mode));
+    return {ok:true,json:async()=>b.mode==='test_manifest'?
+     {...base,status:'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',source_tree_sha:treeSha,files:[{path,sha:blob,size:buf.length}]}:
+     {...base,status:'SIGNED_MAINTENANCE_SOURCE_FILE_VERIFIED',path,sha:blob,size:buf.length,encoding:'base64',content:buf.toString('base64')}};
+   }
+   assert.equal(url,'https://api.openai.com/v1/responses');
+   assert.equal(b.tool_choice,'none');
+   return {ok:true,json:async()=>({status:'completed',id:'resp_fixture_1234',output_text:JSON.stringify(
+    b.text.format.name==='reality_signed_maintenance_target_candidate'?{path,reason:'Exact runtime qualification module'}:
+    {state:'DRAFT',test_source:"import test from 'node:test'; import assert from 'node:assert/strict'; test('preserve authority',()=>assert.equal(false,false));",expected_failure:'Observe exact source failure without changing authorization.'})})};
+  };
+  const r=await generateOneSignedMaintenanceFrozenTestDraft({db,env,shiftId:shift,workerRunId:run,call,fetchImpl});
+  assert.equal(r.status,'SIGNED_FROZEN_TEST_BUILD_RESULT_RECORDED');
+  assert.equal(r.model_generated,true);
+  assert.equal(r.independent_ci_verified,false);
+  assert.equal(r.installation_authorized,false);
+  assert.equal(r.original_job_completed,false);
+  assert.equal(calls.length,2);
+  assert.equal(requests.length,approved?3:4);
+ }
+});
+test('test construction has no model call without an independently leased obligation',async()=>{
+ let count=0;
+ const r=await generateOneSignedMaintenanceFrozenTestDraft({db,env,shiftId:shift,workerRunId:run,
+  call:async()=>({status:'NO_NEW_SIGNED_FROZEN_TEST_DRAFT_READY',model_invocation_authorized:false}),
+  fetchImpl:async()=>{count++;throw Error('NO_PROVIDER_CALL')}});
+ assert.equal(count,0);
+ assert.equal(r.model_generated,false);
 });
