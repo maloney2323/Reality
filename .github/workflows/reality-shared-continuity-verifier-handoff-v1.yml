@@ -1,0 +1,43 @@
+name: Reality shared Continuity and independent verifier handoff acceptance
+on:
+  push:
+    branches:
+      - feature/final-loop-governed-qualification-handoff-20261123
+    paths:
+      - 'src/reality-final-loop-*.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'test/reality-final-loop-*.test.js'
+      - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
+      - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
+  pull_request:
+    paths:
+      - 'src/reality-final-loop-*.js'
+      - 'api/reality/governed-employee-shift-worker.js'
+      - 'test/reality-final-loop-*.test.js'
+      - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
+      - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prove-cross-layer-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Parse signed worker and continuity projections
+        run: |
+          node --check api/reality/governed-employee-shift-worker.js
+          node --check src/reality-final-loop-signed-worker-bridge-v1.js
+          node --check src/reality-final-loop-universe-feedback-v1.js
+          node --check src/reality-final-loop-executive-brief-v1.js
+      - name: Verify source identity, Continuity head, verifier and Universe fences
+        run: |
+          node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
+          node --test test/reality-final-loop-universe-feedback-v1.test.js
+          node --test test/reality-final-loop-executive-brief-v1.test.js
