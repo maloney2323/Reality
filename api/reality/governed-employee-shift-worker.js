@@ -515,6 +515,14 @@ export default async function handler(req,res){
   workerStage='SHARED_CONTINUITY_VERIFIER_PREEXECUTION_FENCE';
   const strictContinuityCycle=
    process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true';
+  // The effect-capable Final Loop lane must never run with its shared
+  // Continuity/verifier fence disabled. Read-only staging remains separate.
+  const finalLoopEffectsRequested=process.env.VERCEL_ENV==='preview'&&
+   process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+   (process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+    process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true');
+  if(finalLoopEffectsRequested&&!strictContinuityCycle)
+   throw Error('FINAL_LOOP_EFFECTS_REQUIRE_SHARED_CONTINUITY_FENCE');
   let finalLoopContinuityIngress={
    status:'SHARED_CONTINUITY_PREEXECUTION_FENCE_NOT_ENABLED',
    read_only:true,execution_authorized:false,
@@ -550,6 +558,39 @@ export default async function handler(req,res){
   if(strictContinuityCycle&&
      wakeReceipt.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    throw Error('FINAL_LOOP_SHARED_CONTINUITY_NO_SIGNED_WORKER_SCOPE');
+
+  // Re-read the current signed graph and the same canonical verifier before
+  // each Final Loop executor. Earlier executor evidence may have changed the
+  // Continuity head; the ingress readback is not reusable permission.
+  let lastFinalLoopContinuity=finalLoopContinuityIngress;
+  const requireFreshFinalLoopContinuity=async()=>{
+   if(!strictContinuityCycle)
+    throw Error('FINAL_LOOP_EFFECTS_REQUIRE_SHARED_CONTINUITY_FENCE');
+   const currentGraph=assertRealityUnifiedShiftGraph(
+    await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
+     expectedShiftId:wakeReceipt.shift_id
+    });
+   const fresh=await inspectFinalLoopOnExistingSignedWorker({
+    db,wake:wakeReceipt,graph:currentGraph,env:process.env,fetchImpl:fetch
+   });
+   const guard=fresh.shared_continuity_guard;
+   const prior=lastFinalLoopContinuity.shared_continuity_guard;
+   if(fresh.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+      guard?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+      fresh.owner_id!==currentGraph.owner_id||
+      fresh.owner_id!==finalLoopContinuityIngress.owner_id||
+      fresh.shift_id!==wakeReceipt.shift_id||
+      guard.owner_id!==fresh.owner_id||guard.shift_id!==fresh.shift_id||
+      guard.continuity_root_id!==prior?.continuity_root_id||
+      !Number.isSafeInteger(fresh.revision)||fresh.revision<prior.revision||
+      guard.revision!==fresh.revision||
+      guard.continuity_head_sha256!==fresh.continuity_head_sha256||
+      guard.execution_authorized!==false||
+      guard.original_job_completed!==false)
+    throw Error('FINAL_LOOP_INTERLAYER_CONTINUITY_FENCE_REJECTED');
+   lastFinalLoopContinuity=fresh;
+   return fresh;
+  };
 
   // Existing signed worker performs ONLY independent readback before choosing
   // a registered business executor. Owner approval never directly invokes it.
@@ -2839,6 +2880,7 @@ export default async function handler(req,res){
     }
    }
    if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
+    await requireFreshFinalLoopContinuity();
     try{
      finalLoopChildReview=await advanceOneFinalLoopChildReview({
      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
@@ -2852,6 +2894,7 @@ export default async function handler(req,res){
    }
    // The same authorized signed worker handles bounded integration AFTER
    // child verification, never a new background orchestrator.
+   await requireFreshFinalLoopContinuity();
    try{
     finalLoopParentIntegration=
      await advanceOneFinalLoopParentIntegration({
@@ -2873,6 +2916,7 @@ export default async function handler(req,res){
     process.env.VERCEL_ENV==='preview'&&
     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
     process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'){
+   await requireFreshFinalLoopContinuity();
    try{
     finalLoopParentDelivery=await advanceOneFinalLoopParentDelivery({
      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,

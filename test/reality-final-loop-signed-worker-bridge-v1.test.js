@@ -674,3 +674,22 @@ test('signed checkpoint acknowledges only independently rebounded event subscrip
  const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.match(worker,/finalLoopEvidenceCheckpoint\?\.evidence_checkpoint_acknowledged!==true/);
 });
+
+
+test('effect-capable Final Loop cannot bypass shared Continuity or reuse stale ingress between executors',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/if\(finalLoopEffectsRequested&&!strictContinuityCycle\)\s*throw Error\('FINAL_LOOP_EFFECTS_REQUIRE_SHARED_CONTINUITY_FENCE'\)/);
+ const helper=worker.slice(worker.indexOf('const requireFreshFinalLoopContinuity=async()=>'),worker.indexOf('// Existing signed worker performs ONLY independent readback before choosing'));
+ assert.match(helper,/reality_read_current_shift_execution_graph_v1/);
+ assert.match(helper,/await inspectFinalLoopOnExistingSignedWorker/);
+ assert.match(helper,/guard\.continuity_root_id!==prior\?\.continuity_root_id/);
+ assert.match(helper,/fresh\.revision<prior\.revision/);
+ assert.match(helper,/guard\.continuity_head_sha256!==fresh\.continuity_head_sha256/);
+ assert.match(helper,/guard\.execution_authorized!==false/);
+ assert.match(helper,/lastFinalLoopContinuity=fresh/);
+ for(const call of ['finalLoopChildReview=await advanceOneFinalLoopChildReview','finalLoopParentIntegration=\n     await advanceOneFinalLoopParentIntegration','finalLoopParentDelivery=await advanceOneFinalLoopParentDelivery']){
+  const at=worker.indexOf(call);
+  assert.ok(at>0,call);
+  assert.match(worker.slice(at-100,at),/await requireFreshFinalLoopContinuity\(\);\s*try\{\s*$/);
+ }
+});
