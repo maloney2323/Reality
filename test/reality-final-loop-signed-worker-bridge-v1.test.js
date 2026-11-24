@@ -417,3 +417,22 @@ test('signed Final Loop consumes event shadow only for the same original, never 
  assert.equal(stale.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
  assert.equal(stale.event_resume_shadow.shadow_ready_event_count,0);
 });
+
+
+test('event-driven Final Loop schema records receipts but never invents execution',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261123235957_final_loop_event_driven_resume_shadow_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/final_loop_resume_conditions_v1/);
+ assert.match(sql,/final_loop_resume_events_v1/);
+ assert.match(sql,/QUALIFIER_PROOF_CHANGED/);
+ assert.match(sql,/INDEPENDENT_FROZEN_CI_RECEIPT/);
+ assert.match(sql,/on_final_loop_qualifier_receipt_change_v1/);
+ assert.match(sql,/on_final_loop_independent_frozen_ci_v1/);
+ assert.match(sql,/current_user<>'service_role'/);
+ assert.match(sql,/event_dispatch_enabled',false/);
+ assert.match(sql,/execution_authorized',false/);
+ assert.match(sql,/ENABLE ROW LEVEL SECURITY/);
+ assert.doesNotMatch(sql,/net\.http_post|send_governed_wake_hint_v1|cron\.unschedule/);
+ assert.doesNotMatch(sql,/github\.com\/maloney2323\/Reality\/pull\/307/);
+});
