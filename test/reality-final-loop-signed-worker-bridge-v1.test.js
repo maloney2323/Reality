@@ -578,3 +578,17 @@ test('first layer was observed in same Universe worldline, not inferred from a d
  assert.match(migration,/FINAL_LOOP_SHARED_CONTINUITY_FIRST_SIGNAL_OR_WORLDLINE_UNVERIFIED/);
  assert.doesNotMatch(migration,/net\.http_post|cron\.unschedule/);
 });
+
+
+test('signed cross-source recovery cannot relabel one original as another',()=>{
+ const sql=readFileSync(new URL(
+  '../supabase/migrations/20261124013500_final_loop_original_source_identity_guard_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(sql,/original_source_ref'=v_source/);
+ assert.match(sql,/m\.owner_id=v_owner/);
+ assert.match(sql,/m\.claimed_shift_id=p_shift_id/);
+ assert.match(sql,/original_work_universe_event_verified/);
+ assert.match(sql,/original_job_completed'='false/);
+ assert.doesNotMatch(sql,/net\.http_post|cron\.unschedule/);
+ assert.doesNotMatch(sql,/github\.com\/maloney2323\/Reality\/pull\/307/);
+});
