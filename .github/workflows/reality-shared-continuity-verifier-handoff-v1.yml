@@ -12,6 +12,9 @@ on:
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
       - 'supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql'
       - 'supabase/migrations/20261124013500_final_loop_original_source_identity_guard_v1.sql'
+      - 'supabase/migrations/20261124015100_final_loop_shift_genesis_root_partition_v1.sql'
+      - 'supabase/migrations/20261124015200_final_loop_independent_parent_universe_return_v1.sql'
+      - 'supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   pull_request:
@@ -24,6 +27,9 @@ on:
       - 'supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql'
       - 'supabase/migrations/20261124012000_final_loop_continuity_first_signal_worldline_guard_v1.sql'
       - 'supabase/migrations/20261124013500_final_loop_original_source_identity_guard_v1.sql'
+      - 'supabase/migrations/20261124015100_final_loop_shift_genesis_root_partition_v1.sql'
+      - 'supabase/migrations/20261124015200_final_loop_independent_parent_universe_return_v1.sql'
+      - 'supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   workflow_dispatch:
