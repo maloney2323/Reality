@@ -38,6 +38,29 @@ export function inspectFinalLoopSignedWorkerOperatingLane({
    ...identity,operating_lane:'NORMAL_SIGNED_SHIFT',
    next_governed_action:'VERIFY_REGISTERED_FINAL_LOOP_HANDLERS_AND_FLAGS'
   });
+ // The SHARED benchmark may prepare the EXACT owner packet, never invoke
+ // a child, approve anything, or claim to be an isolated execution lane.
+ if(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED==='true'&&
+    env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'&&
+    env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED==='true'&&
+    env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'&&
+    env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='true'&&
+    PROJECT.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||'')&&
+    dbProject===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
+    dbProject===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+    /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+      env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||'')&&
+    /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+      env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID||''))
+  return result('FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY',{
+   ...identity,operating_lane:'NORMAL_SIGNED_SHIFT',
+   owner_packet_preparation_configured:true,
+   independent_database_isolation_verified:false,
+   child_review_handler_configured:false,
+   independent_scheduler_release_observed:false,
+   next_governed_action:'PREPARE_EXACT_READ_ONLY_OWNER_PACKET_NO_EXECUTION'
+  });
+
  if(env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true')
   return result('FINAL_LOOP_WORKER_ISOLATED_DATABASE_NOT_CONFIGURED',{
    ...identity,operating_lane:'NORMAL_SIGNED_SHIFT',
