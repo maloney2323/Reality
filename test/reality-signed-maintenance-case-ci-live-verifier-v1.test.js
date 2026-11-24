@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {continueSignedMaintenanceCaseCiVerification}
+import {continueSignedMaintenanceCaseCiVerification,selectSignedCaseCiResumeEvent}
  from '../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 const shift='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
 const worker='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
@@ -133,4 +133,43 @@ test('signed live case CI only records verified GitHub evidence under original w
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.match(worker,/continueSignedMaintenanceCaseCiVerification\(\{/);
  assert.match(worker,/signed_maintenance_sourcecase_ci_reconciliation:signedMaintenanceCaseCiReconciliation/);
+});
+
+
+test('current exact proof-change signal routes to the existing signed case verifier, never a different source',async()=>{
+ const eventId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const source='https://github.com/maloney2323/Reality/pull/307';
+ const event={event_id:eventId,event_state:'SHADOW_PENDING',
+  event_kind:'QUALIFIER_PROOF_CHANGED',source_current:true,
+  would_resume_suspended_obligation:true,source_receipt_sha256:digest,
+  original_work_id:'work:'+'a'.repeat(32),source_ref:source,continuity_revision:2};
+ const shadow={status:'FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY',
+  shift_id:shift,execution_authorized:false,events:[event],
+  subscriptions:[{original_work_id:event.original_work_id,source_ref:source,
+   continuity_revision:2,condition_kind:event.event_kind,
+   next_qualified_action:'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC'}]};
+ const selection=selectSignedCaseCiResumeEvent(shadow,shift);
+ assert.deepEqual(selection,{event_id:eventId,source_ref:source});
+ for(const bad of [
+  {...shadow,execution_authorized:true},
+  {...shadow,events:[{...event,source_current:false}]},
+  {...shadow,events:[{...event,continuity_revision:3}]},
+  {...shadow,events:[event,{...event,event_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}]},
+  {...shadow,subscriptions:[]}
+ ])assert.equal(selectSignedCaseCiResumeEvent(bad,shift),null);
+ const args={db,env,shiftId:shift,workerRunId:worker,resumeEvent:selection};
+ let calls=0;
+ const fetchImpl=async(_url,opts)=>{
+  calls++;
+  assert.equal(JSON.parse(opts.body).resume_event_id,eventId);
+  return {ok:true,json:async()=>({...verified,resume_event_id:eventId,source_ref:source})};
+ };
+ const r=await continueSignedMaintenanceCaseCiVerification({...args,fetchImpl});
+ assert.equal(calls,1);
+ assert.equal(r.case_specific_frozen_red_attested,true);
+ assert.equal(r.installation_authorized,false);
+ await assert.rejects(continueSignedMaintenanceCaseCiVerification({...args,
+  fetchImpl:async()=>({ok:true,json:async()=>({...verified,resume_event_id:eventId,
+   source_ref:'https://github.com/maloney2323/Reality/pull/308'})})}),
+  /SIGNED_CASE_CI_LIVE_EXACT_MAINTENANCE_INDEPENDENT_FROZEN_RECEIPT_INVALID/);
 });
