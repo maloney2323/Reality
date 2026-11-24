@@ -73,6 +73,8 @@ import {assertRealityUnifiedShiftGraph}
 import {inspectFinalLoopOnExistingSignedWorker,
  recordOneFinalLoopEvidenceCheckpoint}
  from '../../src/reality-final-loop-signed-worker-bridge-v1.js';
+import {evaluateRealityWholeCycleAcceptance}
+ from '../../src/reality-final-loop-whole-cycle-acceptance-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
  reconcileVerifiedCurrentShiftCommitTriage}
  from '../../src/reality-shift-commit-triage-handoff-v1.js';
@@ -3741,6 +3743,41 @@ export default async function handler(req,res){
     throw Error('FINAL_LOOP_SHARED_CONTINUITY_RETURN_FENCE_REJECTED');
   }
 
+  // ONE WHOLE-CYCLE acceptance verdict, not another orchestrator. Consume
+  // the independently checked original Continuity return and the existing
+  // owner-scoped approval table. This is a READ MODEL only: no approval,
+  // executor claim, new shift, settlement, or repeat work.
+  workerStage='FINAL_LOOP_WHOLE_CYCLE_INDEPENDENT_ACCEPTANCE_CHECK';
+  let finalLoopOwnerPacketReadback={
+   status:'FINAL_LOOP_OWNER_PACKETS_NOT_VERIFIED',packets:[],
+   read_only:true,execution_authorized:false
+  };
+  if(strictContinuityCycle){
+   try{
+    finalLoopOwnerPacketReadback=await shiftRpc(db,
+     'reality_read_owner_final_loop_child_approvals_v1',{
+      p_owner_id:unifiedGraph.owner_id,p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000});
+   }catch{
+    finalLoopOwnerPacketReadback={
+     status:'FINAL_LOOP_OWNER_PACKET_INDEPENDENT_READBACK_UNAVAILABLE',
+     packets:[],read_only:true,execution_authorized:false
+    };
+   }
+  }
+  const finalLoopWholeCycleAcceptance=evaluateRealityWholeCycleAcceptance({
+   graph:unifiedGraph,
+   ingress:finalLoopContinuityIngress,
+   continuityReturn:finalLoopContinuityReturn,
+   ownerPackets:finalLoopOwnerPacketReadback,
+   recovery:finalLoopRecoveryContinuation,
+   parentReturn:finalLoopVerifiedCanonicalReturn,
+   // A read-only event-subscription shadow is not a verified action
+   // execution receipt. This remains unproved until a separate signed
+   // next-action verifier records the actual outcome.
+   verifiedContinuation:null
+  });
+
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -3896,6 +3933,7 @@ export default async function handler(req,res){
     final_loop_universe_feedback:finalLoopUniverseFeedback,
     final_loop_continuity_ingress:finalLoopContinuityIngress,
     final_loop_continuity_return:finalLoopContinuityReturn,
+    final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
