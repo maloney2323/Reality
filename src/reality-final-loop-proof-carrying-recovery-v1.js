@@ -166,7 +166,7 @@ function failedLedger(c,attempts){
 // Decision read model ONLY: the existing signed service-role executor must
 // independently recheck the persisted freeze, warrant, budget and source.
 export function decideNextRecoveryTransition({
- contract,durableFreeze,proofReceipts=[],failedAttempts=[],
+ contract,durableFreeze,budgetLedger,proofReceipts=[],failedAttempts=[],
  strategy,diagnosticWarrant,mutationWarrant,registeredCapabilities=[]
 }={}){
  try{checkContract(contract)}catch{
@@ -186,6 +186,24 @@ export function decideNextRecoveryTransition({
  if(proofs.error)return safe(proofs.error,{offending_gate:proofs.offending_gate||null});
  const prior=failedLedger(contract,failedAttempts);
  if(!prior)return safe('RECOVERY_FAILED_STRATEGY_LEDGER_UNVERIFIED');
+ // A signed per-obligation budget readback includes ALL prior attempts,
+ // including strategies that produced partial proof. Counting only failed
+ // attempts would allow repeated successful substeps to exceed the budget.
+ if(budgetLedger?.source!=='INDEPENDENT_SIGNED_RECOVERY_BUDGET_LEDGER_READBACK'||
+  budgetLedger.independent_verified!==true||
+  budgetLedger.contract_id!==contract.contract_id||
+  budgetLedger.obligation_id!==contract.obligation_id||
+  budgetLedger.continuity_root_id!==contract.continuity_root_id||
+  !HASH.test(budgetLedger.receipt_sha256||'')||
+  !Number.isSafeInteger(budgetLedger.total_attempts)||
+  budgetLedger.total_attempts<failedAttempts.length||
+  !Number.isSafeInteger(budgetLedger.spent_wall_seconds)||
+  budgetLedger.spent_wall_seconds<prior.wall||
+  !Number.isSafeInteger(budgetLedger.spent_cost_units)||
+  budgetLedger.spent_cost_units<prior.cost||
+  !Number.isSafeInteger(budgetLedger.cumulative_touched_files)||
+  budgetLedger.cumulative_touched_files<prior.changed)
+  return safe('RECOVERY_BUDGET_LEDGER_UNVERIFIED');
  if(!proofs.next_proof)return safe('RECOVERY_PROOF_CHAIN_INDEPENDENTLY_RECEIPTED',{
   next_governed_action:'RECONCILE_CANONICAL_ORIGINAL_SETTLEMENT_AND_UNIVERSE',
   verified_proof_count:proofs.verified_count,
@@ -196,10 +214,10 @@ export function decideNextRecoveryTransition({
   verified_proof_count:proofs.verified_count,
   failed_strategy_count:failedAttempts.length};
  const stop=(status,next)=>safe(status,{...fields,next_governed_action:next});
- if(failedAttempts.length>=contract.budget.max_attempts||
-  prior.wall>=contract.budget.max_wall_seconds||
-  prior.cost>=contract.budget.max_cost_units||
-  prior.changed>=contract.budget.max_changed_files)
+ if(budgetLedger.total_attempts>=contract.budget.max_attempts||
+  budgetLedger.spent_wall_seconds>=contract.budget.max_wall_seconds||
+  budgetLedger.spent_cost_units>=contract.budget.max_cost_units||
+  budgetLedger.cumulative_touched_files>=contract.budget.max_changed_files)
   return stop('RECOVERY_BUDGET_EXHAUSTED',
    'PRESERVE_FAILED_STRATEGIES_AND_REQUEST_BOUNDED_REASSESSMENT');
  if(!obj(strategy))return stop('RECOVERY_DIFFERENT_STRATEGY_REQUIRED',
@@ -224,9 +242,9 @@ export function decideNextRecoveryTransition({
   return safe('RECOVERY_IDENTICAL_FAILED_STRATEGY_REJECTED',{
    ...fields,strategy_fingerprint:fingerprint,
    next_governed_action:'PIVOT_TO_DISTINCT_HYPOTHESIS_OR_INDEPENDENTLY_VERIFIED_NEW_SOURCE_EPOCH'});
- if(strategy.proposed_changed_files+prior.changed>contract.budget.max_changed_files||
-  strategy.estimated_wall_seconds+prior.wall>contract.budget.max_wall_seconds||
-  strategy.estimated_cost_units+prior.cost>contract.budget.max_cost_units||
+ if(strategy.proposed_changed_files+budgetLedger.cumulative_touched_files>contract.budget.max_changed_files||
+  strategy.estimated_wall_seconds+budgetLedger.spent_wall_seconds>contract.budget.max_wall_seconds||
+  strategy.estimated_cost_units+budgetLedger.spent_cost_units>contract.budget.max_cost_units||
   !Number.isSafeInteger(strategy.estimated_wall_seconds)||
   strategy.estimated_wall_seconds<0||
   !Number.isSafeInteger(strategy.estimated_cost_units)||
