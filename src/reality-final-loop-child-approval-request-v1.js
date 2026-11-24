@@ -12,6 +12,24 @@ const fail=(status,extra={})=>Object.freeze({
  owner_approval_granted:false,child_originals_admitted:0,
  execution_authorized:false,original_job_completed:false,...extra
 });
+// The existing shared benchmark may prepare exact READ-ONLY owner review
+// packets only. Actual child execution remains separately gated and isolated.
+function permittedPacketStorage(db,graph,env){
+ const exact=db?.strictSecrets===true&&
+  db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF;
+ const isolated=exact&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&
+  db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF;
+ const shared=exact&&
+  env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'&&
+  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'&&
+  env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='true'&&
+  db.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+  graph?.owner_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&
+  graph?.shift_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID;
+ return isolated||shared;
+}
 export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
  db,graph,workerRunId,env=process.env,fetchImpl=fetch,call=shiftRpc
 }={}){
@@ -20,10 +38,9 @@ export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
   env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED!=='true'||
   (env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED!=='true'&&
    env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true')||
-  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+  !permittedPacketStorage(db,graph,env)||
   db?.strictSecrets!==true||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
-  db.project!==env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF||
   graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
   !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
   !HASH.test(graph.plan_fingerprint||'')||
