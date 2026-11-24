@@ -120,10 +120,17 @@ function verifiedProofs(c,proofs){
    p.verifier_worker_run_id===p.origin_worker_run_id||
    p.source!=='INDEPENDENT_SIGNED_VERIFIER_LEDGER_READBACK'||
    p.independent_verified!==true||p.proof_delta_verified!==true||
-   (i===0&&p.test_reproduces_exact_failure!==true)||
-   (i===1&&p.isolated_write_quarantined!==true)||
-   (i===2&&p.same_frozen_red_artifact_sha256!==proofs[0]?.artifact_sha256)||
-   (i===3&&p.regression_isolation_verified!==true)||
+   (i===0&&(p.test_reproduces_exact_failure!==true||
+     p.frozen_red_test_status!=='FAILED_AS_EXPECTED'))||
+   (i===1&&(p.isolated_write_quarantined!==true||
+     !Number.isSafeInteger(p.touched_file_count)||
+     p.touched_file_count<1||p.touched_file_count>c.budget.max_changed_files||
+     !HASH.test(p.isolated_candidate_receipt_sha256||'')))||
+   (i===2&&(p.same_frozen_red_artifact_sha256!==proofs[0]?.artifact_sha256||
+     p.same_isolated_repair_artifact_sha256!==proofs[1]?.artifact_sha256||
+     p.frozen_red_test_passed_after_repair!==true))||
+   (i===3&&(p.regression_isolation_verified!==true||
+     p.protected_regression_suite_passed!==true))||
    (i===4&&(p.canonical_continuity_return_verified!==true||
      !HASH.test(p.independent_next_action_receipt_sha256||'')))||
    (prev!==null&&p.previous_gate_receipt_sha256!==prev.receipt_sha256))
@@ -246,6 +253,9 @@ export function decideNextRecoveryTransition({
    mutationWarrant.effect!=='ISOLATED_REPAIR_CANDIDATE_ONLY'))
   return stop('RECOVERY_EXACT_MUTATION_WARRANT_REQUIRED',
    'PREPARE_EXACT_ISOLATED_REPAIR_SCOPE_OWNER_DECISION');
+ if(proofs.next_proof==='REPAIR_ISOLATED'&&strategy.proposed_changed_files===0)
+  return stop('RECOVERY_REPAIR_SCOPE_HAS_NO_CHANGED_FILES',
+   'REQUIRE_BOUNDED_ISOLATED_SOURCE_EDIT_UNDER_EXACT_WARRANT');
  if(proofs.next_proof==='REPAIR_ISOLATED'&&
    strategy.isolated_sandbox_verified!==true)
   return stop('RECOVERY_SANDBOX_QUARANTINE_REQUIRED',
