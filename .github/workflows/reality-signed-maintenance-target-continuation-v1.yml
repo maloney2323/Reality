@@ -4,6 +4,12 @@ on:
     paths:
       - 'src/reality-signed-maintenance-verified-artifact-handoff-v1.js'
       - 'api/reality/governed-employee-shift-worker.js'
+      - 'src/reality-signed-maintenance-repair-model-candidate-v1.js'
+      - 'test/reality-signed-maintenance-repair-model-candidate-v1.test.js'
+      - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
+      - 'sql/reality-signed-maintenance-frozen-test-build-v1.sql'
+      - 'supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts'
       - 'supabase/migrations/20261120202000_signed_maintenance_artifact_install_target_review_v1.sql'
       - 'test/reality-signed-maintenance-install-target-review-v1.test.js'
       - 'src/reality-governed-continuity-evidence-classifier-v1.js'
@@ -109,3 +115,5 @@ jobs:
           node --test test/reality-signed-worker-db-claim-provider-latency-v1.test.js
           node --test test/reality-signed-maintenance-verified-artifact-handoff-v1.test.js
           node --test test/reality-signed-maintenance-original-lineage-boundary-v1.test.js
+          node --test test/reality-signed-maintenance-repair-model-candidate-v1.test.js
+          node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
