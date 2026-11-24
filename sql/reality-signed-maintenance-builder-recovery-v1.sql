@@ -240,29 +240,7 @@ BEGIN
  IF pg_catalog.jsonb_typeof(p_observation) IS DISTINCT FROM 'object' OR length(p_observation::text)>1500 OR
  coalesce(cl,'') NOT IN ('PROVIDER_READY','AUTH_OR_SECRET_MISSING','QUOTA_EXHAUSTED','RATE_LIMIT','TRANSIENT_INFRA','MODEL_CONFIG_OR_SCHEMA','UNKNOWN_PROVIDER_OUTCOME','SPEC_OR_TEST_FAILURE')
  OR coalesce(p_observation->>'model','') !~ '^[A-Za-z0-9._-]{3,80}$' OR coalesce(p_observation->>'probe_kind','')<>'BOUNDED_RESPONSES_SCHEMA_DIAGNOSTIC'
- OR (cl='PROVIDER_READY' AND (p_observation->>'http_status' IS DISTINCT FROM '200' OR coalesce(p_observation->>'response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}
- THEN RAISE EXCEPTION 'BUILDER_RECOVERY_OBSERVATION_INVALID';END IF;
- strategy:=CASE WHEN cl='PROVIDER_READY' THEN 'RETRY_AFTER_FRESH_PROVIDER_PROOF' WHEN cl IN ('RATE_LIMIT','TRANSIENT_INFRA') THEN 'BOUNDED_DELAYED_PROVIDER_RETRY' ELSE 'NO_REPLAY_EVIDENCE_BOUNDARY' END;
- decision:=CASE WHEN pg_catalog.jsonb_array_length(m.build_attempt_receipts)>=3 OR m.frozen_test_build->>'state'='INSUFFICIENT_EVIDENCE' OR cl NOT IN ('PROVIDER_READY','RATE_LIMIT','TRANSIENT_INFRA') THEN 'TERMINAL_BOUNDARY' ELSE 'REENTRY_AUTHORIZED' END;
- until_at:=CASE WHEN decision='REENTRY_AUTHORIZED' THEN pg_catalog.clock_timestamp()+interval '5 minutes' ELSE NULL END;
- d:=pg_catalog.jsonb_build_object('incident_id',p_incident_id,'attempt_id',m.frozen_test_build->>'request_id','prior_receipt_sha256',m.frozen_test_build->>'receipt_sha256',
- 'observation',p_observation,'strategy',strategy,'strategy_fingerprint','sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(strategy||':'||cl||':'||coalesce(p_observation->>'model','')||':'||(m.frozen_test_build->>'receipt_sha256'),'UTF8')),'hex'),
- 'state',decision,'remaining_build_attempts',greatest(0,3-pg_catalog.jsonb_array_length(m.build_attempt_receipts)),'not_before',until_at,
- 'original_job_completed',false,'installation_authorized',false,'production_changed',false);
- receipt:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(d::text,'UTF8')),'hex');
- UPDATE reality_internal.owner_internal_maintenance_jobs_v1 SET recovery_state=decision,build_reentry_not_before=until_at,
- build_recovery_decisions=build_recovery_decisions||pg_catalog.jsonb_build_array(d||pg_catalog.jsonb_build_object('receipt_sha256',receipt)) WHERE incident_id=m.incident_id;
- UPDATE reality_internal.owner_shift_continuity_incidents_v1 SET phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',diagnosis='Bounded same-provider diagnostic: '||cl,
- proposed_upgrade=strategy,independent_test_requirement='Independent original frozen CI and settlement remain required.',
- limitations='Provider readback does not independently prove the repair or original work.',investigation_receipt_sha256=receipt,investigated_at=pg_catalog.clock_timestamp() WHERE incident_id=p_incident_id;
- RETURN pg_catalog.jsonb_build_object('status','SIGNED_BUILDER_RECOVERY_DECISION_RECORDED','incident_id',p_incident_id,'maintenance_id',m.incident_id,
- 'recovery_state',decision,'error_class',cl,'strategy',strategy,'receipt_sha256',receipt,'not_before',until_at,
- 'original_job_completed',false,'installation_authorized',false,'production_changed',false,'execution_authorized',false);
-END $fn$;
-REVOKE ALL ON FUNCTION reality_internal.admit_signed_builder_failure_v1(),public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid),
- public.reality_record_signed_builder_recovery_decision_v1(uuid,uuid,uuid,uuid,jsonb) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION reality_internal.admit_signed_builder_failure_v1(),public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid),
- public.reality_record_signed_builder_recovery_decision_v1(uuid,uuid,uuid,uuid,jsonb) TO service_role;))
+ OR (cl='PROVIDER_READY' AND (p_observation->>'http_status' IS DISTINCT FROM '200' OR coalesce(p_observation->>'response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}$'))
  OR (cl='RATE_LIMIT' AND p_observation->>'http_status' IS DISTINCT FROM '429')
  OR (cl='TRANSIENT_INFRA' AND coalesce(p_observation->>'http_status','') NOT IN ('408','500','502','503','504'))
  THEN RAISE EXCEPTION 'BUILDER_RECOVERY_OBSERVATION_INVALID';END IF;
