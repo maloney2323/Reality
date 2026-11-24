@@ -165,7 +165,9 @@ export async function readPrivateChatGoalPublicationEpoch(
     isolatedDb.url!==session.config?.url||
     typeof isolatedDb.secretKey!=='string'||!isolatedDb.secretKey)
   throw Object.assign(Error('CHAT_GOAL_EPOCH_OWNER_SCOPE_INVALID'),{status:503});
- const response=await fetchImpl(
+ let response;
+ try{
+  response=await fetchImpl(
   isolatedDb.url+'/rest/v1/rpc/reality_read_execution_epoch',{
    method:'POST',signal:AbortSignal.timeout(3500),
    headers:{
@@ -177,7 +179,15 @@ export async function readPrivateChatGoalPublicationEpoch(
     p_user_id:session.user_id,p_conversation_id:conversationId
    })
   }
- );
+  );
+ }catch(error){
+  // A provider transport timeout is an unavailable epoch, not a verified
+  // revision. The caller may show its existing transient read-only advisory;
+  // durable publication still requires the exact epoch and atomic CAS.
+  if(['TimeoutError','AbortError','TypeError'].includes(error?.name))
+   throw Object.assign(Error('CHAT_GOAL_EPOCH_READ_UNAVAILABLE'),{status:503});
+  throw error;
+ }
  if(!response.ok)
   throw Object.assign(Error('CHAT_GOAL_EPOCH_READ_UNAVAILABLE'),{status:503});
  const result=await response.json().catch(()=>null);
