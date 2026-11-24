@@ -513,3 +513,20 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
  },{env:state});
  assert.equal(down.status,'FINAL_LOOP_SHARED_CONTINUITY_GUARD_READ_UNAVAILABLE');
 });
+
+
+test('shared guard is enforced by the existing checkpoint writer, not by a model',()=>{
+ const file=readFileSync(new URL(
+ '../supabase/migrations/20261124005000_final_loop_shared_continuity_verifier_guard_v1.sql',
+ import.meta.url),'utf8');
+ assert.match(file,/reality_read_final_loop_shared_continuity_guard_v1/);
+ assert.match(file,/reality_record_final_loop_evidence_checkpoint_v1/);
+ assert.match(file,/v_shared:=public\.reality_read_final_loop_shared_continuity_guard_v1/);
+ assert.match(file,/FINAL_LOOP_SHARED_CONTINUITY_PROOF_OR_IDENTITY_GAP_NO_EFFECT/);
+ assert.match(file,/independent_original_outcome_verified/);
+ assert.match(file,/universe_return_verified/);
+ assert.match(file,/qualifier_digest_verified/);
+ assert.match(file,/UNIVERSE/);
+ assert.doesNotMatch(file,/net\.http_post|cron\.unschedule/);
+ assert.doesNotMatch(file,/github\.com\/maloney2323\/Reality\/pull\/307/);
+});
