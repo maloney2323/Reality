@@ -47,6 +47,24 @@ export function interpretSignedInChatShiftCommand(message,{selectedHours=8}={}){
   production_changed:false,
  });
 }
+// Planning is not authorization. Route natural owner planning requests to
+// the existing Chat approval card; only its explicit approval can POST.
+export function interpretChatShiftProposal(message){
+ if(typeof message!=='string'||!message.trim()||message.length>6000||
+    CONDITION.test(message)||RECURRENCE.test(message))return null;
+ const text=message.trim();
+ const command=interpretSignedInChatShiftCommand(text);
+ const planning=/^(?:(?:hey\s+)?reality\s*[,.:!]?\s*)?(?:please\s+)?(?:build|create|prepare|plan|draft|design|put together)\b[\s\S]{0,500}\b(?:shift|workday|work day)\b/i.test(text);
+ if(!planning&&!command)return null;
+ const m=/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})(?:\s|-)+(?:hours?|hrs?)\b/i.exec(text);
+ const v=m?.[1]?.toLowerCase();
+ const hours=v?(/^\d+$/.test(v)?Number(v):HOUR_WORDS[v]):command?.duration_hours??8;
+ if(!Number.isSafeInteger(hours)||hours<1||hours>12)return null;
+ return Object.freeze({intent:'PREPARE_OWNER_SHIFT_PROPOSAL',duration_hours:hours,
+  all_employees:/\b(?:all|every)\s+(?:my\s+|the\s+)?(?:ai\s+)?employees\b|\b(?:whole|entire|full)\s+(?:team|workforce)\b/i.test(text),
+  completion_bound:true,execution_authorized:false,installation_authorized:false,
+  production_changed:false});
+}
 export function safeShiftReadbackState(data,{requestedHours=null,now=Date.now()}={}){
  if(!data||data.ok!==true||!Array.isArray(data.shifts)||
     data.shifts.length>5||!Number.isFinite(now))

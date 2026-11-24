@@ -679,7 +679,7 @@ export default async function handler(req,res){
    (b.start_mode!==undefined&&(!['START_NOW','SCHEDULE'].includes(b.start_mode)||b.completion_bound!==true))||
    (b.completion_bound!==undefined&&b.completion_bound!==true)||
    (b.completion_bound===true&&
-     (coreKeys.length!==5||b.requested_hours!==8))||
+     (coreKeys.length!==5||!Number.isSafeInteger(b.requested_hours)))||
    (b.completion_bound!==true&&
      (keys.length!==3&&keys.length!==4||
       (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||

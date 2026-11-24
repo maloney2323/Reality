@@ -41,13 +41,23 @@
  block.hidden=true;
  panel.insertBefore(block,composer);
  function showPlan(){block.hidden=false;if(!transcript.contains(block))transcript.append(block);block.scrollIntoView({block:'nearest'});}
- window.addEventListener('reality:open-shift-plan',()=>{showPlan();void load();});
+ window.addEventListener('reality:open-shift-plan',event=>{
+  if(processing)return;
+  const p=event?.detail;
+  requestedHours=Number.isSafeInteger(p?.duration_hours)&&p.duration_hours>=1&&p.duration_hours<=12?p.duration_hours:8;
+  allEmployees=p?.all_employees===true;
+  revisionRequested=false;editing=false;startAt.value='';
+  title.textContent=requestedHours+'-hour proposed employee shift';
+  approve.textContent='Authorize & Start Shift';
+  showPlan();void load();
+ });
  new MutationObserver(()=>{if(!block.hidden&&!transcript.contains(block))transcript.append(block);}).observe(transcript,{childList:true});
  const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  const SHA=/^sha256:[a-f0-9]{64}$/;
  const URL=/^https:\/\/github\.com\/maloney2323\/Reality\/(?:issues|pull|actions\/runs)\/[1-9]\d*$/;
  const active=new Set(['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']);
  let draft=null,editing=false,revisionRequested=false,processing=false;
+ let requestedHours=8,allEmployees=false;
  async function request(url,options={}){
   const res=await fetch(url,{method:'GET',credentials:'same-origin',cache:'no-store',
    signal:AbortSignal.timeout(40000),...options});
@@ -62,6 +72,7 @@
     p.read_only===true&&p.owner_approval_created===false&&
     p.job_started===false&&p.production_changed===false&&
     p.installation_authorized===false&&SHA.test(p.expected_fingerprint||'')&&
+    p.shift_duration_hours===requestedHours&&p.shift_duration_minutes===requestedHours*60&&
     Array.isArray(p.slots)&&p.slots.length===8&&
     p.slots.every((s,i)=>s.sequence===i+1)&&
     tasks?.version==='reality-riley-taylor-combined-work-orders-v1'&&
@@ -97,11 +108,39 @@
    }work.append(list);
   }
  }
+ async function appendAllRoleProposals(){
+  const data=await request('/api/reality/personal-employee-roster');
+  const roles=data.proposed_employees;
+  if(data.owner_scope_verified!==true||data.worker_execution_authorized!==false||
+     data.production_changed!==false||!Array.isArray(roles)||roles.length!==8||
+     new Set(roles.map(r=>r.display_name)).size!==8)
+   throw Error('All-employee roster readback unverified');
+  work.append(x('h4','All eight employees — source-backed planning preview'));
+  const list=x('ul');
+  const seen=new Set();
+  for(const role of roles){
+   if(typeof role.display_name!=='string'||typeof role.role!=='string'||
+      !Array.isArray(role.candidate_jobs))throw Error('Employee role evidence unverified');
+   const li=x('li');li.append(x('strong',role.display_name+' · '+role.role));
+   const jobs=role.candidate_jobs.filter(j=>URL.test(j.source_url||'')&&
+    typeof j.title==='string'&&j.authorized_execution===false&&
+    j.independently_verified_done===false&&!seen.has(j.source_url)).slice(0,2);
+   if(!jobs.length)li.append(x('p','No distinct source-backed assignment available in this preview.'));
+   for(const j of jobs){
+    seen.add(j.source_url);
+    const link=x('a',j.title.slice(0,210));link.href=j.source_url;link.target='_blank';link.rel='noopener noreferrer';
+    const desc=x('p','Proposed source review — not yet execution-authorized.');li.append(link,desc);
+   }
+   list.append(li);
+  }
+  work.append(list);
+  work.append(x('p','The existing executable shift contract does not yet bind all eight roles to one approval. No full-team start is offered until those assignments are in the exact signed scope.'));
+ }
  async function load(){
   if(processing)return;processing=true;prepare.disabled=true;approve.hidden=true;scheduling.hidden=true;
   work.replaceChildren();info.textContent='Checking existing authorization, prior settlements and employee assignments…';
   try{
-   const data=await request('/api/reality/personal-governed-employee-shift?hours=8');
+   const data=await request('/api/reality/personal-governed-employee-shift?hours='+requestedHours);
    if(data.status!=='OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK'||
       data.production_changed!==false||
       data.shift_approval_does_not_authorize_installation!==true||
@@ -109,7 +148,7 @@
     throw Error('Shift owner or execution boundary not verified');
    const existing=data.shifts.find(s=>active.has(s.status)&&
      UUID.test(s.shift_id||'')&&!s.closed_at);
-   if(existing){showExisting(existing,data.governed_auto_trigger);return;}
+   if(existing){showExisting(existing,data.governed_auto_trigger);if(allEmployees)await appendAllRoleProposals();return;}
    const p=data.requested_shift_draft;
    if(!validDraft(p))throw Error('Exact owner shift draft was not independently verified');
    draft=p;editing=revisionRequested;edit.hidden=false;
@@ -129,6 +168,11 @@
    }
    if(list.children.length)work.append(list);
    else work.append(x('p','No qualified source assignments are available in this draft. Reality will not authorize an empty shift.'));
+   if(allEmployees){
+    await appendAllRoleProposals();
+    info.textContent='All-employee planning preview for '+requestedHours+' hours. The exact signed scope currently covers Riley + Taylor only. No full-team work has been authorized.';
+    return;
+   }
    if(p.combined_employee_work_orders.task_count>0&&!revisionRequested){
     approve.hidden=false;approve.disabled=false;scheduling.hidden=false;
    }
@@ -161,7 +205,7 @@
   revisionRequested=false;editing=false;reset.hidden=true;void load();
  });
  approve.addEventListener('click',async()=>{
-  if(processing||editing||revisionRequested||!draft||!validDraft(draft)||
+  if(processing||allEmployees||editing||revisionRequested||!draft||!validDraft(draft)||
      draft.combined_employee_work_orders.task_count===0)return;
   processing=true;approve.disabled=true;prepare.disabled=true;
   info.textContent='Verifying the current source fingerprint and recording your one explicit start approval…';
@@ -178,7 +222,7 @@
      expected_fingerprint:p.expected_fingerprint,
      planned_start_at:requestedStart.toISOString(),
      start_mode:startAt.value?'SCHEDULE':'START_NOW',
-     completion_bound:true,requested_hours:8})
+     completion_bound:true,requested_hours:p.shift_duration_hours})
    });
    if(!['SHIFT_DURABLY_AUTHORIZED','SHIFT_ALREADY_AUTHORIZED'].includes(after.status)||
       !UUID.test(after.shift_id||'')||

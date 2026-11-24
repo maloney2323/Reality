@@ -94,6 +94,7 @@ test('actual Chat click handler prepares, authorizes and refreshes the same shif
  const plan={version:'reality-eight-hour-employee-shift-draft-v1',status:'DRAFT_ONLY_NOT_SCHEDULED_OR_AUTHORIZED',
   read_only:true,owner_approval_created:false,job_started:false,production_changed:false,
   installation_authorized:false,expected_fingerprint:fingerprint,
+  shift_duration_hours:3,shift_duration_minutes:180,
   slots:Array.from({length:8},(_,i)=>({sequence:i+1})),
   combined_employee_work_orders:{version:'reality-riley-taylor-combined-work-orders-v1',
    plan_fingerprint:fingerprint,operating_model:'ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT',
@@ -126,7 +127,8 @@ test('actual Chat click handler prepares, authorizes and refreshes the same shif
  assert.equal(approve.hidden,true);
  assert.equal(card.hidden,true);
  assert.equal(calls.length,0);
- windowHandlers['reality:open-shift-plan']();await new Promise(resolve=>setImmediate(resolve));
+ windowHandlers['reality:open-shift-plan']({detail:{duration_hours:3,all_employees:false}});await new Promise(resolve=>setImmediate(resolve));
+ assert.match(calls[0].url,/hours=3$/);
  assert.equal(card.parentNode,transcript);assert.equal(card.hidden,false);
  assert.equal(approve.hidden,false);
  assert.equal(calls.filter(x=>x.method==='POST').length,0);
@@ -137,6 +139,7 @@ test('actual Chat click handler prepares, authorizes and refreshes the same shif
  assert.equal(posts[0].body.expected_fingerprint,fingerprint);
  assert.equal(posts[0].body.start_mode,'START_NOW');
  assert.equal(posts[0].body.completion_bound,true);
+ assert.equal(posts[0].body.requested_hours,3);
  assert.match(status.textContent,/queued the start/);
  assert.equal(approve.hidden,true);
  prepare.click();await new Promise(resolve=>setImmediate(resolve));

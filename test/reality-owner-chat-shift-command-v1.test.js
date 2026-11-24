@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
- interpretSignedInChatShiftCommand,safeShiftReadbackState,
+ interpretSignedInChatShiftCommand,interpretChatShiftProposal,safeShiftReadbackState,
  resolveExistingSignedInChatShift,
 } from '../reality-owner-chat-shift-command-v1.js';
 
@@ -200,17 +200,30 @@ test('completion-bound owner UI uses exact signed-in start and never asks for ho
 });
 
 
-test('main Chat restores old explicit command routing after saved authenticated intake',()=>{
+test('main Chat prepares the exact shift in the existing approval card after saved intake',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const saved=html.indexOf('intakeVerified=true;');
- const route=html.indexOf('resolveExistingSignedInChatShift(exactOwnerCommand,');
+ const route=html.indexOf('interpretChatShiftProposal(value)');
  const model=html.indexOf("const r=await fetch('/api/reality/personal-chat',{method:'POST',");
  assert.ok(saved>0&&route>saved&&model>route);
- assert.match(html,/interpretSignedInChatShiftCommand\(value\)/);
- assert.match(html,/EXISTING_SIGNED_IN_SHIFT_ALREADY_AUTHORIZED/);
- assert.match(html,/NOT A MODEL ANSWER/);
  const frame=html.slice(saved,model);
- assert.doesNotMatch(frame,/api\/reality\/governed-employee-shift-worker|installation_authorized:true|production_changed:true/);
+ assert.match(frame,/reality:open-shift-plan/);
+ assert.doesNotMatch(frame,/resolveExistingSignedInChatShift|AUTHORIZE_EXACT_EMPLOYEE_SHIFT|governed-employee-shift-worker/);
+});
+test('natural language three-hour all-employee request is proposal only',()=>{
+ for(const message of [
+  'Reality, build me a three-hour shift for all my employees',
+  'Reality. Create a 3 hour shift for all employees',
+  'Prepare a 3-hour shift for the entire team'
+ ]){
+  const p=interpretChatShiftProposal(message);
+  assert.equal(p?.duration_hours,3,message);
+  assert.equal(p?.all_employees,true,message);
+  assert.equal(p?.execution_authorized,false);
+ }
+ assert.equal(interpretChatShiftProposal('Start a 3 hour shift').duration_hours,3);
+ for(const s of ['Do not build a 3 hour shift','Build a 20 hour shift','Build a 3 hour shift every day'])
+  assert.equal(interpretChatShiftProposal(s),null,s);
 });
 test('repeated explicit Start uses exact existing shift GET only, never mints or dispatches',async()=>{
  const id='9460cfff-937a-4105-9093-2e41ab39a950';
