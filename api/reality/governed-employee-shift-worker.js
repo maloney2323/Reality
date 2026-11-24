@@ -81,6 +81,8 @@ import {routeExistingSignedCaseCiForRecovery}
  from '../../src/reality-final-loop-existing-case-ci-bridge-v1.js';
 import {classifyFinalLoopBlockerLiveness}
  from '../../src/reality-final-loop-blocker-liveness-v1.js';
+import {verifySourceBoundTechnicalRecoveryCi}
+ from '../../src/reality-final-loop-technical-ci-evidence-verifier-v1.js';
 import {advanceOneSignedProofRecovery}
  from '../../src/reality-final-loop-signed-proof-recovery-worker-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
@@ -3851,6 +3853,30 @@ export default async function handler(req,res){
    };
   }
 
+  // Reconcile the exact signed GitHub CI run, source-bound case manifest
+  // and immutable artifact ON THE SAME existing signed worker. This consumes
+  // external evidence only; it neither installs a repair nor satisfies the
+  // separate business-original RED/authority gate.
+  workerStage='FINAL_LOOP_TECHNICAL_CI_PROVIDER_RECONCILIATION';
+  let finalLoopTechnicalCiProviderVerification;
+  try{
+   finalLoopTechnicalCiProviderVerification=
+    await verifySourceBoundTechnicalRecoveryCi({
+     db,env:process.env,
+     contractProposal:finalLoopProofCarryingRecovery,
+     existingCiRoute:finalLoopExistingCaseCiRecovery,
+     fetchImpl:fetch
+    });
+  }catch{
+   finalLoopTechnicalCiProviderVerification={
+    status:'RECOVERY_TECHNICAL_CI_PROVIDER_RECONCILIATION_UNVERIFIED',
+    independent_technical_ci_verified:false,
+    original_business_case_red_verified:false,
+    original_job_completed:false,production_changed:false,
+    execution_authorized:false
+   };
+  }
+
   // Always re-evaluate recoverable blocker liveness on the SAME scheduled
   // signed wake. A missing capability stays an explicit machine-owned due
   // action rather than generic waiting; this read model NEVER claims the
@@ -3859,7 +3885,8 @@ export default async function handler(req,res){
    contractProposal:finalLoopProofCarryingRecovery,
    existingCiRoute:finalLoopExistingCaseCiRecovery,
    signedRecovery:finalLoopSignedProofRecovery,
-   budgetState:finalLoopSignedProofRecovery
+   budgetState:finalLoopSignedProofRecovery,
+   technicalCiObservation:finalLoopTechnicalCiProviderVerification
   });
 
   workerStage='WORKER_RESPONSE_PUBLICATION';
@@ -4021,6 +4048,7 @@ export default async function handler(req,res){
     final_loop_proof_carrying_recovery:finalLoopProofCarryingRecovery,
     final_loop_existing_case_ci_recovery:finalLoopExistingCaseCiRecovery,
     final_loop_signed_proof_recovery:finalLoopSignedProofRecovery,
+    final_loop_technical_ci_provider_verification:finalLoopTechnicalCiProviderVerification,
     final_loop_blocker_liveness:finalLoopBlockerLiveness,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
