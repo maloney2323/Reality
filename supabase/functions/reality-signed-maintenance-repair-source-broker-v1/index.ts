@@ -35,6 +35,7 @@ async function rpc(c:{url:string,key:string},name:string,args:Record<string,unkn
  if(![
   'reality_read_signed_maintenance_repair_source_scope_v1',
   'reality_read_signed_existing_maintenance_case_ci_scope_v1',
+  'reality_read_final_loop_event_resume_shadow_v1',
   'reality_record_signed_existing_maintenance_case_ci_v1',
   'reality_read_signed_existing_maintenance_artifact_scope_v1',
   'reality_record_signed_existing_maintenance_artifact_v1',
@@ -222,7 +223,9 @@ async function verifyOneCase(c:{url:string,key:string,github:string},
  return result;
 }
 async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
- if(Object.keys(b).sort().join(',')!=='mode,release_sha,shift_id,worker_run_id'||
+ const scoped=Object.prototype.hasOwnProperty.call(b,'resume_event_id');
+ if(Object.keys(b).sort().join(',')!==(scoped?'mode,release_sha,resume_event_id,shift_id,worker_run_id':'mode,release_sha,shift_id,worker_run_id')||
+    (scoped&&!UUID.test(b.resume_event_id||''))||
     !UUID.test(b.shift_id||'')||!UUID.test(b.worker_run_id||'')||
     !SHA.test(b.release_sha||''))
   return response(400,'CASE_CI_EXACT_SIGNED_WORKER_REQUEST_INVALID');
@@ -243,6 +246,24 @@ async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
     scope.installation_authorized!==false||
     scope.production_changed!==false)
   fail('CASE_CI_WARRANT_READBACK_INVALID');
+ let cases=scope.cases;
+ if(scoped){
+  const shadow=await rpc(c,'reality_read_final_loop_event_resume_shadow_v1',{p_shift_id:b.shift_id});
+  const events=Array.isArray(shadow?.events)?shadow.events.filter((e:any)=>
+   e.event_id===b.resume_event_id&&e.event_state==='SHADOW_PENDING'&&
+   e.source_current===true&&e.would_resume_suspended_obligation===true&&
+   ['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT'].includes(e.event_kind)&&
+   Array.isArray(shadow.subscriptions)&&shadow.subscriptions.some((s:any)=>
+    s.original_work_id===e.original_work_id&&s.source_ref===e.source_ref&&
+    s.continuity_revision===e.continuity_revision&&s.condition_kind===e.event_kind&&
+    s.next_qualified_action==='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC')):[];
+  if(shadow?.status!=='FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY'||
+     shadow.shift_id!==b.shift_id||shadow.execution_authorized!==false||events.length!==1)
+   return response(200,'NO_CURRENT_EXACT_CASE_CI_RESUME_EVENT',{reviewed_count:0});
+  cases=scope.cases.filter((x:any)=>x.source_ref===events[0].source_ref&&
+   x.owner_id===scope.owner_id&&x.shift_id===b.shift_id);
+  if(cases.length!==1)return response(200,'NO_CURRENT_EXACT_CASE_CI_RESUME_EVENT',{reviewed_count:0});
+ }
  const runs=await github(c,'/actions/runs?branch='+
    encodeURIComponent(EXECUTOR_BRANCH)+'&per_page=100');
  const matches=Array.isArray(runs?.workflow_runs)?
@@ -264,11 +285,12 @@ async function verifiedCaseCi(c:{url:string,key:string,github:string},b:any){
    github(c,'/actions/runs/'+run.id+'/jobs?per_page=100'),
    github(c,'/actions/runs/'+run.id+'/artifacts?per_page=100')
  ]);
- for(const original of scope.cases){
+ for(const original of cases){
   const result=await verifyOneCase(c,b,original,run,jobs,arts);
   if(result!==null)
    return response(200,result.status,{
     maintenance_id:result.maintenance_id,shift_id:result.shift_id,
+    ...(scoped?{resume_event_id:b.resume_event_id,source_ref:original.source_ref}:{}),
     github_run_id:result.github_run_id,
     case_specific_ci_receipt_sha256:result.case_specific_ci_receipt_sha256,
     case_specific_frozen_red_attested:true,
