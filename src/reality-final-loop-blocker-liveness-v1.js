@@ -120,6 +120,13 @@ export function classifyFinalLoopBlockerLiveness({
     'RECONCILE_SIGNED_RED_RECEIPT_WITH_DURABLE_RECOVERY_CONTRACT'
   });
  }
+ // An ambiguous provider outcome is never evidence that the action failed
+ // or that acquisition should start. Read back the signed effect first.
+ if(s==='RECOVERY_COMPLETED_CI_CLAIM_INDEPENDENT_OUTCOME_UNVERIFIED')
+  return out('RECOVERY_INDEPENDENT_PROVIDER_RECONCILIATION_DUE',{
+   ...base,liveness:'RECONCILIATION_DUE',next_actor:'REALITY',
+   repeat_prior_ci_dispatch_permitted:false,
+   next_governed_action:'RECONCILE_SIGNED_CASE_CI_PROVIDER_OUTCOME_NO_REPLAY'});
  if([NO_CAP,NEED_SPEC].includes(signedRecovery?.status)){
   return out('RECOVERY_AUTONOMOUS_ACQUISITION_DUE',{
    ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
@@ -128,11 +135,6 @@ export function classifyFinalLoopBlockerLiveness({
    capability_execution_ready:false,execution_authorized:false
   });
  }
- if(s==='RECOVERY_COMPLETED_CI_CLAIM_INDEPENDENT_OUTCOME_UNVERIFIED')
-  return out('RECOVERY_INDEPENDENT_PROVIDER_RECONCILIATION_DUE',{
-   ...base,liveness:'RECONCILIATION_DUE',next_actor:'REALITY',
-   repeat_prior_ci_dispatch_permitted:false,
-   next_governed_action:'RECONCILE_SIGNED_CASE_CI_PROVIDER_OUTCOME_NO_REPLAY'});
  if(s==='RECOVERY_EXISTING_SIGNED_CI_RUNNER_REQUIRES_ATOMIC_CLAIM')
   return out('RECOVERY_SIGNED_EXISTING_EXECUTOR_CLAIM_DUE',{
    ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
