@@ -4,6 +4,7 @@
 import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
+import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
 
 export const GOVERNED_AUTO_TRIGGER_VERSION='reality-governed-auto-trigger-v1.0';
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -364,4 +365,75 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
  return safe('FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY',{
   ...base,dispatch_permitted:true,next_action:action,
   resume_event:Object.freeze({event_id:r.event_id,source_ref:r.source_ref})});
+}
+
+
+// A transport receipt is not a worker, authority or outcome receipt.
+export function finalLoopEventTriggerEnabled(db,env=process.env){
+ return env.VERCEL_ENV==='preview'&&
+  env.REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_EVENT_RESUME_SHADOW_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&
+  env.REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY!=='true'&&
+  db?.strictSecrets===true&&typeof db.project==='string'&&
+  db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
+  db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&
+  db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+  db.url==='https://'+db.project+'.supabase.co';
+}
+export function parseFinalLoopGovernedWake(headers={}){
+ const owner_id=headers['x-reality-governed-owner-id'];
+ const shift_id=headers['x-reality-governed-shift-id'];
+ const plan_fingerprint=headers['x-reality-governed-plan-fingerprint'];
+ if([owner_id,shift_id,plan_fingerprint].every(v=>v===undefined))return null;
+ if(typeof owner_id!=='string'||typeof shift_id!=='string'||
+    typeof plan_fingerprint!=='string'||!signedShiftUUID.test(owner_id)||
+    !signedShiftUUID.test(shift_id)||!signedShiftSHA.test(plan_fingerprint))
+  fail('WAKE_SCOPE_INVALID');
+ return Object.freeze({owner_id,shift_id,plan_fingerprint});
+}
+export function verifyFinalLoopGovernedWakeScope(scope,graph){
+ return !!scope&&graph?.status==='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'&&
+  graph.owner_id===scope.owner_id&&graph.shift_id===scope.shift_id&&
+  graph.plan_fingerprint===scope.plan_fingerprint&&graph.completion_bound===true&&
+  graph.execution_scope_from_owner_warrant_only===true&&
+  graph.new_job_created===false&&graph.installation_authorized===false&&
+  graph.production_changed===false;
+}
+export async function readFinalLoopGovernedShiftStart({db,ownerId,shift,env=process.env,
+ invoke=shiftRpc}={}){
+ const safe=(status,extra={})=>Object.freeze({status,...extra,
+  execution_authorized_by_trigger:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false});
+ if(!finalLoopEventTriggerEnabled(db,env))
+  return safe('GOVERNED_START_TRANSPORT_NOT_ENABLED');
+ if(!signedShiftUUID.test(ownerId||'')||!signedShiftUUID.test(shift?.shift_id||'')||
+    !signedShiftSHA.test(shift.plan_fingerprint||'')||shift.planned_end_at!=='infinity')
+  return safe('GOVERNED_START_SCOPE_UNVERIFIED');
+ try{
+  const r=await invoke(db,'reality_read_final_loop_governed_start_v1',{
+   p_owner_id:ownerId,p_shift_id:shift.shift_id,p_plan_fingerprint:shift.plan_fingerprint});
+  if(r?.owner_id!==ownerId||r.shift_id!==shift.shift_id||
+     r.plan_fingerprint!==shift.plan_fingerprint||r.read_only!==true||
+     r.execution_authorized!==false||r.installation_authorized!==false||
+     r.original_job_completed!==false||r.production_changed!==false||
+     !['GOVERNED_START_NOT_QUEUED','GOVERNED_START_WAKE_QUEUED',
+        'GOVERNED_START_WORKER_OBSERVED','GOVERNED_START_SCHEDULED'].includes(r.status))
+   return safe('GOVERNED_START_READBACK_UNVERIFIED');
+  if(r.status==='GOVERNED_START_WAKE_QUEUED'||r.status==='GOVERNED_START_WORKER_OBSERVED'){
+   if(!Number.isSafeInteger(r.network_request_id)||r.network_request_id<1||
+      !Number.isFinite(Date.parse(r.queued_at||'')))
+    return safe('GOVERNED_START_READBACK_UNVERIFIED');
+  }
+  if(r.status==='GOVERNED_START_WORKER_OBSERVED'&&
+     (!Number.isFinite(Date.parse(r.last_worker_seen_at||''))||
+      Date.parse(r.last_worker_seen_at)<Date.parse(r.queued_at)))
+   return safe('GOVERNED_START_READBACK_UNVERIFIED');
+  return safe(r.status,{shift_id:r.shift_id,
+   wake_queued:['GOVERNED_START_WAKE_QUEUED','GOVERNED_START_WORKER_OBSERVED'].includes(r.status),
+   worker_observed:r.status==='GOVERNED_START_WORKER_OBSERVED',
+   queued_at:r.queued_at||null,last_worker_seen_at:r.last_worker_seen_at||null});
+ }catch{return safe('GOVERNED_START_READBACK_UNAVAILABLE');}
 }

@@ -201,7 +201,8 @@ import {reconcileSignedVerifiedMaintenanceArtifact,
  from '../../src/reality-signed-maintenance-verified-artifact-handoff-v1.js';
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
-import {routeSignedMaintenanceContinuityTrigger,routeVerifiedFinalLoopResumeTrigger}
+import {routeSignedMaintenanceContinuityTrigger,routeVerifiedFinalLoopResumeTrigger,
+ finalLoopEventTriggerEnabled,parseFinalLoopGovernedWake,verifyFinalLoopGovernedWakeScope}
  from '../../src/reality-governed-auto-trigger-v1.0.js';
 import {advanceVerifiedMaintenanceOriginalHandoff}
  from '../../src/reality-signed-maintenance-original-return-handoff-v1.js';
@@ -258,6 +259,11 @@ export default async function handler(req,res){
  try{
   const db=shiftDatabase(process.env);
   activePulseDb=db;
+  const governedWakeScope=parseFinalLoopGovernedWake(req.headers);
+  if(governedWakeScope&&(!finalLoopEventTriggerEnabled(db,process.env)||
+    !verifyFinalLoopGovernedWakeScope(governedWakeScope,await shiftRpc(db,
+     'reality_read_current_shift_execution_graph_v1',{}))))
+   throw Error('GOVERNED_AUTO_TRIGGER_WAKE_SCOPE_REJECTED');
   // A standing shift or discovery grant is not a new execution event.
   // Durable, service-role-only singleton claim prevents concurrent full
   // workers even when a legacy cron wake arrives during active execution.
@@ -445,6 +451,11 @@ export default async function handler(req,res){
     'NO_CURRENT_AUTHORIZED_SHIFT_FOR_WORKER_PULSE'].includes(wakeReceipt?.status)||
      wakeReceipt.installation_authorized!==false)
    throw Error('WORKER_WAKE_DATABASE_READBACK_UNVERIFIED');
+  if(governedWakeScope&&(wakeReceipt.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    wakeReceipt.shift_id!==governedWakeScope.shift_id||
+    !verifyFinalLoopGovernedWakeScope(governedWakeScope,await shiftRpc(db,
+     'reality_read_current_shift_execution_graph_v1',{}))))
+   throw Error('GOVERNED_AUTO_TRIGGER_WAKE_SCOPE_CHANGED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
   // Continuous, standing EVIDENCE qualification intake: all existing employee

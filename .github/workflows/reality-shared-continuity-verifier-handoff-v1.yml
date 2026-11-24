@@ -5,6 +5,10 @@ on:
       - feature/final-loop-governed-qualification-handoff-20261123
     paths:
       - 'src/reality-final-loop-*.js'
+      - 'src/reality-governed-auto-trigger-v1.0.js'
+      - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
+      - 'reality-chat-employee-shift-card-v1.js'
+      - 'api/reality/personal-governed-employee-shift.js'
       - 'api/reality/governed-employee-shift-worker.js'
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
@@ -30,6 +34,10 @@ on:
   pull_request:
     paths:
       - 'src/reality-final-loop-*.js'
+      - 'src/reality-governed-auto-trigger-v1.0.js'
+      - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
+      - 'reality-chat-employee-shift-card-v1.js'
+      - 'api/reality/personal-governed-employee-shift.js'
       - 'api/reality/governed-employee-shift-worker.js'
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
@@ -70,6 +78,8 @@ jobs:
       - name: Parse signed worker and continuity projections
         run: |
           node --check api/reality/governed-employee-shift-worker.js
+          node --check api/reality/personal-governed-employee-shift.js
+          node --check reality-chat-employee-shift-card-v1.js
           node --check api/reality/personal-time-horizon.js
           node --check api/reality/personal-chat.js
           node --check src/reality-final-loop-signed-worker-bridge-v1.js
@@ -78,6 +88,7 @@ jobs:
       - name: Verify source identity, Continuity head, verifier and Universe fences
         run: |
           node --test test/reality-governed-auto-trigger-v1.0.test.js
+          node --test test/reality-final-loop-governed-start-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-final-loop-shared-owner-packet-v1.test.js
           node --test test/reality-final-loop-whole-cycle-acceptance-v1.test.js
@@ -139,3 +150,4 @@ jobs:
           PGDATABASE: reality_recovery_smoke
         run: |
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql
+          psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-governed-start-smoke-v1.sql

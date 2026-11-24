@@ -36,6 +36,7 @@ import {classifyRealityGovernedContinuityEvidence}
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
+import {readFinalLoopGovernedShiftStart} from '../../src/reality-governed-auto-trigger-v1.0.js';
 export const maxDuration=60;
 // An owner-authorized shift must begin with the work Reality already knows.
 // These are read-only source priorities; no issue, legacy queue or model
@@ -640,7 +641,10 @@ export default async function handler(req,res){
        owner_backlog_coverage_complete:priority.source_coverage_complete,
        previously_settled_original_source_refs_excluded:settledRefs};
    }
-   return res.status(200).json({ok:true,...read,shift_briefing,
+   const activeShift=read.shifts.find(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&!s.closed_at);
+   const governed_auto_trigger=activeShift?await readFinalLoopGovernedShiftStart({
+    db,ownerId:session.user_id,shift:activeShift}):null;
+   return res.status(200).json({ok:true,...read,shift_briefing,governed_auto_trigger,
     shift_activity,shift_activity_status,
     shift_source_native_receipts,shift_source_native_receipts_status,
     shift_automatic_supervisor,shift_automatic_supervisor_status,
@@ -731,8 +735,10 @@ export default async function handler(req,res){
     s.plan_fingerprint===drafted.expected_fingerprint&&
     s.planned_end_at==='infinity'&&s.steps.length===8);
    if(!exact)throw Error('SHIFT_MAINTENANCE_CONTINUATION_READBACK_UNVERIFIED');
+   const governed_auto_trigger=await readFinalLoopGovernedShiftStart({
+    db,ownerId:session.user_id,shift:exact});
    return res.status(202).json({
-    ok:true,...receipt,shift:exact,status:'SHIFT_DURABLY_AUTHORIZED',
+    ok:true,...receipt,shift:exact,status:'SHIFT_DURABLY_AUTHORIZED',governed_auto_trigger,
     original_shift_ids:drafted.originating_shift_ids,
     work_items:drafted.work_items,
     start_confirmation:{
@@ -798,8 +804,10 @@ export default async function handler(req,res){
    original_job_completed:false,installation_authorized:false,
    production_changed:false
   });
+  const governed_auto_trigger=await readFinalLoopGovernedShiftStart({
+   db,ownerId:session.user_id,shift:exact});
   return res.status(202).json({ok:true,...receipt,shift:exact,
-   start_confirmation,
+   start_confirmation,governed_auto_trigger,
    combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
    completion_bound:b.completion_bound===true,
