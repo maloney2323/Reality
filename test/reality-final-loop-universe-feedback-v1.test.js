@@ -169,3 +169,37 @@ test('owner and signed worker resolve identical Universe facts from one canonica
  assert.equal(workerRead.execution_authorized,false);
  assert.equal(workerRead.shift_completed,false);
 });
+
+
+test('Universe rejects settlement not reconciled by the shared continuity verifier',()=>{
+ const guard={
+  status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+  owner_id:owner,shift_id:shift,continuity_root_id:root,
+  continuity_head_sha256:hash('1'),revision:3,observation_sha256:hash('9'),
+  read_only:true,execution_authorized:false,
+  transition_committed:false,original_job_completed:false,
+  handoffs:[
+   {source_ref:pr307,original_work_id:work,
+    continuity_identity_verified:true,execution_authorized:false,
+    independent_original_outcome_verified:false,
+    universe_return_verified:false},
+   {source_ref:pr308,original_work_id:null,
+    continuity_identity_verified:true,execution_authorized:false,
+    universe_return_verified:false}
+  ]
+ };
+ const synced={...view,time_horizon:{...view.time_horizon,
+  present:{...view.time_horizon.present,revision:3}}};
+ const okay=feedback({canonicalView:synced,
+  parentOutcomes:outcomes(),sharedContinuityGuard:guard});
+ assert.equal(okay.status,'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY');
+ assert.equal(okay.shared_continuity_guard_crosschecked,true);
+ assert.equal(okay.original_job_completed,false);
+ const invented=feedback({canonicalView:synced,
+  parentOutcomes:outcomes([verified]),sharedContinuityGuard:guard});
+ assert.equal(invented.status,
+  'FINAL_LOOP_UNIVERSE_INDEPENDENT_SETTLEMENT_NOT_RECONCILED');
+ const foreign=feedback({canonicalView:synced,parentOutcomes:outcomes(),
+  sharedContinuityGuard:{...guard,continuity_head_sha256:hash('2')}});
+ assert.equal(foreign.status,'FINAL_LOOP_UNIVERSE_SHARED_CONTINUITY_PROOF_MISMATCH');
+});
