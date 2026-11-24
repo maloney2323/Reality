@@ -258,6 +258,9 @@ export async function inspectFinalLoopOnExistingSignedWorker({
        !HASH.test(o.qualifier_receipt_sha256||'')||
        !Array.isArray(o.unresolved_proof_gates)||
        o.unresolved_proof_gates.length>20||
+       o.unresolved_proof_gates.some(x=>typeof x!=='string'||
+        !/^[A-Z][A-Z0-9_]{3,99}$/.test(x))||
+       new Set(o.unresolved_proof_gates).size!==o.unresolved_proof_gates.length||
        o.executor_authorized_by_observation!==false||
        typeof o.original_claim_admitted!=='boolean'||
        typeof o.internal_maintenance_independent_frozen_ci_verified!=='boolean'||
@@ -270,6 +273,11 @@ export async function inspectFinalLoopOnExistingSignedWorker({
      source_ref:j.source_ref,original_work_id:j.original_work_id,
      status:o.status,continuity_identity_verified:true,
      qualifier_digest_verified:o.qualifier_digest_verified===true,
+     // Preserve the independently checked diagnosis for the recovery policy.
+     // Dropping these fields silently prevents a source-bound contract.
+     qualifier_receipt_sha256:j.original_work_id===null?null:o.qualifier_receipt_sha256,
+     unresolved_proof_gates:Object.freeze(j.original_work_id===null?[]:
+      [...o.unresolved_proof_gates]),
      independent_internal_ci_verified:
       o.internal_maintenance_independent_frozen_ci_verified===true,
      original_claim_admitted:o.original_claim_admitted===true,

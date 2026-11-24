@@ -5,6 +5,7 @@ import {inspectFinalLoopOnExistingSignedWorker as inspect,
  recordOneFinalLoopEvidenceCheckpoint as record}
  from '../src/reality-final-loop-signed-worker-bridge-v1.js';
 import {assertRealityUnifiedShiftGraph} from '../src/reality-shift-unified-execution-controller-v1.js';
+import {projectRecoveryContractFromFinalLoop} from '../src/reality-final-loop-proof-carrying-recovery-v1.js';
 
 const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -485,6 +486,38 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
  assert.equal(good.shared_continuity_guard.status,
   'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY');
  assert.equal(good.shared_continuity_guard.handoffs[0].original_work_id,work);
+ assert.equal(good.shared_continuity_guard.handoffs[0].qualifier_receipt_sha256,sha('9'));
+ assert.deepEqual(good.shared_continuity_guard.handoffs[0].unresolved_proof_gates,
+  ['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED']);
+ // Exercise the actual bridge output, not a manually enriched recovery fixture.
+ const pr='https://github.com/maloney2323/Reality/pull/307';
+ const raw=rawGraph();
+ raw.jobs=[{...raw.jobs[0],source_ref:pr,original_kind:'REAL_PR_REVIEW_ORIGINAL',
+  phase:'BLOCKED'}];
+ const prGraph=assertRealityUnifiedShiftGraph(raw);
+ const prEnvelope={...pendingEnvelope,jobs:[{...pendingEnvelope.jobs[0],
+  source_ref:pr,original_kind:'REAL_PR_REVIEW_ORIGINAL',source_phase:'BLOCKED'}]};
+ const prGuard={...guard,obligations:[{...guard.obligations[0],source_ref:pr,
+  unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED',
+   'BUSINESS_ORIGINAL_WARRANT_MISMATCH','ORIGINAL_CLAIM_NOT_ADMITTED']}]};
+ const actual=await caller(async(db,name)=>{
+  if(name==='reality_read_current_shift_execution_graph_v1')return raw;
+  if(name==='reality_read_current_final_loop_proof_envelope_v1')return prEnvelope;
+  if(name==='reality_read_final_loop_shared_continuity_guard_v1')return prGuard;
+  throw Error('UNEXPECTED_RPC');
+ },{env:state,graph:prGraph});
+ assert.equal(actual.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ const contract=projectRecoveryContractFromFinalLoop({graph:prGraph,
+  continuityReturn:actual,stagedRoutes:{
+   status:'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED',
+   routes:[{source_ref:pr,parent_original_work_id:work,source_head_sha:'a'.repeat(40)}]},
+  ownerPackets:{status:'FINAL_LOOP_OWNER_EXACT_CHILD_APPROVALS_READ_ONLY',
+   owner_id:owner,shift_id:shift,packets:[]}});
+ assert.equal(contract.status,'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE');
+ assert.equal(contract.contract_candidate.blocker_evidence_sha256,sha('9'));
+ assert.equal(contract.contract_candidate.obligation_id,work);
+ assert.equal(contract.execution_authorized,false);
+ assert.equal(contract.contract_candidate.ledger_freeze_verified,false);
  assert.equal(good.shared_continuity_guard.handoffs[0].universe_return_verified,false);
  assert.equal(good.executor_invoked,false);
  for(const [mutation,expected] of [

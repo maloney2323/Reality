@@ -137,3 +137,20 @@ test('live signed worker publishes whole-cycle verdict AFTER independent return 
  assert.match(s,/final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance/);
  assert.match(s,/verifiedContinuation:null/);
 });
+
+
+test('verified review approval does not hide a separate business warrant mismatch behind CI retries',()=>{
+ const approved={...packets,packets:[{...packets.packets[0],state:'APPROVED_ONCE',approved:true}]};
+ const h={...handoff,unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED',
+  'BUSINESS_ORIGINAL_WARRANT_MISMATCH','ORIGINAL_CLAIM_NOT_ADMITTED']};
+ const r=assess({...args,ownerPackets:approved,continuityReturn:{...checkpoint,
+  shared_continuity_guard:{...verifiedGuard,handoffs:[h]}}});
+ assert.equal(r.original_reports[0].status,'FULL_CYCLE_EXACT_BUSINESS_AUTHORITY_RECONCILIATION_REQUIRED');
+ assert.equal(r.original_reports[0].exact_owner_approval_required,false);
+ assert.equal(r.original_reports[0].business_original_authority_missing,true);
+ assert.equal(r.original_reports[0].internal_ci_evidence_missing,true);
+ assert.equal(r.next_governed_action,'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION');
+ assert.equal(r.original_reports[0].next_recovery_action,'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC');
+ assert.equal(r.full_cycle_accepted,false);
+ assert.equal(r.authority_extended,false);
+});

@@ -107,6 +107,10 @@ export function evaluateRealityWholeCycleAcceptance({
    verifiedContinuation.continuity_root_id===
     continuityReturn.shared_continuity_guard.continuity_root_id;
   const internalCI=h.independent_internal_ci_verified===true;
+  const gates=Array.isArray(h.unresolved_proof_gates)?h.unresolved_proof_gates:[];
+  const businessAuthorityMissing=gates.includes('BUSINESS_ORIGINAL_WARRANT_MISMATCH');
+  const authorityAction=businessAuthorityMissing?
+   'VERIFY_EXISTING_ORIGINAL_WARRANT_NO_SILENT_SCOPE_EXPANSION':null;
   const statuses=[
    stage('Original source and goal','VERIFIED',true),
    stage('Continuity and independent verifier','VERIFIED',true),
@@ -117,10 +121,11 @@ export function evaluateRealityWholeCycleAcceptance({
    stage('Universe return to same original',settled?'VERIFIED':'NOT_VERIFIED',settled),
    stage('Automatic next authorized action',resumed?'INDEPENDENTLY_VERIFIED':'NOT_VERIFIED',resumed)
   ];
-  const status=resumed&&settled&&final&&admission&&approved&&internalCI?
+  const status=resumed&&settled&&final&&admission&&approved&&internalCI&&!businessAuthorityMissing?
     'FULL_CYCLE_INDEPENDENTLY_ACCEPTED':
     !p?'FULL_CYCLE_SELF_RECOVERY_PREPARE_EXACT_OWNER_PACKET':
     !approved?'FULL_CYCLE_OWNER_APPROVAL_REQUIRED_AND_INTERNAL_CI_PENDING':
+    businessAuthorityMissing?'FULL_CYCLE_EXACT_BUSINESS_AUTHORITY_RECONCILIATION_REQUIRED':
     !internalCI?'FULL_CYCLE_SELF_RECOVERY_INDEPENDENT_INTERNAL_CI_REQUIRED':
     !admission?'FULL_CYCLE_GOVERNED_ORIGINAL_ADMISSION_REQUIRED':
     !final?'FULL_CYCLE_ORIGINAL_OUTCOME_VERIFICATION_REQUIRED':
@@ -130,18 +135,21 @@ export function evaluateRealityWholeCycleAcceptance({
    source_ref:j.source_ref,original_work_id:j.original_work_id,
    status,stages:Object.freeze(statuses),owner_packet_id:p?.packet_id??null,
    exact_owner_approval_required:!approved,
+   business_original_authority_missing:businessAuthorityMissing,
+   next_authority_action:authorityAction,
    internal_ci_evidence_missing:!internalCI,
    next_recovery_action:!internalCI?
     'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC':null,
    next_governed_action:!p?'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':
     !approved?'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT':
+    businessAuthorityMissing?authorityAction:
     !internalCI?'RESUME_REGISTERED_SIGNED_MAINTENANCE_CI_VERIFIER':
     !admission?'VERIFY_ISOLATED_ONE_USE_CHILD_EXECUTION_CLAIM':
     !final?'REQUIRE_INDEPENDENT_ORIGINAL_OUTCOME':
     !settled?'RECONCILE_VERIFIED_UNIVERSE_PARENT_TO_ORIGINAL':
     !resumed?'RESUME_NEXT_AUTHORIZED_ACTION_WITH_SIGNED_VERIFIER_RECEIPT':
     'FULL_CYCLE_ACCEPTED',
-   full_cycle_accepted:statuses.every(s=>s.verified),
+   full_cycle_accepted:!businessAuthorityMissing&&statuses.every(s=>s.verified),
    owner_approval_granted_by_evaluator:false
   }));
  }
