@@ -89,7 +89,7 @@ test('new page scripts and inherited inline full application compile',()=>{
 test('Chat keeps technical panels outside the transcript without changing handlers',()=>{
  assert.match(js,/const inlineScreen=\(\)=>false/);
  assert.match(js,/realityChatSavedWorkReadback/);
- assert.match(js,/savedWork\.append\(card\)/);
+ assert.match(read('reality-chat-direct-work-handoff-v1.js'),/const workNoticeHost=workPanel\|\|transcript/);
  assert.match(html,/workReadbackHost\.append\(card\)/);
  assert.match(html,/workReadbackHost\.append\(evidence\)/);
  assert.match(html,/Reality could not reach its AI provider/);
