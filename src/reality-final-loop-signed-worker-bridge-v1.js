@@ -522,10 +522,27 @@ export async function recordOneFinalLoopEvidenceCheckpoint({
   return safe('FINAL_LOOP_DB_CHECKPOINT_RECEIPT_UNVERIFIED_NO_REPLAY',{
    shift_id:wake.shift_id,original_work_id:original.original_work_id
   });
+
+ // When shared Continuity is active, require the actual DB writer's
+ // atomic revision-and-event-subscription proof too. A local receipt
+ // hash alone cannot certify the next cycle.
+ if(env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
+    (receipt.shared_continuity_guard_verified!==true||
+     !HASH.test(receipt.shared_continuity_observation_sha256||'')||
+     receipt.next_continuity_revision!==inspection.revision+1||
+     !Number.isSafeInteger(receipt.event_subscriptions_rebound_to_next_revision)||
+     receipt.event_subscriptions_rebound_to_next_revision<0))
+  return safe('FINAL_LOOP_DURABLE_CHECKPOINT_SUBSCRIPTION_CAS_UNVERIFIED_NO_REPLAY',{
+   shift_id:wake.shift_id,original_work_id:original.original_work_id
+  });
+
  return safe('FINAL_LOOP_EVIDENCE_ONLY_CHECKPOINT_INDEPENDENTLY_ACKNOWLEDGED',{
   shift_id:wake.shift_id,original_work_id:original.original_work_id,
   checkpoint_receipt_id:receipt.receipt_id,
   checkpoint_receipt_sha256:receipt.receipt_sha256,
-  evidence_checkpoint_acknowledged:true
+  evidence_checkpoint_acknowledged:true,
+  next_continuity_revision:receipt.next_continuity_revision??null,
+  event_subscriptions_rebound_to_next_revision:
+   receipt.event_subscriptions_rebound_to_next_revision??null
  });
 }
