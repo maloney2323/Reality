@@ -250,3 +250,44 @@ export async function readPrivateChatRequest(session,{conversationId,requestId},
   status:'AUTHENTICATED_EXACT_REQUEST_RLS_READBACK',
   work_execution_authorized:false,installation_authorized:false});
 }
+
+// Conversation text is not a goal or work transition. Use the same owner
+// storage and conversation lock, without depending on operational feature flags.
+export function resolvePrivateConversationDatabase(session,env=process.env){
+ const ref=String(env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||'');
+ const url='https://'+ref+'.supabase.co';
+ const key=String(env.REALITY_UNIVERSE_PERSISTENCE_KEY||env.SUPABASE_SECRET_KEY||env.supabase_secret_key||'').trim();
+ if(env.VERCEL_ENV!=='preview'||!validUuid(session?.user_id)||
+  !/^[a-z0-9]{20}$/.test(ref)||session.config?.url!==url||
+  env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF!==ref||
+  env.REALITY_RELIABILITY_BENCHMARK_PROJECT_REF!==ref||
+  String(env.REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL||'').replace(/\/$/,'')!==url||!key)
+  return null;
+ return Object.freeze({url,project:ref,strictSecrets:true,secretKey:key});
+}
+export async function publishPrivateConversationReply(session,{
+ conversationId,requestId,sourceRef,text,db
+},{fetchImpl=fetch}={}){
+ const id=String(sourceRef||'').replace(/^supabase:reality_chat_messages:/,'');
+ if(!db?.strictSecrets||db.url!==session.config?.url||!db.secretKey||
+  !validUuid(session?.user_id)||!validUuid(conversationId)||!validUuid(requestId)||
+  !validUuid(id)||sourceRef!=='supabase:reality_chat_messages:'+id||
+  typeof text!=='string'||!text.trim()||text.length>12000)
+  throw Object.assign(Error('CHAT_CONVERSATION_PUBLICATION_SCOPE_INVALID'),{status:503});
+ let r;
+ try{r=await fetchImpl(db.url+'/rest/v1/rpc/reality_publish_conversational_reply_v1',{
+  method:'POST',signal:AbortSignal.timeout(5000),
+  headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,
+   accept:'application/json','content-type':'application/json'},
+  body:JSON.stringify({p_user_id:session.user_id,p_conversation_id:conversationId,
+   p_request_id:requestId,p_user_message_id:id,p_content:text})
+ })}catch{throw Object.assign(Error('CHAT_CONVERSATION_PUBLICATION_UNAVAILABLE'),{status:503})}
+ const value=await r.json().catch(()=>null);
+ if(!r.ok){
+  const code=['CHAT_NEWER_USER_MESSAGE_DURING_COGNITION_RETRY_NEW_TURN','CHAT_ATOMIC_ASSISTANT_ALREADY_PUBLISHED'].find(x=>String(value?.message||'').includes(x));
+  throw Object.assign(Error(code||'CHAT_CONVERSATION_PUBLICATION_UNAVAILABLE'),{status:code?409:503});
+ }
+ if(!validUuid(value))throw Object.assign(Error('CHAT_CONVERSATION_PUBLICATION_RECEIPT_UNVERIFIED'),{status:503});
+ return Object.freeze({source_ref:'supabase:reality_chat_messages:'+value,
+  conversational_reply_persisted:true,execution_authorized:false});
+}
