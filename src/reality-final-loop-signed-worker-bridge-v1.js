@@ -188,6 +188,103 @@ export async function inspectFinalLoopOnExistingSignedWorker({
   if(governedQualificationHandoffs===null)
    return safe('FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
 
+
+  // Cross-layer Continuity guard: reuse the canonical ledger and independent
+  // verifier receipts, never a model-generated handoff or a second ledger.
+  // The guard is required in strict rollout mode and must fail closed.
+  let sharedContinuityGuard={
+   status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_NOT_ENABLED',
+   read_only:true,execution_authorized:false,
+   transition_committed:false,original_job_completed:false
+  };
+  if(env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'){
+   let g;
+   try{
+    g=await read(db,'reality_read_final_loop_shared_continuity_guard_v1',
+     {p_shift_id:wake.shift_id},{fetchImpl,timeoutMs:6000});
+   }catch{
+    return safe('FINAL_LOOP_SHARED_CONTINUITY_GUARD_READ_UNAVAILABLE',{
+     owner_id:graph.owner_id,shift_id:wake.shift_id
+    });
+   }
+   if(g?.schema!=='reality-shared-cross-layer-continuity-handoff-v1'||
+      g.status!=='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'||
+      g.owner_id!==graph.owner_id||g.shift_id!==wake.shift_id||
+      g.continuity_root_id!==p.continuity_root_id||
+      g.continuity_head_sha256!==p.continuity_head_sha256||
+      g.frozen_shift_scope_sha256!==p.frozen_shift_scope_sha256||
+      g.revision!==p.revision||
+      !HASH.test(g.handoff_observation_sha256||'')||
+      g.read_only!==true||g.execution_authorized!==false||
+      g.transition_committed!==false||g.executor_invoked!==false||
+      g.installation_authorized!==false||
+      g.original_job_completed!==false||g.production_changed!==false||
+      g.no_new_executable_authority!==true||
+      !Array.isArray(g.obligations)||
+      g.obligations.length!==p.jobs.length||
+      g.unverified_handoffs!==0)
+    return safe('FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID');
+   const verifiedHandoffs=[],observed=new Set();
+   for(const j of p.jobs){
+    const matches=g.obligations.filter(o=>
+      o?.source_ref===j.source_ref&&
+      o.original_work_id===j.original_work_id);
+    if(matches.length!==1||observed.has(j.source_ref))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_IDENTITY_MISMATCH');
+    observed.add(j.source_ref);
+    const o=matches[0];
+    if(o.continuity_identity_verified!==true||
+       o.execution_permitted_by_handoff!==false||
+       o.source_proof_verified!==j.independent_source_proof_verified||
+       o.universe_return_verified!==false&&
+        o.independent_original_outcome_verified!==true||
+       o.status==='INDEPENDENTLY_SETTLED_WITH_UNIVERSE'&&
+        (o.universe_return_verified!==true||
+         o.independent_original_outcome_verified!==true))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_VERIFIER_OR_AUTHORITY_CONFLICT');
+    if(j.original_work_id===null){
+      if(o.status!=='SOURCE_NOT_ADMITTED'||
+         o.execution_permitted_by_handoff!==false)
+       return safe('FINAL_LOOP_SHARED_CONTINUITY_UNADMITTED_SOURCE_NOT_FENCED');
+    }else if(!/^work:[a-f0-9]{32}$/.test(j.original_work_id)||
+       o.qualifier_digest_verified!==true||
+       !HASH.test(o.qualifier_receipt_sha256||'')||
+       !Array.isArray(o.unresolved_proof_gates)||
+       o.unresolved_proof_gates.length>20||
+       o.executor_authorized_by_observation!==false||
+       typeof o.original_claim_admitted!=='boolean'||
+       typeof o.internal_maintenance_independent_frozen_ci_verified!=='boolean'||
+       typeof o.independent_original_outcome_verified!=='boolean'||
+       typeof o.universe_return_verified!=='boolean'||
+       (o.internal_maintenance_independent_frozen_ci_verified&&
+        !HASH.test(o.internal_maintenance_verifier_receipt_sha256||'')))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_PROOF_NOT_VERIFIED');
+    verifiedHandoffs.push(Object.freeze({
+     source_ref:j.source_ref,original_work_id:j.original_work_id,
+     status:o.status,continuity_identity_verified:true,
+     qualifier_digest_verified:o.qualifier_digest_verified===true,
+     independent_internal_ci_verified:
+      o.internal_maintenance_independent_frozen_ci_verified===true,
+     original_claim_admitted:o.original_claim_admitted===true,
+     independent_original_outcome_verified:
+      o.independent_original_outcome_verified===true,
+     universe_return_verified:o.universe_return_verified===true,
+     execution_authorized:false,original_job_completed:false
+    }));
+   }
+   sharedContinuityGuard=Object.freeze({
+    status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+    shift_id:wake.shift_id,owner_id:graph.owner_id,
+    continuity_root_id:p.continuity_root_id,
+    continuity_head_sha256:p.continuity_head_sha256,
+    revision:p.revision,
+    observation_sha256:g.handoff_observation_sha256,
+    handoffs:Object.freeze(verifiedHandoffs),
+    read_only:true,execution_authorized:false,
+    transition_committed:false,original_job_completed:false
+   });
+  }
+
   // The Final Loop's durable event inbox lives in the same service-only
   // continuity database. The event is an observation, never an execution
   // instruction: no provider call, lease, retry or installation is granted.
@@ -307,6 +404,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    revision:p.revision,checkpoint_candidates:Object.freeze(pending),
    governed_qualification_handoffs:governedQualificationHandoffs,
    event_resume_shadow:eventResumeShadow,
+   shared_continuity_guard:sharedContinuityGuard,
    next_governed_action:governedQualificationHandoffs.length>0?
     governedQualificationHandoffs[0].next_qualified_action:
     canonicalSourceDecisions.some(d=>
