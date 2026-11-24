@@ -592,3 +592,41 @@ test('signed cross-source recovery cannot relabel one original as another',()=>{
  assert.doesNotMatch(sql,/net\.http_post|cron\.unschedule/);
  assert.doesNotMatch(sql,/github\.com\/maloney2323\/Reality\/pull\/307/);
 });
+
+
+test('independent provider settlement returns to the ORIGINAL canonical Continuity workline without a second scheduler',()=>{
+ const boundary=readFileSync(new URL('../src/reality-governed-shift-boundary-v1.js',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const root=readFileSync(new URL(
+  '../supabase/migrations/20261124015100_final_loop_shift_genesis_root_partition_v1.sql',
+  import.meta.url),'utf8');
+ const bridge=readFileSync(new URL(
+  '../supabase/migrations/20261124015200_final_loop_independent_parent_universe_return_v1.sql',
+  import.meta.url),'utf8');
+ const guard=readFileSync(new URL(
+  '../supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql',
+  import.meta.url),'utf8');
+ assert.match(boundary,/reconcile_verified_parent_universe_return_v1/);
+ assert.match(worker,/reality_reconcile_verified_parent_universe_return_v1/);
+ const before=worker.indexOf("workerStage='FINAL_LOOP_INDEPENDENT_UNIVERSE_TO_CONTINUITY_RETURN'");
+ assert.ok(before>worker.indexOf('advanceOneFinalLoopParentDelivery'));
+ assert.ok(before<worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
+ assert.match(worker,/FINAL_LOOP_VERIFIED_CANONICAL_RETURN_RECEIPT_INVALID/);
+ assert.match(worker,/final_loop_verified_canonical_return:finalLoopVerifiedCanonicalReturn/);
+ assert.match(root,/FINAL_LOOP_CANONICAL_FIRST_SIGNAL_ROOT_UNVERIFIED/);
+ assert.match(root,/event_kind='RAW_SIGNAL'/);
+ assert.match(bridge,/source_universe_outcome_event_id/);
+ assert.match(bridge,/reality_final_loop_verified_cross_worldline_return_v1/);
+ assert.match(bridge,/independent_verifier_worker_run_id IS DISTINCT FROM/);
+ assert.match(bridge,/FINAL_LOOP_NO_NEW_INDEPENDENTLY_SETTLED_PARENT_TO_RETURN/);
+ assert.match(bridge,/return_appended',true/);
+ assert.match(bridge,/new_effect_executed',false/);
+ assert.match(bridge,/new_authority_granted',false/);
+ assert.match(guard,/isolated\.continuity_root_id=d\.shift_id/);
+ assert.match(guard,/returned\.continuity_root_id=v_root/);
+ assert.match(guard,/returned\.payload->>'original_work_id'=d\.parent_original_work_id/);
+ assert.match(guard,/independent_verifier_worker_run_id/);
+ assert.match(guard,/has_final:=has_final OR has_universe/);
+ assert.doesNotMatch(bridge,/net\.http_post|cron\.schedule|cron\.unschedule/);
+ assert.doesNotMatch(bridge,/github\.com\/maloney2323\/Reality\/pull\/307/);
+});
