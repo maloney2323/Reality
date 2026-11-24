@@ -77,6 +77,7 @@ BEGIN
     AND q.reconciliation_snapshot->>'next_action'=q.reconciliation_next_action
     AND q.reconciliation_snapshot->>'source_proof_bound'='true'
     AND q.reconciliation_snapshot->>'lineage_packet_found'='true';
+   qualifier_ok:=coalesce(qualifier_ok,false);
    v_action:=CASE WHEN qualifier_ok THEN q.reconciliation_next_action ELSE null END;
    v_qualifier_receipt:=CASE WHEN qualifier_ok THEN q.reconciliation_receipt_sha256 ELSE null END;
    v_gates:=CASE WHEN qualifier_ok THEN
