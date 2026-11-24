@@ -44,8 +44,34 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
       method:'GET',headers,redirect:'error',cache:'no-store',
       signal:AbortSignal.timeout(5000)
     });
-    if(response.status===401||response.status===403)
-      return report('ISOLATED_CREDENTIAL_NOT_AUTHORIZED',{http_status:response.status});
+    if(response.status===401||response.status===403){
+      // Report only bounded classifications, never key material or provider text.
+      const credential_source=env.REALITY_UNIVERSE_PERSISTENCE_KEY?.trim()?
+        'BRANCH_PERSISTENCE':env.SUPABASE_SECRET_KEY?.trim()?'EXISTING_SECRET':'LEGACY_FALLBACK';
+      const key=db.secretKey;
+      let credential_kind=key.startsWith('sb_secret_')?'SECRET':
+        key.startsWith('sb_publishable_')?'PUBLISHABLE':'UNRECOGNIZED';
+      let legacy_project_matches=null;
+      if(key.split('.').length===3){
+        try{
+          const claims=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString('utf8'));
+          credential_kind=claims.role==='service_role'?'LEGACY_SERVICE_ROLE':
+            claims.role==='anon'?'LEGACY_ANON':'OTHER_JWT';
+          legacy_project_matches=typeof claims.ref==='string'?claims.ref===ISOLATED_PROJECT:null;
+        }catch{}
+      }
+      const body=await response.json().catch(()=>null);
+      const msg=String(body?.message??body?.msg??'').toLowerCase();
+      const provider_reason=msg.includes('invalid api key')?'INVALID_API_KEY':
+        msg.includes('invalid jwt')?'INVALID_JWT':
+        msg.includes('expired')?'EXPIRED':
+        msg.includes('permission denied')?'PERMISSION_DENIED':
+        msg.includes('browser')?'BROWSER_RESTRICTION':'UNSPECIFIED';
+      return report('ISOLATED_CREDENTIAL_NOT_AUTHORIZED',{
+        http_status:response.status,credential_source,credential_kind,
+        legacy_project_matches,provider_reason
+      });
+    }
     if(!response.ok)return report('ISOLATED_SERVICE_READ_FAILED',{http_status:response.status});
     const data=await response.json();
     return report(Array.isArray(data)&&data.length===0?
