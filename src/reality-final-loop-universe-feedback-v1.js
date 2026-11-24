@@ -62,9 +62,29 @@ const identity=view=>{
   revision:c.revision,obligations:p.obligations};
 };
 export function projectFinalLoopUniverseFeedback({
- canonicalView,parentOutcomes,recoveryGuidance=null
+ canonicalView,parentOutcomes,recoveryGuidance=null,
+ sharedContinuityGuard=null
 }={}){
  const i=identity(canonicalView);
+
+ if(sharedContinuityGuard!==null){
+  const g=sharedContinuityGuard;
+  if(g.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+     g.read_only!==true||g.execution_authorized!==false||
+     g.transition_committed!==false||g.original_job_completed!==false||
+     g.owner_id!==i?.owner_id||g.shift_id!==i?.shift_id||
+     g.continuity_root_id!==i?.continuity_root_id||
+     g.continuity_head_sha256!==i?.continuity_head_sha256||
+     g.revision!==i?.revision||!HASH.test(g.observation_sha256||'')||
+     !Array.isArray(g.handoffs)||g.handoffs.length!==i?.obligations.length||
+     i.obligations.some(o=>g.handoffs.filter(h=>
+       h.source_ref===o.source_ref&&
+       h.original_work_id===o.original_work_id&&
+       h.continuity_identity_verified===true&&
+       h.execution_authorized===false).length!==1))
+   return output('FINAL_LOOP_UNIVERSE_SHARED_CONTINUITY_PROOF_MISMATCH');
+ }
+
  if(!i)return output('FINAL_LOOP_UNIVERSE_CANONICAL_CONTINUITY_UNVERIFIED');
  if(!['FINAL_LOOP_OWNER_PARENT_OUTCOMES_READ_ONLY',
         'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ']
@@ -82,6 +102,20 @@ export function projectFinalLoopUniverseFeedback({
     parentOutcomes.verified_parent_count+
       parentOutcomes.unfinished_parent_count!==parentOutcomes.outcomes.length)
   return output('FINAL_LOOP_UNIVERSE_INDEPENDENT_OUTCOME_READBACK_REQUIRED');
+
+ if(sharedContinuityGuard!==null){
+  const g=sharedContinuityGuard;
+  const gSettled=g.handoffs.filter(h=>h.universe_return_verified===true)
+   .map(h=>h.original_work_id+'|'+h.source_ref).sort();
+  const oSettled=parentOutcomes.outcomes.filter(o=>
+   o.status==='INDEPENDENTLY_SETTLED_UNIVERSE_PAST'&&
+   o.independent_universe_verified===true&&
+   o.original_job_completed===true)
+   .map(o=>o.original_work_id+'|'+o.source_ref).sort();
+  if(JSON.stringify(gSettled)!==JSON.stringify(oSettled))
+    return output('FINAL_LOOP_UNIVERSE_INDEPENDENT_SETTLEMENT_NOT_RECONCILED');
+ }
+
  const byWork=new Map(),seen=new Set();
  for(const p of parentOutcomes.outcomes){
   const matched=i.obligations.find(o=>
@@ -184,6 +218,7 @@ export function projectFinalLoopUniverseFeedback({
   observations,
   next_attention:recovery||pending[0]||null,
   universe_readback_verified:true,
+  shared_continuity_guard_crosschecked:sharedContinuityGuard!==null,
   no_verified_parent_is_not_shift_completion:true
  });
 }
