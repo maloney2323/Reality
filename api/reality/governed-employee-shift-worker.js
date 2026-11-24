@@ -2857,6 +2857,62 @@ export default async function handler(req,res){
    }
   }
 
+
+  // VERIFIED UNIVERSE RETURN: a parent delivery settles on its own
+  // owner-approved workline. Only the independent provider outcome and its
+  // separate-run verifier can be bridged back to the ORIGINAL signed shift's
+  // Continuity root. This existing-worker call cannot run a model, publish,
+  // install, settle, grant authority or create another orchestration engine.
+  workerStage='FINAL_LOOP_INDEPENDENT_UNIVERSE_TO_CONTINUITY_RETURN';
+  let finalLoopVerifiedCanonicalReturn={
+   status:'FINAL_LOOP_VERIFIED_CANONICAL_RETURN_NOT_ENABLED',
+   return_appended:false,execution_authorized:false,
+   original_job_completed:false
+  };
+  if(process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
+     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i
+       .test(actualWorkerRunId||'')){
+   const read=await shiftRpc(db,
+    'reality_reconcile_verified_parent_universe_return_v1',{
+     p_shift_id:wakeReceipt.shift_id,
+     p_worker_run_id:actualWorkerRunId
+    },{timeoutMs:7000});
+   const noEffect=new Set([
+    'FINAL_LOOP_VERIFIED_PARENT_RETURN_ACTIVE_SIGNED_RUN_REQUIRED',
+    'FINAL_LOOP_VERIFIED_PARENT_RETURN_EXISTING_SHIFT_REQUIRED',
+    'FINAL_LOOP_VERIFIED_PARENT_RETURN_CANONICAL_PROOF_UNVERIFIED',
+    'FINAL_LOOP_NO_NEW_INDEPENDENTLY_SETTLED_PARENT_TO_RETURN',
+    'FINAL_LOOP_PARENT_ALREADY_RETURNED_NO_REPLAY',
+    'FINAL_LOOP_PARENT_RETURN_CANONICAL_HEAD_CHANGED_NO_REPLAY'
+   ]);
+   if(read?.status==='FINAL_LOOP_VERIFIED_PARENT_RETURN_DURABLY_RECONCILED'){
+    if(read.shift_id!==wakeReceipt.shift_id||
+       read.owner_id!==unifiedGraph.owner_id||
+       read.continuity_root_id!==
+        finalLoopContinuityIngress?.shared_continuity_guard?.continuity_root_id||
+       read.same_original_independently_verified!==true||
+       read.return_appended!==true||
+       read.new_effect_executed!==false||
+       read.new_authority_granted!==false||
+       read.execution_authorized!==false||
+       read.production_changed!==false||
+       !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(
+        read.canonical_universe_return_event_id||'')||
+       !unifiedGraph.jobs.some(x=>
+        x.original_work_id===read.original_work_id&&
+        x.source_ref===read.source_ref))
+      throw Error('FINAL_LOOP_VERIFIED_CANONICAL_RETURN_RECEIPT_INVALID');
+   }else if(!noEffect.has(read?.status)||
+      read.return_appended!==false||
+      read.execution_authorized!==false||
+      read.original_job_completed!==false){
+    throw Error('FINAL_LOOP_CANONICAL_RETURN_INDEPENDENT_READBACK_UNVERIFIED');
+   }
+   finalLoopVerifiedCanonicalReturn=read;
+  }
+
   // One canonical signed shift: reviewed Recovery -> qualified source ->
   // registered continuation handler. A failed dispatch is an explicit
   // pending obligation, never a recovered job or a completed worker result.
@@ -3839,6 +3895,7 @@ export default async function handler(req,res){
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
     final_loop_parent_delivery:finalLoopParentDelivery,
+    final_loop_verified_canonical_return:finalLoopVerifiedCanonicalReturn,
     riley_original_review:rileyOriginalReview,
     riley_governed_pr_write_broker:governedPrProvider,
     riley_code_repair_original:rileyCodeRepair,
