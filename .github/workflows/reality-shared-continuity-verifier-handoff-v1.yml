@@ -9,6 +9,9 @@ on:
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
+      - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
+      - 'supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts'
       - 'test/reality-frozen-regressions/reality-final-loop-*.test.js'
       - 'reality-final-loop-recovery-case-specs/**'
       - 'scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs'
@@ -31,6 +34,9 @@ on:
       - 'api/reality/personal-time-horizon.js'
       - 'api/reality/personal-chat.js'
       - 'test/reality-final-loop-*.test.js'
+      - 'src/reality-signed-maintenance-case-ci-live-verifier-v1.js'
+      - 'test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js'
+      - 'supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts'
       - 'test/reality-frozen-regressions/reality-final-loop-*.test.js'
       - 'reality-final-loop-recovery-case-specs/**'
       - 'scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs'
@@ -78,6 +84,8 @@ jobs:
           node --test test/reality-final-loop-pr307-recovery-harness-v1.test.js
           node --test test/reality-final-loop-signed-proof-recovery-v1.test.js
           node --test test/reality-final-loop-existing-case-ci-bridge-v1.test.js
+          node --test test/reality-signed-maintenance-case-ci-live-verifier-v1.test.js
+          node --test test/reality-signed-maintenance-repair-model-candidate-v1.test.js
           node --test test/reality-final-loop-blocker-liveness-v1.test.js
           node --test test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js
           node --test test/reality-final-loop-technical-ci-continuity-writer-v1.test.js
