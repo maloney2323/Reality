@@ -183,7 +183,10 @@
   const planShift=node('button','reality-chat-plan-action','Plan a shift');
   planShift.type='button';
   planShift.addEventListener('click',()=>{closePanel();window.dispatchEvent(new Event('reality:open-shift-plan'));});
-  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, planShift, focusToggle);
+  const decisionAction=node('button','reality-chat-plan-action','Review decision');
+  decisionAction.type='button';decisionAction.id='realityChatDecisionAction';decisionAction.hidden=true;
+  decisionAction.addEventListener('click',()=>{const target=decisionAction.dataset.tab||'approvals';selectTab(target);closePanel();openPanel('work');});
+  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, planShift, decisionAction, focusToggle);
   threadHeader.append(threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
 
@@ -328,6 +331,20 @@
   // All original controls and handlers remain intact. The page rearranges DOM
   // nodes instead of copying or recreating an approval form or worker action.
   ready.append(workspace);
+  // Show a single navigation action only when existing exact decision controls are ready.
+  // No action or approval is submitted here; real handlers remain unchanged.
+  function syncDecisionAction(){
+    const exactIn=p=>[...p.querySelectorAll('button')].some(b=>{
+      if(b.disabled||b.hidden||!/^(?:Approve exact|Approve investigation and testing|Continue \d+ unfinished repair)/i.test(b.textContent.trim()))return false;
+      for(let n=b;n&&n!==p;n=n.parentElement)if(n.hidden)return false;
+      return true;
+    });
+    const tab=exactIn(panels.approvals)?'approvals':exactIn(panels.work)?'work':'';
+    decisionAction.dataset.tab=tab;decisionAction.hidden=!tab;
+  }
+  const decisionObserver=new MutationObserver(syncDecisionAction);
+  for(const p of [panels.approvals,panels.work])decisionObserver.observe(p,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','disabled']});
+  syncDecisionAction();
   // Home may open Chat to discuss a gap. Prefill an owner-editable question,
   // but NEVER submit it or grant work authority from a navigation link.
   if(window.location.hash==='#weekly-workload'){

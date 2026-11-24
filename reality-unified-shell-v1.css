@@ -328,3 +328,19 @@ body.reality-unified-ui :is(button,a,summary,input,textarea,select):focus-visibl
 @media(prefers-reduced-motion:reduce){
  body.reality-unified-ui .rx-nav-link{transition:none!important}
 }
+
+/* Chat is one conversation, even when Android requests the desktop site. */
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace{
+ grid-template-columns:minmax(0,1fr)!important;min-width:0;width:100%;max-width:1000px;
+}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-conversation{grid-column:1;min-width:0;width:100%;}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-sidebar,
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-inspector{display:none!important;}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-thread-heading{flex-wrap:wrap!important;min-width:0;}
+body.reality-unified-ui[data-reality-route="chat"] .reality-chat-thread-buttons{flex-wrap:wrap!important;max-width:100%;}
+body.reality-unified-ui[data-reality-route="chat"] #realityChatCompactShiftState{padding:6px 14px;margin:0;font-size:12px;line-height:1.4;flex:none;}
+body.reality-unified-ui[data-reality-route="chat"] #realityChatCompactShiftState[hidden],body.reality-unified-ui[data-reality-route="chat"] #realityChatDecisionAction[hidden],body.reality-unified-ui[data-reality-route="chat"] #realityChatFinalShiftReceipt[hidden]{display:none!important;}
+@media(pointer:coarse){
+ body.reality-unified-ui[data-reality-route="chat"] .rx-nav-rail{display:none!important;}
+ body.reality-unified-ui[data-reality-route="chat"] main{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}
+}

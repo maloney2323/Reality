@@ -5,7 +5,7 @@
  'use strict';
  if(!/^\/chat\/?$/.test(window.location.pathname))return;
  const get=id=>document.getElementById(id);
- const ready=get('privateReady'),thread=get('privateTranscript');
+ const ready=get('privateReady'),thread=get('realityChatPanelApprovals')||get('privateTranscript');
  if(!ready||!thread||get('realityRepairScopeChatCard'))return;
  const URL='/api/reality/owner-repair-scope-approval';
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;

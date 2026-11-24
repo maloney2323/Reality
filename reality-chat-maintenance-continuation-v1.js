@@ -9,7 +9,7 @@
  if(!/^\/chat\/?$/.test(window.location.pathname))return;
  const get=id=>document.getElementById(id);
  const ready=get('privateReady'),inbox=get('realityChatApprovalInbox'),
-  thread=get('privateTranscript');
+  thread=get('realityChatPanelApprovals')||get('privateTranscript');
  // Require only actual signed-in Chat anchors; a removed container id must not hide approval.
  if(!ready||!inbox||!thread||get('realityChatMaintenanceContinuation'))return;
  const URL='/api/reality/personal-governed-employee-shift';

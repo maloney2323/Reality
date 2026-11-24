@@ -39,7 +39,8 @@
  const composer=document.getElementById('realityChatComposer');
  if(!composer||composer.parentNode!==panel)return;
  block.hidden=true;
- function showPlan(){block.hidden=false;if(!transcript.contains(block))transcript.append(block);}
+ panel.insertBefore(block,composer);
+ function showPlan(){block.hidden=false;if(!transcript.contains(block))transcript.append(block);block.scrollIntoView({block:'nearest'});}
  window.addEventListener('reality:open-shift-plan',()=>{showPlan();void load();});
  new MutationObserver(()=>{if(!block.hidden&&!transcript.contains(block))transcript.append(block);}).observe(transcript,{childList:true});
  const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;

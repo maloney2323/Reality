@@ -4,7 +4,7 @@
 (()=>{
  if(window.location.pathname!=='/chat')return;
  const ready=document.getElementById('privateReady');
- const transcript=document.getElementById('privateTranscript');
+ const transcript=document.getElementById('realityChatPanelProof')||document.getElementById('privateTranscript');
  if(!ready||!transcript)return;
  const SHA=/^[a-f0-9]{40}$/;
  const HASH=/^sha256:[a-f0-9]{64}$/;
