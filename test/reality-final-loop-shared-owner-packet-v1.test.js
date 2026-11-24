@@ -118,3 +118,19 @@ test('the existing worker registers packet handler without treating packet as au
  assert.match(code,/REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED/);
  assert.doesNotMatch(code,/owner_approval_granted:\s*true/);
 });
+
+
+test('owner intent is not a 12-hour lease; live signed capacity and exact acceptance remain required',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-child-transactional-v1.sql',import.meta.url),'utf8');
+ const claim=sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.reality_claim_final_loop_child_review_v1('),sql.indexOf('CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_model_scope_v1('));
+ assert.doesNotMatch(sql,/interval '12 hours'/);
+ assert.match(claim,/r.started_at>=pg_catalog.clock_timestamp\(\)-interval '10 minutes'/);
+ assert.match(claim,/s.closed_at IS NULL/);
+ assert.match(claim,/w.state='ACTIVE'/);
+ assert.match(claim,/scope.entry->>'source_ref'=a.source_ref/);
+ assert.match(claim,/reality_read_final_loop_child_approval_preflight_v1\(p_shift_id\)/);
+ assert.match(claim,/FINAL_LOOP_OWNER_ACCEPTANCE_SCOPE_NOT_CURRENT/);
+ assert.match(claim,/FOR UPDATE OF a SKIP LOCKED/);
+ assert.match(sql,/'signed_worker_observed',v_capacity/);
+ assert.doesNotMatch(claim,/cron\.job|cron\.schedule/);
+});

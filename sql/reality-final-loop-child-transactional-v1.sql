@@ -329,12 +329,18 @@ BEGIN
  WHERE a.shift_id=p_shift_id
   AND a.state IN ('APPROVED_ONCE','EFFECT_RESERVED_RECONCILE_ONLY')
   AND a.owner_approval_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
-  AND a.approved_at>=pg_catalog.clock_timestamp()-interval '12 hours'
+  -- Owner intent is durable for the exact active signed shift. The separate
+  -- actual worker lease above remains short-lived and must be current.
+  AND a.approved_at IS NOT NULL
+  AND a.approved_at<=pg_catalog.clock_timestamp()
+  AND a.owner_approval_request_id IS NOT NULL
   AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL
   AND s.planned_end_at='infinity'::timestamptz
   AND s.status IN ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
   AND w.state='ACTIVE' AND w.mode IN ('UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS',
    'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS')
+  AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(w.source_scope) scope(entry)
+   WHERE scope.entry->>'source_ref'=a.source_ref)
   AND EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
    WHERE r.shift_id=a.shift_id AND r.owner_id=a.owner_id
     AND r.original_work_id=a.parent_original_work_id
@@ -357,6 +363,17 @@ BEGIN
   AND p.state='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION';
  IF NOT FOUND THEN
   RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_PARENT_PLAN_DRIFT',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ -- Revalidate the exact frozen contract and independently recorded goal
+ -- before reserving any child. Durable consent does not permit scope drift.
+ IF v_packet.acceptance_contract_sha256 IS DISTINCT FROM
+   reality_internal.final_loop_pr_review_acceptance_digest_v1(v_plan.plan_id)
+   OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(
+    public.reality_read_final_loop_child_approval_preflight_v1(p_shift_id)->'plans') p(value)
+    WHERE p.value->>'plan_id'=v_plan.plan_id::text
+     AND p.value->>'independent_goal_acceptance_verified'='true'
+     AND p.value->>'owner_approval_claim_window_current'='true') THEN
+  RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_OWNER_ACCEPTANCE_SCOPE_NOT_CURRENT',
    'child_claimed',false,'original_job_completed',false);END IF;
  IF pg_catalog.jsonb_array_length(v_plan.source_plan->'bounded_scopes')
     <>v_plan.proposed_scope_count THEN
@@ -946,7 +963,11 @@ BEGIN
  ) u
  CROSS JOIN LATERAL (
   SELECT count(e.event_id)=1 AS accepted,
-   count(e.event_id)=1 AND coalesce(bool_and(a.approved_at>=pg_catalog.now()-interval '12 hours'),false) AS current_window
+   -- Compatibility field: current means exact accepted scope on an active
+   -- signed shift, not time elapsed since the owner accepted the goal.
+   count(e.event_id)=1 AND coalesce(bool_and(a.approved_at IS NOT NULL
+    AND a.approved_at<=pg_catalog.clock_timestamp()
+    AND a.owner_approval_request_id IS NOT NULL),false) AS current_window
   FROM reality_internal.final_loop_child_approval_packets_v1 a
   JOIN public.universe_events e ON e.continuity_root_id=p.shift_id AND e.worldline_id=p.plan_id AND e.entity_id=p.plan_id
   WHERE a.plan_id=p.plan_id AND a.shift_id=p.shift_id AND a.owner_id=p.owner_id
