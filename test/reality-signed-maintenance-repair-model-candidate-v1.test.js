@@ -313,3 +313,36 @@ test('SQL preserves rejected model patch and independent off-target review befor
  ])assert.ok(sql.includes(term),term);
  assert.doesNotMatch(sql,/net\\.http_post|insert into reality_internal\\.governed_employee_shifts_v1/);
 });
+
+
+test('an unused authority comparison cannot be persisted as a maintenance repair candidate',async()=>{
+ const f=scenario({patchBody:{
+  find:patch.find,
+  replace:'  const sourceMatchesOriginal=claim.source_ref===env.REALITY_ORIGINAL_ISSUE_URL;\n'+patch.find,
+  reason:'Proposed authority comparison with no change to the governed decision.'
+ }});
+ const r=await f.run();
+ assert.equal(r.status,'SIGNED_MAINTENANCE_MODEL_CANDIDATE_NOT_VERIFIED');
+ assert.equal(r.reason,'SIGNED_MAINTENANCE_MODEL_UNUSED_COMPARISON_ONLY');
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.installation_authorized,false);
+ assert.equal(f.modelCalls.length,2);
+ assert.deepEqual(f.calls.map(x=>x.name),[
+  'reality_claim_signed_maintenance_repair_candidate_v1',
+  'reality_mark_signed_maintenance_repair_candidate_unverified_v1'
+ ]);
+ assert.equal(f.calls[1].args.p_reason,'SIGNED_MAINTENANCE_MODEL_UNUSED_COMPARISON_ONLY');
+});
+test('a comparison that participates in the changed decision is not rejected by the narrow unused-check guard',async()=>{
+ const f=scenario({patchBody:{
+  find:patch.find,
+  replace:'  const sourceMatchesOriginal=claim.source_ref===env.REALITY_ORIGINAL_ISSUE_URL;\n'+
+   '  return {original_execution_admitted:false,validation_required:true,sourceMatchesOriginal};',
+  reason:'The new comparison is consumed in the changed output for independent testing.'
+ }});
+ const r=await f.run();
+ assert.equal(r.status,'SIGNED_MAINTENANCE_REPAIR_CODE_CANDIDATE_RECORDED');
+ assert.equal(r.independent_ci_verified,false);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.installation_authorized,false);
+});
