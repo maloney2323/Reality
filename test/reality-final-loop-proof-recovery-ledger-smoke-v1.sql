@@ -6,6 +6,7 @@ CREATE ROLE authenticated NOLOGIN;
 CREATE SCHEMA reality_internal;
 GRANT USAGE ON SCHEMA reality_internal TO service_role;
 \ir ../supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql
+\ir ../supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql
 DO $$
 BEGIN
  IF (SELECT count(*) FROM reality_internal.final_loop_recovery_capability_registry_v1
@@ -20,6 +21,14 @@ BEGIN
  IF NOT has_function_privilege('service_role',
   'public.reality_read_final_loop_recovery_contract_v1(uuid,text)','EXECUTE')
  THEN RAISE EXCEPTION 'RECOVERY_SERVICE_READBACK_NOT_GRANTED';END IF;
+ IF has_function_privilege('authenticated',
+  'public.reality_record_final_loop_technical_ci_observation_v1(text,uuid,jsonb)',
+  'EXECUTE') THEN RAISE EXCEPTION 'TECHNICAL_CI_WRITE_EXPOSED';END IF;
+ IF NOT has_function_privilege('service_role',
+  'public.reality_read_final_loop_technical_ci_observation_v1(text)',
+  'EXECUTE') THEN RAISE EXCEPTION 'TECHNICAL_CI_READ_NOT_SERVICE_SCOPED';END IF;
+ IF (SELECT count(*) FROM reality_internal.final_loop_technical_ci_observations_v1)<>0
+ THEN RAISE EXCEPTION 'TECHNICAL_CI_OBSERVATION_MUST_START_EMPTY';END IF;
 END $$;
 SET ROLE service_role;
 DO $$
@@ -41,5 +50,15 @@ BEGIN
   '12345678-1234-4123-8123-123456789abc'::uuid,'{}'::jsonb);
  IF v->>'status'<>'RECOVERY_FREEZE_CONTRACT_INVALID'
  THEN RAISE EXCEPTION 'RECOVERY_INVALID_CONTRACT_FAIL_OPEN';END IF;
+ v:=public.reality_read_final_loop_technical_ci_observation_v1(
+  'sha256:'||repeat('a',64));
+ IF v->>'status'<>'RECOVERY_TECHNICAL_CI_NOT_DURABLY_OBSERVED' OR
+  v->>'business_original_red_verified'<>'false'
+ THEN RAISE EXCEPTION 'TECHNICAL_CI_MISSING_OBSERVATION_FAIL_OPEN';END IF;
+ v:=public.reality_record_final_loop_technical_ci_observation_v1(
+  'sha256:'||repeat('a',64),
+  '12345678-1234-4123-8123-123456789abc'::uuid,'{}'::jsonb);
+ IF v->>'status'<>'RECOVERY_TECH_CI_SOURCE_PROOF_INVALID_NO_WRITE'
+ THEN RAISE EXCEPTION 'TECHNICAL_CI_INVALID_PROOF_FAIL_OPEN';END IF;
 END $$;
 RESET ROLE;
