@@ -74,7 +74,9 @@ test('actual Chat click handler prepares, authorizes and refreshes the same shif
  class Element{
   constructor(tag){this.tag=tag;this.children=[];this.parentNode=null;this.hidden=false;
    this.disabled=false;this.value='';this.textContent='';this.style={};this.handlers={};}
-  append(...items){for(const x of items){this.children.push(x);x.parentNode=this;}}
+  append(...items){for(const x of items){if(x.parentNode)x.parentNode.children=x.parentNode.children.filter(y=>y!==x);this.children.push(x);x.parentNode=this;}}
+  contains(x){return x===this||this.children.some(y=>y.contains(x));}
+  scrollIntoView(){}
   insertBefore(x,before){const i=this.children.indexOf(before);assert.ok(i>=0);
    this.children.splice(i,0,x);x.parentNode=this;}
   replaceChildren(...items){this.children=[];this.append(...items);}
@@ -112,15 +114,20 @@ test('actual Chat click handler prepares, authorizes and refreshes the same shif
   return {ok:true,json:async()=>result};
  };
  const ui=readFileSync(new URL('../reality-chat-employee-shift-card-v1.js',import.meta.url),'utf8');
+ const windowHandlers={};
+ class MutationObserver{constructor(fn){this.fn=fn;}observe(){}disconnect(){}}
  runInNewContext(ui,{document:{getElementById:k=>elements[k],createElement:t=>new Element(t)},
-  location:{pathname:'/chat',hash:''},window:{addEventListener(){}},fetch,AbortSignal,Date,
+  location:{pathname:'/chat',hash:''},window:{addEventListener(k,fn){windowHandlers[k]=fn;}},MutationObserver,fetch,AbortSignal,Date,
   setTimeout,console});
  const card=panel.children.find(x=>x.id==='realityCreateShift');
  assert.ok(card);assert.equal(card.parentNode,panel);
  const [prepare,, ,approve]=card.children[2].children;
  const status=card.children[4];
  assert.equal(approve.hidden,true);
- prepare.click();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(card.hidden,true);
+ assert.equal(calls.length,0);
+ windowHandlers['reality:open-shift-plan']();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(card.parentNode,transcript);assert.equal(card.hidden,false);
  assert.equal(approve.hidden,false);
  assert.equal(calls.filter(x=>x.method==='POST').length,0);
  const first=approve.click();const second=approve.click();
