@@ -77,6 +77,8 @@ import {evaluateRealityWholeCycleAcceptance}
  from '../../src/reality-final-loop-whole-cycle-acceptance-v1.js';
 import {projectRecoveryContractFromFinalLoop}
  from '../../src/reality-final-loop-proof-carrying-recovery-v1.js';
+import {routeExistingSignedCaseCiForRecovery}
+ from '../../src/reality-final-loop-existing-case-ci-bridge-v1.js';
 import {advanceOneSignedProofRecovery}
  from '../../src/reality-final-loop-signed-proof-recovery-worker-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
@@ -3794,6 +3796,37 @@ export default async function handler(req,res){
    ownerPackets:finalLoopOwnerPacketReadback
   });
 
+  // The old signed maintenance CI runner already exists. Read its exact
+  // original maintenance warrant and independent diagnostic receipts BEFORE
+  // choosing the next recovery strategy; never repeat a completed CI trigger.
+  // This read is permitted on the shared benchmark, but causes NO effect.
+  workerStage='FINAL_LOOP_EXISTING_CASE_CI_RECOVERY_CLASSIFICATION';
+  let finalLoopExistingCaseCiRecovery={
+   status:'RECOVERY_EXISTING_CI_CANONICAL_READBACK_NOT_AVAILABLE',
+   read_only:true,handler_invoked:false,claim_created:false,
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false
+  };
+  if(finalLoopProofCarryingRecovery?.status===
+     'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'&&
+     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+   try{
+    const maintenanceLedger=await shiftRpc(db,
+     'reality_read_owner_internal_maintenance_v1',{
+      p_owner_id:unifiedGraph.owner_id},{timeoutMs:6000});
+    finalLoopExistingCaseCiRecovery=routeExistingSignedCaseCiForRecovery({
+     contractProposal:finalLoopProofCarryingRecovery,maintenanceLedger
+    });
+   }catch{
+    finalLoopExistingCaseCiRecovery={
+     status:'RECOVERY_EXISTING_SIGNED_CI_LEDGER_READ_UNVERIFIED',
+     read_only:true,handler_invoked:false,claim_created:false,
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false
+    };
+   }
+  }
+
   // Consume the same source-scoped contract proposal via one existing
   // signed worker, never another queue. Shared benchmark is read-only;
   // durable freeze requires an independently isolated registered release.
@@ -3804,7 +3837,8 @@ export default async function handler(req,res){
     db,env:process.env,wake:wakeReceipt,
     graph:unifiedGraph,continuityReturn:finalLoopContinuityReturn,
     stagedRoutes:finalLoopStagedActionRoutes,
-    ownerPackets:finalLoopOwnerPacketReadback,workerRunId:actualWorkerRunId
+    ownerPackets:finalLoopOwnerPacketReadback,workerRunId:actualWorkerRunId,
+    existingCiRoute:finalLoopExistingCaseCiRecovery
    });
   }catch{
    finalLoopSignedProofRecovery={
@@ -3972,6 +4006,7 @@ export default async function handler(req,res){
     final_loop_continuity_return:finalLoopContinuityReturn,
     final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance,
     final_loop_proof_carrying_recovery:finalLoopProofCarryingRecovery,
+    final_loop_existing_case_ci_recovery:finalLoopExistingCaseCiRecovery,
     final_loop_signed_proof_recovery:finalLoopSignedProofRecovery,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
