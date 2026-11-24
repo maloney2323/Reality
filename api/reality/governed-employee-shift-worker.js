@@ -2315,8 +2315,10 @@ export default async function handler(req,res){
   });
   const registeredRecoveryActionKeys=Object.freeze([
    'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
-   ...(signedWorkerReleaseOperatingLane.status===
-       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'?
+   ...((signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
+       signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY')?
     ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[])
   ]);
   const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
@@ -2786,8 +2788,10 @@ export default async function handler(req,res){
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
    // An exact packet is never an execution warrant. The registered handler
    // independently checks its isolated DB fence and signed source proof.
-   if(signedWorkerReleaseOperatingLane.status===
-       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'&&
+   if((signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
+       signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY')&&
       registeredRecoveryActionKeys.includes('PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
       finalLoopStagedActionRoutes.status===
        'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
