@@ -16,6 +16,7 @@ on:
       - 'supabase/migrations/20261124015200_final_loop_independent_parent_universe_return_v1.sql'
       - 'supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql'
       - 'supabase/migrations/20261124015400_final_loop_evidence_checkpoint_atomic_resume_rebind_v1.sql'
+      - 'supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   pull_request:
@@ -32,6 +33,7 @@ on:
       - 'supabase/migrations/20261124015200_final_loop_independent_parent_universe_return_v1.sql'
       - 'supabase/migrations/20261124015300_final_loop_cross_worldline_return_shared_guard_v1.sql'
       - 'supabase/migrations/20261124015400_final_loop_evidence_checkpoint_atomic_resume_rebind_v1.sql'
+      - 'supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   workflow_dispatch:
@@ -63,6 +65,7 @@ jobs:
           node --test test/reality-final-loop-whole-cycle-acceptance-v1.test.js
           node --test test/reality-final-loop-proof-carrying-recovery-v1.test.js
           node --test test/reality-final-loop-pr307-recovery-harness-v1.test.js
+          node --test test/reality-final-loop-signed-proof-recovery-v1.test.js
           node --test test/reality-final-loop-staged-plan-action-router-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js
           node --test test/reality-final-loop-executive-brief-v1.test.js
