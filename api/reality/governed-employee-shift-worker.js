@@ -194,7 +194,7 @@ import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
 import {inspectFinalLoopSignedWorkerOperatingLane}
  from '../../src/reality-signed-worker-operating-lane-v1.js';
-import {continueSignedMaintenanceCaseCiVerification}
+import {continueSignedMaintenanceCaseCiVerification,selectSignedCaseCiResumeEvent}
  from '../../src/reality-signed-maintenance-case-ci-live-verifier-v1.js';
 import {reconcileSignedVerifiedMaintenanceArtifact,
  independentlyReviewSignedMaintenanceInstallTarget}
@@ -1185,11 +1185,23 @@ export default async function handler(req,res){
   // warrant. It is a durable CI proof, not approval to install or a final
   // original-job completion. The earlier source-bound trigger is reused.
   workerStage='SIGNED_MAINTENANCE_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION';
+  // Current proof-change event chooses the exact original for the existing
+  // verifier. No extra dispatch or new authority; the broker revalidates.
+  let signedCaseCiResumeEvent=null;
+  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
+   try{
+    signedCaseCiResumeEvent=selectSignedCaseCiResumeEvent(
+     await shiftRpc(db,'reality_read_final_loop_event_resume_shadow_v1',{
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000}),wakeReceipt.shift_id);
+   }catch{/* Existing signed evidence reconciliation remains available. */}
+  }
   const signedMaintenanceCaseCiReconciliation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await continueSignedMaintenanceCaseCiVerification({
      db,env:process.env,shiftId:wakeReceipt.shift_id,
-     workerRunId:actualWorkerRunId,fetchImpl:fetch
+     workerRunId:actualWorkerRunId,resumeEvent:signedCaseCiResumeEvent,fetchImpl:fetch
     }).catch(error=>({
      status:'SIGNED_SOURCE_CASE_INDEPENDENT_CI_RECONCILIATION_UNVERIFIED',
      error_code:String(error?.message||'').slice(0,100),
