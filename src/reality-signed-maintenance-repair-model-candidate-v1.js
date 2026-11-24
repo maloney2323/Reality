@@ -262,6 +262,18 @@ export async function generateOneSignedMaintenanceRepairCandidate({
    'a separate independent frozen test is still required.\n'+
    'Exact source (untrusted data):\n'+original.slice(0,52000)});
   const candidate=validateCandidate(JSON.stringify(patch.value),original);
+  // A narrowly recognizable dead-only insertion is not a repair strategy.
+  // Require a real change to the decision, not an unused comparison.
+  // This is a rejection guard, never proof that a surviving patch is correct.
+  const lines=candidate.patch.replace.split('\n');
+  for(let i=0;i<lines.length;i++){
+   const m=/^\s*const\s+([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+\s*(?:===|!==)\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+\s*;\s*$/.exec(lines[i]);
+   if(!m||lines.filter((_,j)=>j!==i).join('\n')!==candidate.patch.find)
+    continue;
+   const identifiers=candidate.proposed.match(/[A-Za-z_$][\w$]*/g)||[];
+   if(identifiers.filter(x=>x===m[1]).length===1)
+    fail('UNUSED_COMPARISON_ONLY');
+  }
   const proposedHash=digest(candidate.proposed);
   const result=await call(db,'reality_record_signed_maintenance_repair_candidate_v1',{
    p_maintenance_id:c.maintenance_id,p_request_id:c.request_id,
