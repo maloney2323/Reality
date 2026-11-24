@@ -209,6 +209,36 @@ test('real packet acknowledgement is a pending owner action, not recovery or set
   'FINAL_LOOP_REGISTERED_OWNER_PACKET_HANDLER_NOT_VERIFIED');
  assert.equal(missing.handler_dispatched,false);
 });
+
+test('shared benchmark packet preparation resolves recovery blocker without granting autonomous owner authority',()=>{
+ const r=inspect({
+  candidate:candidate(),
+  operatingLane:{
+   status:'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY',
+   operating_lane:'NORMAL_SIGNED_SHIFT'
+  },
+  approvalRequest:{
+   status:'FINAL_LOOP_CHILD_APPROVAL_GATED_BY_EXACT_OWNER_ACTION',
+   owner_id:owner,shift_id:shift,
+   approvals:[{
+    plan_id:admitted.plan_id,source_ref:admitted.source_ref,
+    status:'FINAL_LOOP_CHILD_EXACT_OWNER_APPROVAL_REQUIRED',
+    packet_id:'77777777-7777-4777-8777-777777777777',
+    proposal_fingerprint:hash('a')
+   }]
+  }
+ });
+ assert.equal(r.status,'FINAL_LOOP_EXACT_OWNER_APPROVAL_PACKET_DURABLY_PREPARED');
+ assert.equal(r.blocker_class,'EXACT_OWNER_AUTHORIZATION_REQUIRED');
+ assert.equal(r.next_governed_action,'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT');
+ assert.equal(r.handler_result_verified,true);
+ assert.equal(r.child_execution_authorized,false);
+ assert.equal(r.recovery_verified,false);
+ assert.equal(r.owner_approval_granted,false);
+ assert.equal(r.automatic_retry_without_new_evidence,false);
+ assert.equal(r.original_job_completed,false);
+});
+
 test('signed worker publishes recovery-to-source disposition separately from outcome receipts',()=>{
  const worker=readFileSync(new URL(
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
