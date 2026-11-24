@@ -68,6 +68,7 @@ jobs:
           node --test test/reality-final-loop-proof-carrying-recovery-v1.test.js
           node --test test/reality-final-loop-pr307-recovery-harness-v1.test.js
           node --test test/reality-final-loop-signed-proof-recovery-v1.test.js
+          node --test test/reality-final-loop-existing-case-ci-bridge-v1.test.js
           node --test test/reality-final-loop-staged-plan-action-router-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js
           node --test test/reality-final-loop-executive-brief-v1.test.js
