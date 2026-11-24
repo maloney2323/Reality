@@ -85,3 +85,14 @@ test('new page scripts and inherited inline full application compile',()=>{
  assert.ok(inline?.length>100000);
  assert.doesNotThrow(()=>new Script(inline));
 });
+
+test('Chat keeps technical panels outside the transcript without changing handlers',()=>{
+ assert.match(js,/const inlineScreen=\(\)=>false/);
+ assert.match(js,/realityChatSavedWorkReadback/);
+ assert.match(js,/savedWork\.append\(card\)/);
+ assert.match(html,/workReadbackHost\.append\(card\)/);
+ assert.match(html,/workReadbackHost\.append\(evidence\)/);
+ assert.match(html,/Reality could not reach its AI provider/);
+ assert.match(css,/data-reality-chat-panel="work"\] \.reality-chat-workspace>\.reality-chat-inspector\{display:flex!important\}/);
+ assert.doesNotMatch(js,/\bfetch\s*\(|XMLHttpRequest|sendBeacon/);
+});

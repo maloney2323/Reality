@@ -348,3 +348,27 @@ body[data-reality-route="chat"] #realityChatComposer #realityChatStatusSummary{d
 body[data-reality-route="chat"] #realityCreateShift{align-self:flex-start;width:100%;max-width:760px;box-sizing:border-box;margin:0;}
 body[data-reality-route="chat"] .reality-chat-plan-action{background:#d6eff9!important;color:#102d40!important;font-weight:750;}
 body[data-reality-route="chat"] .reality-chat-typing-note{display:none;}
+
+/* Conversation-first: technical evidence is accessible in separate drawers.
+   Original authenticated controls remain mounted; the transcript is not a dashboard. */
+body[data-reality-route="chat"] .reality-chat-thread-heading{justify-content:flex-start}
+body[data-reality-route="chat"] .reality-chat-thread-heading>div:first-of-type{flex:1;min-width:0}
+body[data-reality-route="chat"] .reality-chat-thread-heading #realityChatOpenConversations{display:inline-flex;flex:0 0 auto}
+body[data-reality-route="chat"] .reality-chat-thread-heading .reality-chat-home-link,
+body[data-reality-route="chat"] .reality-chat-thread-heading .reality-chat-premium-eyebrow,
+body[data-reality-route="chat"] .reality-chat-thread-heading small,
+body[data-reality-route="chat"] .reality-chat-thread-heading .reality-chat-plan-action:not(#realityChatDecisionAction){display:none}
+body[data-reality-route="chat"] .reality-chat-thread-buttons{flex-wrap:nowrap}
+body[data-reality-route="chat"] .reality-chat-thread-buttons [hidden]{display:none!important}
+body[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-sidebar,
+body[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-inspector{position:fixed;top:0;bottom:0;height:100dvh;max-height:none;width:min(430px,calc(100vw - 20px));z-index:201;box-sizing:border-box;overflow-y:auto;border-radius:0}
+body[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-sidebar{left:0}
+body[data-reality-route="chat"] .reality-chat-workspace>.reality-chat-inspector{right:0}
+body[data-reality-route="chat"][data-reality-chat-panel="history"] .reality-chat-workspace>.reality-chat-sidebar,
+body[data-reality-route="chat"][data-reality-chat-panel="work"] .reality-chat-workspace>.reality-chat-inspector{display:flex!important}
+body[data-reality-route="chat"][data-reality-chat-panel="history"] .reality-chat-panel-scrim,
+body[data-reality-route="chat"][data-reality-chat-panel="work"] .reality-chat-panel-scrim{display:block!important;position:fixed;inset:0;z-index:200;background:#020914b3;border:0}
+body[data-reality-route="chat"] .reality-chat-workspace .reality-chat-panel-close{display:block;align-self:flex-end;min-height:42px}
+body[data-reality-route="chat"] .reality-chat-inspector-panel{overflow:visible}
+body[data-reality-route="chat"] #realityChatComposer .reality-chat-status-bar[hidden]{display:none!important}
+body[data-reality-route="chat"] #realityChatSavedWorkReadback>*{max-width:100%;overflow-wrap:anywhere;margin:8px 0}

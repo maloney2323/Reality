@@ -6977,6 +6977,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   const atBottom=thread.scrollHeight-thread.scrollTop-thread.clientHeight<=90;
   const previousTop=thread.scrollTop,previousHeight=thread.scrollHeight;
   thread.replaceChildren();
+  const workReadbackHost=el('realityChatSavedWorkReadback')||thread;
+  if(workReadbackHost!==thread)workReadbackHost.replaceChildren();
   // Independent owner-ledger evidence stays visible even when the model
   // fails to answer or incorrectly describes all jobs as settled.
   const originalReadback=data.original_work_readback;
@@ -6993,6 +6995,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      '. These are not completed-job receipts or automatic permission to install.');
     evidence.querySelector('.label').textContent='REALITY · VERIFIED ORIGINAL WORK READBACK';
     evidence.setAttribute('role','status');
+    if(workReadbackHost!==thread)workReadbackHost.append(evidence);
    }
   }
   const weeklyQueue=data.weekly_queue_readback;
@@ -7007,6 +7010,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     '. These need evidence qualification; they are not automatically authorized executable jobs.');
    panel.querySelector('.label').textContent='REALITY · VERIFIED WEEKLY SOURCE QUEUE';
    panel.setAttribute('role','status');
+   if(workReadbackHost!==thread)workReadbackHost.append(panel);
   }
   // Only show missing replies reported by the authenticated owner-scoped
   // readback. These notices are NOT model answers or work receipts.
@@ -7389,7 +7393,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
       void inspect.onclick();
      }
     }
-    thread.append(card);
+    workReadbackHost.append(card);
    }
    const missing=message.role==='user'?unmatched.get(message.request_id):null;
    if(missing&&missing.user_source_ref===message.source_ref){
@@ -7398,7 +7402,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     notice.setAttribute('role','status');
     const heading=document.createElement('div');
     heading.className='label';
-    heading.textContent='CHAT DELIVERY STATUS · NOT A REALITY ANSWER';
+    heading.textContent='Reply unavailable · message saved';
     const explanation=document.createElement('div');
     const savedAt=Date.parse(missing.saved_at||'');
     const older=Number.isFinite(savedAt)&&Date.now()-savedAt>120000;
@@ -7407,7 +7411,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
      'Your message was saved. A Chat reply has not been verified. The governed work intake has a separate receipt when the existing worker accepts it.';
     const retry=document.createElement('button');
     retry.type='button';
-    retry.textContent='Retry this saved reply — do not send again';
+    retry.textContent='Retry saved reply';
     retry.dataset.recoverRequestId=message.request_id;
     retry.onclick=async()=>{
      retry.disabled=true;
@@ -7446,8 +7450,11 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
          outcome.continuity?.current_answer_persisted!==true){
        const code=String(outcome?.error||'CHAT_RESPONSE_UNAVAILABLE');
        const stage=String(outcome?.stage||'UNKNOWN');
-       explanation.textContent='The original message remains saved. Reply recovery stopped at '+
-        stage.slice(0,80)+' ('+code.slice(0,110)+'). No new message or work authorization was created.';
+       explanation.textContent=code==='CHAT_MODEL_RATE_LIMITED'||code==='CHAT_MODEL_INSUFFICIENT_QUOTA'?
+        'Reality could not reach its AI provider. Check API credits or limits, then retry this saved reply.':
+        'Reality could not finish its reply. Your message is saved; retry it without sending another message.';
+       explanation.title=stage.slice(0,80)+' · '+code.slice(0,110);
+       retry.textContent='Retry saved reply';
        retry.disabled=false;
        return;
       }
