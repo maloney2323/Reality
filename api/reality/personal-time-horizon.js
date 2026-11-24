@@ -4,6 +4,8 @@ import {privateChatConfig,authenticatedChatSession}
  from '../../src/reality-private-chat-auth-v0.1.js';
 import {shiftDatabase,shiftRpc,assertShiftReadback}
  from '../../src/reality-governed-shift-boundary-v1.js';
+import {projectSignedOperationalTimeHorizon}
+ from '../../src/reality-evidence-driven-capability-router-v1.js';
 export const maxDuration=18;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^sha256:[a-f0-9]{64}$/;
@@ -111,6 +113,8 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
    call(db,'reality_read_owner_employee_shifts_v1',
     {p_owner_id:ownerId}),
    call(db,'reality_read_owner_employee_discovery_v1',
+    {p_owner_id:ownerId}),
+   call(db,'reality_read_owner_shift_handoff_health_v1',
     {p_owner_id:ownerId})
   ]);
   const past=checks[0].status==='fulfilled'?
@@ -120,6 +124,10 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
   const potential=checks[2].status==='fulfilled'&&
    checks[2].value?.owner_id===ownerId?
    futureDiscoveryProjection(checks[2].value,now):null;
+  const health=checks[3].status==='fulfilled'?checks[3].value:null;
+  const operational=health?.owner_id===ownerId&&UUID.test(health.shift_id||'')?
+   projectSignedOperationalTimeHorizon({health,ownerId,shiftId:health.shift_id}):
+   {status:'OPERATIONAL_TIME_EVIDENCE_UNVERIFIED',read_only:true};
   // Each horizon can fail independently; never represent missing evidence as
   // zero jobs, zero receipts, a completed task, or a fresh plan.
   return Object.freeze({
@@ -129,6 +137,7 @@ export async function readOwnerTimeHorizonEvidence({ownerId,db,call=shiftRpc,now
    past:past||{status:'PAST_RECEIPTS_NOT_VERIFIED'},
    present:present||{status:'PRESENT_SHIFT_NOT_VERIFIED'},
    future:potential||{status:'FUTURE_DISCOVERY_NOT_VERIFIED'},
+   operational_time_horizon:operational,
    approved_new_work_by_read:false,shift_started_by_read:false,
    deployment_changed_by_read:false,billing_changed_by_read:false,
    new_jobs_created_by_read:0,verified_cash_savings_usd:null
