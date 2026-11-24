@@ -3,9 +3,62 @@
 import { resolveReliabilityBenchmarkDb } from '../../src/reality-reliability-db-boundary-v0.1.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 const ALLOWED_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
+const FINAL_LOOP_BRANCH='feature/final-loop-governed-qualification-handoff-20261123';
+const ISOLATED_PROJECT='txqgqqievsttobujcsli';
+const SHARED_PROJECT='hvkfreoagbrphwghjajw';
+
+// Reuse the server-side Preview credential and existing database boundary.
+// Exact, operator-configured isolated target only; no caller-selected URL,
+// redirects, fallback credentials, row data, writes, model or execution calls.
+async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch){
+  const report=(status,extra={})=>res.status(200).json({
+    ok:true,status,isolated_project:ISOLATED_PROJECT,
+    credential_compatibility_verified:status==='ISOLATED_SERVICE_READ_VERIFIED',
+    execution_authorized:false,worker_started:false,model_calls:0,writes:0,
+    ...extra
+  });
+  if(Object.keys(req.query||{}).length||
+    env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF!==ISOLATED_PROJECT||
+    env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF!==SHARED_PROJECT||
+    env.REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='false')
+    return report('ISOLATED_PREFLIGHT_SCOPE_REJECTED');
+  let db;
+  try{
+    db=resolveReliabilityBenchmarkDb({...env,
+      REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true',
+      REALITY_RELIABILITY_BENCHMARK_PROJECT_REF:ISOLATED_PROJECT,
+      REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF:ISOLATED_PROJECT,
+      REALITY_RELIABILITY_BENCHMARK_SUPABASE_URL:'https://'+ISOLATED_PROJECT+'.supabase.co'
+    });
+    if(!db?.strictSecrets||db.project!==ISOLATED_PROJECT||!db.secretKey)
+      return report('ISOLATED_CREDENTIAL_UNAVAILABLE');
+  }catch{return report('ISOLATED_CREDENTIAL_UNAVAILABLE');}
+  try{
+    // SELECT is service-role-only in this isolated database; limit=0 returns no rows.
+    // Modern opaque keys use apikey, while legacy JWT keys also use Authorization.
+    const headers={apikey:db.secretKey,accept:'application/json'};
+    if(!db.secretKey.startsWith('sb_'))headers.authorization='Bearer '+db.secretKey;
+    const response=await request(db.url+'/rest/v1/universe_events?select=event_id&limit=0',{
+      method:'GET',headers,redirect:'error',cache:'no-store',
+      signal:AbortSignal.timeout(5000)
+    });
+    if(response.status===401||response.status===403)
+      return report('ISOLATED_CREDENTIAL_NOT_AUTHORIZED',{http_status:response.status});
+    if(!response.ok)return report('ISOLATED_SERVICE_READ_FAILED',{http_status:response.status});
+    const data=await response.json();
+    return report(Array.isArray(data)&&data.length===0?
+      'ISOLATED_SERVICE_READ_VERIFIED':'ISOLATED_SERVICE_RESPONSE_UNVERIFIED',
+      {http_status:response.status});
+  }catch{return report('ISOLATED_SERVICE_READ_UNAVAILABLE');}
+}
+
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({ok:false,code:'METHOD_NOT_ALLOWED'});
+  if(process.env.VERCEL_ENV==='preview' && process.env.VERCEL_GIT_COMMIT_REF===FINAL_LOOP_BRANCH)
+    return isolatedCredentialPreflight(req,res);
   if(process.env.VERCEL_ENV!=='preview' || process.env.VERCEL_GIT_COMMIT_REF!==ALLOWED_BRANCH)
     return res.status(404).json({ok:false,code:'NOT_AVAILABLE'});
   let db;
