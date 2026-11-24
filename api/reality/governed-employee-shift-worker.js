@@ -77,6 +77,8 @@ import {evaluateRealityWholeCycleAcceptance}
  from '../../src/reality-final-loop-whole-cycle-acceptance-v1.js';
 import {projectRecoveryContractFromFinalLoop}
  from '../../src/reality-final-loop-proof-carrying-recovery-v1.js';
+import {advanceOneSignedProofRecovery}
+ from '../../src/reality-final-loop-signed-proof-recovery-worker-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
  reconcileVerifiedCurrentShiftCommitTriage}
  from '../../src/reality-shift-commit-triage-handoff-v1.js';
@@ -3792,6 +3794,27 @@ export default async function handler(req,res){
    ownerPackets:finalLoopOwnerPacketReadback
   });
 
+  // Consume the same source-scoped contract proposal via one existing
+  // signed worker, never another queue. Shared benchmark is read-only;
+  // durable freeze requires an independently isolated registered release.
+  workerStage='FINAL_LOOP_SIGNED_RECOVERY_CONTRACT_RECONCILIATION';
+  let finalLoopSignedProofRecovery;
+  try{
+   finalLoopSignedProofRecovery=await advanceOneSignedProofRecovery({
+    db,env:process.env,wake:wakeReceipt,
+    graph:unifiedGraph,continuityReturn:finalLoopContinuityReturn,
+    stagedRoutes:finalLoopStagedActionRoutes,
+    ownerPackets:finalLoopOwnerPacketReadback,workerRunId:actualWorkerRunId
+   });
+  }catch{
+   finalLoopSignedProofRecovery={
+    status:'RECOVERY_SIGNED_CONTRACT_RECONCILIATION_UNVERIFIED',
+    contract_frozen:false,claim_created:false,strategy_executed:false,
+    original_job_completed:false,installation_authorized:false,
+    production_changed:false
+   };
+  }
+
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -3949,6 +3972,7 @@ export default async function handler(req,res){
     final_loop_continuity_return:finalLoopContinuityReturn,
     final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance,
     final_loop_proof_carrying_recovery:finalLoopProofCarryingRecovery,
+    final_loop_signed_proof_recovery:finalLoopSignedProofRecovery,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
