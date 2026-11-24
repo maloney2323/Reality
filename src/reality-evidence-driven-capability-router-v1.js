@@ -46,6 +46,10 @@ export function projectSignedOperationalTimeHorizon({health,ownerId,shiftId}={})
      ![p.independent_baseline_receipt_sha256,p.last_builder_receipt_sha256,p.independent_repair_receipt_sha256].every(hash)||
      !states.has(p.last_builder_outcome)||!states.has(n.builder_state)||
      p.last_builder_outcome!==n.builder_state||
+     (n.recovery_state!==undefined&&(!['READY_FOR_BUILD','CLAIM_ACTIVE','FAILED_PENDING_TRIAGE','REENTRY_AUTHORIZED','CANDIDATE_READY','TERMINAL_BOUNDARY'].includes(n.recovery_state)||
+       !Number.isSafeInteger(p.build_attempt_count)||p.build_attempt_count<0||p.build_attempt_count>3||
+       !hash(p.last_recovery_decision_receipt_sha256)||
+       (n.recovery_state==='REENTRY_AUTHORIZED'&&(!SHA.test(p.last_recovery_decision_receipt_sha256||'')||!Number.isFinite(Date.parse(n.reentry_not_before||''))))))||
      !(p.last_builder_recorded_at===null||Number.isFinite(Date.parse(p.last_builder_recorded_at)))||
      !KEY.test(n.phase||'')||!KEY.test(n.handling_state||'')||
      [n.original_job_completed,n.repair_independently_verified,n.independent_frozen_red_verified].some(v=>typeof v!=='boolean')||
@@ -58,7 +62,9 @@ export function projectSignedOperationalTimeHorizon({health,ownerId,shiftId}={})
   // Derive from observed state, not an untrusted or stale recommendation.
   const next=n.original_job_completed?'RECONCILE_EXISTING_FINAL_RECEIPT_NO_REPLAY':
    n.repair_independently_verified?'RECONCILE_SEPARATE_ORIGINAL_JOB_ACCEPTANCE':
-   ['PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE'].includes(n.builder_state)?'INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY':
+   n.recovery_state==='TERMINAL_BOUNDARY'?'REPORT_EXACT_EVIDENCE_OR_RESOURCE_BOUNDARY':
+   n.recovery_state==='REENTRY_AUTHORIZED'?'CLAIM_EXISTING_BUILDER_WHEN_REENTRY_DUE':
+   n.recovery_state==='FAILED_PENDING_TRIAGE'||['PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE'].includes(n.builder_state)?'INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY':
    n.builder_state==='DRAFT'?'INDEPENDENTLY_QUALIFY_AND_RUN_INERT_FROZEN_TEST_CANDIDATE':
    n.builder_state==='CLAIMED'?'RECONCILE_ACTIVE_BUILDER_LEASE':'QUALIFY_REQUIRED_SOURCE_EVIDENCE';
   if(next!==f.next_required_action)
@@ -67,10 +73,13 @@ export function projectSignedOperationalTimeHorizon({health,ownerId,shiftId}={})
   items.push(Object.freeze({source_ref:e.source_ref,maintenance_id:e.maintenance_id,
    past:Object.freeze({independent_baseline_receipt_sha256:p.independent_baseline_receipt_sha256,
     last_builder_receipt_sha256:p.last_builder_receipt_sha256,last_builder_outcome:p.last_builder_outcome,
-    last_builder_recorded_at:p.last_builder_recorded_at,independent_repair_receipt_sha256:p.independent_repair_receipt_sha256}),
+    last_builder_recorded_at:p.last_builder_recorded_at,independent_repair_receipt_sha256:p.independent_repair_receipt_sha256,
+    ...(n.recovery_state!==undefined?{build_attempt_count:p.build_attempt_count,last_recovery_decision_receipt_sha256:p.last_recovery_decision_receipt_sha256}:{})}),
    present:Object.freeze({phase:n.phase,handling_state:n.handling_state,builder_state:n.builder_state,
     original_job_completed:n.original_job_completed,repair_independently_verified:n.repair_independently_verified,
-    independent_frozen_red_verified:n.independent_frozen_red_verified}),
+    independent_frozen_red_verified:n.independent_frozen_red_verified,
+    ...(n.recovery_state!==undefined?{recovery_state:n.recovery_state,reentry_not_before:n.reentry_not_before||null,
+      recovery_error_class:['PROVIDER_READY','AUTH_OR_SECRET_MISSING','QUOTA_EXHAUSTED','RATE_LIMIT','TRANSIENT_INFRA','MODEL_CONFIG_OR_SCHEMA','UNKNOWN_PROVIDER_OUTCOME','SPEC_OR_TEST_FAILURE'].includes(n.recovery_error_class)?n.recovery_error_class:null}:{})}),
    future:Object.freeze({next_required_action:next,expected_outcome_verified:false,execution_authorized:false,installation_authorized:false})}));
  }
  return bounded('OPERATIONAL_TIME_EVIDENCE_PROJECTED',{owner_id:ownerId,shift_id:shiftId,read_only:true,
@@ -106,13 +115,17 @@ export function planGovernedCapabilitiesFromOwnerReceipts({
   const ownerRequired=proof==='OWNER_AUTHORITY_PENDING';
   const t=temporal.items?.find(x=>x.source_ref===sourceRef);
   const pendingRecovery=!ownerRequired&&t?.future.next_required_action==='INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY';
-  const next=pendingRecovery?t.future.next_required_action:action;
+  const boundary=!ownerRequired&&t?.future.next_required_action==='REPORT_EXACT_EVIDENCE_OR_RESOURCE_BOUNDARY';
+  const reentry=!ownerRequired&&t?.future.next_required_action==='CLAIM_EXISTING_BUILDER_WHEN_REENTRY_DUE';
+  const next=pendingRecovery||boundary||reentry?t.future.next_required_action:action;
   pending.push(Object.freeze({
    source_ref:sourceRef,capability_key:next,next_action:next,
    ...(pendingRecovery?{prior_required_capability:action,blocked_attempt_receipt_sha256:t.past.last_builder_receipt_sha256}:{}),
    authority_basis:authority,evidence_state:proof,origin,
    execution_route:ownerRequired?'OWNER_CLICK_REQUIRED':
     pendingRecovery?'RECOVERY_INVESTIGATION_REQUIRED':
+    boundary?'EXPLICIT_RECOVERY_BOUNDARY':
+    reentry?'GOVERNED_REENTRY_SCHEDULED':
     registered.has(action)?'REGISTERED_CAPABILITY_AVAILABLE':
      'REGISTERED_CAPABILITY_MISSING',
    next_actor:ownerRequired?'OWNER':'REALITY',
@@ -166,6 +179,8 @@ export function planGovernedCapabilitiesFromOwnerReceipts({
   owner_decision_count:pending.filter(x=>
    x.execution_route==='OWNER_CLICK_REQUIRED').length,
   recovery_investigation_count:pending.filter(x=>x.execution_route==='RECOVERY_INVESTIGATION_REQUIRED').length,
+  recovery_boundary_count:pending.filter(x=>x.execution_route==='EXPLICIT_RECOVERY_BOUNDARY').length,
+  recovery_reentry_count:pending.filter(x=>x.execution_route==='GOVERNED_REENTRY_SCHEDULED').length,
   operational_time_horizon:temporal,
   source_actions:Object.freeze(pending),read_only:true
  });
