@@ -79,6 +79,8 @@ import {projectRecoveryContractFromFinalLoop}
  from '../../src/reality-final-loop-proof-carrying-recovery-v1.js';
 import {routeExistingSignedCaseCiForRecovery}
  from '../../src/reality-final-loop-existing-case-ci-bridge-v1.js';
+import {classifyFinalLoopBlockerLiveness}
+ from '../../src/reality-final-loop-blocker-liveness-v1.js';
 import {advanceOneSignedProofRecovery}
  from '../../src/reality-final-loop-signed-proof-recovery-worker-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
@@ -3849,6 +3851,17 @@ export default async function handler(req,res){
    };
   }
 
+  // Always re-evaluate recoverable blocker liveness on the SAME scheduled
+  // signed wake. A missing capability stays an explicit machine-owned due
+  // action rather than generic waiting; this read model NEVER claims the
+  // absent capability is installed or invokes it without its warrant.
+  const finalLoopBlockerLiveness=classifyFinalLoopBlockerLiveness({
+   contractProposal:finalLoopProofCarryingRecovery,
+   existingCiRoute:finalLoopExistingCaseCiRecovery,
+   signedRecovery:finalLoopSignedProofRecovery,
+   budgetState:finalLoopSignedProofRecovery
+  });
+
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution
   // after an HTTP response cannot guarantee release of this singleflight lease.
@@ -4008,6 +4021,7 @@ export default async function handler(req,res){
     final_loop_proof_carrying_recovery:finalLoopProofCarryingRecovery,
     final_loop_existing_case_ci_recovery:finalLoopExistingCaseCiRecovery,
     final_loop_signed_proof_recovery:finalLoopSignedProofRecovery,
+    final_loop_blocker_liveness:finalLoopBlockerLiveness,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
     final_loop_parent_integration:finalLoopParentIntegration,
