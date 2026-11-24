@@ -152,6 +152,6 @@ test('SQL migration binds same original/ledger, service role, disabled registry 
  const src=readFileSync(new URL(
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.ok(src.includes('final_loop_signed_proof_recovery:finalLoopSignedProofRecovery'));
- assert.ok(src.indexOf('const finalLoopSignedProofRecovery')>
+ assert.ok(src.indexOf('let finalLoopSignedProofRecovery')>
   src.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
 });
