@@ -101,14 +101,21 @@ test('model candidates from prior wrong-target review are not proof',()=>{
  const env={source:'INDEPENDENT_SIGNED_SOURCE_EPOCH_READBACK',
   independent_verified:true,env_state_hash:sha('1'),
   source_revision:sourceHead,receipt_sha256:sha('3')};
+ const budgetLedger={
+  source:'INDEPENDENT_SIGNED_RECOVERY_BUDGET_LEDGER_READBACK',
+  independent_verified:true,contract_id:c.contract_id,obligation_id:work,
+  continuity_root_id:root,receipt_sha256:sha('5'),
+  total_attempts:1,spent_wall_seconds:30,spent_cost_units:2,
+  cumulative_touched_files:0
+ };
  const diag={source:'SIGNED_WARRANT_LEDGER_READBACK',valid:true,
   obligation_id:work,continuity_root_id:root,source_revision:sourceHead,
   warrant_receipt_sha256:sha('4')};
- const same=decideNextRecoveryTransition({contract:c,durableFreeze:freeze,
+ const same=decideNextRecoveryTransition({contract:c,durableFreeze:freeze,budgetLedger,
   failedAttempts:[failure],strategy:{...s,environment_proof:env},
   diagnosticWarrant:diag,registeredCapabilities:[s.capability_id]});
  assert.equal(same.status,'RECOVERY_IDENTICAL_FAILED_STRATEGY_REJECTED');
- const pivot=decideNextRecoveryTransition({contract:c,durableFreeze:freeze,
+ const pivot=decideNextRecoveryTransition({contract:c,durableFreeze:freeze,budgetLedger,
   failedAttempts:[failure],strategy:{...s,
    hypothesis_class:'FOCUSED_CAUSAL_TEST_REPRODUCTION',
    environment_proof:env},diagnosticWarrant:diag,
