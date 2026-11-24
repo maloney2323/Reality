@@ -119,7 +119,7 @@ BEGIN
  IF p_shift_id IS NULL OR p_worker_run_id IS NULL OR
   coalesce(p_original_work_id,'') !~ '^work:[a-f0-9]{32}$' OR
   pg_catalog.jsonb_typeof(p_contract)<>'object' OR
-  NOT pg_catalog.coalesce(p_contract ?& ARRAY[
+  NOT coalesce(p_contract ?& ARRAY[
    'version','owner_id','shift_id','obligation_id','source_ref',
    'source_revision','continuity_root_id','continuity_head_sha256',
    'blocker_evidence_sha256','blocker_class','blocker_kind',
@@ -287,7 +287,7 @@ BEGIN
  IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
   'status','RECOVERY_NO_DURABLE_CONTRACT','read_only',true,
   'execution_authorized',false,'original_job_completed',false);END IF;
- SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT coalesce(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object(
    'strategy_fingerprint',a.strategy_fingerprint,
    'capability_id',a.capability_id,'failure_class',a.failure_class,
@@ -300,7 +300,7 @@ BEGIN
    ORDER BY a.claimed_at),'[]'::jsonb)
  INTO v_attempts FROM reality_internal.final_loop_recovery_strategy_attempts_v1 a
  WHERE a.contract_id=c.contract_id;
- SELECT pg_catalog.coalesce(pg_catalog.jsonb_agg(
+ SELECT coalesce(pg_catalog.jsonb_agg(
   pg_catalog.jsonb_build_object('gate',p.gate,'receipt_sha256',
    p.independent_proof_receipt_sha256,'artifact_sha256',p.artifact_sha256,
    'origin_worker_run_id',p.origin_worker_run_id,
@@ -317,12 +317,12 @@ BEGIN
    'continuity_root_id',c.continuity_root_id,
    'receipt_sha256',c.freeze_receipt_sha256,
    'total_attempts',count(*)::int,
-   'spent_wall_seconds',pg_catalog.coalesce(sum(
-     pg_catalog.coalesce(a.actual_wall_seconds,a.estimated_wall_seconds)),0)::int,
-   'spent_cost_units',pg_catalog.coalesce(sum(
-     pg_catalog.coalesce(a.actual_cost_units,a.estimated_cost_units)),0)::int,
-   'cumulative_touched_files',pg_catalog.coalesce(sum(
-     pg_catalog.coalesce(a.actual_changed_files,a.proposed_changed_files)),0)::int
+   'spent_wall_seconds',coalesce(sum(
+     coalesce(a.actual_wall_seconds,a.estimated_wall_seconds)),0)::int,
+   'spent_cost_units',coalesce(sum(
+     coalesce(a.actual_cost_units,a.estimated_cost_units)),0)::int,
+   'cumulative_touched_files',coalesce(sum(
+     coalesce(a.actual_changed_files,a.proposed_changed_files)),0)::int
   ) INTO v_budget
  FROM reality_internal.final_loop_recovery_strategy_attempts_v1 a
  WHERE a.contract_id=c.contract_id;
