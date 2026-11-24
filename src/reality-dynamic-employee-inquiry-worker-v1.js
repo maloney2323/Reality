@@ -197,6 +197,10 @@ export async function generateOneEmployeeTemporalInquiry({
    time.present.active_shift_count:null;
   if(key.length<20||!/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,70}$/.test(model))
    fail('MODEL_PROVIDER_NOT_CONFIGURED');
+  const operational=time?.operational_time_horizon;
+  const temporal=operational?.status==='OPERATIONAL_TIME_EVIDENCE_PROJECTED'&&
+   operational.owner_id===ownerId&&Array.isArray(operational.items)?
+   operational.items.find(x=>x.source_ref===claimed.source_ref)||null:null;
   const modelInput=JSON.stringify({
    source_evidence:provider,
    existing_employee:{name:claimed.employee,function:role.role,
@@ -204,6 +208,8 @@ export async function generateOneEmployeeTemporalInquiry({
    past_independently_verified_final_receipts:past,
    present_active_shifts:present,
    future:claimed.source_title,
+   operational_past_present_future:temporal,
+   future_is_an_expected_outcome_not_verified_completion:true,
    discovery_evidence_hash:claimed.evidence_sha256,
    discovery_disposition:'UNSETTLED_NEEDS_CURRENT_QUALIFICATION',
    no_execution_authority:true
