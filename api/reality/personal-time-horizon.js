@@ -337,6 +337,80 @@ export async function readOwnerTimeHorizonEvidence({
     };
    }
   }
+
+  // Owner Chat, Past/Present/Future, and Universe share the SAME service-only
+  // Continuity/verifier guard as the signed worker. This is a read-only
+  // projection of existing canonical evidence, not another ledger or proof.
+  let finalLoopSharedContinuityGuard={
+   status:'FINAL_LOOP_SHARED_CONTINUITY_OWNER_GUARD_NOT_ENABLED',
+   read_only:true,execution_authorized:false,
+   original_job_completed:false
+  };
+  if(env.VERCEL_ENV==='preview'&&
+     env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
+     finalLoopOwner?.status==='FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
+     finalLoopOwner.owner_scope_verified===true){
+   try{
+    const raw=await call(db,
+     'reality_read_final_loop_shared_continuity_guard_v1',{
+      p_shift_id:finalLoopOwner.shift_id
+     },{timeoutMs:6000});
+    const current=finalLoopOwner.time_horizon?.present;
+    if(raw?.schema==='reality-shared-cross-layer-continuity-handoff-v1'&&
+       raw.status==='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'&&
+       raw.owner_id===ownerId&&raw.shift_id===finalLoopOwner.shift_id&&
+       raw.continuity_root_id===current?.continuity_root_id&&
+       raw.continuity_head_sha256===current?.continuity_head_sha256&&
+       raw.frozen_shift_scope_sha256===current?.frozen_shift_scope_sha256&&
+       raw.revision===current?.revision&&
+       SHA.test(raw.handoff_observation_sha256||'')&&
+       raw.read_only===true&&raw.no_new_executable_authority===true&&
+       raw.execution_authorized===false&&raw.transition_committed===false&&
+       raw.original_job_completed===false&&raw.installation_authorized===false&&
+       raw.production_changed===false&&raw.unverified_handoffs===0&&
+       Array.isArray(raw.obligations)&&
+       Array.isArray(current?.obligations)&&
+       raw.obligations.length===current.obligations.length&&
+       current.obligations.every(o=>raw.obligations.filter(g=>
+         g.source_ref===o.source_ref&&
+         g.original_work_id===o.original_work_id&&
+         g.continuity_identity_verified===true&&
+         g.execution_permitted_by_handoff===false&&
+         g.source_proof_verified===true&&
+         (g.original_work_id===null||g.qualifier_digest_verified===true)
+       ).length===1)){
+      finalLoopSharedContinuityGuard=Object.freeze({
+       status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+       owner_id:ownerId,shift_id:finalLoopOwner.shift_id,
+       continuity_root_id:raw.continuity_root_id,
+       continuity_head_sha256:raw.continuity_head_sha256,
+       revision:raw.revision,
+       observation_sha256:raw.handoff_observation_sha256,
+       handoffs:Object.freeze(raw.obligations.map(g=>Object.freeze({
+        source_ref:g.source_ref,original_work_id:g.original_work_id,
+        continuity_identity_verified:true,
+        independent_original_outcome_verified:
+         g.independent_original_outcome_verified===true,
+        universe_return_verified:g.universe_return_verified===true,
+        execution_authorized:false,original_job_completed:false
+       }))),
+       read_only:true,execution_authorized:false,
+       transition_committed:false,original_job_completed:false
+      });
+     }else{
+      finalLoopSharedContinuityGuard={
+       status:'FINAL_LOOP_SHARED_CONTINUITY_OWNER_SCOPE_OR_PROOF_UNVERIFIED',
+       read_only:true,execution_authorized:false,original_job_completed:false
+      };
+     }
+   }catch{
+    finalLoopSharedContinuityGuard={
+     status:'FINAL_LOOP_SHARED_CONTINUITY_OWNER_READBACK_UNAVAILABLE',
+     read_only:true,execution_authorized:false,original_job_completed:false
+    };
+   }
+  }
+
   // One owner/shift/root-bound Universe feedback projection over the
   // INDEPENDENT native+Universe settlement reader and canonical Continuity.
   // The same result can inform CEO and Chat, but grants no new authority.
@@ -350,10 +424,16 @@ export async function readOwnerTimeHorizonEvidence({
      finalLoopOwner.status===
       'FINAL_LOOP_OWNER_TIME_AND_EXECUTIVE_EVIDENCE_READY'&&
      finalLoopParentOutcomes.status===
-      'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ'){
+      'FINAL_LOOP_SAME_OWNER_PARENT_OUTCOMES_INDEPENDENTLY_READ'&&
+     (env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED!=='true'||
+      finalLoopSharedContinuityGuard.status===
+       'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY')){
    finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
     canonicalView:finalLoopOwner,parentOutcomes:finalLoopParentOutcomes,
-    recoveryGuidance:finalLoopRecoveryGuidance
+    recoveryGuidance:finalLoopRecoveryGuidance,
+    sharedContinuityGuard:finalLoopSharedContinuityGuard.status===
+     'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'?
+      finalLoopSharedContinuityGuard:null
    });
    if(finalLoopUniverseFeedback.status===
       'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY')
@@ -409,6 +489,7 @@ export async function readOwnerTimeHorizonEvidence({
    final_loop_source_plans:finalLoopSourcePlans,
    final_loop_parent_outcomes:finalLoopParentOutcomes,
    final_loop_universe_feedback:finalLoopUniverseFeedback,
+   final_loop_shared_continuity_guard:finalLoopSharedContinuityGuard,
    final_loop_recovery_guidance:finalLoopRecoveryGuidance,
    final_loop_governed_engineering:finalLoopGovernedEngineering,
    approved_new_work_by_read:false,shift_started_by_read:false,
