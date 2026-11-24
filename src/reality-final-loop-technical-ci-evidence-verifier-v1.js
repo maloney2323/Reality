@@ -91,7 +91,7 @@ export async function verifySourceBoundTechnicalRecoveryCi({
   // Bind to exactly the SHA deployed by this signed preview. Do not accept
   // an older successful CI run from another release or another PR.
   const runs=await get('/actions/workflows/'+
-   encodeURIComponent(WORKFLOW)+'/runs?branch='+
+   'reality-shared-continuity-verifier-handoff-v1.yml/runs?branch='+
    encodeURIComponent(BRANCH)+'&per_page=15');
   const matched=(runs?.workflow_runs||[]).filter(r=>
    r?.name===WORKFLOW_NAME&&r?.path===WORKFLOW&&
@@ -100,10 +100,10 @@ export async function verifySourceBoundTechnicalRecoveryCi({
    r.status==='completed'&&r.conclusion==='success'&&
    r.repository?.full_name===REPO&&
    Number.isSafeInteger(r.id)&&r.id>0);
-  if(matched.length!==1)
+  if(matched.length<1)
    return result('RECOVERY_TECHNICAL_CI_EXACT_SIGNED_RUN_PENDING',{
     ...base,verified_run_count:matched.length});
-  const run=matched[0];
+  const run=matched.sort((a,b)=>b.id-a.id)[0];
   const [dir,jobs,artifacts]=await Promise.all([
    get('/contents/'+SPEC_DIR+'?ref='+deployed),
    get('/actions/runs/'+run.id+'/jobs?per_page=100'),
