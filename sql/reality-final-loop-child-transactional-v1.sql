@@ -929,8 +929,10 @@ BEGIN
     u.acceptance_hash,
    'verified_signed_source_goal_contract_prepared',
     u.acceptance_hash IS NOT NULL,
-   'owner_goal_acceptance_pending',u.acceptance_hash IS NOT NULL,
-   'independent_goal_acceptance_verified',false,
+   'owner_goal_acceptance_pending',u.acceptance_hash IS NOT NULL AND NOT proof.accepted,
+   'independent_goal_acceptance_verified',proof.accepted,
+   'owner_approval_claim_window_current',proof.current_window,
+   'owner_approval_expired',proof.accepted AND NOT proof.current_window,
    'pending_exact_owner_approval',u.acceptance_hash IS NOT NULL AND NOT EXISTS(
     SELECT 1 FROM reality_internal.final_loop_child_approval_packets_v1 a
     WHERE a.plan_id=p.plan_id AND
@@ -942,6 +944,32 @@ BEGIN
   SELECT reality_internal.final_loop_pr_review_acceptance_digest_v1(p.plan_id)
    AS acceptance_hash
  ) u
+ CROSS JOIN LATERAL (
+  SELECT count(e.event_id)=1 AS accepted,
+   count(e.event_id)=1 AND coalesce(bool_and(a.approved_at>=pg_catalog.now()-interval '12 hours'),false) AS current_window
+  FROM reality_internal.final_loop_child_approval_packets_v1 a
+  JOIN public.universe_events e ON e.continuity_root_id=p.shift_id AND e.worldline_id=p.plan_id AND e.entity_id=p.plan_id
+  WHERE a.plan_id=p.plan_id AND a.shift_id=p.shift_id AND a.owner_id=p.owner_id
+   AND a.source_manifest_sha256=p.source_manifest_sha256 AND a.parent_original_work_id=p.parent_original_work_id AND a.source_ref=p.source_ref
+   AND a.acceptance_contract_sha256=u.acceptance_hash
+   AND a.state IN ('APPROVED_ONCE','EFFECT_RESERVED_RECONCILE_ONLY')
+   AND a.authority_effect='READ_ONLY_INTERNAL_PR_REVIEW'
+   AND e.entity_type='reality_final_loop_owner_accepted_goal_v1'
+   AND e.epistemic_status='VERIFIED' AND e.event_kind='WORK'
+   AND e.payload->>'owner_approval_receipt_sha256'=a.owner_approval_receipt_sha256
+   AND e.payload->>'owner_approval_request_id'=a.owner_approval_request_id::text
+   AND e.payload->>'acceptance_contract_sha256'=a.acceptance_contract_sha256
+   AND e.payload->>'goal_accepted'='true'
+   AND e.payload->>'original_job_completed'='false'
+   AND e.payload->>'production_changed'='false'
+   AND e.payload->>'source_head_sha'=p.source_head_sha
+   AND e.payload->>'source_manifest_sha256'=p.source_manifest_sha256
+   AND e.payload->>'owner_id'=p.owner_id::text
+   AND e.payload->>'shift_id'=p.shift_id::text
+   AND e.payload->>'original_work_id'=p.parent_original_work_id
+   AND e.payload->>'source_ref'=p.source_ref
+   AND e.content_hash=pg_catalog.encode(extensions.digest(pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(e.payload),'UTF8'),'sha256'),'hex')
+ ) proof
  WHERE p.shift_id=p_shift_id AND p.owner_id=v_shift.owner_id
   AND p.parent_original_work_id IS NOT NULL;
  RETURN pg_catalog.jsonb_build_object(
