@@ -27,6 +27,57 @@ const rightOwner=(h,ownerId,shiftId)=>h&&
  Number.isSafeInteger(h.original_claim_count)&&
  Number.isSafeInteger(h.original_independent_final_receipt_count);
 
+// Single owner-scoped temporal read model: past receipts, present state, future
+// obligations. This is not a new ledger and never grants execution authority.
+export function projectSignedOperationalTimeHorizon({health,ownerId,shiftId}={}){
+ if(!rightOwner(health,ownerId,shiftId)||
+    health.operational_temporal_coverage!=='BOUNDED_CURRENT_SIGNED_MAINTENANCE_SOURCES'||
+    !Array.isArray(health.operational_temporal_evidence)||
+    health.operational_temporal_evidence.length>8)
+  return bounded('OPERATIONAL_TIME_EVIDENCE_UNVERIFIED',{read_only:true,owner_id:ownerId,shift_id:shiftId});
+ const allowed=new Set([health.repair_scope?.source_ref,...health.maintenance_handoffs.map(x=>x.source_ref)]);
+ const seen=new Set(),items=[];
+ const states=new Set([null,'CLAIMED','DRAFT','PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE']);
+ const hash=v=>v===null||SHA.test(v||'');
+ for(const e of health.operational_temporal_evidence){
+  const p=e?.past,n=e?.present,f=e?.future;
+  if(!safeRef(e?.source_ref)||!allowed.has(e.source_ref)||seen.has(e.source_ref)||
+     !UUID.test(e.maintenance_id||'')||!p||!n||!f||
+     ![p.independent_baseline_receipt_sha256,p.last_builder_receipt_sha256,p.independent_repair_receipt_sha256].every(hash)||
+     !states.has(p.last_builder_outcome)||!states.has(n.builder_state)||
+     p.last_builder_outcome!==n.builder_state||
+     !(p.last_builder_recorded_at===null||Number.isFinite(Date.parse(p.last_builder_recorded_at)))||
+     !KEY.test(n.phase||'')||!KEY.test(n.handling_state||'')||
+     [n.original_job_completed,n.repair_independently_verified,n.independent_frozen_red_verified].some(v=>typeof v!=='boolean')||
+     n.repair_independently_verified!==(p.independent_repair_receipt_sha256!==null)||
+     (['DRAFT','PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE'].includes(n.builder_state)&&
+       (!SHA.test(p.last_builder_receipt_sha256||'')||!Number.isFinite(Date.parse(p.last_builder_recorded_at))))||
+     !KEY.test(f.next_required_action||'')||f.expected_outcome_verified!==false||
+     f.execution_authorized!==false||f.installation_authorized!==false)
+   return bounded('OPERATIONAL_TIME_EVIDENCE_UNVERIFIED',{read_only:true,owner_id:ownerId,shift_id:shiftId});
+  // Derive from observed state, not an untrusted or stale recommendation.
+  const next=n.original_job_completed?'RECONCILE_EXISTING_FINAL_RECEIPT_NO_REPLAY':
+   n.repair_independently_verified?'RECONCILE_SEPARATE_ORIGINAL_JOB_ACCEPTANCE':
+   ['PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE'].includes(n.builder_state)?'INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY':
+   n.builder_state==='DRAFT'?'INDEPENDENTLY_QUALIFY_AND_RUN_INERT_FROZEN_TEST_CANDIDATE':
+   n.builder_state==='CLAIMED'?'RECONCILE_ACTIVE_BUILDER_LEASE':'QUALIFY_REQUIRED_SOURCE_EVIDENCE';
+  if(next!==f.next_required_action)
+   return bounded('OPERATIONAL_TIME_EVIDENCE_UNVERIFIED',{read_only:true,owner_id:ownerId,shift_id:shiftId});
+  seen.add(e.source_ref);
+  items.push(Object.freeze({source_ref:e.source_ref,maintenance_id:e.maintenance_id,
+   past:Object.freeze({independent_baseline_receipt_sha256:p.independent_baseline_receipt_sha256,
+    last_builder_receipt_sha256:p.last_builder_receipt_sha256,last_builder_outcome:p.last_builder_outcome,
+    last_builder_recorded_at:p.last_builder_recorded_at,independent_repair_receipt_sha256:p.independent_repair_receipt_sha256}),
+   present:Object.freeze({phase:n.phase,handling_state:n.handling_state,builder_state:n.builder_state,
+    original_job_completed:n.original_job_completed,repair_independently_verified:n.repair_independently_verified,
+    independent_frozen_red_verified:n.independent_frozen_red_verified}),
+   future:Object.freeze({next_required_action:next,expected_outcome_verified:false,execution_authorized:false,installation_authorized:false})}));
+ }
+ return bounded('OPERATIONAL_TIME_EVIDENCE_PROJECTED',{owner_id:ownerId,shift_id:shiftId,read_only:true,
+  checked_at:health.checked_at||null,coverage:health.operational_temporal_coverage,items:Object.freeze(items),
+  expected_outcomes_are_not_verified_facts:true});
+}
+
 // This is a single common obligation evaluator for an arbitrary collection of
 // verified work. It reads the DB's next-action receipt rather than assigning a
 // procedural chain based on an issue number, source domain or work title.
@@ -40,6 +91,7 @@ export function planGovernedCapabilitiesFromOwnerReceipts({
   stop('SIGNED_OWNER_WORK_LEDGER_REQUIRED');
  const registered=new Set(registeredActionKeys);
  const pending=[];
+ const temporal=projectSignedOperationalTimeHorizon({health,ownerId,shiftId});
  function add({sourceRef,action,authority,proof,origin}){
   if(!safeRef(sourceRef)||!KEY.test(action||'')||
      !['APPROVED_EXACT_SOURCE_SCOPE','SIGNED_EXISTING_WARRANT',
@@ -52,10 +104,15 @@ export function planGovernedCapabilitiesFromOwnerReceipts({
   // warrant adapter.
   if(pending.some(p=>p.source_ref===sourceRef&&p.next_action===action))return;
   const ownerRequired=proof==='OWNER_AUTHORITY_PENDING';
+  const t=temporal.items?.find(x=>x.source_ref===sourceRef);
+  const pendingRecovery=!ownerRequired&&t?.future.next_required_action==='INVESTIGATE_NEW_EVIDENCE_BEFORE_REENTRY';
+  const next=pendingRecovery?t.future.next_required_action:action;
   pending.push(Object.freeze({
-   source_ref:sourceRef,capability_key:action,next_action:action,
+   source_ref:sourceRef,capability_key:next,next_action:next,
+   ...(pendingRecovery?{prior_required_capability:action,blocked_attempt_receipt_sha256:t.past.last_builder_receipt_sha256}:{}),
    authority_basis:authority,evidence_state:proof,origin,
    execution_route:ownerRequired?'OWNER_CLICK_REQUIRED':
+    pendingRecovery?'RECOVERY_INVESTIGATION_REQUIRED':
     registered.has(action)?'REGISTERED_CAPABILITY_AVAILABLE':
      'REGISTERED_CAPABILITY_MISSING',
    next_actor:ownerRequired?'OWNER':'REALITY',
@@ -108,6 +165,8 @@ export function planGovernedCapabilitiesFromOwnerReceipts({
    x.execution_route==='REGISTERED_CAPABILITY_MISSING').length,
   owner_decision_count:pending.filter(x=>
    x.execution_route==='OWNER_CLICK_REQUIRED').length,
+  recovery_investigation_count:pending.filter(x=>x.execution_route==='RECOVERY_INVESTIGATION_REQUIRED').length,
+  operational_time_horizon:temporal,
   source_actions:Object.freeze(pending),read_only:true
  });
 }
