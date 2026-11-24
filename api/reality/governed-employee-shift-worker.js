@@ -2968,6 +2968,7 @@ export default async function handler(req,res){
   };
   if(process.env.VERCEL_ENV==='preview'&&
      process.env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'&&
+     finalLoopEvidenceCheckpoint?.evidence_checkpoint_acknowledged!==true&&
      finalLoopEngineShadow.status===
        'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'&&
      finalLoopEngineShadow.canonical_continuity_handoff
