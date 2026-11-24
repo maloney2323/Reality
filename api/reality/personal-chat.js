@@ -336,7 +336,11 @@ export default async function handler(req,res){
      x.final_loop_universe_feedback.owner_id===session.user_id&&
      x.final_loop_universe_feedback.read_only===true&&
      x.final_loop_universe_feedback.execution_authorized===false&&
-     x.final_loop_universe_feedback.original_job_completed===false,
+     x.final_loop_universe_feedback.original_job_completed===false&&
+     (process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED!=='true'||
+       (x.final_loop_shared_continuity_guard?.status===
+        'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'&&
+        x.final_loop_universe_feedback.shared_continuity_guard_crosschecked===true)),
     fallback:null},
    {id:'weekly_queue',read:()=>readOwnerWeeklyCandidateQueueForChat({session}),
       validate:v=>typeof v?.status==='string'&&
@@ -482,6 +486,8 @@ export default async function handler(req,res){
   const finalLoopUniverseObservations=
    feedback?.status===
      'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY'&&
+   (process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED!=='true'||
+    feedback.shared_continuity_guard_crosschecked===true)&&
    feedback.owner_id===session.user_id&&
    feedback.shift_id===verifiedOwnerShift?.active_owner_shift_id&&
    feedback.read_only===true&&feedback.execution_authorized===false&&
