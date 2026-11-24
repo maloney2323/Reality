@@ -83,6 +83,8 @@ import {classifyFinalLoopBlockerLiveness}
  from '../../src/reality-final-loop-blocker-liveness-v1.js';
 import {verifySourceBoundTechnicalRecoveryCi}
  from '../../src/reality-final-loop-technical-ci-evidence-verifier-v1.js';
+import {attachVerifiedTechnicalCiToContinuity}
+ from '../../src/reality-final-loop-technical-ci-continuity-writer-v1.js';
 import {advanceOneSignedProofRecovery}
  from '../../src/reality-final-loop-signed-proof-recovery-worker-v1.js';
 import {admitVerifiedCurrentShiftCommitTriage,
@@ -3877,6 +3879,31 @@ export default async function handler(req,res){
    };
   }
 
+  // Attach the independently observed external CI result to the same
+  // frozen source/Continuity contract under one service-only CAS. Shared
+  // benchmark remains read-only; never elevate this technical proof into
+  // an original-business RED, installation or Universe settlement.
+  workerStage='FINAL_LOOP_TECHNICAL_CI_CONTINUITY_EVIDENCE_ATTACHMENT';
+  let finalLoopTechnicalCiContinuityAttachment;
+  try{
+   finalLoopTechnicalCiContinuityAttachment=
+    await attachVerifiedTechnicalCiToContinuity({
+     db,env:process.env,wake:wakeReceipt,
+     workerRunId:actualWorkerRunId,
+     contractProposal:finalLoopProofCarryingRecovery,
+     signedRecovery:finalLoopSignedProofRecovery,
+     technicalCiProviderProof:finalLoopTechnicalCiProviderVerification
+    });
+  }catch{
+   finalLoopTechnicalCiContinuityAttachment={
+    status:'RECOVERY_TECH_CI_SIGNED_CONTINUITY_ATTACHMENT_UNVERIFIED',
+    technical_observation_recorded:false,
+    original_business_red_verified:false,
+    original_job_completed:false,
+    execution_authorized:false,production_changed:false
+   };
+  }
+
   // Always re-evaluate recoverable blocker liveness on the SAME scheduled
   // signed wake. A missing capability stays an explicit machine-owned due
   // action rather than generic waiting; this read model NEVER claims the
@@ -4049,6 +4076,7 @@ export default async function handler(req,res){
     final_loop_existing_case_ci_recovery:finalLoopExistingCaseCiRecovery,
     final_loop_signed_proof_recovery:finalLoopSignedProofRecovery,
     final_loop_technical_ci_provider_verification:finalLoopTechnicalCiProviderVerification,
+    final_loop_technical_ci_continuity_attachment:finalLoopTechnicalCiContinuityAttachment,
     final_loop_blocker_liveness:finalLoopBlockerLiveness,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
