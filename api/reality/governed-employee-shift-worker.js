@@ -2975,15 +2975,16 @@ export default async function handler(req,res){
      };
     }
    }
-   if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'&&
-      process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+   if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
     const freshChildContinuity=await requireFreshFinalLoopContinuity();
     try{
+     if(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
      const freshChildGraph=assertRealityUnifiedShiftGraph(
       await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
        expectedShiftId:wakeReceipt.shift_id
       });
      finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(freshChildContinuity,freshChildGraph);
+     }
      // Route the existing approved goal to its existing handler only in
      // the isolated operating lane. The handler still owns all atomic
      // claim, source, worker lease and model authority checks.
