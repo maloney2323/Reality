@@ -320,3 +320,22 @@ test('truncated, mismatched and oversized patches do not qualify as full source'
  assert.equal(verifyFinalLoopChildPatch(file.patch,{...file,additions:694}),false);
  assert.equal(verifyFinalLoopChildPatch('x'.repeat(40001),file),false);
 });
+
+test('canonical handoff overload delegates the same atomic claim and rejects stale authority without another ledger',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-child-transactional-v1.sql',import.meta.url),'utf8');
+ const scope=sql.slice(sql.indexOf('-- Canonical scope-bound overload'),sql.indexOf('-- Exact owner-facing packet readback'));
+ assert.match(scope,/p_shift_id uuid,p_worker_run_id uuid,p_canonical_handoff jsonb/);
+ assert.match(scope,/reality_read_final_loop_child_approval_preflight_v1\(p_shift_id\)/);
+ assert.match(scope,/current_scope IS DISTINCT FROM/);
+ assert.match(scope,/reality_read_final_loop_shared_continuity_guard_v1\(p_shift_id\)/);
+ assert.match(scope,/reality_read_current_final_loop_proof_envelope_v1\(p_shift_id\)/);
+ assert.match(scope,/l\.lease_expires_at>pg_catalog\.clock_timestamp\(\)/);
+ assert.match(scope,/a\.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'/);
+ assert.match(scope,/e\.governed_wake_worker_run_id=r\.run_id/);
+ assert.match(scope,/c:=public\.reality_claim_final_loop_child_review_v1\(p_shift_id,p_worker_run_id\)/);
+ assert.match(scope,/x\.packet_id::text=h->>'packet_id'/);
+ assert.match(scope,/RAISE EXCEPTION 'FINAL_LOOP_CANONICAL_CHILD_ATOMIC_CLAIM_SCOPE_MISMATCH'/);
+ assert.match(scope,/FROM PUBLIC,anon,authenticated/);
+ assert.match(scope,/'isolated_model_invoked',false/);
+ assert.doesNotMatch(scope,/CREATE TABLE|INSERT INTO|UPDATE reality_internal/);
+});

@@ -1028,6 +1028,158 @@ BEGIN
   'execution_authorized',false,'original_job_completed',false);
 END $fn$;
 
+-- Canonical scope-bound overload of the SAME atomic child admission.
+-- No copied warrant, no alternative claim table and no model invocation.
+-- Release qualification must separately admit this exact existing handler;
+-- a source-read/packet-preparation release is not execution capacity.
+CREATE OR REPLACE FUNCTION public.reality_claim_final_loop_child_review_v1(
+ p_shift_id uuid,p_worker_run_id uuid,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE h jsonb; g jsonb; p jsonb; current_scope jsonb; c jsonb; n int;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_CLAIM_SERVICE_ONLY';END IF;
+ h:=p_canonical_handoff;
+ IF p_shift_id IS NULL OR p_worker_run_id IS NULL
+  OR pg_catalog.jsonb_typeof(h) IS DISTINCT FROM 'object'
+  OR pg_catalog.length(h::text)>20000
+  OR h->>'schema' IS DISTINCT FROM 'reality-canonical-approved-review-scope-v1'
+  OR h->>'status' IS DISTINCT FROM 'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED'
+  OR h->>'shift_id' IS DISTINCT FROM p_shift_id::text
+  OR h->>'effect_type' IS DISTINCT FROM 'READ_ONLY_INTERNAL_PR_REVIEW'
+  OR h->>'next_governed_action' IS DISTINCT FROM 'CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER'
+  OR h->'canonical_claim_required' IS DISTINCT FROM 'true'::jsonb
+  OR h->'read_only' IS DISTINCT FROM 'true'::jsonb
+  OR h->'execution_authorized' IS DISTINCT FROM 'false'::jsonb
+  OR h->'original_job_completed' IS DISTINCT FROM 'false'::jsonb
+  OR h->'production_changed' IS DISTINCT FROM 'false'::jsonb
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_HANDOFF_INVALID','child_claimed',false,
+  'original_job_completed',false,'production_changed',false);END IF;
+ -- Re-read the exact accepted scope, not a copied approval or client hash.
+ SELECT count(*), (pg_catalog.jsonb_agg(x.value->'canonical_review_handoff')->0)
+ INTO n,current_scope
+ FROM pg_catalog.jsonb_array_elements(
+  public.reality_read_final_loop_child_approval_preflight_v1(p_shift_id)->'plans') x(value)
+ WHERE x.value->>'plan_id'=h->>'plan_id'
+  AND x.value->>'independent_goal_acceptance_verified'='true'
+  AND x.value->>'owner_approval_claim_window_current'='true'
+  AND x.value->'canonical_review_handoff' IS NOT NULL;
+ IF n<>1 OR current_scope IS DISTINCT FROM
+  (h - ARRAY['status','continuity_root_id','continuity_head_sha256','revision','next_governed_action','read_only']::text[])
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_ACCEPTANCE_SCOPE_DRIFT','child_claimed',false,
+  'original_job_completed',false,'production_changed',false);END IF;
+ g:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+ p:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+ IF g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+  OR p->>'status' IS DISTINCT FROM 'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'
+  OR g->>'owner_id' IS DISTINCT FROM h->>'owner_id'
+  OR p->>'owner_id' IS DISTINCT FROM h->>'owner_id'
+  OR g->>'shift_id' IS DISTINCT FROM p_shift_id::text
+  OR p->>'shift_id' IS DISTINCT FROM p_shift_id::text
+  OR p->>'plan_fingerprint' IS DISTINCT FROM h->>'plan_fingerprint'
+  OR g->>'continuity_root_id' IS DISTINCT FROM h->>'continuity_root_id'
+  OR p->>'continuity_root_id' IS DISTINCT FROM h->>'continuity_root_id'
+  OR g->>'continuity_head_sha256' IS DISTINCT FROM h->>'continuity_head_sha256'
+  OR p->>'continuity_head_sha256' IS DISTINCT FROM h->>'continuity_head_sha256'
+  OR g->>'revision' IS DISTINCT FROM h->>'revision'
+  OR p->>'revision' IS DISTINCT FROM h->>'revision'
+  OR g->>'frozen_shift_scope_sha256' IS DISTINCT FROM p->>'frozen_shift_scope_sha256'
+  OR g->>'unverified_handoffs' IS DISTINCT FROM '0'
+  OR g->>'first_signal_anchor_verified' IS DISTINCT FROM 'true'
+  OR g->>'worldline_parent_links_verified' IS DISTINCT FROM 'true'
+  OR g->>'shift_scope_authority_event_present' IS DISTINCT FROM 'true'
+  OR g->>'no_new_executable_authority' IS DISTINCT FROM 'true'
+  OR g->>'execution_authorized' IS DISTINCT FROM 'false'
+  OR g->>'original_job_completed' IS DISTINCT FROM 'false'
+  OR g->>'production_changed' IS DISTINCT FROM 'false'
+  OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(p->'jobs') j
+   WHERE j->>'original_work_id'=h->>'parent_original_work_id'
+    AND j->>'source_ref'=h->>'source_ref'
+    AND j->>'source_proof_sha256'=h->>'source_proof_sha256'
+    AND j->>'source_phase'='BLOCKED'
+    AND j->>'independent_source_proof_verified'='true'
+    AND j->>'final_outcome_verified'='false')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_CONTINUITY_HEAD_DRIFT','child_claimed',false,
+  'original_job_completed',false,'production_changed',false);END IF;
+ -- The existing canonical release witness must be exact for this handler.
+ -- An independent isolated-execution capacity proof must be carried by the
+ -- consumed release. Existing diagnostic-only releases cannot reserve work.
+ IF NOT EXISTS(SELECT 1
+  FROM reality_internal.governed_signed_worker_release_wakes_v1 w
+  JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
+  JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=w.worker_run_id
+  JOIN reality_internal.governed_preview_shift_worker_leases_v1 l
+   ON l.worker_key='preview-governed-employee-shift-worker'
+  WHERE w.worker_run_id=p_worker_run_id AND w.shift_id=p_shift_id
+   AND w.owner_id::text=h->>'owner_id'
+   AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+   AND w.release_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+   AND w.running_release_sha=a.release_sha AND w.running_release_ref=a.release_ref
+   AND a.owner_id=w.owner_id AND a.shift_id=w.shift_id AND a.state='CLAIMED_ONCE'
+   AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+   AND a.capability_key=ANY(w.registered_capabilities)
+   AND a.runtime_scope->>'target_environment'='CANONICAL_BENCHMARK_PREVIEW'
+   AND a.runtime_scope->>'original_work_id'=h->>'parent_original_work_id'
+   AND a.runtime_scope->>'source_ref'=h->>'source_ref'
+   AND a.runtime_scope->>'plan_fingerprint'=h->>'plan_fingerprint'
+   AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
+   AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+   AND a.runtime_scope->>'child_execution_enabled'='false'
+   AND a.runtime_scope->>'parent_delivery_enabled'='false'
+   AND a.runtime_scope->>'production_changed'='false'
+   AND a.independent_isolation_proof_sha256~'^sha256:[a-f0-9]{64}$'
+   AND r.status='STARTED' AND r.finished_at IS NULL
+   AND r.started_at>=l.claimed_at AND l.released_at IS NULL
+   AND l.lease_expires_at>pg_catalog.clock_timestamp()
+   AND r.started_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+   AND EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+    WHERE e.governed_wake_worker_run_id=r.run_id AND e.shift_id=w.shift_id
+     AND e.owner_id=w.owner_id AND e.original_work_id=h->>'parent_original_work_id'
+     AND e.source_ref=h->>'source_ref'
+     AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'))
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_QUALIFIED_EXECUTION_RELEASE_REQUIRED',
+  'child_claimed',false,'original_job_completed',false,'production_changed',false);END IF;
+ -- Reuse the existing transactional allocator. If its selection differs,
+ -- raise and roll back ALL changes; no other parent can be reserved.
+ c:=public.reality_claim_final_loop_child_review_v1(p_shift_id,p_worker_run_id);
+ IF c->>'status' IS DISTINCT FROM 'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE'
+  OR c->>'owner_id' IS DISTINCT FROM h->>'owner_id'
+  OR c->>'shift_id' IS DISTINCT FROM h->>'shift_id'
+  OR c->>'parent_original_work_id' IS DISTINCT FROM h->>'parent_original_work_id'
+  OR c->>'source_ref' IS DISTINCT FROM h->>'source_ref'
+  OR c->>'source_head_sha' IS DISTINCT FROM h->>'source_head_sha'
+  OR c->>'source_proof_sha256' IS DISTINCT FROM h->>'source_proof_sha256'
+  OR c->>'source_manifest_sha256' IS DISTINCT FROM h->>'source_manifest_sha256'
+  OR c->>'acceptance_contract_sha256' IS DISTINCT FROM h->>'acceptance_contract_sha256'
+  OR c->>'approval_receipt_sha256' IS DISTINCT FROM h->>'owner_approval_receipt_sha256'
+  OR c->>'claimant_worker_run_id' IS DISTINCT FROM p_worker_run_id::text
+  OR c->>'original_job_completed' IS DISTINCT FROM 'false'
+  OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(h->'scope_fingerprints') s
+    WHERE s->>'index'=c->>'scope_index' AND s->>'scope_sha256'=c->>'scope_sha256')
+  OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 x
+    WHERE x.child_work_id=c->>'child_work_id' AND x.packet_id::text=h->>'packet_id'
+     AND x.plan_id::text=h->>'plan_id' AND x.claim_id::text=c->>'claim_id'
+     AND x.claimant_worker_run_id=p_worker_run_id AND x.phase='CLAIMED')
+ THEN RAISE EXCEPTION 'FINAL_LOOP_CANONICAL_CHILD_ATOMIC_CLAIM_SCOPE_MISMATCH';END IF;
+ -- Carry a reference to the SAME claim. It is not a bearer token or
+ -- a permission to invoke a model without fresh canonical readback.
+ RETURN c||pg_catalog.jsonb_build_object(
+  'canonical_scope_bound',true,'canonical_claim_required',true,
+  'continuity_root_id',h->'continuity_root_id',
+  'continuity_head_sha256',h->'continuity_head_sha256','revision',h->'revision',
+  'packet_id',h->'packet_id','plan_id',h->'plan_id',
+  'execution_authorized',false,'isolated_model_invoked',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_claim_final_loop_child_review_v1(uuid,uuid,jsonb)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_claim_final_loop_child_review_v1(uuid,uuid,jsonb)
+ TO service_role;
+
 -- Exact owner-facing packet readback; requires authenticated app session
 -- before the service proxy is allowed to call it.
 CREATE OR REPLACE FUNCTION public.reality_read_owner_final_loop_child_approvals_v1(
