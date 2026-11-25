@@ -65,6 +65,11 @@ test('isolated release needs real Supabase branch, matching CI, matching Vercel'
  assert.equal(r.candidate.source_staging_only,false);
  assert.equal(r.candidate.owner_packet_handler_registered,true);
  assert.equal(r.ci.independently_verified,true);
+ assert.match(r.provider_release_proof_sha256,/^sha256:[a-f0-9]{64}$/);
+ assert.match(r.independent_isolation_proof_sha256,/^sha256:[a-f0-9]{64}$/);
+ const again=await fixture().result;
+ assert.equal(again.provider_release_proof_sha256,r.provider_release_proof_sha256);
+ assert.equal(again.independent_isolation_proof_sha256,r.independent_isolation_proof_sha256);
  assert.equal(f.calls.length,3);
  assert.equal(r.release_activated,false);
  assert.equal(r.owner_approval_granted,false);

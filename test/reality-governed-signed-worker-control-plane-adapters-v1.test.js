@@ -39,6 +39,15 @@ function fixture({config={},cron=schedule,wrongProject=false,
    return {ok:true,json:async()=>cron};
   if(url.includes('/rest/v1/rpc/reality_read_governed_signed_worker_release_approval_v1'))
    return {ok:true,json:async()=>({status:'EXACT_PREVIEW_RELEASE_OWNER_APPROVED'})};
+  if(url.includes('/rest/v1/rpc/reality_prepare_governed_signed_worker_release_v1')){
+   const p=JSON.parse(options.body);
+   return {ok:true,json:async()=>({status:'SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED',
+    owner_id:p.p_owner_id,shift_id:p.p_shift_id,release_sha:p.p_release_sha,
+    release_ref:p.p_release_ref,scheduled_alias:p.p_scheduled_alias,
+    capability_key:p.p_capability_key,request_id:'cccccccc-cccc-4ccc-cccc-cccccccccccc',
+    proposal_fingerprint:'sha256:'+'c'.repeat(64),owner_approval_granted:false,
+    release_changed:false,original_job_completed:false})};
+  }
   if(url.includes('/rest/v1/rpc/reality_claim_governed_signed_worker_release_v1'))
    return {ok:true,json:async()=>({status:'EXACT_SIGNED_CAPABILITY_DELIVERY_CLAIMED'})};
   if(url.includes('/v4/aliases/'))
@@ -144,4 +153,39 @@ test('owner release approval is independently read via exact service RPC',async(
   release_sha:oldSha,scheduled_alias:alias,
   capability_key:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'
  }),/SIGNED_RELEASE_APPROVAL_READ_SCOPE_UNVERIFIED/);
+});
+
+test('existing release preparation creates only the exact owner packet, no activation claim or provider write',async()=>{
+ const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+ const capability='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET';
+ const f=fixture({config:{REALITY_SIGNED_WORKER_RELEASE_OWNER_ID:owner,
+  REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID:shift,REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY:capability}});
+ const qualification={status:'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY',
+  read_only:true,owner_approval_granted:false,release_activated:false,production_changed:false,
+  branch_project_ref:project,provider_deployment_id:deploymentId,
+  provider_release_proof_sha256:'sha256:'+'a'.repeat(64),
+  independent_isolation_proof_sha256:'sha256:'+'b'.repeat(64),
+  candidate:{sha,branch,shift_id:shift,capability_key:capability,scheduled_alias:alias,
+   operating_lane:'NORMAL_SIGNED_SHIFT',source_staging_only:false,
+   isolated_database_independently_verified:true,preview_only:true,
+   environment:'ISOLATED_PREVIEW',production_changed:false},
+  ci:{status:'INDEPENDENT_FROZEN_CI_PASSED',release_sha:sha,independently_verified:true,
+   test_source_pinned:true,run_id:2004}};
+ const input={qualification,schedule:{status:'GOVERNED_SCHEDULE_INDEPENDENTLY_READ',
+  job_id:7,host:alias,dedicated_stable_release_alias:true,branch_automanaged:false,
+  signed_worker_target_verified:true},
+  currentAlias:{provider:'VERCEL',independently_observed:true,project_verified:true,
+   preview_only:true,alias,resolved_release_sha:oldSha,resolved_branch:'repair/older-worker'}};
+ const r=await f.adapter.prepareExactRelease(input);
+ assert.equal(r.status,'SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED');
+ assert.equal(r.owner_approval_granted,false);
+ assert.equal(f.calls.length,1);
+ assert.match(f.calls[0].url,/reality_prepare_governed_signed_worker_release_v1$/);
+ assert.equal(JSON.parse(f.calls[0].body).p_previous_release_sha,oldSha);
+ for(const bad of [{...input,qualification:{...qualification,branch_project_ref:'anotherproject1234567'}},
+  {...input,schedule:{...input.schedule,branch_automanaged:true}},
+  {...input,qualification:{...qualification,ci:{...qualification.ci,independently_verified:false}}}]){
+  await assert.rejects(()=>f.adapter.prepareExactRelease(bad),/RELEASE_PREPARATION_EXACT_INDEPENDENT_SCOPE_UNVERIFIED/);
+ }
+ assert.equal(f.calls.length,1);
 });

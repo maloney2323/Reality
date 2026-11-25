@@ -2,6 +2,7 @@
 // control plane. No LLM callbacks, browser credentials, arbitrary endpoints,
 // automatic alias retries or owner-approval fabrication.
 const SHA=/^[a-f0-9]{40}$/;
+const HASH=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const BRANCH=/^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$/;
 const HOST=/^[a-z0-9-]{6,145}\.vercel\.app$/;
@@ -77,7 +78,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   // Static allowlist: never put caller input into an RPC pathname.
   if(!['reality_read_governed_worker_release_schedule_v1',
     'reality_claim_governed_signed_worker_release_v1',
-    'reality_read_governed_signed_worker_release_approval_v1'].includes(name))
+    'reality_read_governed_signed_worker_release_approval_v1',
+    'reality_prepare_governed_signed_worker_release_v1'].includes(name))
    throw Error('RELEASE_CONTROL_RPC_NOT_ALLOWLISTED');
   return requestJson(fetchImpl,db.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{
    method:'POST',headers:dbHeaders,body:JSON.stringify(payload)
@@ -161,6 +163,63 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    });
   return approval;
  }
+ // Reuse the existing durable preparation RPC. This does not grant consent,
+ // consume the one-use claim, change an alias, or start another shift.
+ async function prepareExactRelease({qualification,schedule,currentAlias}={}){
+  const c=qualification?.candidate,ci=qualification?.ci;
+  const owner=env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID;
+  const shift=env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID;
+  const cap=env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY;
+  if(!UUID.test(owner||'')||!UUID.test(shift||'')||!KEY.test(cap||'')||
+   qualification?.status!=='QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY'||
+   qualification.read_only!==true||qualification.owner_approval_granted!==false||
+   qualification.release_activated!==false||qualification.production_changed!==false||
+   qualification.branch_project_ref!==db.project||
+   qualification.provider_deployment_id!==env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||
+   c?.sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   c.branch!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||c.shift_id!==shift||
+   c.capability_key!==cap||c.scheduled_alias!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
+   c.operating_lane!=='NORMAL_SIGNED_SHIFT'||c.source_staging_only!==false||
+   c.isolated_database_independently_verified!==true||c.preview_only!==true||
+   c.environment!=='ISOLATED_PREVIEW'||c.production_changed!==false||
+   ci?.status!=='INDEPENDENT_FROZEN_CI_PASSED'||ci.release_sha!==c.sha||
+   ci.independently_verified!==true||ci.test_source_pinned!==true||
+   !Number.isSafeInteger(ci.run_id)||ci.run_id<1||
+   !HASH.test(qualification.provider_release_proof_sha256||'')||
+   !HASH.test(qualification.independent_isolation_proof_sha256||'')||
+   schedule?.status!=='GOVERNED_SCHEDULE_INDEPENDENTLY_READ'||
+   schedule.job_id!==Number(env.REALITY_SIGNED_WORKER_CRON_JOB_ID)||
+   schedule.host!==c.scheduled_alias||schedule.dedicated_stable_release_alias!==true||
+   schedule.branch_automanaged!==false||schedule.signed_worker_target_verified!==true||
+   currentAlias?.provider!=='VERCEL'||currentAlias.independently_observed!==true||
+   currentAlias.project_verified!==true||currentAlias.preview_only!==true||
+   currentAlias.alias!==schedule.host||!SHA.test(currentAlias.resolved_release_sha||'')||
+   !BRANCH.test(currentAlias.resolved_branch||''))
+   throw Error('RELEASE_PREPARATION_EXACT_INDEPENDENT_SCOPE_UNVERIFIED');
+  if(currentAlias.resolved_release_sha===c.sha&&currentAlias.resolved_branch===c.branch)
+   return Object.freeze({status:'SIGNED_RELEASE_ALREADY_AT_TARGET_NO_PREPARATION',
+    owner_approval_granted:false,release_changed:false,original_job_completed:false});
+  const packet=await serviceRpc('reality_prepare_governed_signed_worker_release_v1',{
+   p_owner_id:owner,p_shift_id:shift,p_scheduled_alias:schedule.host,
+   p_release_sha:c.sha,p_release_ref:c.branch,p_capability_key:cap,
+   p_previous_release_sha:currentAlias.resolved_release_sha,
+   p_previous_release_ref:currentAlias.resolved_branch,p_independent_ci_run_id:ci.run_id,
+   p_provider_release_proof_sha256:qualification.provider_release_proof_sha256,
+   p_independent_isolation_proof_sha256:qualification.independent_isolation_proof_sha256
+  });
+  if(packet.status==='SIGNED_RELEASE_STALE_OR_DIFFERENT_PACKET_NO_REPLAY')
+   return Object.freeze({status:packet.status,owner_approval_granted:false,
+    release_changed:false,original_job_completed:false});
+  if(packet.status!=='SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED'||
+   packet.owner_id!==owner||packet.shift_id!==shift||packet.release_sha!==c.sha||
+   packet.release_ref!==c.branch||packet.scheduled_alias!==schedule.host||
+   packet.capability_key!==cap||!UUID.test(packet.request_id||'')||
+   !HASH.test(packet.proposal_fingerprint||'')||
+   packet.owner_approval_granted!==false||packet.release_changed!==false||
+   packet.original_job_completed!==false)
+   throw Error('RELEASE_PREPARATION_DURABLE_PACKET_UNVERIFIED');
+  return Object.freeze(packet);
+ }
  async function claimApprovedRelease({
   owner_id,shift_id,release_sha,release_ref,capability_key,
   scheduled_alias,previous_release_sha,previous_release_ref,
@@ -214,7 +273,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  return Object.freeze({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
   ready:true,read_only:false,
-  readSchedule,observeAlias,readApprovedRelease,claimApprovedRelease,assignAlias,
+  readSchedule,observeAlias,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,
   owner_approval_granted:false,provider_assignment_attempted:false
  });
 }

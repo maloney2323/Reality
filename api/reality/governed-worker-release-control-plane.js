@@ -41,7 +41,7 @@ export default async function handler(req,res){
   !req.body||typeof req.body!=='object'||
   Array.isArray(req.body)||Object.getPrototypeOf(req.body)!==Object.prototype||
   Object.keys(req.body).join(',')!=='intent'||
-  !['INSPECT','SWITCH_EXACT_APPROVED_RELEASE'].includes(req.body.intent))
+  !['INSPECT','PREPARE_EXACT_RELEASE','SWITCH_EXACT_APPROVED_RELEASE'].includes(req.body.intent))
   return result(res,400,'GOVERNED_RELEASE_CONTROL_INTENT_INVALID');
  try{
   const db=shiftDatabase(env);
@@ -98,9 +98,28 @@ export default async function handler(req,res){
    scheduled_alias:env.REALITY_SIGNED_WORKER_STABLE_ALIAS,
    capability_key:env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY
   });
+  if(approval?.status==='SIGNED_RELEASE_EXACT_OWNER_APPROVAL_NOT_FOUND'){
+   // A qualified but unapproved release must produce a durable owner packet
+   // using the existing controller, not simply report a missing approval.
+   // The DB rejects a missing authorized shift and stale/different packets.
+   const packet=await adapters.prepareExactRelease({
+    qualification:proof,schedule,currentAlias
+   });
+   return result(res,409,packet.status,{
+    release_preparation:packet,release_switch_attempted:false,
+    next_governed_action:packet.status==='SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED'?
+     'PRESENT_EXACT_OWNER_RELEASE_PACKET':
+     'RECONCILE_EXISTING_RELEASE_PACKET_WITHOUT_REPLAY'
+   });
+  }
   if(approval?.status!=='EXACT_PREVIEW_RELEASE_OWNER_APPROVED')
    return result(res,409,'GOVERNED_RELEASE_EXACT_OWNER_APPROVAL_PENDING',{
     release_switch_attempted:false
+   });
+  if(req.body.intent==='PREPARE_EXACT_RELEASE')
+   return result(res,200,'GOVERNED_RELEASE_EXISTING_EXACT_APPROVAL_READ',{
+    release_switch_attempted:false,
+    next_governed_action:'SWITCH_EXACT_APPROVED_RELEASE_UNDER_EXISTING_ONE_USE_CLAIM'
    });
   // Only the existing governed delivery executor can consume the exact
   // one-use database claim before one provider alias POST.

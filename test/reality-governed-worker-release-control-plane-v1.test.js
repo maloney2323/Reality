@@ -57,3 +57,13 @@ test('endpoint only reaches one-use governed switch after independent provider r
  assert.doesNotMatch(s,/req\.body\.release_sha/);
  assert.doesNotMatch(s,/req\.body\.scheduled_alias/);
 });
+
+test('qualified missing approval routes through existing durable preparation before any switch',()=>{
+ const s=readFileSync(new URL('../api/reality/governed-worker-release-control-plane.js',import.meta.url),'utf8');
+ const prepare=s.indexOf('await adapters.prepareExactRelease(');
+ const qualification=s.indexOf('await qualifyCurrentIsolatedSignedWorkerRelease(');
+ const switchIndex=s.indexOf('await triggerOneGovernedSignedWorkerReleaseSwitch(');
+ assert.ok(qualification>0&&prepare>qualification&&switchIndex>prepare);
+ assert.match(s,/if\(req.body.intent==='PREPARE_EXACT_RELEASE'\)/);
+ assert.match(s,/PRESENT_EXACT_OWNER_RELEASE_PACKET/);
+});

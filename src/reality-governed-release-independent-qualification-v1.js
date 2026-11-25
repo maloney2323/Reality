@@ -2,6 +2,7 @@
 // never qualified solely by flags, a model's plan, or Vercel READY status.
 // Checks exact current process, CI head, Vercel deployment and actual
 // Supabase development branch ancestry. Does not invoke the worker.
+import {createHash} from 'node:crypto';
 import {inspectFinalLoopSignedWorkerOperatingLane}
  from './reality-signed-worker-operating-lane-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
@@ -17,6 +18,7 @@ const base=Object.freeze({
  original_job_completed:false,production_changed:false
 });
 const safe=(status,more={})=>Object.freeze({...base,status,...more});
+const digest=fields=>'sha256:'+createHash('sha256').update(JSON.stringify(fields)).digest('hex');
 async function getJson(fetchImpl,url,token,timeoutMs=7000){
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -129,6 +131,13 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   candidate,ci:ciProof,
   branch_project_ref:isolated,
   provider_deployment_id:vercelId,
+  // Hash only the stable, independently read provider identity fields. No
+  // time-varying timestamp or secret can change the existing packet identity.
+  provider_release_proof_sha256:digest([repo,sha,branch,ci.id,ci.path,
+   ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,d.state,d.target??null]),
+  independent_isolation_proof_sha256:digest([exact[0].project_ref,
+   exact[0].parent_project_ref,exact[0].is_default,exact[0].status,
+   exact[0].preview_project_status,dbProject]),
   next_governed_action:'READ_EXACT_OWNER_RELEASE_APPROVAL'
  });
 }
