@@ -32,6 +32,7 @@ import {projectFinalLoopUniverseFeedback}
 import {inspectFinalLoopGovernedEngineering}
  from '../../src/reality-final-loop-governed-engineering-v1.js';
 import {classifySignedFinalLoopStagedPlanActions,
+ hasCurrentApprovedChildReviewRoute,
  reconcileReviewedRecoveryToFinalLoopSource,
  inspectFinalLoopRecoveryContinuation,
  verifyFinalLoopRecoveryContinuityReadback}
@@ -2974,10 +2975,19 @@ export default async function handler(req,res){
    if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
     await requireFreshFinalLoopContinuity();
     try{
-     finalLoopChildReview=await advanceOneFinalLoopChildReview({
+     // Route the existing approved goal to its existing handler only in
+     // the isolated operating lane. The handler still owns all atomic
+     // claim, source, worker lease and model authority checks.
+     finalLoopChildReview=hasCurrentApprovedChildReviewRoute({
+      routes:finalLoopStagedActionRoutes,operatingLane:signedWorkerReleaseOperatingLane
+     })?await advanceOneFinalLoopChildReview({
      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
      env:process.env,fetchImpl:fetch
-    });
+    }):{
+     status:'FINAL_LOOP_CHILD_CURRENT_APPROVED_ISOLATED_ROUTE_REQUIRED',
+     child_claimed:false,model_invoked:false,external_effect_performed:false,
+     original_job_completed:false,production_changed:false
+    };
    }catch{
     finalLoopChildReview={
      status:'FINAL_LOOP_CHILD_SIGNED_EXECUTION_OR_VERIFICATION_BLOCKED',

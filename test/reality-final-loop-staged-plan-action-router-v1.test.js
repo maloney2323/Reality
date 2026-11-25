@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {classifySignedFinalLoopStagedPlanActions as classify,
+ hasCurrentApprovedChildReviewRoute as canRoute,
  reconcileReviewedRecoveryToFinalLoopSource as reconcile,
  inspectFinalLoopRecoveryContinuation as inspect,
  verifyFinalLoopRecoveryContinuityReadback as observe}
@@ -109,6 +110,7 @@ test('existing signed worker must publish route and keep child execution distinc
  assert.match(approval,/REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED/);
  assert.match(approval,/REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED/);
  assert.match(worker,/REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED/);
+ assert.match(worker,/finalLoopChildReview=hasCurrentApprovedChildReviewRoute\(\{[\s\S]*?\?await advanceOneFinalLoopChildReview/);
 });
 
 
@@ -299,8 +301,13 @@ test('existing exact approved goal remains connected to reviewed recovery withou
  assert.equal(routes.prepared_owner_packet_candidate_count,0);
  assert.equal(routes.routes[0].existing_owner_goal_acceptance_verified,true);
  assert.equal(routes.routes[0].owner_action_required,false);
- assert.equal(routes.routes[0].next_registered_handler,null);
+ assert.equal(routes.routes[0].next_registered_handler,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
  assert.equal(routes.routes[0].child_execution_authorized,false);
+ assert.equal(canRoute({routes,operatingLane}),true);
+ assert.equal(canRoute({routes,operatingLane:{...operatingLane,status:'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'}}),false);
+ assert.equal(canRoute({routes:{...routes,action_dispatched:true},operatingLane}),false);
+ assert.equal(canRoute({routes:{...routes,routes:[{...routes.routes[0],acceptance_contract_sha256:null}]},operatingLane}),false);
+ assert.equal(canRoute({routes:classify({graph,staged,preflight}),operatingLane}),false);
  const c=reconcile({graph,stagedActions:routes,
   continuityClassification:classification,registeredRouting:recoveryRouting});
  assert.equal(c.status,'FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL');

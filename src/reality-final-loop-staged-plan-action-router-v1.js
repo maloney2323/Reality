@@ -116,7 +116,8 @@ export function classifySignedFinalLoopStagedPlanActions({
    acceptance_contract_sha256:p?.acceptance_contract_sha256??null,
    next_governed_action:next,
    next_registered_handler:pending?
-    'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':null,
+    'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':
+    accepted?'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':null,
    handler_requires_isolated_service_claim:Boolean(p),
    existing_owner_goal_acceptance_verified:accepted,
    source_plan_only:true,owner_action_required:pending,
@@ -129,6 +130,27 @@ export function classifySignedFinalLoopStagedPlanActions({
  return result('FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED',routes);
 }
 
+
+// The accepted route selects the existing child worker, not its authority.
+// The current isolated worker and the service-role claim still independently
+// enforce the same signed shift, accepted source, model scope and lease.
+export function hasCurrentApprovedChildReviewRoute({routes,operatingLane}={}){
+ return routes?.status==='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
+  routes.read_only===true&&routes.action_dispatched===false&&
+  routes.model_execution_authorized===false&&routes.original_job_completed===false&&
+  operatingLane?.status==='FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'&&
+  operatingLane.operating_lane==='NORMAL_SIGNED_SHIFT'&&
+  Array.isArray(routes.routes)&&routes.routes.some(r=>
+   r.next_registered_handler==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
+   r.next_governed_action==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
+   r.existing_owner_goal_acceptance_verified===true&&
+   r.owner_action_required===false&&r.handler_requires_isolated_service_claim===true&&
+   r.parent_source_phase==='BLOCKED'&&WORK.test(r.parent_original_work_id||'')&&
+   UUID.test(r.plan_id||'')&&PR.test(r.source_ref||'')&&
+   HASH.test(r.source_manifest_sha256||'')&&HASH.test(r.acceptance_contract_sha256||'')&&
+   r.handler_dispatched===false&&r.child_execution_authorized===false&&
+   r.original_job_completed===false);
+}
 
 // Join the independently reviewed Continuity recovery with the SAME frozen
 // shift's qualified source-plan routes. This is a read model in the existing
