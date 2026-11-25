@@ -26,7 +26,7 @@ CREATE OR REPLACE FUNCTION reality_internal.notify_final_loop_governed_trigger_v
  RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 DECLARE w record; l record; e record; target text; token text; bypass text;
         req bigint; now_at timestamptz:=pg_catalog.clock_timestamp(); is_start boolean;
-        approved_sha text; nonce uuid; event_id uuid; release_claim uuid;
+        approved_sha text; nonce uuid; wake_event_id uuid; release_claim uuid;
 BEGIN
  -- Reuse the existing Vault credentials; never expose or copy their values.
  -- Transport is deliberately inert until an independently qualified canonical
@@ -135,12 +135,12 @@ BEGIN
  SET next_wake_at=now_at WHERE worker_key='preview-governed-employee-shift-worker'
   AND lease_expires_at<=now_at;
  nonce:=pg_catalog.gen_random_uuid();
- event_id:=CASE WHEN is_start THEN w.shift_id ELSE e.event_id END;
+ wake_event_id:=CASE WHEN is_start THEN w.shift_id ELSE e.event_id END;
  req:=net.http_post(url:=target,body:='{}'::jsonb,headers:=pg_catalog.jsonb_build_object(
   'Authorization','Bearer '||token,'x-vercel-protection-bypass',bypass,
   'Content-Type','application/json','x-reality-governed-owner-id',w.owner_id::text,
   'x-reality-governed-shift-id',w.shift_id::text,'x-reality-governed-plan-fingerprint',w.plan_fingerprint,
-  'x-reality-governed-event-id',event_id::text,'x-reality-governed-wake-nonce',nonce::text,
+  'x-reality-governed-event-id',wake_event_id::text,'x-reality-governed-wake-nonce',nonce::text,
   'x-reality-governed-wake-kind',CASE WHEN is_start THEN 'START' ELSE 'RESUME' END,
   'x-reality-governed-release-sha',approved_sha),
   timeout_milliseconds:=45000);
