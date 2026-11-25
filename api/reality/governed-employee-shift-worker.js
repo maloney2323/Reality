@@ -1225,8 +1225,7 @@ export default async function handler(req,res){
    process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'?
     (async()=>{
      if(strictContinuityCycle)await requireFreshFinalLoopContinuity();
-     return 
-    await generateOneSignedMaintenanceFrozenTestDraft({
+     return await generateOneSignedMaintenanceFrozenTestDraft({
      db,env:process.env,shiftId:wakeReceipt.shift_id,
      workerRunId:actualWorkerRunId,fetchImpl:fetch
     });

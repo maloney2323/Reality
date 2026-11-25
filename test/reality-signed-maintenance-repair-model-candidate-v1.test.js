@@ -465,3 +465,9 @@ test('Final Loop release retains existing frozen builder and incident recovery o
  assert.match(worker,/investigateOneSignedShiftContinuityIncident\(\{[\s\S]*?workerRunId:actualWorkerRunId/);
  for(const rpc of ['claim_signed_maintenance_frozen_test_draft_v1','record_signed_maintenance_frozen_test_draft_v1','record_signed_builder_recovery_decision_v1'])assert.ok(boundary.includes(rpc),rpc);
 });
+
+
+test('worker returns the actual frozen builder receipt rather than an ASI-terminated return',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/return await generateOneSignedMaintenanceFrozenTestDraft\(/);
+});
