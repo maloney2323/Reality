@@ -1,6 +1,8 @@
 // Trusted service-side Supabase/Vercel adapters for the independent release
 // control plane. No LLM callbacks, browser credentials, arbitrary endpoints,
 // automatic alias retries or owner-approval fabrication.
+import {assertRealityUnifiedShiftGraph} from './reality-shift-unified-execution-controller-v1.js';
+import {verifySharedFinalLoopContinuityGuard} from './reality-final-loop-signed-worker-bridge-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -80,7 +82,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  const serviceRpc=async(name,payload)=>{
   // Static allowlist: never put caller input into an RPC pathname.
   const readRpcs=['reality_read_governed_worker_release_schedule_v1',
-   'reality_read_current_shift_execution_graph_v1','reality_read_final_loop_shared_continuity_guard_v1'];
+   'reality_read_current_shift_execution_graph_v1','reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1'];
   if(inspectionOnly===true&&!readRpcs.includes(name))throw Error('RELEASE_INSPECTION_MUTATION_FORBIDDEN');
   if(![...readRpcs,
     'reality_claim_governed_signed_worker_release_v1',
@@ -165,17 +167,23 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    ownerId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||
    shiftId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID)
    return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_SCOPE_REQUIRED');
-  const graph=await serviceRpc('reality_read_current_shift_execution_graph_v1',{});
-  if(graph?.status!=='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'||
-   graph.owner_id!==ownerId||graph.shift_id!==shiftId||
-   graph.production_changed!==false||!HASH.test(graph.plan_fingerprint||''))
+  const rawGraph=await serviceRpc('reality_read_current_shift_execution_graph_v1',{});
+  let graph;
+  try{graph=assertRealityUnifiedShiftGraph(rawGraph,{expectedShiftId:shiftId})}
+  catch{return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_NOT_VERIFIED')}
+  if(graph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||graph.owner_id!==ownerId||graph.shift_id!==shiftId)
    return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_NOT_VERIFIED');
-  const guard=await serviceRpc('reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:shiftId});
-  if(guard?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
-   guard.owner_id!==ownerId||guard.shift_id!==shiftId||guard.read_only!==true||
-   guard.execution_authorized!==false||!UUID.test(guard.continuity_root_id||'')||
-   !HASH.test(guard.continuity_head_sha256||'')||!Number.isSafeInteger(guard.revision))
+  const p=await serviceRpc('reality_read_current_final_loop_proof_envelope_v1',{p_shift_id:shiftId});
+  if(p?.schema!=='reality-final-loop-canonical-proof-readback-v1'||
+   p.status!=='FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'||
+   p.read_only!==true||p.independent_owner_scope_verified!==true||
+   p.owner_acceptance_verified!==false||p.execution_authorized!==false||
+   p.installation_authorized!==false||p.original_job_completed!==false||p.production_changed!==false)
    return safe('GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED');
+  const g=await serviceRpc('reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:shiftId});
+  const guard=verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId});
+  if(guard.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY')
+   return safe('GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED',{proof_status:guard.status});
   const schedule=await readSchedule();
   const alias=await observeAlias(schedule.host);
   const target=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA;

@@ -199,12 +199,34 @@ test('read-only direction inspection works before target release or switch permi
   REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:owner,REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:shift};
  const f=fixture({cron:{...schedule,host:alias}});
  const calls=[];
+ const hash=c=>'sha256:'+c.repeat(64);
+ const job={source_step_index:2,source_ref:'https://github.com/maloney2323/Reality/issues/301',
+  original_kind:'REAL_ENGINEERING_REPAIR_ORIGINAL',phase:'SOURCE_ADMITTED',original_work_id:'work:'+'1'.repeat(32),
+  source_proof_sha256:hash('a'),independent_source_proof_verified:true,next_governed_action:'GENERATE_AND_TEST_ORIGINAL',
+  capability_installation_authorized:false,provider_effect_claimed_by_graph:false,original_job_completed_by_graph:false};
+ const raw={status:'OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED',owner_id:owner,shift_id:shift,
+  plan_fingerprint:hash('c'),completion_bound:true,selected_sources:1,execution_scope_from_owner_warrant_only:true,
+  new_job_created:false,installation_authorized:false,original_job_completed_by_graph:false,production_changed:false,jobs:[job]};
+ const proof={schema:'reality-final-loop-canonical-proof-readback-v1',status:'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING',
+  owner_id:owner,shift_id:shift,plan_fingerprint:raw.plan_fingerprint,read_only:true,independent_owner_scope_verified:true,
+  owner_acceptance_verified:false,execution_authorized:false,installation_authorized:false,original_job_completed:false,production_changed:false,
+  continuity_root_id:shift,continuity_head_sha256:hash('b'),frozen_shift_scope_sha256:hash('d'),revision:3,jobs:[job]};
+ const guard={schema:'reality-shared-cross-layer-continuity-handoff-v1',status:'FINAL_LOOP_SHARED_CONTINUITY_CHECKED',
+  owner_id:owner,shift_id:shift,continuity_root_id:shift,continuity_head_sha256:hash('b'),frozen_shift_scope_sha256:hash('d'),revision:3,
+  handoff_observation_sha256:hash('8'),read_only:true,no_new_executable_authority:true,first_signal_anchor_verified:true,
+  worldline_parent_links_verified:true,shift_scope_authority_event_present:true,verified_evidence_event_count:2,unverified_handoffs:0,
+  transition_committed:false,executor_invoked:false,execution_authorized:false,installation_authorized:false,original_job_completed:false,production_changed:false,
+  obligations:[{source_ref:job.source_ref,original_work_id:job.original_work_id,status:'CONTINUITY_OPEN_PENDING_PROOFS',source_proof_verified:true,
+   continuity_identity_verified:true,original_work_universe_event_verified:true,qualifier_digest_verified:true,qualifier_receipt_sha256:hash('9'),
+   unresolved_proof_gates:['CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED'],internal_maintenance_independent_frozen_ci_verified:false,
+   original_claim_admitted:false,independent_original_outcome_verified:false,universe_return_verified:false,
+   executor_authorized_by_observation:false,execution_permitted_by_handoff:false}]};
+ let mismatch=false;
  const observed=create({env:scope,db,inspectionOnly:true,fetchImpl:async(address,options)=>{
   calls.push(String(address));
-  if(String(address).endsWith('/reality_read_current_shift_execution_graph_v1'))
-   return {ok:true,json:async()=>({status:'OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED',owner_id:owner,shift_id:shift,production_changed:false,plan_fingerprint:'sha256:'+'a'.repeat(64)})};
-  if(String(address).endsWith('/reality_read_final_loop_shared_continuity_guard_v1'))
-   return {ok:true,json:async()=>({status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',owner_id:owner,shift_id:shift,read_only:true,execution_authorized:false,continuity_root_id:shift,continuity_head_sha256:'sha256:'+'b'.repeat(64),revision:3})};
+  if(String(address).endsWith('/reality_read_current_shift_execution_graph_v1'))return {ok:true,json:async()=>raw};
+  if(String(address).endsWith('/reality_read_current_final_loop_proof_envelope_v1'))return {ok:true,json:async()=>proof};
+  if(String(address).endsWith('/reality_read_final_loop_shared_continuity_guard_v1'))return {ok:true,json:async()=>mismatch?{...guard,continuity_head_sha256:hash('e')}:guard};
   return f.fetchImpl(address,options);
  }});
  assert.equal(observed.ready,true);
@@ -219,4 +241,8 @@ test('read-only direction inspection works before target release or switch permi
  const count=calls.length;
  assert.equal((await observed.readDirection({ownerId:owner,shiftId:owner})).status,'GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_SCOPE_REQUIRED');
  assert.equal(calls.length,count);
+ mismatch=true;
+ const drift=await observed.readDirection({ownerId:owner,shiftId:shift});
+ assert.equal(drift.status,'GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED');
+ assert.equal(drift.release_activated,false);
 });
