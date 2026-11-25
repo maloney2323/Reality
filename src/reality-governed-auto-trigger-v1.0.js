@@ -352,6 +352,26 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
  }
  const qualified=c.governed_qualification_handoffs.filter(q=>
   q?.source_ref===r.source_ref&&q.original_work_id===r.original_work_id);
+ const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
+ // The exhausted builder may qualify DISTINCT evidence, not replay CI or
+ // lease another build. The existing verifier is the only permitted reader.
+ if(r.event_kind==='QUALIFIER_PROOF_CHANGED'&&r.next_qualified_action===terminalAction){
+  if(h.next_qualified_action!==terminalAction||
+     h.qualifier_receipt_sha256!==r.source_receipt_sha256||
+     qualified.length!==1||qualified[0].qualifier_receipt_sha256!==r.source_receipt_sha256||
+     qualified[0].next_qualified_action!==terminalAction||
+     !Array.isArray(h.unresolved_proof_gates)||
+     !h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')||
+     !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
+     h.independent_internal_ci_verified!==false)
+   return reject('TERMINAL_RECOVERY_CURRENT_EVIDENCE_UNVERIFIED');
+  return safe('FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE',{
+   ...base,dispatch_permitted:false,resume_event:null,
+   evidence_readback_permitted:true,next_action:terminalAction,
+   qualifier_receipt_sha256:r.source_receipt_sha256,
+   previous_attempt_budget_preserved:true,new_attempt_authorized:false,
+   repeat_prior_ci_dispatch_permitted:false});
+ }
  const action='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC';
  if(r.event_kind!=='QUALIFIER_PROOF_CHANGED'||
     r.next_qualified_action!==action||
@@ -360,6 +380,7 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
     qualified[0].next_qualified_action!==action||
     !Array.isArray(h.unresolved_proof_gates)||
     !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
+    h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')||
     h.independent_internal_ci_verified!==false)
   return reject('CURRENT_QUALIFIED_ACTION_OR_PROOF_MISMATCH');
  return safe('FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY',{

@@ -28,6 +28,10 @@ test('canonical delivery requires exact event nonce, original shift and current 
 test('transport consumes existing event only after real lease and release witness, before worker actions',()=>{
  const sql=readFileSync(new URL('../sql/reality-final-loop-canonical-governed-auto-trigger-transport-v1.sql',import.meta.url),'utf8');
  assert.match(sql,/run\.status='COMPLETED'/);
+ assert.match(sql,/QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY/);
+ assert.match(sql,/recovery_terminal_history'->>'remaining_attempts'='0'/);
+ assert.match(sql,/recovery_terminal_history'->>'replay_permitted'='false'/);
+ assert.match(sql,/recovery_terminal_history'->>'new_attempt_authorized'='false'/);
  assert.match(sql,/governed_wake_worker_run_id IS NULL/);
  assert.match(sql,/governed_wake_nonce=p_nonce/);
  assert.match(sql,/CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED/);

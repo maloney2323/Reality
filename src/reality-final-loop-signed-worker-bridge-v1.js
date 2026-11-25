@@ -388,6 +388,15 @@ export async function inspectFinalLoopOnExistingSignedWorker({
        s.condition_kind===e.event_kind&&s.continuity_revision===e.continuity_revision);
       if(subscriptions.length!==1)
        return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
+      // The subscription describes the prior suspended state. A verified
+      // current qualifier may supersede its action without changing the
+      // original identity or granting a fresh attempt budget.
+      const current=governedQualificationHandoffs.filter(h=>
+       h.source_ref===e.source_ref&&h.original_work_id===e.original_work_id&&
+       h.qualifier_receipt_sha256===e.source_receipt_sha256);
+      const terminal=e.event_kind==='QUALIFIER_PROOF_CHANGED'&&
+       current.length===1&&current[0].next_qualified_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+       current[0].unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED');
       ready.push(Object.freeze({
        event_id:e.event_id,source_ref:e.source_ref,
        original_work_id:e.original_work_id,event_kind:e.event_kind,
@@ -395,7 +404,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
        source_receipt_sha256:e.source_receipt_sha256,
        continuity_revision:e.continuity_revision,
        continuity_head_sha256:p.continuity_head_sha256,
-       next_qualified_action:subscriptions[0].next_qualified_action,
+       next_qualified_action:terminal?current[0].next_qualified_action:subscriptions[0].next_qualified_action,
        would_resume_suspended_obligation:true,
        executor_invoked:false,execution_authorized:false
       }));

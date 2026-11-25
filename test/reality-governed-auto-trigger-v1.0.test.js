@@ -127,6 +127,28 @@ test('Final Loop auto trigger rejects ambiguous, stale or unauthorized proof eve
   {...c,event_resume_shadow:{...c.event_resume_shadow,shadow_ready_event_count:2,ready_event_refs:[e,e]}},
   {...c,shared_continuity_guard:{...c.shared_continuity_guard,handoffs:[{...h,independent_internal_ci_verified:true}]}}
  ])assert.equal(route(bad).dispatch_permitted,false);
+ const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
+ const terminalGate='TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED';
+ const terminal={...change({next_qualified_action:terminalAction}),
+  shared_continuity_guard:{...c.shared_continuity_guard,handoffs:[{...h,
+   next_qualified_action:terminalAction,unresolved_proof_gates:[...h.unresolved_proof_gates,terminalGate]}]},
+  governed_qualification_handoffs:[{...identity,qualifier_receipt_sha256:digest,
+   next_qualified_action:terminalAction}]};
+ const recovery=route(terminal);
+ assert.equal(recovery.status,'FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE');
+ assert.equal(recovery.evidence_readback_permitted,true);
+ assert.equal(recovery.dispatch_permitted,false);
+ assert.equal(recovery.resume_event,null);
+ assert.equal(recovery.new_attempt_authorized,false);
+ assert.equal(recovery.previous_attempt_budget_preserved,true);
+ assert.equal(recovery.repeat_prior_ci_dispatch_permitted,false);
+ assert.equal(recovery.execution_authorized_by_trigger,false);
+ for(const invalid of [
+  {...terminal,governed_qualification_handoffs:c.governed_qualification_handoffs},
+  {...terminal,shared_continuity_guard:{...terminal.shared_continuity_guard,handoffs:[h]}},
+  {...terminal,event_resume_shadow:{...terminal.event_resume_shadow,ready_event_refs:[{...e,next_qualified_action:terminalAction,source_receipt_sha256:head}]}},
+  {...c,shared_continuity_guard:terminal.shared_continuity_guard}
+ ]){const blocked=route(invalid);assert.equal(blocked.dispatch_permitted,false);assert.notEqual(blocked.evidence_readback_permitted,true);}
  const completed=change({event_kind:'INDEPENDENT_FROZEN_CI_RECEIPT'});
  completed.shared_continuity_guard={...c.shared_continuity_guard,handoffs:[{...h,independent_internal_ci_verified:true}]};
  assert.equal(route(completed).status,'FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE');
