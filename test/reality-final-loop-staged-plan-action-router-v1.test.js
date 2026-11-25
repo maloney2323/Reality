@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {classifySignedFinalLoopStagedPlanActions as classify,
  hasCurrentApprovedChildReviewRoute as canRoute,
+ selectCurrentApprovedChildReviewRoute as selectRoute,
  projectCanonicalApprovedReviewHandoff as handoff,
  reconcileReviewedRecoveryToFinalLoopSource as reconcile,
  inspectFinalLoopRecoveryContinuation as inspect,
@@ -111,6 +112,7 @@ test('existing signed worker must publish route and keep child execution distinc
  assert.match(approval,/REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED/);
  assert.match(approval,/REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED/);
  assert.match(worker,/REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED/);
+ assert.match(worker,/const freshChildContinuity=await requireFreshFinalLoopContinuity\(\);[\s\S]*?finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions\(freshChildContinuity,freshChildGraph\)/);
  assert.match(worker,/finalLoopChildReview=hasCurrentApprovedChildReviewRoute\(\{[\s\S]*?\?await advanceOneFinalLoopChildReview/);
 });
 
@@ -305,6 +307,23 @@ test('existing exact approved goal remains connected to reviewed recovery withou
  assert.equal(routes.routes[0].next_registered_handler,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
  assert.equal(routes.routes[0].child_execution_authorized,false);
  assert.equal(canRoute({routes,operatingLane}),true);
+ assert.equal(routes.routes[0].operation_category,'EXECUTION');
+ assert.equal(routes.routes[0].authority_scope,'EXACT_ACCEPTED_READ_ONLY_REVIEW');
+ assert.equal(routes.routes[1].operation_category,'QUALIFICATION');
+ assert.equal(selectRoute({routes,operatingLane}),routes.routes[0]);
+ const second={...routes.routes[0],plan_id:unadmitted.plan_id,source_ref:unadmitted.source_ref,
+  parent_original_work_id:'work:'+'2'.repeat(32)};
+ for(const competing of [second,{...second,child_execution_authorized:true}]){
+  assert.equal(selectRoute({routes:{...routes,routes:[...routes.routes,competing]},operatingLane}),null);
+ }
+ for(const drift of [{operation_category:'RECOVERY'},{authority_scope:'SIGNED_MAINTENANCE_WARRANT'},
+  {source_head_sha:null},{child_execution_authorized:true}]){
+  assert.equal(selectRoute({routes:{...routes,routes:[{...routes.routes[0],...drift},routes.routes[1]]},
+   operatingLane}),null);
+ }
+ const waiting=classify({graph,staged,preflight});
+ assert.equal(waiting.routes[0].operation_category,'AUTHORITY_REQUIRED');
+ assert.equal(waiting.routes[0].authority_scope,'EXACT_OWNER_APPROVAL_PENDING');
  assert.equal(canRoute({routes,operatingLane:{...operatingLane,status:'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'}}),false);
  assert.equal(canRoute({routes:{...routes,action_dispatched:true},operatingLane}),false);
  assert.equal(canRoute({routes:{...routes,routes:[{...routes.routes[0],acceptance_contract_sha256:null}]},operatingLane}),false);
