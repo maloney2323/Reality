@@ -114,6 +114,12 @@ export function classifySignedFinalLoopStagedPlanActions({
    parent_source_phase:plan.parent_source_phase,
    proposed_scope_count:plan.proposed_scope_count,
    acceptance_contract_sha256:p?.acceptance_contract_sha256??null,
+   // Keep review execution distinct from repair/recovery and owner consent.
+   // Classification does not assert readiness of a live executor or a warrant.
+   operation_category:plan.parent_source_phase==='NOT_ADMITTED'?'QUALIFICATION':
+    accepted?'EXECUTION':pending?'AUTHORITY_REQUIRED':'QUALIFICATION',
+   authority_scope:accepted?'EXACT_ACCEPTED_READ_ONLY_REVIEW':
+    pending?'EXACT_OWNER_APPROVAL_PENDING':'NO_EXECUTION_AUTHORITY',
    next_governed_action:next,
    next_registered_handler:pending?
     'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':
@@ -207,22 +213,36 @@ export function projectCanonicalApprovedReviewHandoff({graph,plan,approval,conti
 // The accepted route selects the existing child worker, not its authority.
 // The current isolated worker and the service-role claim still independently
 // enforce the same signed shift, accepted source, model scope and lease.
-export function hasCurrentApprovedChildReviewRoute({routes,operatingLane}={}){
- return routes?.status==='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
-  routes.read_only===true&&routes.action_dispatched===false&&
-  routes.model_execution_authorized===false&&routes.original_job_completed===false&&
-  operatingLane?.status==='FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'&&
-  operatingLane.operating_lane==='NORMAL_SIGNED_SHIFT'&&
-  Array.isArray(routes.routes)&&routes.routes.some(r=>
+export function selectCurrentApprovedChildReviewRoute({routes,operatingLane}={}){
+ if(routes?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+  routes.read_only!==true||routes.action_dispatched!==false||
+  routes.model_execution_authorized!==false||routes.original_job_completed!==false||
+  operatingLane?.status!=='FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
+  operatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||!Array.isArray(routes.routes))
+  return null;
+ const candidates=routes.routes.filter(r=>
    r.next_registered_handler==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
-   r.next_governed_action==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
-   r.existing_owner_goal_acceptance_verified===true&&
-   r.owner_action_required===false&&r.handler_requires_isolated_service_claim===true&&
-   r.parent_source_phase==='BLOCKED'&&WORK.test(r.parent_original_work_id||'')&&
-   UUID.test(r.plan_id||'')&&PR.test(r.source_ref||'')&&
-   HASH.test(r.source_manifest_sha256||'')&&HASH.test(r.acceptance_contract_sha256||'')&&
-   r.handler_dispatched===false&&r.child_execution_authorized===false&&
-   r.original_job_completed===false);
+   r.next_governed_action==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
+ // Do not silently discard a competing candidate, select the first route,
+ // or use an accepted review as authorization for maintenance/installation.
+ if(candidates.length!==1)return null;
+ const r=candidates[0];
+ if(r.operation_category!=='EXECUTION'||
+   r.authority_scope!=='EXACT_ACCEPTED_READ_ONLY_REVIEW'||
+   r.existing_owner_goal_acceptance_verified!==true||
+   r.owner_action_required!==false||r.handler_requires_isolated_service_claim!==true||
+   r.parent_source_phase!=='BLOCKED'||!WORK.test(r.parent_original_work_id||'')||
+   !UUID.test(r.plan_id||'')||!PR.test(r.source_ref||'')||
+   !SHA.test(r.source_head_sha||'')||
+   !HASH.test(r.source_manifest_sha256||'')||!HASH.test(r.acceptance_contract_sha256||'')||
+   r.handler_dispatched!==false||r.child_execution_authorized!==false||
+   r.original_job_completed!==false)return null;
+ return r;
+}
+// Keep the original boolean consumer compatible; the existing worker can
+// now consume the precise route rather than rediscovering its category.
+export function hasCurrentApprovedChildReviewRoute(input={}){
+ return selectCurrentApprovedChildReviewRoute(input)!==null;
 }
 
 // Join the independently reviewed Continuity recovery with the SAME frozen
