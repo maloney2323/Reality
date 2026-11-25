@@ -305,7 +305,7 @@ export function projectRecoveryContractFromFinalLoop({
   ownerPackets.shift_id!==graph.shift_id||
   !Array.isArray(ownerPackets.packets))
   return unavailable('RECOVERY_CANONICAL_READBACKS_NOT_RECONCILED');
- const candidates=[];
+ const candidates=[],terminal=[];
  for(const h of continuityReturn.shared_continuity_guard.handoffs){
   if(!h.unresolved_proof_gates?.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
    h.continuity_identity_verified!==true||
@@ -318,6 +318,20 @@ export function projectRecoveryContractFromFinalLoop({
   if(matches.length!==1||routes.length!==1||
    !SHA.test(routes[0].source_head_sha||''))
    return unavailable('RECOVERY_SOURCE_OR_PARENT_IDENTITY_AMBIGUOUS');
+  // The independently verified canonical qualifier carries the exhausted
+  // legacy builder ledger. A different contract fingerprint or isolated
+  // DB must not turn that same obligation into a fresh attempt budget.
+  if(h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')){
+   if(h.next_qualified_action!=='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY')
+    return unavailable('RECOVERY_TERMINAL_QUALIFICATION_RECEIPT_CONFLICT');
+   terminal.push(Object.freeze({owner_id:graph.owner_id,shift_id:graph.shift_id,
+    obligation_id:h.original_work_id,source_ref:h.source_ref,
+    source_revision:routes[0].source_head_sha,
+    continuity_root_id:continuityReturn.shared_continuity_guard.continuity_root_id,
+    qualifier_receipt_sha256:h.qualifier_receipt_sha256,
+    next_qualified_action:h.next_qualified_action}));
+   continue;
+  }
   const approval=ownerPackets.packets.find(p=>p.source_ref===h.source_ref&&
    p.parent_original_work_id===h.original_work_id&&p.approved===true);
   let c;
@@ -335,6 +349,14 @@ export function projectRecoveryContractFromFinalLoop({
    target_scope:'ORIGINAL_SOURCE_BOUND_MAINTENANCE'}
   })}catch{return unavailable('RECOVERY_CONTRACT_SOURCE_PROOF_INCOMPLETE')}
   candidates.push(Object.freeze({contract:c,approved_read_only_review:!!approval}));
+ }
+ if(terminal.length>0){
+  if(terminal.length!==1||candidates.length!==0)
+   return unavailable('RECOVERY_MULTIPLE_CONTRACTS_REQUIRE_EXACT_SELECTION');
+  return safe('RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED',{
+   contract_candidate:null,terminal_requalification:terminal[0],
+   previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false,
+   next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
  }
  if(candidates.length===0)return unavailable('RECOVERY_NO_SOURCE_BOUND_MISSING_RED_PROOF');
  if(candidates.length>1)return unavailable('RECOVERY_MULTIPLE_CONTRACTS_REQUIRE_EXACT_SELECTION');

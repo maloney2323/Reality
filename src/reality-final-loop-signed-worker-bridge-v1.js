@@ -276,6 +276,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
      // Preserve the independently checked diagnosis for the recovery policy.
      // Dropping these fields silently prevents a source-bound contract.
      qualifier_receipt_sha256:j.original_work_id===null?null:o.qualifier_receipt_sha256,
+     next_qualified_action:j.original_work_id===null?null:o.next_qualified_action,
      unresolved_proof_gates:Object.freeze(j.original_work_id===null?[]:
       [...o.unresolved_proof_gates]),
      independent_internal_ci_verified:

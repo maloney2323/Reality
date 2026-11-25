@@ -213,3 +213,36 @@ test('missing or mismatched independent report cannot advance the same durable o
   assert.equal(result.status,'RECOVERY_INDEPENDENT_PROOF_DELTA_UNVERIFIED');
  }
 });
+
+test('canonical exhausted legacy builder cannot acquire a fresh budget by switching to the new recovery contract',async()=>{
+ const continuity={...continuityReturn,shared_continuity_guard:{
+  ...continuityReturn.shared_continuity_guard,handoffs:[{...handoff,
+   next_qualified_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY',
+   unresolved_proof_gates:[...handoff.unresolved_proof_gates,
+    'TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED']}]}};
+ const input={...args,continuityReturn:continuity};
+ const p=projectRecoveryContractFromFinalLoop(input);
+ assert.equal(p.status,'RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED');
+ assert.equal(p.contract_candidate,null);
+ assert.equal(p.terminal_requalification.obligation_id,id);
+ let calls=0;
+ const r=await advanceOneSignedProofRecovery({...input,call:async()=>{calls++;throw Error('must not claim')}});
+ assert.equal(r.status,p.status);
+ assert.equal(r.previous_attempt_budget_preserved,true);
+ assert.equal(r.strategy_executed,false);
+ assert.equal(r.contract_frozen,false);
+ assert.equal(calls,0);
+ const {classifyFinalLoopBlockerLiveness}=await import('../src/reality-final-loop-blocker-liveness-v1.js');
+ const next=classifyFinalLoopBlockerLiveness({contractProposal:p,signedRecovery:r});
+ assert.equal(next.status,'RECOVERY_DISTINCT_EVIDENCE_REQUALIFICATION_DUE');
+ assert.equal(next.next_actor,'REALITY');
+ assert.equal(next.new_attempt_authorized,false);
+ assert.equal(next.original_job_completed,false);
+ assert.notEqual(classifyFinalLoopBlockerLiveness({contractProposal:p,
+  signedRecovery:{...r,obligation_id:'work:'+'0'.repeat(32)}}).status,next.status);
+ const conflict={...continuity,shared_continuity_guard:{
+  ...continuity.shared_continuity_guard,handoffs:[{...continuity.shared_continuity_guard.handoffs[0],
+   next_qualified_action:'COMPLETE_EXISTING_SIGNED_MAINTENANCE_FROZEN_CI'}]}};
+ assert.equal(projectRecoveryContractFromFinalLoop({...input,continuityReturn:conflict}).status,
+  'RECOVERY_TERMINAL_QUALIFICATION_RECEIPT_CONFLICT');
+});

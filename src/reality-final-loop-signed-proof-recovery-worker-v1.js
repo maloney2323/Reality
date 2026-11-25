@@ -69,6 +69,10 @@ export async function advanceOneSignedProofRecovery({
 }={}){
  const proposal=projectRecoveryContractFromFinalLoop({
   graph,continuityReturn,stagedRoutes,ownerPackets});
+ if(proposal.status==='RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED')
+  return no(proposal.status,{...proposal.terminal_requalification,
+   previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false,
+   next_governed_action:proposal.next_governed_action});
  if(proposal.status!=='RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE')
   return no('RECOVERY_SOURCE_PROOF_NOT_QUALIFIED_FOR_CONTRACT',{
    proof_status:proposal.status});

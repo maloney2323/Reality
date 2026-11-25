@@ -49,6 +49,27 @@ export function classifyFinalLoopBlockerLiveness({
  originalLineageEvidence,technicalCiAttachment
 }={}){
  const c=contractProposal?.contract_candidate;
+ const t=contractProposal?.terminal_requalification;
+ if(contractProposal?.status==='RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED'&&
+  contractProposal.read_only===true&&contractProposal.contract_candidate===null&&
+  contractProposal.previous_attempt_budget_preserved===true&&
+  contractProposal.repeat_prior_ci_dispatch_permitted===false&&
+  WORK.test(t?.obligation_id||'')&&URL.test(t?.source_ref||'')&&
+  HASH.test(t?.qualifier_receipt_sha256||'')&&
+  t.next_qualified_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+  signedRecovery?.status===contractProposal.status&&
+  signedRecovery.obligation_id===t.obligation_id&&signedRecovery.source_ref===t.source_ref&&
+  signedRecovery.owner_id===t.owner_id&&signedRecovery.shift_id===t.shift_id&&
+  signedRecovery.qualifier_receipt_sha256===t.qualifier_receipt_sha256&&
+  signedRecovery.strategy_executed===false&&signedRecovery.contract_frozen===false&&
+  signedRecovery.original_job_completed===false&&signedRecovery.installation_authorized===false&&
+  signedRecovery.production_changed===false)
+  return out('RECOVERY_DISTINCT_EVIDENCE_REQUALIFICATION_DUE',{
+   ...t,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
+   original_obligation_open:true,resume_same_obligation:true,
+   previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false,
+   capability_execution_ready:false,new_attempt_authorized:false,
+   next_governed_action:t.next_qualified_action});
  if(contractProposal?.status!==
   'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'||
   contractProposal?.read_only!==true||
