@@ -186,7 +186,9 @@
   const decisionAction=node('button','reality-chat-plan-action','Review decision');
   decisionAction.type='button';decisionAction.id='realityChatDecisionAction';decisionAction.hidden=true;
   decisionAction.addEventListener('click',()=>{const target=decisionAction.dataset.tab||'approvals';selectTab(target);closePanel();openPanel('work');});
-  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, planShift, decisionAction, focusToggle);
+  // Each existing control mounts once in its final navigation container.
+  // Preserve the actual DOM/handlers; append() would otherwise move history and planShift again.
+  threadButtons.append(homeLink, inspectorToggle, newChatHeader, decisionAction, focusToggle);
   quickNav.append(planShift);
   threadHeader.append(historyToggle, threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
