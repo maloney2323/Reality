@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch}
+import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory}
  from '../src/reality-final-loop-child-review-worker-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../src/reality-final-loop-child-approval-request-v1.js';
@@ -338,4 +338,56 @@ test('canonical handoff overload delegates the same atomic claim and rejects sta
  assert.match(scope,/FROM PUBLIC,anon,authenticated/);
  assert.match(scope,/'isolated_model_invoked',false/);
  assert.doesNotMatch(scope,/CREATE TABLE|INSERT INTO|UPDATE reality_internal/);
+});
+
+test('already claimed isolated computation uses only fresh canonical readback and returns unverified advisory',async()=>{
+ const files=completeLargeFiles(),plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
+ const body='Source review of '+scope.files.map(f=>f.path).join(', ')+
+  '. Test each changed behavior and independent regression.';
+ const claim={
+  status:'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',
+  owner_id:owner,shift_id:shift,child_work_id:child,
+  claim_id:'44444444-4444-4444-8444-444444444444',
+  claimant_worker_run_id:run,parent_original_work_id:parent,source_ref:pr,
+  source_head_sha:plan.live_head_sha,source_manifest_sha256:plan.source_manifest_sha256,
+  source_proof_sha256:sourceHash,acceptance_contract_sha256:acceptance,
+  scope_index:0,scope_sha256:scope.proposed_scope_sha256,scope,
+  phase:'CLAIMED',child_claimed:true,original_job_completed:false,
+  production_changed:false,canonical_scope_bound:true
+ };
+ const current={...claim,status:'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK',
+  worker_run_id:run,model_response_id:null,model_authorized:true};
+ let reads=0,modelCalls=0;
+ const fetchImpl=provider({id:'resp_claimed123456',text:body},files,()=>modelCalls++);
+ const base={claim,mode:'PREPARE',shiftId:shift,workerRunId:run,env,
+  executionProject:db.project,fetchImpl};
+ const r=await computeClaimedFinalLoopChildAdvisory({...base,readCurrentChild:async()=>{reads++;return current;}});
+ assert.equal(r.status,'FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED');
+ assert.equal(r.candidate,body);
+ assert.equal(r.child_work_id,child);
+ assert.equal(r.parent_original_work_id,parent);
+ assert.equal(r.model_response_id,'resp_claimed123456');
+ assert.match(r.provider_evidence_sha256,/^sha256:[a-f0-9]{64}$/);
+ assert.equal(r.independent_verification_committed,false);
+ assert.equal(r.original_job_completed,false);
+ assert.equal(r.external_effect_performed,false);
+ assert.equal(reads,2);
+ assert.equal(modelCalls,1);
+ for(const options of [
+  {claim:{...claim,claimant_worker_run_id:other}},
+  {executionProject:'wrongproject'},
+  {env:{...env,REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:db.project}},
+  {readCurrentChild:async()=>({...current,model_authorized:false})},
+  {readCurrentChild:async()=>({...current,parent_original_work_id:'work:'+'3'.repeat(32)})}
+ ]){
+  const blocked=await computeClaimedFinalLoopChildAdvisory({...base,readCurrentChild:async()=>current,...options});
+  assert.notEqual(blocked.status,'FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED');
+ }
+ assert.equal(modelCalls,1);
+ let staleReads=0;
+ const stale=await computeClaimedFinalLoopChildAdvisory({...base,readCurrentChild:async()=>
+  ++staleReads===1?current:{...current,model_authorized:false}});
+ assert.equal(stale.status,'FINAL_LOOP_CHILD_GATEWAY_CURRENT_AUTHORITY_OR_SOURCE_REJECTED');
+ assert.equal(stale.candidate,undefined);
+ assert.equal(modelCalls,2);
 });
