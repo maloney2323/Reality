@@ -81,6 +81,14 @@ export function classifySignedFinalLoopStagedPlanActions({
   if(matching.length>1)
    return result('FINAL_LOOP_STAGED_GOAL_PREFLIGHT_DUPLICATED');
   const p=matching[0];
+  const accepted=p?.independent_goal_acceptance_verified===true&&
+   p.owner_goal_acceptance_pending===false&&
+   p.pending_exact_owner_approval===false&&
+   p.owner_approval_claim_window_current===true&&
+   p.owner_approval_expired===false;
+  const pending=p?.independent_goal_acceptance_verified===false&&
+   p.owner_goal_acceptance_pending===true&&
+   p.pending_exact_owner_approval===true;
   if(p){
    if(plan.parent_source_phase!=='BLOCKED'||
     p.source_ref!==plan.source_ref||
@@ -88,15 +96,14 @@ export function classifySignedFinalLoopStagedPlanActions({
     p.source_manifest_sha256!==plan.source_manifest_sha256||
     !HASH.test(p.acceptance_contract_sha256||'')||
     p.verified_signed_source_goal_contract_prepared!==true||
-    p.owner_goal_acceptance_pending!==true||
-    p.independent_goal_acceptance_verified!==false||
-    p.pending_exact_owner_approval!==true||
+    (!pending&&!accepted)||
     p.child_review_automatically_authorized!==false)
     return result('FINAL_LOOP_STAGED_GOAL_CONTRACT_OR_SOURCE_DRIFT');
    matched.add(p.plan_id);
   }
   const next=plan.parent_source_phase==='NOT_ADMITTED'?
    'QUALIFY_AND_ADMIT_EXACT_PARENT_ORIGINAL':
+   accepted?'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':
    p?'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET':
     'PREPARE_VERIFIED_PARENT_GOAL_ACCEPTANCE_CONTRACT';
   routes.push(Object.freeze({
@@ -108,10 +115,11 @@ export function classifySignedFinalLoopStagedPlanActions({
    proposed_scope_count:plan.proposed_scope_count,
    acceptance_contract_sha256:p?.acceptance_contract_sha256??null,
    next_governed_action:next,
-   next_registered_handler:p?
+   next_registered_handler:pending?
     'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':null,
    handler_requires_isolated_service_claim:Boolean(p),
-   source_plan_only:true,owner_action_required:Boolean(p),
+   existing_owner_goal_acceptance_verified:accepted,
+   source_plan_only:true,owner_action_required:pending,
    handler_dispatched:false,owner_approval_granted:false,
    child_execution_authorized:false,original_job_completed:false
   }));
@@ -180,7 +188,8 @@ export function reconcileReviewedRecoveryToFinalLoopSource({
   return result('FINAL_LOOP_MULTIPLE_REVIEWED_RECOVERIES_REQUIRE_EXACT_LINEAGE',{
    reviewed_incident_count:independentlyReviewed.length});
  const eligible=stagedActions.routes.filter(route=>
-  route.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'&&
+  (route.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'||
+   route.existing_owner_goal_acceptance_verified===true)&&
   route.parent_source_phase==='BLOCKED'&&
   WORK.test(route.parent_original_work_id||'')&&
   HASH.test(route.source_manifest_sha256||'')&&
@@ -199,20 +208,25 @@ export function reconcileReviewedRecoveryToFinalLoopSource({
    eligible_original_count:eligible.length,
    next_governed_action:'REQUEST_EXACT_ORIGINAL_SCOPE_SELECTION'});
  const p=eligible[0];
- return result('FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE',{
+ return result(p.existing_owner_goal_acceptance_verified===true?
+  'FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL':
+  'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE',{
   incident_id:independentlyReviewed[0].incident_id,
   owner_id:graph.owner_id,shift_id:graph.shift_id,
   original_work_id:p.parent_original_work_id,
   source_ref:p.source_ref,plan_id:p.plan_id,
   source_manifest_sha256:p.source_manifest_sha256,
   acceptance_contract_sha256:p.acceptance_contract_sha256,
-  next_registered_handler:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET',
+  next_registered_handler:p.next_registered_handler,
+  existing_owner_goal_acceptance_verified:p.existing_owner_goal_acceptance_verified===true,
   // A shift-wide diagnosis may lack a source_claim_id. The independent
   // source/goal contract can justify displaying a packet, but not settle the
   // incident's causal source attribution or authorize effects.
   incident_causal_lineage_independently_verified:false,
   original_source_and_goal_verified_for_owner_proposal:true,
-  next_governed_action:'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'
+  next_governed_action:p.existing_owner_goal_acceptance_verified===true?
+   'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':
+   'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'
  });
 }
 
@@ -229,6 +243,18 @@ export function inspectFinalLoopRecoveryContinuation({
   production_changed:false,continuation_settled:false
  };
  const result=(status,more={})=>Object.freeze({...base,status,...more});
+ // Acceptance is an already-observed fact, not a fresh grant. The
+ // existing isolated child worker and atomic claim still control execution.
+ if(candidate?.status==='FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL'&&
+    candidate.existing_owner_goal_acceptance_verified===true)
+  return result('FINAL_LOOP_EXISTING_ACCEPTED_GOAL_REQUIRES_VERIFIED_CHILD_CLAIM',{
+   incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
+   source_ref:candidate.source_ref,plan_id:candidate.plan_id,
+   existing_owner_goal_acceptance_verified:true,
+   owner_action_required:false,handler_dispatched:false,
+   child_execution_authorized:false,original_obligation_remains_open:true,
+   next_governed_action:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  });
  if(candidate?.status!==
     'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE')
   return result('FINAL_LOOP_REENTRY_REQUIRES_INDEPENDENT_SOURCE_QUALIFICATION',{
