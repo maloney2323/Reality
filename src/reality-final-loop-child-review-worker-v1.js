@@ -206,6 +206,81 @@ function modelRequest(c,patches,model,kind){
 const samePaths=(a,b)=>Array.isArray(a)&&a.length===b.length&&
  a.every(x=>typeof x==='string'&&b.includes(x))&&
  new Set(a).size===a.length;
+// One computation implementation for the existing worker and a future
+// isolated invocation of a canonical claim. No admission, claim allocation,
+// receipt write, provider publication, or settlement lives in this function.
+// The trusted service supplies fresh claim readback; a model or browser must
+// never supply that callback. Returned data is an UNVERIFIED advisory only.
+export async function computeClaimedFinalLoopChildAdvisory({
+ claim,mode,shiftId,workerRunId,env=process.env,executionProject,
+ readCurrentChild,fetchImpl=fetch
+}={}){
+ const isolated=env.VERCEL_ENV==='preview'&&
+  env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_LARGE_PR_QUALIFICATION_SHADOW_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&
+  typeof executionProject==='string'&&executionProject.length>0&&
+  executionProject===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
+  executionProject===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&
+  executionProject!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF;
+ if(!isolated||!['PREPARE','VERIFY'].includes(mode)||
+  !UUID.test(shiftId||'')||!UUID.test(workerRunId||'')||
+  typeof readCurrentChild!=='function'||typeof fetchImpl!=='function')
+  return no('FINAL_LOOP_CHILD_GOVERNED_EXECUTOR_DISABLED_OR_ISOLATED_DB_MISSING');
+ let c;
+ try{
+  c=identity(claim,mode==='PREPARE'?'CLAIM':'VERIFY');
+  if(c.shift_id!==shiftId||
+   (mode==='PREPARE'?c.claimant_worker_run_id!==workerRunId:
+    c.independent_verifier_run_id!==workerRunId||
+    c.original_generation_worker_run_id===workerRunId))
+   deny('FOREIGN_SIGNED_EXECUTOR_RUN');
+ }catch{return no('FINAL_LOOP_CHILD_SIGNED_CLAIM_SCOPE_UNVERIFIED');}
+ const token=env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN;
+ const key=env.REALITY_STANDALONE_OPENAI_API_KEY||env.OPENAI_API_KEY;
+ const model=env.REALITY_OPENAI_MODEL||'gpt-4.1-mini';
+ let fresh;
+ try{fresh=await readPinnedScope(c,{fetchImpl,githubToken:token,env});}
+ catch{
+  return no('FINAL_LOOP_CHILD_PROVIDER_SCOPE_OR_PATCH_UNVERIFIED_NO_EFFECT_RETRY',{
+   child_work_id:c.child_work_id
+  });
+ }
+ if(typeof key!=='string'||key.length<12)
+  return no('FINAL_LOOP_CHILD_MODEL_KEY_UNAVAILABLE');
+ const gateway=createRealityGovernedOpenAIGateway({apiKey:key,model,fetchImpl});
+ const scope=scopeFor(c,fresh.provider_evidence_sha256);
+ const modeName=mode==='VERIFY'?'INDEPENDENT_REVIEW':'PREPARE';
+ const readCurrentSource=async()=>
+  (await readPinnedScope(c,{fetchImpl,githubToken:token,env})).current;
+ const request=modelRequest(c,fresh.patches,model,mode);
+ if(JSON.stringify(request).length>FINAL_LOOP_CHILD_MAX_REQUEST_CHARS)
+  return no('FINAL_LOOP_CHILD_COMPLETE_SOURCE_EXCEEDS_GOVERNED_REQUEST_BUDGET',{
+   child_work_id:c.child_work_id
+  });
+ let modelResult;
+ try{
+  modelResult=await gateway.finalLoopChildReadOnlyAdvisory({
+   scope,mode:modeName,request,readCurrentChild,readCurrentSource
+  });
+ }catch{
+  return no('FINAL_LOOP_CHILD_GATEWAY_CURRENT_AUTHORITY_OR_SOURCE_REJECTED',{
+   child_work_id:c.child_work_id
+  });
+ }
+ if(modelResult.status!=='CURRENT_FINAL_LOOP_CHILD_ADVISORY_UNTRUSTED')
+  return no('FINAL_LOOP_CHILD_MODEL_ADVISORY_NOT_PREPARED',{
+   child_work_id:c.child_work_id
+  });
+ return no('FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED',{
+  child_work_id:c.child_work_id,parent_original_work_id:c.parent_original_work_id,
+  model_response_id:modelResult.data.id,
+  candidate:textFromModel(modelResult.data),
+  provider_evidence_sha256:fresh.provider_evidence_sha256,
+  independent_verification_committed:false,original_job_completed:false
+ });
+}
 export async function advanceOneFinalLoopChildReview({
  db,shiftId,workerRunId,env=process.env,
  call=shiftRpc,fetchImpl=fetch
@@ -223,9 +298,6 @@ export async function advanceOneFinalLoopChildReview({
   typeof call==='function'&&typeof fetchImpl==='function';
  if(!isolated)
   return no('FINAL_LOOP_CHILD_GOVERNED_EXECUTOR_DISABLED_OR_ISOLATED_DB_MISSING');
- const token=env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN;
- const key=env.REALITY_STANDALONE_OPENAI_API_KEY||env.OPENAI_API_KEY;
- const model=env.REALITY_OPENAI_MODEL||'gpt-4.1-mini';
  let c,mode;
  try{
   const recovery=await call(db,
@@ -255,20 +327,6 @@ export async function advanceOneFinalLoopChildReview({
  }catch{
   return no('FINAL_LOOP_CHILD_ATOMIC_CLAIM_OR_VERIFIER_READBACK_UNAVAILABLE');
  }
- let fresh;
- try{fresh=await readPinnedScope(c,{fetchImpl,githubToken:token,env});}
- catch{
-  return no('FINAL_LOOP_CHILD_PROVIDER_SCOPE_OR_PATCH_UNVERIFIED_NO_EFFECT_RETRY',{
-   child_work_id:c.child_work_id
-  });
- }
- if(typeof key!=='string'||key.length<12)
-  return no('FINAL_LOOP_CHILD_MODEL_KEY_UNAVAILABLE');
- const gateway=createRealityGovernedOpenAIGateway({
-  apiKey:key,model,fetchImpl
- });
- const scope=scopeFor(c,fresh.provider_evidence_sha256);
- const modeName=mode==='VERIFY'?'INDEPENDENT_REVIEW':'PREPARE';
  const readCurrentChild=async()=>{
   if(mode==='VERIFY'){
    const check=await call(db,'reality_read_final_loop_child_verify_v1',{
@@ -279,31 +337,12 @@ export async function advanceOneFinalLoopChildReview({
    p_child_work_id:c.child_work_id,p_claim_id:c.claim_id,
    p_worker_run_id:workerRunId},{fetchImpl});
  };
- const readCurrentSource=async()=>
-  (await readPinnedScope(c,{fetchImpl,githubToken:token,env})).current;
- const request=modelRequest(c,fresh.patches,model,mode);
- // A larger review is still bounded. Never silently truncate a file or
- // let a partial prompt certify complete patch evidence.
- if(JSON.stringify(request).length>FINAL_LOOP_CHILD_MAX_REQUEST_CHARS)
-  return no('FINAL_LOOP_CHILD_COMPLETE_SOURCE_EXCEEDS_GOVERNED_REQUEST_BUDGET',{
-   child_work_id:c.child_work_id
-  });
- let modelResult;
- try{
-  modelResult=await gateway.finalLoopChildReadOnlyAdvisory({
-   scope,mode:modeName,request,
-   readCurrentChild,readCurrentSource
-  });
- }catch{
-  return no('FINAL_LOOP_CHILD_GATEWAY_CURRENT_AUTHORITY_OR_SOURCE_REJECTED',{
-   child_work_id:c.child_work_id
-  });
- }
- if(modelResult.status!=='CURRENT_FINAL_LOOP_CHILD_ADVISORY_UNTRUSTED')
-  return no('FINAL_LOOP_CHILD_MODEL_ADVISORY_NOT_PREPARED',{
-   child_work_id:c.child_work_id
-  });
- const candidate=textFromModel(modelResult.data);
+ const advisory=await computeClaimedFinalLoopChildAdvisory({
+  claim:c,mode,shiftId,workerRunId,env,executionProject:db.project,
+  readCurrentChild,fetchImpl
+ });
+ if(advisory.status!=='FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED')return advisory;
+ const candidate=advisory.candidate;
  const paths=c.scope.files.map(f=>f.path);
  if(mode==='PREPARE'){
   if(candidate.length<100||candidate.length>4000||
@@ -316,7 +355,7 @@ export async function advanceOneFinalLoopChildReview({
    const receipt=await call(db,'reality_prepare_final_loop_child_review_v1',{
     p_child_work_id:c.child_work_id,p_claim_id:c.claim_id,
     p_worker_run_id:workerRunId,p_head_sha:c.source_head_sha,
-    p_model_response_id:modelResult.data.id,
+    p_model_response_id:advisory.model_response_id,
     p_review_body:candidate
    },{fetchImpl});
    if(receipt?.status!=='FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED'||
@@ -354,8 +393,8 @@ export async function advanceOneFinalLoopChildReview({
   source_head_sha:c.source_head_sha,
   review_sha256:c.review_sha256,
   independent_verifier_run_id:workerRunId,
-  verifier_model_response_id:modelResult.data.id,
-  provider_evidence_sha256:fresh.provider_evidence_sha256,
+  verifier_model_response_id:advisory.model_response_id,
+  provider_evidence_sha256:advisory.provider_evidence_sha256,
   verifier_verdict_sha256:digest(candidate),
   verified_paths:paths,
   review_source_verified:true,
