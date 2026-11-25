@@ -2,6 +2,7 @@
 // control plane. No LLM callbacks, browser credentials, arbitrary endpoints,
 // automatic alias retries or owner-approval fabrication.
 import {assertRealityUnifiedShiftGraph} from './reality-shift-unified-execution-controller-v1.js';
+import {qualifiedWorkerRuntime,matchesWorkerReleaseAuthority} from './reality-signed-worker-capability-delivery-v1.js';
 import {verifySharedFinalLoopContinuityGuard} from './reality-final-loop-signed-worker-bridge-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -189,13 +190,17 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   const target=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA;
   const targetRef=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF;
   const targetPinned=SHA.test(target||'')&&BRANCH.test(targetRef||'');
-  const current={owner_id:ownerId,shift_id:shiftId,authoritative_database:db.project,
+  const unfinished=guard.handoffs.filter(h=>/^work:[a-f0-9]{32}$/.test(h.original_work_id||'')&&h.qualifier_digest_verified===true&&
+   h.independent_original_outcome_verified===false&&h.original_job_completed===false);
+  const exact=unfinished.length===1?unfinished[0]:null;
+  const current={original_work_id:exact?.original_work_id??null,source_ref:exact?.source_ref??null,
+   qualifier_receipt_sha256:exact?.qualifier_receipt_sha256??null,owner_id:ownerId,shift_id:shiftId,authoritative_database:db.project,
    plan_fingerprint:graph.plan_fingerprint,continuity_root_id:guard.continuity_root_id,
    continuity_head_sha256:guard.continuity_head_sha256,continuity_revision:guard.revision,
    scheduled_host:schedule.host,cron_job_id:schedule.job_id,
    observed_alias_release_sha:alias.resolved_release_sha,observed_alias_release_ref:alias.resolved_branch,
    running_release_sha:SHA.test(runningReleaseSha||'')?runningReleaseSha:null,
-   configured_target_release_sha:targetPinned?target:null,
+   configured_target_release_sha:targetPinned?target:null,configured_target_release_ref:targetPinned?targetRef:null,
    target_runtime_database_independently_verified:false};
   if(!schedule.dedicated_stable_release_alias||schedule.branch_automanaged)
    return safe('GOVERNED_RELEASE_SCHEDULER_DIRECTION_NOT_STABLE',{...current,
@@ -231,18 +236,21 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   const owner=env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID;
   const shift=env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID;
   const cap=env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY;
+  const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
   if(!UUID.test(owner||'')||!UUID.test(shift||'')||!KEY.test(cap||'')||
-   qualification?.status!=='QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY'||
+   qualification?.status!==(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY')||
    qualification.read_only!==true||qualification.owner_approval_granted!==false||
    qualification.release_activated!==false||qualification.production_changed!==false||
-   qualification.branch_project_ref!==db.project||
+   qualification.branch_project_ref!==(canonical?env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:db.project)||
    qualification.provider_deployment_id!==env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||
    c?.sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
    c.branch!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||c.shift_id!==shift||
    c.capability_key!==cap||c.scheduled_alias!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
    c.operating_lane!=='NORMAL_SIGNED_SHIFT'||c.source_staging_only!==false||
-   c.isolated_database_independently_verified!==true||c.preview_only!==true||
-   c.environment!=='ISOLATED_PREVIEW'||c.production_changed!==false||
+   !qualifiedWorkerRuntime(c,env)||c.preview_only!==true||
+   (canonical&&(c.runtime_scope?.owner_id!==owner||c.runtime_scope?.runtime_database_project_ref!==db.project||
+    c.runtime_scope?.provider_release_proof_sha256!==qualification.provider_release_proof_sha256||
+    c.runtime_scope?.independent_isolation_proof_sha256!==qualification.independent_isolation_proof_sha256))||c.production_changed!==false||
    ci?.status!=='INDEPENDENT_FROZEN_CI_PASSED'||ci.release_sha!==c.sha||
    ci.independently_verified!==true||ci.test_source_pinned!==true||
    !Number.isSafeInteger(ci.run_id)||ci.run_id<1||
@@ -266,7 +274,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    p_previous_release_sha:currentAlias.resolved_release_sha,
    p_previous_release_ref:currentAlias.resolved_branch,p_independent_ci_run_id:ci.run_id,
    p_provider_release_proof_sha256:qualification.provider_release_proof_sha256,
-   p_independent_isolation_proof_sha256:qualification.independent_isolation_proof_sha256
+   p_independent_isolation_proof_sha256:qualification.independent_isolation_proof_sha256,
+   ...(canonical?{p_runtime_scope:c.runtime_scope}:{})
   });
   if(packet.status==='SIGNED_RELEASE_STALE_OR_DIFFERENT_PACKET_NO_REPLAY')
    return Object.freeze({status:packet.status,owner_approval_granted:false,
@@ -276,6 +285,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    packet.release_ref!==c.branch||packet.scheduled_alias!==schedule.host||
    packet.capability_key!==cap||!UUID.test(packet.request_id||'')||
    !HASH.test(packet.proposal_fingerprint||'')||
+   (canonical&&!matchesWorkerReleaseAuthority(c,packet))||
    packet.owner_approval_granted!==false||packet.release_changed!==false||
    packet.original_job_completed!==false)
    throw Error('RELEASE_PREPARATION_DURABLE_PACKET_UNVERIFIED');
@@ -284,8 +294,11 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  async function claimApprovedRelease({
   owner_id,shift_id,release_sha,release_ref,capability_key,
   scheduled_alias,previous_release_sha,previous_release_ref,
-  independent_ci_run_id
+  independent_ci_run_id,runtime_scope
  }={}){
+  const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+  if(canonical&&(!runtime_scope||runtime_scope.owner_id!==owner_id||runtime_scope.shift_id!==shift_id||runtime_scope.release_sha!==release_sha||runtime_scope.release_ref!==release_ref||runtime_scope.capability_key!==capability_key||runtime_scope.scheduled_alias!==scheduled_alias||runtime_scope.runtime_database_project_ref!==db.project))
+   throw Error('RELEASE_CANONICAL_RUNTIME_CLAIM_SCOPE_UNVERIFIED');
   if(!UUID.test(owner_id||'')||!UUID.test(shift_id||'')||
    !SHA.test(release_sha||'')||!BRANCH.test(release_ref||'')||
    !SHA.test(previous_release_sha||'')||
@@ -303,7 +316,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    p_scheduled_alias:scheduled_alias,
    p_previous_release_sha:previous_release_sha,
    p_previous_release_ref:previous_release_ref,
-   p_independent_ci_run_id:independent_ci_run_id
+   p_independent_ci_run_id:independent_ci_run_id,
+   ...(canonical?{p_runtime_scope:runtime_scope}:{})
   });
  }
  async function assignAlias({

@@ -2,6 +2,7 @@
 // alias assignment, or worker HTTP success is never release activation.
 // A completed signed run establishes the actual process identity; cron
 // causality is a distinct proof and must not be inferred from a timestamp.
+import {qualifiedWorkerRuntime,matchesWorkerReleaseAuthority} from './reality-signed-worker-capability-delivery-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{40}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -31,12 +32,11 @@ export function verifyActuallyCompletedSignedWorkerRelease({
   schedule.credential_values_exposed!==false||
   schedule.signed_worker_target_verified!==true)
   return ret('INDEPENDENT_SCHEDULE_SCOPE_NOT_VERIFIED');
- if(candidate?.environment!=='ISOLATED_PREVIEW'||
+ if(!qualifiedWorkerRuntime(candidate)||
   candidate.preview_only!==true||
   candidate.provider_deployment_ready!==true||
   candidate.operating_lane!=='NORMAL_SIGNED_SHIFT'||
   candidate.source_staging_only!==false||
-  candidate.isolated_database_independently_verified!==true||
   candidate.owner_packet_handler_registered!==true||
   candidate.production_changed!==false||
   !UUID.test(candidate.shift_id||'')||
@@ -57,7 +57,7 @@ export function verifyActuallyCompletedSignedWorkerRelease({
   approval.release_sha!==candidate.sha||
   approval.capability_key!==candidate.capability_key||
   approval.scheduled_alias!==schedule.host||
-  approval.target_environment!=='ISOLATED_PREVIEW'||
+  !matchesWorkerReleaseAuthority(candidate,approval)||
   approval.production_change_permitted!==false||
   !HASH.test(approval.receipt_sha256||'')||
   !Number.isFinite(Date.parse(approval.approved_at||'')))

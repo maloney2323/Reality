@@ -19,6 +19,36 @@ const safe=(status,detail={})=>Object.freeze({
  new_shift_started:false
 });
 
+// Distinguish the isolated-runtime proof from a separately isolated
+// qualification of an exact canonical benchmark runtime. Never treat them
+// as interchangeable, and never permit child execution in the shared lane.
+export function qualifiedWorkerRuntime(candidate,env){
+ if(candidate?.environment==='ISOLATED_PREVIEW')return candidate.isolated_database_independently_verified===true;
+ if(candidate?.environment!=='CANONICAL_BENCHMARK_PREVIEW'||candidate.isolated_database_independently_verified!==false||
+  (env&&env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'))return false;
+ const s=candidate.runtime_scope;
+ return !!s&&s.target_environment===candidate.environment&&s.shift_id===candidate.shift_id&&UUID.test(s.owner_id||'')&&
+  s.release_sha===candidate.sha&&s.release_ref===candidate.branch&&s.capability_key===candidate.capability_key&&
+  s.scheduled_alias===candidate.scheduled_alias&&/^[a-z0-9]{20}$/.test(s.runtime_database_project_ref||'')&&
+  /^[a-z0-9]{20}$/.test(s.qualification_database_project_ref||'')&&s.runtime_database_project_ref!==s.qualification_database_project_ref&&
+  (!env||(s.runtime_database_project_ref===env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&s.qualification_database_project_ref===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF))&&
+  s.runtime_same_shift_verified===true&&s.independent_qualification_branch_verified===true&&s.independent_gateway_ci_verified===true&&
+  s.child_execution_enabled===false&&s.parent_delivery_enabled===false&&s.production_changed===false&&
+  HASH.test(s.provider_release_proof_sha256||'')&&HASH.test(s.independent_isolation_proof_sha256||'')&&
+  HASH.test(s.plan_fingerprint||'')&&HASH.test(s.continuity_head_sha256||'')&&HASH.test(s.qualifier_receipt_sha256||'')&&
+  UUID.test(s.continuity_root_id||'')&&Number.isSafeInteger(s.continuity_revision)&&s.continuity_revision>0&&
+  Number.isSafeInteger(s.cron_job_id)&&s.cron_job_id>0&&Number.isSafeInteger(s.gateway_ci_run_id)&&s.gateway_ci_run_id>0&&
+  /^work:[a-f0-9]{32}$/.test(s.original_work_id||'')&&/^https:\/\/github[.]com\/maloney2323\/Reality\/(issues|pull)\/[1-9][0-9]*$/.test(s.source_ref||'')&&
+  ['REQUALIFY_EXISTING_CONTINUITY_SOURCE','PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'].includes(s.capability_key);
+}
+export function matchesWorkerReleaseAuthority(candidate,authority){
+ if(authority?.target_environment!==candidate?.environment)return false;
+ if(candidate.environment==='ISOLATED_PREVIEW')return true;
+ const s=candidate.runtime_scope,a=authority.runtime_scope;
+ return candidate.environment==='CANONICAL_BENCHMARK_PREVIEW'&&!!s&&!!a&&
+  Object.keys(s).length===Object.keys(a).length&&Object.keys(s).every(k=>s[k]===a[k]);
+}
+
 // This is emitted from the *actual signed worker execution process*.
 // The attestation is runtime identity, NOT a Vercel alias or CI verdict.
 // Missing or unverified system env fails closed (never fabricate a commit).
@@ -92,10 +122,9 @@ export function assessSignedWorkerCapabilityActivation({
   !REF.test(candidate.branch||'')||
   candidate.preview_only!==true||
   candidate.provider_deployment_ready!==true||
-  candidate.environment!=='ISOLATED_PREVIEW'||
+  !qualifiedWorkerRuntime(candidate)||
   candidate.operating_lane!=='NORMAL_SIGNED_SHIFT'||
   candidate.source_staging_only!==false||
-  candidate.isolated_database_independently_verified!==true||
   candidate.owner_packet_handler_registered!==true||
   !UUID.test(candidate.shift_id||'')||
   candidate.shift_id!==attestation.shift_id||
@@ -116,7 +145,7 @@ export function assessSignedWorkerCapabilityActivation({
   approval.shift_id!==attestation.shift_id||
   approval.release_sha!==candidate.sha||
   approval.capability_key!==targetActionKey||
-  approval.target_environment!=='ISOLATED_PREVIEW'||
+  !matchesWorkerReleaseAuthority(candidate,approval)||
   !HASH.test(approval.receipt_sha256||'')||
   !Number.isFinite(Date.parse(approval.approved_at||''))||
   approval.production_change_permitted!==false)
@@ -202,13 +231,12 @@ export async function deliverOnceApprovedSignedWorkerCapability({
   releaseCandidate.capability_key!==capabilityKey||
   releaseCandidate.preview_only!==true||
   releaseCandidate.provider_deployment_ready!==true||
-  releaseCandidate.environment!=='ISOLATED_PREVIEW'||
+  !qualifiedWorkerRuntime(releaseCandidate,env)||
   releaseCandidate.production_changed!==false||
   // A READY staging-only preview would replace normal shift processing with
   // a restricted diagnostic lane. Never point the existing cron at it.
   releaseCandidate.operating_lane!=='NORMAL_SIGNED_SHIFT'||
   releaseCandidate.source_staging_only!==false||
-  releaseCandidate.isolated_database_independently_verified!==true||
   releaseCandidate.owner_packet_handler_registered!==true||
   ci?.status!=='INDEPENDENT_FROZEN_CI_PASSED'||
   ci.release_sha!==targetReleaseSha||
@@ -249,7 +277,8 @@ export async function deliverOnceApprovedSignedWorkerCapability({
   capability_key:capabilityKey,scheduled_alias:scheduledAlias,
   previous_release_sha:oldAlias.resolved_release_sha,
   previous_release_ref:oldAlias.resolved_branch,
-  independent_ci_run_id:ci.run_id
+  independent_ci_run_id:ci.run_id,
+  ...(releaseCandidate.environment==='CANONICAL_BENCHMARK_PREVIEW'?{runtime_scope:releaseCandidate.runtime_scope}:{})
  })}catch{return base('SIGNED_CAPABILITY_DELIVERY_OWNER_CLAIM_UNAVAILABLE',{
   provider_assignment_attempted:false
  })}
@@ -262,7 +291,7 @@ export async function deliverOnceApprovedSignedWorkerCapability({
   claim.previous_release_sha!==oldAlias.resolved_release_sha||
   claim.previous_release_ref!==oldAlias.resolved_branch||
   claim.independent_ci_run_id!==ci.run_id||
-  claim.target_environment!=='ISOLATED_PREVIEW'||
+  !matchesWorkerReleaseAuthority(releaseCandidate,claim)||
   claim.one_use_service_claim!==true||
   claim.owner_approved_exact_release!==true||
   !UUID.test(claim.claim_id||'')||

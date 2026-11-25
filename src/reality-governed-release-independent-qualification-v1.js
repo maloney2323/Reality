@@ -31,8 +31,9 @@ async function getJson(fetchImpl,url,token,timeoutMs=7000){
  }finally{clearTimeout(timer)}
 }
 export async function qualifyCurrentIsolatedSignedWorkerRelease({
- env=process.env,dbProject,fetchImpl=fetch
+ env=process.env,dbProject,fetchImpl=fetch,direction=null
 }={}){
+ const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
  const branch=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF;
  const sha=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA;
  const isolated=env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF;
@@ -44,7 +45,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  if(typeof fetchImpl!=='function'||!SHA.test(sha||'')||
   !REF.test(branch||'')||!PROJECT.test(dbProject||'')||
   !PROJECT.test(isolated||'')||!PROJECT.test(parent||'')||
-  isolated===parent||isolated!==dbProject||
+  isolated===parent||(canonical?parent!==dbProject:isolated!==dbProject)||
   !UUID.test(env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID||'')||
   !UUID.test(env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID||'')||
   !ID.test(vercelId||'')||!KEY.test(cap||'')||
@@ -58,12 +59,39 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN.length<20)
   return safe('PINNED_RELEASE_OR_PROVIDER_PROOF_CONFIG_MISSING');
  const lane=inspectFinalLoopSignedWorkerOperatingLane({env,dbProject});
- if(lane.status!=='FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
+ if(lane.status!==(canonical?'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY':
+    'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED')||
   lane.running_release_sha!==sha||
   lane.running_release_ref!==branch)
   return safe('QUALIFIED_NORMAL_SIGNED_WORKER_RUNTIME_NOT_PRESENT',{
    operating_lane_status:lane.status
   });
+ const gatewayId=Number(env.REALITY_SIGNED_WORKER_RELEASE_GATEWAY_CI_RUN_ID);
+ const gatewayPath=env.REALITY_SIGNED_WORKER_RELEASE_GATEWAY_CI_WORKFLOW_PATH;
+ if(canonical&&(
+  env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF!==dbProject||
+  env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF!==dbProject||
+  env.VERCEL_DEPLOYMENT_ID!==vercelId||
+  env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED!=='true'||
+  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+  env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'||
+  !['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET','REQUALIFY_EXISTING_CONTINUITY_SOURCE'].includes(cap)||
+  !Number.isSafeInteger(gatewayId)||gatewayId<1||gatewayId===ciId||
+  !/^\.github\/workflows\/[A-Za-z0-9._-]+\.ya?ml$/.test(gatewayPath||'')||
+  !['GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED','GOVERNED_RELEASE_DIRECTION_MATCHES_PIN_UNVERIFIED_ACTIVATION'].includes(direction?.status)||
+  direction.read_only!==true||direction.release_activated!==false||direction.production_changed!==false||
+  direction.authoritative_database!==dbProject||direction.owner_id!==env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID||
+  direction.shift_id!==env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID||
+  direction.configured_target_release_sha!==sha||direction.configured_target_release_ref!==branch||
+  direction.scheduled_host!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
+  !Number.isSafeInteger(direction.cron_job_id)||direction.cron_job_id<1||
+  !UUID.test(direction.continuity_root_id||'')||!Number.isSafeInteger(direction.continuity_revision)||direction.continuity_revision<1||
+  !/^sha256:[a-f0-9]{64}$/.test(direction.plan_fingerprint||'')||
+  !/^sha256:[a-f0-9]{64}$/.test(direction.continuity_head_sha256||'')||
+  !/^sha256:[a-f0-9]{64}$/.test(direction.qualifier_receipt_sha256||'')||
+  !/^work:[a-f0-9]{32}$/.test(direction.original_work_id||'')||
+  !/^https:\/\/github[.]com\/maloney2323\/Reality\/(issues|pull)\/[1-9][0-9]*$/.test(direction.source_ref||'')))
+  return safe('CANONICAL_RUNTIME_SAME_SHIFT_OR_GATEWAY_CONFIG_NOT_VERIFIED');
  let branches;
  try{
   branches=await getJson(fetchImpl,
@@ -97,6 +125,16 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   ci.status!=='completed'||ci.conclusion!=='success'||
   !['push','pull_request'].includes(ci.event))
   return safe('INDEPENDENT_EXACT_RELEASE_CI_NOT_PASSED');
+ let gateway=null;
+ if(canonical){
+  try{gateway=await getJson(fetchImpl,'https://api.github.com/repos/'+encodeURIComponent(org)+'/'+
+    encodeURIComponent(name)+'/actions/runs/'+gatewayId,env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN)}
+  catch{return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE')}
+  if(gateway?.id!==gatewayId||gateway.head_sha!==sha||gateway.head_branch!==branch||
+   gateway.name!=='Reality — Isolated governed OpenAI gateway proof'||gateway.path!==gatewayPath||
+   gateway.status!=='completed'||gateway.conclusion!=='success'||!['push','pull_request'].includes(gateway.event))
+   return safe('INDEPENDENT_GATEWAY_CI_NOT_PASSED');
+ }
  let d;
  try{
   const data=await getJson(fetchImpl,
@@ -114,30 +152,42 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   d.meta?.githubCommitRef!==branch||
   d.meta?.githubOrg!==org||d.meta?.githubRepo!==name)
   return safe('VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH');
+ const providerProof=digest([repo,sha,branch,ci.id,ci.path,ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,d.state,d.target??null,
+  ...(canonical?[gateway.id,gateway.path,gateway.status,gateway.conclusion]:[])]);
+ const isolationProof=digest([exact[0].project_ref,exact[0].parent_project_ref,exact[0].is_default,exact[0].status,
+  exact[0].preview_project_status,dbProject]);
+ const runtimeScope=canonical?Object.freeze({target_environment:'CANONICAL_BENCHMARK_PREVIEW',owner_id:direction.owner_id,
+  shift_id:direction.shift_id,scheduled_alias:direction.scheduled_host,runtime_database_project_ref:dbProject,
+  qualification_database_project_ref:isolated,original_work_id:direction.original_work_id,source_ref:direction.source_ref,
+  qualifier_receipt_sha256:direction.qualifier_receipt_sha256,plan_fingerprint:direction.plan_fingerprint,
+  continuity_root_id:direction.continuity_root_id,continuity_head_sha256:direction.continuity_head_sha256,
+  continuity_revision:direction.continuity_revision,cron_job_id:direction.cron_job_id,gateway_ci_run_id:gatewayId,
+  target_deployment_id:vercelId,release_sha:sha,release_ref:branch,capability_key:cap,
+  provider_release_proof_sha256:providerProof,independent_isolation_proof_sha256:isolationProof,
+  runtime_same_shift_verified:true,independent_qualification_branch_verified:true,independent_gateway_ci_verified:true,
+  child_execution_enabled:false,parent_delivery_enabled:false,production_changed:false}):null;
  const candidate=Object.freeze({
   sha,branch,shift_id:env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID,
   capability_key:cap,scheduled_alias:env.REALITY_SIGNED_WORKER_STABLE_ALIAS,
   preview_only:true,provider_deployment_ready:true,
-  environment:'ISOLATED_PREVIEW',operating_lane:'NORMAL_SIGNED_SHIFT',
+  environment:canonical?'CANONICAL_BENCHMARK_PREVIEW':'ISOLATED_PREVIEW',operating_lane:'NORMAL_SIGNED_SHIFT',
   source_staging_only:false,
-  isolated_database_independently_verified:true,
+  isolated_database_independently_verified:!canonical,
+  ...(canonical?{runtime_scope:runtimeScope}:{}),
   owner_packet_handler_registered:true,production_changed:false
  });
  const ciProof=Object.freeze({
   status:'INDEPENDENT_FROZEN_CI_PASSED',release_sha:sha,
   independently_verified:true,test_source_pinned:true,run_id:ciId
  });
- return safe('QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY',{
+ return safe(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY',{
   candidate,ci:ciProof,
   branch_project_ref:isolated,
   provider_deployment_id:vercelId,
   // Hash only the stable, independently read provider identity fields. No
   // time-varying timestamp or secret can change the existing packet identity.
-  provider_release_proof_sha256:digest([repo,sha,branch,ci.id,ci.path,
-   ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,d.state,d.target??null]),
-  independent_isolation_proof_sha256:digest([exact[0].project_ref,
-   exact[0].parent_project_ref,exact[0].is_default,exact[0].status,
-   exact[0].preview_project_status,dbProject]),
+  provider_release_proof_sha256:providerProof,
+  independent_isolation_proof_sha256:isolationProof,
   next_governed_action:'READ_EXACT_OWNER_RELEASE_APPROVAL'
  });
 }

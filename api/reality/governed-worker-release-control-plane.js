@@ -82,11 +82,14 @@ export default async function handler(req,res){
     'GOVERNED_RELEASE_STABLE_ALIAS_MIGRATION_REQUIRED',{
      current,release_switch_attempted:false
     });
+  const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+  const direction=canonical?await adapters.readDirection({ownerId:env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID,
+    shiftId:env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID}):null;
   const proof=await qualifyCurrentIsolatedSignedWorkerRelease({
-   env,dbProject:db.project,fetchImpl:fetch
+   env,dbProject:db.project,fetchImpl:fetch,direction
   });
-  if(proof.status!==
-    'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY')
+  if(proof.status!==(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':
+    'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY'))
    return result(res,409,'GOVERNED_RELEASE_INDEPENDENT_QUALIFICATION_BLOCKED',{
     qualification_status:proof.status,
     release_switch_attempted:false

@@ -106,3 +106,43 @@ test('Vercel READY on a different commit is not sufficient',async()=>{
  assert.equal(r.status,'VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH');
  assert.equal(f.calls.length,3);
 });
+
+test('canonical benchmark qualification is a distinct topology, requires same current shift and independent gateway pass',async()=>{
+ const owner=env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID,shift=env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID;
+ const gatewayPath='.github/workflows/reality-gateway-proof.yml';
+ const e={...env,REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
+  REALITY_RELEASE_CONTROL_DB_PROJECT_REF:parent,REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:parent,
+  REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED:'false',REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED:'true',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:owner,REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:shift,
+  REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED:'true',VERCEL_DEPLOYMENT_ID:env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID,
+  REALITY_SIGNED_WORKER_RELEASE_GATEWAY_CI_RUN_ID:'2005',REALITY_SIGNED_WORKER_RELEASE_GATEWAY_CI_WORKFLOW_PATH:gatewayPath};
+ const direction={status:'GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED',read_only:true,release_activated:false,production_changed:false,
+  authoritative_database:parent,owner_id:owner,shift_id:shift,configured_target_release_sha:sha,configured_target_release_ref:branch,
+  scheduled_host:env.REALITY_SIGNED_WORKER_STABLE_ALIAS,cron_job_id:7,continuity_root_id:shift,continuity_revision:3,
+  plan_fingerprint:'sha256:'+'1'.repeat(64),continuity_head_sha256:'sha256:'+'2'.repeat(64),qualifier_receipt_sha256:'sha256:'+'3'.repeat(64),
+  original_work_id:'work:'+'4'.repeat(32),source_ref:'https://github.com/maloney2323/Reality/pull/307'};
+ const calls=[];let gatewayPass=true;
+ const fetchImpl=async url=>{
+  calls.push(String(url));
+  let data;
+  if(String(url).includes('api.supabase.com'))data=[{project_ref:project,parent_project_ref:parent,is_default:false,preview_project_status:'ACTIVE_HEALTHY',status:'FUNCTIONS_DEPLOYED'}];
+  else if(String(url).endsWith('/2004'))data={id:2004,head_sha:sha,head_branch:branch,name:'Reality Final Loop Engine lifecycle acceptance',
+   path:'.github/workflows/reality-final-loop-engine-v1-ci.yml',status:'completed',conclusion:'success',event:'push'};
+  else if(String(url).endsWith('/2005'))data={id:2005,head_sha:sha,head_branch:branch,name:'Reality — Isolated governed OpenAI gateway proof',
+   path:gatewayPath,status:'completed',conclusion:gatewayPass?'success':'failure',event:'push'};
+  else data={id:env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID,project:{id:env.REALITY_VERIFIED_VERCEL_PROJECT_ID},state:'READY',target:null,
+   meta:{githubCommitSha:sha,githubCommitRef:branch,githubOrg:'org',githubRepo:'repo'}};
+  return {ok:true,json:async()=>data};
+ };
+ const run=extra=>qualify({env:e,dbProject:parent,direction,fetchImpl,...extra});
+ const result=await run();
+ assert.equal(result.status,'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY');
+ assert.equal(result.candidate.isolated_database_independently_verified,false);
+ assert.equal(result.candidate.runtime_scope.runtime_database_project_ref,parent);
+ assert.equal(result.candidate.runtime_scope.qualification_database_project_ref,project);
+ assert.equal(result.candidate.runtime_scope.original_work_id,direction.original_work_id);
+ assert.equal(result.release_activated,false);
+ gatewayPass=false;
+ assert.equal((await run()).status,'INDEPENDENT_GATEWAY_CI_NOT_PASSED');
+ assert.equal((await run({direction:{...direction,shift_id:owner}})).status,'CANONICAL_RUNTIME_SAME_SHIFT_OR_GATEWAY_CONFIG_NOT_VERIFIED');
+});
