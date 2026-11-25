@@ -160,6 +160,8 @@ jobs:
       - name: Check complete controller and acceptance syntax
         run: |
           node --check src/reality-shift-unified-execution-controller-v1.js
+          node --check src/reality-final-loop-external-recovery-handoff-v1.js
+          node --check src/reality-shift-continuity-auto-investigation-v1.js
           node --check src/reality-final-loop-time-horizon-v1.js
           node --check src/reality-final-loop-executive-brief-v1.js
           node --check src/reality-final-loop-owner-time-bridge-v1.js
@@ -215,6 +217,7 @@ jobs:
           node --check test/reality-final-loop-governed-engineering-v1.test.js
       - name: Run existing controller and new Final Loop Engine invariants
         run: |
+          node --test test/reality-final-loop-external-recovery-handoff-v1.test.js
           node --test test/reality-unified-shift-execution-controller-v1.test.js
           node --test test/reality-final-loop-engine-v1.test.js
           node --test test/reality-final-loop-time-horizon-v1.test.js

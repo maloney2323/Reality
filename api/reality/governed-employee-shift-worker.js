@@ -5,6 +5,8 @@
 // This endpoint cannot admit new jobs, authorize installation, bypass owner
 // approval, settle original work, or alter production operations.
 import crypto from 'node:crypto';
+import {observeSignedInfrastructureOnExistingWorker}
+ from '../../src/reality-final-loop-external-recovery-handoff-v1.js';
 import {independentlyReviewOneStagedMaintenanceRegression,
  independentlyReviewOneClaimBoundMaintenanceCiDiagnostic}
  from '../../src/reality-signed-maintenance-external-review-v1.js';
@@ -698,6 +700,12 @@ export default async function handler(req,res){
      original_job_completed:false,production_changed:false};
   // An exhausted investigation is not restarted. A distinct signed wake may
   // qualify only an independently tested, current-release correction.
+  workerStage='SIGNED_INFRASTRUCTURE_CONTINUITY_OBSERVATION';
+  const signedInfrastructureObservation=await observeSignedInfrastructureOnExistingWorker({
+   db,env:process.env,wake:wakeReceipt,continuity:finalLoopContinuityIngress,
+   workerRunId:actualWorkerRunId,wakeClaimId:governedWakeClaimId,fetchImpl:fetch
+  }).catch(()=>({status:'SIGNED_INFRASTRUCTURE_OBSERVATION_UNVERIFIED',
+   repair_executed:false,original_job_completed:false,production_changed:false}));
   workerStage='SIGNED_SHIFT_INVESTIGATION_REMEDIATION_QUALIFICATION';
   const shiftInvestigationRemediation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
@@ -4099,6 +4107,7 @@ export default async function handler(req,res){
     signed_chat_review_incident_observation:signedChatReviewIncidentObservation,
     signed_chat_model_rejection_reentry:signedModelRejectionReentry,
     shift_investigation_remediation:shiftInvestigationRemediation,
+    signed_infrastructure_observation:signedInfrastructureObservation,
     shift_continuity_incident_investigation:shiftContinuityInvestigation,
     signed_continuity_recovery_action:signedContinuityRecoveryAction,
     signed_continuity_recovery_verification:signedContinuityRecoveryVerification,

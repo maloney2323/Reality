@@ -241,7 +241,22 @@ export async function investigateOneSignedShiftContinuityIncident({
     'QUALIFIED_EVIDENCE_JOB_BLOCKED',
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
     'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED',
-    'SIGNED_CHAT_RECOVERY_MODEL_REJECTED','SIGNED_GOVERNED_TRANSITION_STALLED'].includes(claim.kind)||
+    'SIGNED_CHAT_RECOVERY_MODEL_REJECTED','SIGNED_GOVERNED_TRANSITION_STALLED',
+    'SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED'].includes(claim.kind)||
+  (claim.kind==='SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED'&&(
+   claim.source_evidence?.schema!=='reality-signed-infrastructure-incident-v1'||
+   claim.source_evidence.owner_id!==claim.owner_id||claim.source_evidence.shift_id!==shiftId||
+   !/^work:[a-f0-9]{32}$/.test(claim.source_evidence.original_work_id||'')||
+   !/^https:\/\/github[.]com\/maloney2323\/Reality\/pull\/[1-9][0-9]*$/.test(claim.source_evidence.source_ref||'')||
+   claim.source_evidence.provider!=='supabase'||
+   !/^[a-z0-9]{20}$/.test(claim.source_evidence.project_ref||'')||
+   !/^[a-z0-9]{20}$/.test(claim.source_evidence.parent_project_ref||'')||
+   claim.source_evidence.project_ref===claim.source_evidence.parent_project_ref||
+   !['MIGRATIONS_FAILED','FUNCTIONS_DEPLOY_FAILED','PROJECT_FAILED'].includes(claim.source_evidence.branch_status)||
+   !HASH.test(claim.source_evidence.source_receipt_sha256||'')||
+   claim.source_evidence.investigation_only!==true||claim.source_evidence.root_cause_verified!==false||
+   claim.source_evidence.original_job_completed!==false||claim.source_evidence.installation_authorized!==false||
+   claim.source_evidence.production_changed!==false))||
   (claim.kind==='EMPLOYEE_QUALIFICATION_HANDOFF_STALLED'&&
    (!UUID.test(claim.source_claim_id||'')||
     !/^https:\/\/github[.]com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull)\/[1-9][0-9]*$/.test(claim.failed_source_ref||'')))||
@@ -387,6 +402,7 @@ export async function investigateOneSignedShiftContinuityIncident({
   const modelRejectionIncident=claim.kind==='SIGNED_CHAT_RECOVERY_MODEL_REJECTED';
   const fencedTransitionIncident=claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED';
   const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident||modelRejectionIncident||fencedTransitionIncident;
+  const infrastructureIncident=claim.kind==='SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED';
   const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident;
   // Real repeated wake receipts prove no progress, not a root cause.
   // The existing owner-scoped original preflight provides current admission
@@ -489,6 +505,8 @@ export async function investigateOneSignedShiftContinuityIncident({
      'Do not generate executable SQL or claim permission to deploy. Do not '+
      'assign fixed employee names; select function IDs using the role roster. '+
      'Return only the specified fields.'+
+     (infrastructureIncident?
+      ' The recorded failure concerns an isolated Supabase branch. Identify the exact failed migration and provider error needed for causal proof. The branch status alone is NOT a cause. Do not reset the branch, copy credentials, change the scheduled worker, widen authority, or infer permission to mutate any environment. ': '')+
      (fencedTransitionIncident?
       ' The signed original is stuck behind a previously fenced GITHUB provider transition. ' +
       'A timeout or provider write response cannot be treated as no effect. ' +
@@ -526,7 +544,7 @@ export async function investigateOneSignedShiftContinuityIncident({
     {role:'user',content:[{type:'input_text',text:JSON.stringify({
      owner_shift_id:claim.shift_id,incident_id:claim.incident_id,
      kind:claim.kind,evidence_sha256:claim.evidence_sha256,
-     source_evidence:chatReviewIncident?claim.source_evidence:null,
+     source_evidence:chatReviewIncident||infrastructureIncident?claim.source_evidence:null,
      error_summary:claim.error_summary,
      claim_id:claim.source_claim_id||null,
      observed_at:claim.first_detected_at,
