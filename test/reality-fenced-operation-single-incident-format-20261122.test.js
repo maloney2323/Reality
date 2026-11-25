@@ -67,7 +67,9 @@ test('investigator provides frozen signed Chat source and actual read-only owner
  assert.ok(investigator.includes("independently_refreshed:false"));
  assert.ok(investigator.includes("github_provider_effect_verified:false"));
  assert.ok(investigator.includes("if(guidedRecovery&&(!chatReviewIncident||fencedTransitionIncident))"));
- assert.ok(investigator.includes("source_evidence:chatReviewIncident?claim.source_evidence:null"));
+ assert.ok(investigator.includes("source_evidence:chatReviewIncident||infrastructureIncident?claim.source_evidence:null"));
+ assert.ok(investigator.includes("claim.source_evidence?.schema!=='reality-signed-infrastructure-incident-v1'"));
+ assert.ok(investigator.includes("claim.source_evidence.owner_id!==claim.owner_id||claim.source_evidence.shift_id!==shiftId"));
  assert.ok(investigator.includes("provider_effect_known!==false"));
  assert.ok(investigator.includes("method:'GET'"));
 });
