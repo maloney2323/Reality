@@ -79,6 +79,40 @@ export function classifyFinalLoopBlockerLiveness({
    ...base,liveness:'PAUSED_FOR_EXACT_AUTHORITY',
    next_actor:'OWNER',next_governed_action:
     'PREPARE_EXACT_WARRANT_REQUEST_WITH_CURRENT_INDEPENDENT_PROOF'});
+ // The current durable contract takes precedence over a stale RED
+ // acquisition recommendation. It never grants an execution effect.
+ if(signedRecovery?.contract_id===c.contract_id&&
+  signedRecovery.contract_frozen===true&&signedRecovery.strategy_executed===false&&
+  signedRecovery.original_job_completed===false&&
+  signedRecovery.production_changed===false&&
+  signedRecovery.installation_authorized===false){
+  if(['RECOVERY_DURABLE_STRATEGY_OUTCOME_UNCERTAIN_NO_REPLAY',
+      'RECOVERY_DURABLE_ATTEMPT_LEDGER_UNVERIFIED',
+      'RECOVERY_INDEPENDENT_PROOF_DELTA_UNVERIFIED',
+      'RECOVERY_PROOF_SEQUENCE_UNVERIFIED','RECOVERY_FAILED_STRATEGY_LEDGER_UNVERIFIED',
+      'RECOVERY_BUDGET_LEDGER_UNVERIFIED'].includes(signedRecovery.status))
+   return out('RECOVERY_DURABLE_LEDGER_RECONCILIATION_DUE',{
+    ...base,liveness:'RECONCILIATION_DUE',next_actor:'REALITY',
+    repeat_prior_ci_dispatch_permitted:false,
+    next_governed_action:signedRecovery.status==='RECOVERY_DURABLE_STRATEGY_OUTCOME_UNCERTAIN_NO_REPLAY'?
+     'RECONCILE_EXISTING_SIGNED_STRATEGY_OUTCOME':'RECONCILE_SIGNED_RECOVERY_LEDGER'
+   });
+  if(signedRecovery.status==='RECOVERY_DURABLE_NEXT_PROOF_REQUIRES_EXACT_SIGNED_HANDLER'&&
+   ['REPAIR_ISOLATED','GREEN','REGRESSION','CONTINUATION'].includes(signedRecovery.next_required_proof))
+   return out('RECOVERY_DURABLE_NEXT_PROOF_HANDLER_DUE',{
+    ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
+    next_required_proof:signedRecovery.next_required_proof,
+    repeat_prior_ci_dispatch_permitted:false,capability_execution_ready:false,
+    next_governed_action:'QUALIFY_EXACT_REGISTERED_HANDLER_AND_WARRANT_FOR_NEXT_PROOF'
+   });
+  if(signedRecovery.status==='RECOVERY_PROOF_CHAIN_INDEPENDENTLY_RECEIPTED'&&
+   signedRecovery.verified_proof_count===5)
+   return out('RECOVERY_DURABLE_PROOF_CHAIN_RETURN_DUE',{
+    ...base,liveness:'RECOVERABLE_UNFINISHED',next_actor:'REALITY',
+    repeat_prior_ci_dispatch_permitted:false,
+    next_governed_action:'RECONCILE_CANONICAL_ORIGINAL_SETTLEMENT_AND_UNIVERSE'
+   });
+ }
  if(!exact(c,existingCiRoute))
   return out('RECOVERY_EXISTING_CI_IDENTITY_UNVERIFIED',{
    ...base,liveness:'RECHECK_DUE',

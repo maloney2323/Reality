@@ -223,3 +223,19 @@ test('current technical CI proof supersedes a stale case-construction recommenda
  }
  assert.equal(classify({...input,technicalCiObservation:{...proof,source_revision:'0'.repeat(40)}}).technical_ci_verified,undefined);
 });
+
+test('current durable strategy and next proof outrank stale diagnostic acquisition',()=>{
+ const durable={contract_id:sha('a'),contract_frozen:true,strategy_executed:false,
+  original_job_completed:false,production_changed:false,installation_authorized:false};
+ for(const [status,expected,action,extra] of [
+  ['RECOVERY_DURABLE_STRATEGY_OUTCOME_UNCERTAIN_NO_REPLAY','RECOVERY_DURABLE_LEDGER_RECONCILIATION_DUE','RECONCILE_EXISTING_SIGNED_STRATEGY_OUTCOME',{}],
+  ['RECOVERY_INDEPENDENT_PROOF_DELTA_UNVERIFIED','RECOVERY_DURABLE_LEDGER_RECONCILIATION_DUE','RECONCILE_SIGNED_RECOVERY_LEDGER',{}],
+  ['RECOVERY_DURABLE_NEXT_PROOF_REQUIRES_EXACT_SIGNED_HANDLER','RECOVERY_DURABLE_NEXT_PROOF_HANDLER_DUE','QUALIFY_EXACT_REGISTERED_HANDLER_AND_WARRANT_FOR_NEXT_PROOF',{next_required_proof:'REPAIR_ISOLATED'}],
+  ['RECOVERY_PROOF_CHAIN_INDEPENDENTLY_RECEIPTED','RECOVERY_DURABLE_PROOF_CHAIN_RETURN_DUE','RECONCILE_CANONICAL_ORIGINAL_SETTLEMENT_AND_UNIVERSE',{verified_proof_count:5}]
+ ]){
+  const r=classify(args({signedRecovery:{...durable,status,...extra}}));
+  assert.equal(r.status,expected);assert.equal(r.next_governed_action,action);
+  assert.equal(r.repeat_prior_ci_dispatch_permitted,false);
+  assert.equal(r.original_job_completed,false);assert.equal(r.execution_authorized,false);
+ }
+});
