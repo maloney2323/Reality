@@ -47,6 +47,9 @@ const read={
  status:'RECOVERY_TECHNICAL_CI_SOURCE_BOUND_OBSERVATION_RECORDED',
  contract_id:sha('a'),obligation_id:work,source_ref:source,
  source_revision:head,owner_id:owner,shift_id:shift,
+ continuity_root_id:root,maintenance_id:p.maintenance_id,
+ github_job_id:p.github_job_id,signed_case_spec_git_blob_sha:p.signed_case_spec_git_blob_sha,
+ technical_ci_independently_observed:true,read_only:true,
  github_run_id:p.github_run_id,github_artifact_id:p.github_artifact_id,
  github_artifact_digest:p.github_artifact_digest,
  github_release_sha:release,
@@ -166,4 +169,40 @@ test('new isolated SQL observation schema is service-only, source-bound, and no 
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.match(worker,/attachVerifiedTechnicalCiToContinuity/);
  assert.match(worker,/final_loop_technical_ci_continuity_attachment:finalLoopTechnicalCiContinuityAttachment/);
+});
+
+
+test('independent readback cannot attach evidence to another continuity root, maintenance incident, job or case blob',async()=>{
+ const variants=[
+  {continuity_root_id:'11111111-1111-4111-8111-111111111111'},
+  {maintenance_id:'11111111-1111-4111-8111-111111111111'},
+  {github_job_id:9999},
+  {signed_case_spec_git_blob_sha:'b'.repeat(40)},
+  {technical_ci_independently_observed:false},
+  {read_only:false}
+ ];
+ for(const change of variants){
+  const calls=[];
+  const r=await attach({...args,call:async(_db,method)=>{
+   calls.push(method);return {...read,...change};
+  }});
+  assert.equal(r.status,'RECOVERY_TECH_CI_EXISTING_RECORD_MISMATCH_NO_REPLAY');
+  assert.equal(r.technical_observation_recorded,false);
+  assert.deepEqual(calls,['reality_read_final_loop_technical_ci_observation_v1']);
+ }
+});
+test('post-write readback must confirm the exact atomic receipt digest',async()=>{
+ let n=0;
+ const r=await attach({...args,call:async(_db,method)=>{
+  if(method==='reality_read_final_loop_technical_ci_observation_v1')
+   return ++n===1?{status:'RECOVERY_TECHNICAL_CI_NOT_DURABLY_OBSERVED'}:
+    {...read,observation_receipt_sha256:sha('0')};
+  return {status:'RECOVERY_TECHNICAL_CI_OBSERVATION_ATOMICALLY_RECORDED',
+   contract_id:sha('a'),obligation_id:work,github_artifact_digest:sha('b'),
+   observation_receipt_sha256:sha('d'),original_job_completed:false,
+   execution_authorized:false,business_original_red_verified:false};
+ }});
+ assert.equal(r.status,'RECOVERY_TECH_CI_POSTWRITE_READBACK_MISMATCH');
+ assert.equal(r.technical_observation_recorded,false);
+ assert.equal(r.original_job_completed,false);
 });
