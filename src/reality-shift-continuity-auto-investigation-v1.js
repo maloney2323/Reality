@@ -544,7 +544,8 @@ export async function investigateOneSignedShiftContinuityIncident({
     {role:'user',content:[{type:'input_text',text:JSON.stringify({
      owner_shift_id:claim.shift_id,incident_id:claim.incident_id,
      kind:claim.kind,evidence_sha256:claim.evidence_sha256,
-     source_evidence:chatReviewIncident||infrastructureIncident?claim.source_evidence:null,
+     source_evidence:chatReviewIncident?claim.source_evidence:null,
+     infrastructure_source_evidence:infrastructureIncident?claim.source_evidence:null,
      error_summary:claim.error_summary,
      claim_id:claim.source_claim_id||null,
      observed_at:claim.first_detected_at,
