@@ -257,6 +257,20 @@ export default async function handler(req,res){
    scopedRoot:'personal:chat:'+scope,principalId:session.user_id,db:isolated
   });
   const scopedRoot=continuity.scopedRoot;
+  // Both model lanes use the existing Universe projector. A bounded
+  // conversation passes only its available owner-scoped observations; the
+  // operational pipeline still reconstructs and verifies its durable spine.
+  const makeOwnerUniverseReadModel=({observations,reconciledOriginals=null}={})=>{
+   const spine=createContinuitySpine({
+    continuityRootId:scopedRoot,worldlineId:scopedRoot,
+    subjectId:session.user_id
+   });
+   return projectOwnerRealityUniverseForChat({
+    rootId:spine.continuity_root_id,worldlineId:spine.worldline_id,
+    worldId:scopedRoot,continuityHistory:null,
+    currentObservations:observations,reconciledOriginals
+   });
+  };
   if(continuity.fork_recovery&&goalCommand)
    fail('CHAT_FORK_GOAL_MUTATION_REQUIRES_INDEPENDENT_RECONCILIATION',409);
   const key=String(process.env.REALITY_STANDALONE_OPENAI_API_KEY||process.env.OPENAI_API_KEY||'');
@@ -292,6 +306,7 @@ export default async function handler(req,res){
    const shift=ctx.values.active_shift?.find(x=>x?.source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'&&x.owner_shift_authorization_recorded===true)||null;
    const observations=[...(ctx.values.verified_work||[]),...(ctx.values.self_visibility||[]),...(ctx.values.active_shift||[])].slice(0,90);
    const mission=ctx.values.mission?.state?.active_goal;
+   const ownerUniverse=makeOwnerUniverseReadModel({observations});
    stage='READ_ONLY_MODEL_COGNITION';
    const quickStart=Date.now();
    const advisory=await generateProportionalReadOnlyReply({
@@ -307,7 +322,7 @@ export default async function handler(req,res){
      active_owner_mission:mission?.user_confirmed===true&&mission.status==='ACTIVE'?{title:mission.title,source_user_message_ref:mission.source_user_message_ref,grants_execution_authority:false}:null,
      owner_operational_incidents:ctx.values.owner_handoff?.items?.slice(0,3)||null,
      conversation_never_grants_execution_authority:true},
-    verifiedUniverseObservations:observations
+    verifiedUniverseObservations:ownerUniverse.observations
    });
    governedCognitionMs=Date.now()-quickStart;
    stage='READ_ONLY_CONVERSATION_PUBLICATION';
@@ -327,6 +342,7 @@ export default async function handler(req,res){
      goal_publication_atomicity:publication?'CONVERSATIONAL_EXACT_REQUEST_ATOMIC_INSERT':'UNAVAILABLE',
      reply_recovery_requires_exact_saved_request:!publication},
     reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',transient_answer_not_a_receipt:!publication,
+     canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
      independently_verified_semantic_correctness:false,business_outcome_verified:false,external_actions_authorized:false},
     contextual_readback_status:{evidence:ctx.status,unavailable_sources:ctx.unavailable,grants_execution_authority:false},
     execution:{status:'NOT_EXECUTED',external_actions_authorized:false,installation_authorized:false},
@@ -589,25 +605,14 @@ export default async function handler(req,res){
    ...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
   ];
-  const makeOwnerUniverseReadModel=(priorHistory=null)=>{
-   const spine=createContinuitySpine({
-    continuityRootId:scopedRoot,worldlineId:scopedRoot,
-    subjectId:session.user_id
-   });
-   return projectOwnerRealityUniverseForChat({
-    rootId:spine.continuity_root_id,
-    worldlineId:spine.worldline_id,
-    worldId:scopedRoot,continuityHistory:priorHistory,
-    currentObservations:ownerCurrentUniverseObservations,
-    reconciledOriginals
-   });
-  };
   stage='COGNITION_AND_RELIABILITY';
   const governedCognitionStart=Date.now();
   // The full operational pipeline already reconstructs durable Universe
   // history itself. Supply the SAME current owner cognitive read model,
   // without issuing another persistence query or creating a second ledger.
-  const ownerUniverse=makeOwnerUniverseReadModel();
+  const ownerUniverse=makeOwnerUniverseReadModel({
+   observations:ownerCurrentUniverseObservations,reconciledOriginals
+  });
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    // The signed-in user's current request can permit read-only public search;

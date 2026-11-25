@@ -176,7 +176,9 @@ test('read-only HTTP publication preserves exact saved turn while consequential 
  assert.match(api,/READ_ONLY_CONVERSATION_PUBLICATION/);
  assert.match(api,/publishPrivateAssistantAtomically/);
  assert.match(api,/publishPrivateConversationReply/);
- assert.match(api,/readPrivateChatRequest\(session,\{conversationId,requestId\}\)/);
+ // Both exact request readbacks validate the requested ID before owner RLS.
+ assert.equal((api.match(/readPrivateChatRequest\(session,\{\s*conversationId,requestId:targetRequestId\}\)/g)||[]).length,2);
+ assert.equal((api.match(/if\(!validUuid\(targetRequestId\)\)fail\('CHAT_REQUEST_ID_INVALID',400\)/g)||[]).length,2);
  assert.match(api,/external_actions_authorized:false/);
  assert.match(api,/wantsWorkerHealth\?/);
  assert.match(helper,/runRealityCognitiveRuntime/);
