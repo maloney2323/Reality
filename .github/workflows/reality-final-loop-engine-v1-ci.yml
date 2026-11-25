@@ -218,6 +218,7 @@ jobs:
       - name: Run existing controller and new Final Loop Engine invariants
         run: |
           node --test test/reality-final-loop-external-recovery-handoff-v1.test.js
+          node --test test/reality-canonical-governed-auto-trigger-v1.test.js
           node --test test/reality-unified-shift-execution-controller-v1.test.js
           node --test test/reality-final-loop-engine-v1.test.js
           node --test test/reality-final-loop-time-horizon-v1.test.js

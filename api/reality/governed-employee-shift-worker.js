@@ -206,7 +206,7 @@ import {reconcileSignedVerifiedMaintenanceArtifact,
 import {continueExactOwnerApprovedMaintenanceInstall}
  from '../../src/reality-signed-maintenance-approved-install-bridge-v1.js';
 import {routeSignedMaintenanceContinuityTrigger,routeVerifiedFinalLoopResumeTrigger,
- finalLoopEventTriggerEnabled,parseFinalLoopGovernedWake,verifyFinalLoopGovernedWakeScope}
+ finalLoopEventTriggerEnabled,parseFinalLoopGovernedWake,verifyFinalLoopGovernedWakeScope,verifyCanonicalGovernedWakeDelivery}
  from '../../src/reality-governed-auto-trigger-v1.0.js';
 import {advanceVerifiedMaintenanceOriginalHandoff}
  from '../../src/reality-signed-maintenance-original-return-handoff-v1.js';
@@ -264,6 +264,11 @@ export default async function handler(req,res){
   const db=shiftDatabase(process.env);
   activePulseDb=db;
   const governedWakeScope=parseFinalLoopGovernedWake(req.headers);
+  const canonicalEventRuntime=process.env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+  if(canonicalEventRuntime&&process.env.REALITY_CANONICAL_EVENT_ONLY_WORKER_ENABLED==='true'&&!governedWakeScope)
+   return res.status(202).json({status:'UNGOVERNED_PERIODIC_WAKE_IGNORED',worker_started:false,work_completed:false,installation_authorized:false,production_changed:false});
+  if(governedWakeScope&&canonicalEventRuntime&&!verifyCanonicalGovernedWakeDelivery(governedWakeScope,process.env))
+   throw Error('CANONICAL_GOVERNED_WAKE_DELIVERY_SCOPE_REJECTED');
   if(governedWakeScope&&(!finalLoopEventTriggerEnabled(db,process.env)||
     !verifyFinalLoopGovernedWakeScope(governedWakeScope,await shiftRpc(db,
      'reality_read_current_shift_execution_graph_v1',{}))))
@@ -312,6 +317,16 @@ export default async function handler(req,res){
      realRun.installation_authorized!==false||
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
+  if(governedWakeScope&&canonicalEventRuntime){
+   const receipt=await shiftRpc(db,'reality_claim_canonical_governed_wake_v1',{
+    p_owner_id:governedWakeScope.owner_id,p_shift_id:governedWakeScope.shift_id,p_plan_fingerprint:governedWakeScope.plan_fingerprint,
+    p_event_id:governedWakeScope.event_id,p_nonce:governedWakeScope.nonce,p_kind:governedWakeScope.kind,p_release_sha:governedWakeScope.release_sha,
+    p_worker_run_id:actualWorkerRunId,p_lease_id:governedWakeClaimId});
+   if(receipt?.status!=='CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED'||receipt.event_id!==governedWakeScope.event_id||
+    receipt.shift_id!==governedWakeScope.shift_id||receipt.worker_run_id!==actualWorkerRunId||receipt.execution_authorized!==false||
+    receipt.original_job_completed!==false||receipt.production_changed!==false)
+    throw Error('CANONICAL_GOVERNED_WAKE_NOT_DURABLY_CLAIMED');
+  }
   // Explicitly authenticated, preview-only source staging for the SAME
   // signed worker and its durable lease/run. This is NOT a second worker
   // and never invokes a model, approves work, or publishes to a provider.

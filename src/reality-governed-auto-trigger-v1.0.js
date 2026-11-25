@@ -370,19 +370,25 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
 
 // A transport receipt is not a worker, authority or outcome receipt.
 export function finalLoopEventTriggerEnabled(db,env=process.env){
- return env.VERCEL_ENV==='preview'&&
+ const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+ const runtimeBound=canonical?
+  (env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'&&
+   env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED==='true'&&
+   env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'&&env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='true'&&
+   signedShiftUUID.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||'')&&signedShiftUUID.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID||'')&&
+   db?.project===env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&db?.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+   db?.project!==env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF):
+  (env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&db?.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&db?.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF);
+ return runtimeBound&& env.VERCEL_ENV==='preview'&&
   env.REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED==='true'&&
   env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
   env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
   env.REALITY_FINAL_LOOP_EVENT_RESUME_SHADOW_ENABLED==='true'&&
-  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&
   env.REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY!=='true'&&
   db?.strictSecrets===true&&typeof db.project==='string'&&
   db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
-  db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&
   typeof env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF==='string'&&
   env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF.length>0&&
-  db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
   db.url==='https://'+db.project+'.supabase.co';
 }
 export function parseFinalLoopGovernedWake(headers={}){
@@ -394,7 +400,19 @@ export function parseFinalLoopGovernedWake(headers={}){
     typeof plan_fingerprint!=='string'||!signedShiftUUID.test(owner_id)||
     !signedShiftUUID.test(shift_id)||!signedShiftSHA.test(plan_fingerprint))
   fail('WAKE_SCOPE_INVALID');
- return Object.freeze({owner_id,shift_id,plan_fingerprint});
+ const event_id=headers['x-reality-governed-event-id'],nonce=headers['x-reality-governed-wake-nonce'],
+  kind=headers['x-reality-governed-wake-kind'],release_sha=headers['x-reality-governed-release-sha'];
+ if([event_id,nonce,kind,release_sha].every(v=>v===undefined))return Object.freeze({owner_id,shift_id,plan_fingerprint});
+ if(typeof event_id!=='string'||!signedShiftUUID.test(event_id)||typeof nonce!=='string'||!signedShiftUUID.test(nonce)||
+  !['START','RESUME'].includes(kind)||typeof release_sha!=='string'||!/^[a-f0-9]{40}$/.test(release_sha))fail('WAKE_EVENT_INVALID');
+ return Object.freeze({owner_id,shift_id,plan_fingerprint,event_id,nonce,kind,release_sha});
+}
+export function verifyCanonicalGovernedWakeDelivery(scope,env=process.env){
+ return env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW'&&!!scope&&
+  scope.owner_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&scope.shift_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID&&
+  scope.release_sha===env.VERCEL_GIT_COMMIT_SHA&&/^[a-f0-9]{40}$/.test(scope.release_sha||'')&&
+  signedShiftUUID.test(scope.event_id||'')&&signedShiftUUID.test(scope.nonce||'')&&
+  (scope.kind==='RESUME'||(scope.kind==='START'&&scope.event_id===scope.shift_id));
 }
 export function verifyFinalLoopGovernedWakeScope(scope,graph){
  return !!scope&&graph?.status==='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'&&
