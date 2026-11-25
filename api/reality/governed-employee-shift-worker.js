@@ -2898,22 +2898,25 @@ export default async function handler(req,res){
    action_dispatched:false,owner_approval_granted:false,
    model_execution_authorized:false,original_job_completed:false
   };
+  // One existing categorizer owns the route. Refresh its two proof inputs
+  // against the exact current Continuity head before consuming a route.
+  const readCurrentFinalLoopStagedActions=async(continuity,graph)=>{
+   const [staged,preflight]=await Promise.all([
+    shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{
+     p_shift_id:wakeReceipt.shift_id
+    },{timeoutMs:6000}),
+    shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{
+     p_shift_id:wakeReceipt.shift_id
+    },{timeoutMs:6000})
+   ]);
+   return classifySignedFinalLoopStagedPlanActions({graph,staged,preflight,continuity});
+  };
   if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.VERCEL_ENV==='preview'&&
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
      process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
    try{
-    const [staged,preflight]=await Promise.all([
-     shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{
-      p_shift_id:wakeReceipt.shift_id
-     },{timeoutMs:6000}),
-     shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{
-      p_shift_id:wakeReceipt.shift_id
-     },{timeoutMs:6000})
-    ]);
-    finalLoopStagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
-     graph:unifiedGraph,staged,preflight,continuity:lastFinalLoopContinuity
-    });
+    finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(lastFinalLoopContinuity,unifiedGraph);
    }catch{
     finalLoopStagedActionRoutes={
      status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
@@ -2972,9 +2975,15 @@ export default async function handler(req,res){
      };
     }
    }
-   if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
-    await requireFreshFinalLoopContinuity();
+   if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'&&
+      process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+    const freshChildContinuity=await requireFreshFinalLoopContinuity();
     try{
+     const freshChildGraph=assertRealityUnifiedShiftGraph(
+      await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
+       expectedShiftId:wakeReceipt.shift_id
+      });
+     finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(freshChildContinuity,freshChildGraph);
      // Route the existing approved goal to its existing handler only in
      // the isolated operating lane. The handler still owns all atomic
      // claim, source, worker lease and model authority checks.
