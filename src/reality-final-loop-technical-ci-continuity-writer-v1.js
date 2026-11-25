@@ -6,6 +6,8 @@ export const TECHNICAL_CI_CONTINUITY_WRITER_VERSION=
  'reality-final-loop-technical-ci-continuity-writer-v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
+const GIT=/^[a-f0-9]{40}$/;
+const providerId=n=>Number.isSafeInteger(n)&&n>0;
 const out=(status,extra={})=>Object.freeze({
  schema:TECHNICAL_CI_CONTINUITY_WRITER_VERSION,status,
  source_bound_evidence_only:true,technical_observation_recorded:false,
@@ -37,10 +39,17 @@ export async function attachVerifiedTechnicalCiToContinuity({
   p.owner_id!==c?.owner_id||
   p.obligation_id!==c?.obligation_id||
   !HASH.test(p.github_artifact_digest||'')||
-  !HASH.test(c?.contract_id||''))
+  !HASH.test(c?.contract_id||'')||
+  !UUID.test(c?.continuity_root_id||'')||
+  !UUID.test(p.maintenance_id||'')||
+  !providerId(p.github_run_id)||!providerId(p.github_job_id)||
+  !providerId(p.github_artifact_id)||
+  !GIT.test(p.github_release_sha||'')||
+  !GIT.test(p.signed_case_spec_git_blob_sha||''))
   return out('RECOVERY_TECH_CI_EXTERNAL_EVIDENCE_STILL_PENDING');
  const exact={contract_id:c.contract_id,obligation_id:c.obligation_id,
   source_ref:c.source_ref,shift_id:c.shift_id,owner_id:c.owner_id,
+  continuity_root_id:c.continuity_root_id,maintenance_id:p.maintenance_id,
   github_run_id:p.github_run_id,github_artifact_digest:p.github_artifact_digest};
  // Critical: a previously approved internal review is NOT authority to
  // write evidence to the shared/production database or install a patch.
@@ -75,6 +84,11 @@ export async function attachVerifiedTechnicalCiToContinuity({
   r.source_ref===c.source_ref&&
   r.source_revision===c.source_revision&&
   r.shift_id===c.shift_id&&r.owner_id===c.owner_id&&
+  r.continuity_root_id===c.continuity_root_id&&
+  r.maintenance_id===p.maintenance_id&&
+  r.github_job_id===p.github_job_id&&
+  r.signed_case_spec_git_blob_sha===p.signed_case_spec_git_blob_sha&&
+  r.technical_ci_independently_observed===true&&r.read_only===true&&
   r.github_run_id===p.github_run_id&&
   r.github_artifact_digest===p.github_artifact_digest&&
   r.github_artifact_id===p.github_artifact_id&&
@@ -114,7 +128,9 @@ export async function attachVerifiedTechnicalCiToContinuity({
  try{after=await read()}catch{
   return out('RECOVERY_TECH_CI_WRITE_RECORDED_INDEPENDENT_READBACK_REQUIRED',{...exact});
  }
- if(!match(after))
+ // The independent read must confirm the very receipt returned by the
+ // atomic writer, not merely another receipt with a well-formed digest.
+ if(!match(after)||after.observation_receipt_sha256!==recorded.observation_receipt_sha256)
   return out('RECOVERY_TECH_CI_POSTWRITE_READBACK_MISMATCH',{...exact});
  return out('RECOVERY_TECH_CI_OBSERVATION_DURABLY_RECONCILED',{
   ...exact,technical_observation_recorded:true,
