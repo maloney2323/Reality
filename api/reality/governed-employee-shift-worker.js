@@ -3078,44 +3078,6 @@ export default async function handler(req,res){
    }
   }
 
-  // Universe feedback is independently read from the SAME service-owned
-  // signed shift, original obligations, and parent/Universe settlement RPC.
-  // This is operational context only; neither the model nor a Universe
-  // projection can dispatch, certify an outcome, grant approval, or restart.
-  let finalLoopUniverseFeedback={
-   status:'FINAL_LOOP_UNIVERSE_FEEDBACK_NOT_ENABLED',
-   read_only:true,universe_readback_verified:false,
-   execution_authorized:false,original_job_completed:false
-  };
-  if(process.env.VERCEL_ENV==='preview'&&
-     process.env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'&&
-     finalLoopEvidenceCheckpoint?.evidence_checkpoint_acknowledged!==true&&
-     finalLoopEngineShadow.status===
-       'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'&&
-     finalLoopEngineShadow.canonical_continuity_handoff
-      ?.canonical_handoff_verified===true){
-   try{
-    const universeOutcomes=await shiftRpc(db,
-     'reality_read_owner_final_loop_parent_outcomes_v1',{
-      p_owner_id:unifiedGraph.owner_id,
-      p_shift_id:wakeReceipt.shift_id
-     },{timeoutMs:6000});
-    finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
-     canonicalView:finalLoopEngineShadow,
-     parentOutcomes:universeOutcomes,
-     sharedContinuityGuard:finalLoopEngineShadow.shared_continuity_guard?.status===
-      'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'?
-      finalLoopEngineShadow.shared_continuity_guard:null
-    });
-   }catch{
-    finalLoopUniverseFeedback={
-     status:'FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE',
-     read_only:true,universe_readback_verified:false,
-     execution_authorized:false,original_job_completed:false
-    };
-   }
-  }
-
   // Reuse Reality's ACTUAL signed engineering candidate, independent
   // target review and case CI as an exact Final Loop original continuation.
   // The independent original-work warrant is enforced before any case
@@ -3814,7 +3776,7 @@ export default async function handler(req,res){
   // A single CEO-style overview of the same governed signed shift.
   // It reads both the existing automatic supervisor and Final Loop
   // temporal projection. No separate agent, job, warrant, or action.
-  const finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({
+  let finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({
    timeHorizon:finalLoopEngineShadow?.time_horizon||null,
    sharedContinuityGuard:finalLoopEngineShadow?.shared_continuity_guard?.status===
      'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'?
@@ -4022,6 +3984,49 @@ export default async function handler(req,res){
    technicalCiAttachment:finalLoopTechnicalCiContinuityAttachment,
    originalLineageEvidence:signedOriginalLineageEvidence
   });
+
+  // Publish the Universe return AFTER the last recovery/technical evidence
+  // attachment, not from the earlier pre-action shadow. Same signed worker,
+  // same canonical Continuity root, existing independent outcome reader.
+  // Never authorize execution from this projection.
+  workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN';
+  let finalLoopUniverseFeedback={
+   status:'FINAL_LOOP_UNIVERSE_FEEDBACK_NOT_ENABLED',
+   read_only:true,universe_readback_verified:false,
+   execution_authorized:false,original_job_completed:false
+  };
+  if(process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_UNIVERSE_FEEDBACK_ENABLED==='true'){
+   // Suppress pre-effect executive priorities if the new head cannot be
+   // independently read. A stale projection is not current operational truth.
+   finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({});
+   try{
+    const universeReturnView=await requireFreshFinalLoopContinuity();
+    const universeOutcomes=await shiftRpc(db,
+     'reality_read_owner_final_loop_parent_outcomes_v1',{
+      p_owner_id:universeReturnView.owner_id,
+      p_shift_id:wakeReceipt.shift_id
+     },{timeoutMs:6000});
+    finalLoopUniverseFeedback=projectFinalLoopUniverseFeedback({
+     canonicalView:universeReturnView,
+     parentOutcomes:universeOutcomes,
+     sharedContinuityGuard:universeReturnView.shared_continuity_guard
+    });
+    if(finalLoopUniverseFeedback.status===
+       'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY'&&
+       finalLoopUniverseFeedback.shared_continuity_guard_crosschecked===true)
+     finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({
+      timeHorizon:universeReturnView.time_horizon,
+      sharedContinuityGuard:universeReturnView.shared_continuity_guard
+     });
+   }catch{
+    finalLoopUniverseFeedback={
+     status:'FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE',
+     read_only:true,universe_readback_verified:false,
+     execution_authorized:false,original_job_completed:false
+    };
+   }
+  }
 
   workerStage='WORKER_RESPONSE_PUBLICATION';
   // Finish the signed wake lifecycle BEFORE responding: serverless execution

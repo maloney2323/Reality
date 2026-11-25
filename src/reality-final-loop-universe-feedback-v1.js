@@ -41,6 +41,8 @@ const identity=view=>{
     t.original_job_completed!==false||
     p?.owner_id!==view.owner_id||p?.shift_id!==view.shift_id||
     p.continuity_root_id!==c.continuity_root_id||
+    p.continuity_head_sha256!==c.continuity_head_sha256||
+    p.revision!==c.revision||
     !Array.isArray(p.obligations)||p.obligations.length>8||
     (view.continuity_head_sha256!==undefined&&
      view.continuity_head_sha256!==c.continuity_head_sha256))

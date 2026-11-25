@@ -38,7 +38,7 @@ const view={
   status:'FINAL_LOOP_TIME_HORIZONS_PROJECTED_READ_ONLY',
   execution_authorized:false,original_job_completed:false,
   present:{owner_id:owner,shift_id:shift,continuity_root_id:root,
-   obligations}
+   continuity_head_sha256:hash('1'),revision:3,obligations}
  }
 };
 const outcomes=(items=[])=>({
@@ -217,4 +217,31 @@ test('owner Chat and temporal Universe readback require same service-only Contin
  assert.match(chat,/x\.final_loop_shared_continuity_guard\?\.status/);
  assert.match(chat,/feedback\.shared_continuity_guard_crosschecked===true/);
  assert.doesNotMatch(ownerTime,/cron\.schedule\(|net\.http_post/);
+});
+
+
+test('Universe fences temporal projections from an earlier continuity revision or head',()=>{
+ for(const change of [{revision:2},{continuity_head_sha256:hash('2')}]) {
+  const stale={...view,time_horizon:{...view.time_horizon,
+   present:{...view.time_horizon.present,...change}}};
+  const r=feedback({canonicalView:stale,parentOutcomes:outcomes([verified])});
+  assert.equal(r.status,'FINAL_LOOP_UNIVERSE_CANONICAL_CONTINUITY_UNVERIFIED');
+  assert.equal(r.execution_authorized,false);
+  assert.equal(r.original_job_completed,false);
+ }
+});
+
+test('worker refreshes Universe and executive priorities after recovery evidence attachment using existing verifier',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const attachment=worker.indexOf("workerStage='FINAL_LOOP_TECHNICAL_CI_CONTINUITY_EVIDENCE_ATTACHMENT'");
+ const returned=worker.indexOf("workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN'");
+ const publication=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",returned);
+ assert.ok(attachment>=0&&returned>attachment&&publication>returned);
+ const section=worker.slice(returned,publication);
+ assert.match(section,/const universeReturnView=await requireFreshFinalLoopContinuity\(\)/);
+ assert.match(section,/canonicalView:universeReturnView/);
+ assert.match(section,/sharedContinuityGuard:universeReturnView\.shared_continuity_guard/);
+ assert.match(section,/timeHorizon:universeReturnView\.time_horizon/);
+ assert.doesNotMatch(section,/canonicalView:finalLoopEngineShadow/);
 });
