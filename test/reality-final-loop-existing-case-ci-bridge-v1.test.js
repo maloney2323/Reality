@@ -130,3 +130,13 @@ test('existing signed worker routes from actual owner maintenance ledger, no ext
  assert.ok(src.indexOf("workerStage='FINAL_LOOP_EXISTING_CASE_CI_RECOVERY_CLASSIFICATION'")<
   src.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'"));
 });
+
+test('terminal evidence route reuses only completed diagnostic and exact event; never leases another attempt',()=>{
+ const t={...candidate.contract_candidate,qualifier_receipt_sha256:sha('8'),next_qualified_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'};
+ const proposal={status:'RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED',read_only:true,contract_candidate:null,terminal_requalification:t,previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false};
+ const trigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE',evidence_readback_permitted:true,dispatch_permitted:false,execution_authorized_by_trigger:false,new_attempt_authorized:false,previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false,owner_id:owner,shift_id:shift,original_work_id:work,source_ref:source,continuity_root_id:root,qualifier_receipt_sha256:sha('8')};
+ const read=(resumeTrigger,maintenanceLedger=ledger())=>routeExistingSignedCaseCiForRecovery({contractProposal:proposal,resumeTrigger,maintenanceLedger});
+ const r=read(trigger);assert.equal(r.status,'RECOVERY_TERMINAL_EXISTING_CI_DIAGNOSTIC_READBACK_READY');assert.equal(r.contract_id,null);assert.equal(r.new_attempt_authorized,false);assert.equal(r.claim_created,false);assert.equal(r.repeat_prior_ci_dispatch_permitted,false);
+ for(const invalid of [undefined,{...trigger,new_attempt_authorized:true},{...trigger,qualifier_receipt_sha256:sha('7')},{...trigger,original_work_id:'work:'+'f'.repeat(32)}])assert.notEqual(read(invalid).status,r.status);
+ assert.notEqual(read(trigger,ledger([{...item,signed_executor_state:'PENDING'}])).status,r.status);
+});

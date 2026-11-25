@@ -3925,15 +3925,23 @@ export default async function handler(req,res){
    original_job_completed:false,installation_authorized:false,
    production_changed:false
   };
-  if(finalLoopProofCarryingRecovery?.status===
-     'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'&&
+  // Terminal evidence-only work must be selected by the exact delivered
+  // governed event, not by a periodic wake or another original's receipt.
+  const terminalEvidenceTrigger=finalLoopGovernedResumeTrigger?.evidence_readback_permitted===true&&
+   canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&
+   governedWakeScope.event_id===finalLoopGovernedResumeTrigger.event_id?
+   finalLoopGovernedResumeTrigger:null;
+  if((finalLoopProofCarryingRecovery?.status===
+      'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'||
+     (finalLoopProofCarryingRecovery?.status==='RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED'&&terminalEvidenceTrigger))&&
      wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    try{
     const maintenanceLedger=await shiftRpc(db,
      'reality_read_owner_internal_maintenance_v1',{
       p_owner_id:unifiedGraph.owner_id},{timeoutMs:6000});
     finalLoopExistingCaseCiRecovery=routeExistingSignedCaseCiForRecovery({
-     contractProposal:finalLoopProofCarryingRecovery,maintenanceLedger
+     contractProposal:finalLoopProofCarryingRecovery,maintenanceLedger,
+     resumeTrigger:terminalEvidenceTrigger
     });
    }catch{
     finalLoopExistingCaseCiRecovery={

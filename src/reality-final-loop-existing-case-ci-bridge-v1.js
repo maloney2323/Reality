@@ -17,23 +17,38 @@ const safe=(status,extra={})=>Object.freeze({
  production_changed:false,next_governed_action:null,...extra
 });
 export function routeExistingSignedCaseCiForRecovery({
- contractProposal,maintenanceLedger
+ contractProposal,maintenanceLedger,resumeTrigger
 }={}){
- const c=contractProposal?.contract_candidate;
- if(contractProposal?.status!==
-  'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'||
+ // Reuse the existing independent maintenance ledger for a terminal
+ // evidence-only action. Never invent a new recovery contract or budget.
+ const terminal=contractProposal?.status==='RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED';
+ const c=terminal?contractProposal.terminal_requalification:contractProposal?.contract_candidate;
+ const terminalQualified=terminal&&contractProposal.contract_candidate===null&&
+  contractProposal.previous_attempt_budget_preserved===true&&
+  contractProposal.repeat_prior_ci_dispatch_permitted===false&&
+  HASH.test(c?.qualifier_receipt_sha256||'')&&c.next_qualified_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+  resumeTrigger?.status==='FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE'&&
+  resumeTrigger.evidence_readback_permitted===true&&resumeTrigger.dispatch_permitted===false&&
+  resumeTrigger.execution_authorized_by_trigger===false&&resumeTrigger.new_attempt_authorized===false&&
+  resumeTrigger.previous_attempt_budget_preserved===true&&resumeTrigger.repeat_prior_ci_dispatch_permitted===false&&
+  resumeTrigger.owner_id===c.owner_id&&resumeTrigger.shift_id===c.shift_id&&
+  resumeTrigger.original_work_id===c.obligation_id&&resumeTrigger.source_ref===c.source_ref&&
+  resumeTrigger.continuity_root_id===c.continuity_root_id&&
+  resumeTrigger.qualifier_receipt_sha256===c.qualifier_receipt_sha256;
+ if((terminal?!terminalQualified:contractProposal?.status!==
+  'RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE')||
   contractProposal.read_only!==true||
-  !HASH.test(c?.contract_id||'')||
+  (!terminal&&!HASH.test(c?.contract_id||''))||
   !UUID.test(c?.owner_id||'')||
   !UUID.test(c?.shift_id||'')||
   !UUID.test(c?.continuity_root_id||'')||
   !WORK.test(c?.obligation_id||'')||
   !SOURCE.test(c?.source_ref||'')||
-  !HASH.test(c?.blocker_evidence_sha256||'')||
+  (!terminal&&(!HASH.test(c?.blocker_evidence_sha256||'')||
   c?.freeze_state!=='CANDIDATE_NOT_DURABLE'||
   c?.ledger_freeze_verified!==false||
   !Array.isArray(c.required_proofs)||
-  c.required_proofs[0]!=='RED')
+  c.required_proofs[0]!=='RED')))
   return safe('RECOVERY_CANONICAL_CONTRACT_CANDIDATE_REQUIRED');
  if(maintenanceLedger?.status!=='OWNER_VERIFIED_INTERNAL_MAINTENANCE_READ_ONLY'||
   maintenanceLedger.owner_id!==c.owner_id||
@@ -74,7 +89,7 @@ export function routeExistingSignedCaseCiForRecovery({
   item.production_changed!==false)
   return safe('RECOVERY_EXISTING_CASE_CI_EXACT_WARRANT_OR_BASELINE_MISSING',{
    contract_id:c.contract_id,obligation_id:c.obligation_id});
- const evidence={contract_id:c.contract_id,obligation_id:c.obligation_id,
+ const evidence={contract_id:terminal?null:c.contract_id,obligation_id:c.obligation_id,
   source_ref:c.source_ref,owner_id:c.owner_id,shift_id:c.shift_id,
   maintenance_id:item.origin_incident_id,
   original_maintenance_origin_shift_id:item.origin_shift_id,
@@ -87,6 +102,19 @@ export function routeExistingSignedCaseCiForRecovery({
   frozen_test_receipt_sha256:
    HASH.test(item.independent_frozen_test_receipt_sha256||'')?
     item.independent_frozen_test_receipt_sha256:null};
+ if(terminal){
+  if(item.signed_executor_state!=='COMPLETED'||item.signed_executor_action!==CAP||
+     !HASH.test(item.ci_dispatch_receipt_sha256||'')||
+     !HASH.test(item.ci_independent_diagnostic_receipt_sha256||'')||
+     item.frozen_reproduction_verified!==false||item.independent_frozen_test_receipt_sha256!=null)
+   return safe('RECOVERY_TERMINAL_EXISTING_DIAGNOSTIC_RECONCILIATION_REQUIRED',{
+    ...evidence,repeat_prior_ci_dispatch_permitted:false,new_attempt_authorized:false});
+  return safe('RECOVERY_TERMINAL_EXISTING_CI_DIAGNOSTIC_READBACK_READY',{
+   ...evidence,qualifier_receipt_sha256:c.qualifier_receipt_sha256,
+   prior_diagnostic_verified:true,previous_attempt_budget_preserved:true,
+   repeat_prior_ci_dispatch_permitted:false,new_attempt_authorized:false,
+   next_governed_action:'READ_DISTINCT_TECHNICAL_CI_EVIDENCE_ONLY'});
+ }
  if(item.frozen_reproduction_verified===true&&
   HASH.test(item.independent_frozen_test_receipt_sha256||''))
   return safe('RECOVERY_EXISTING_CASE_SPECIFIC_CI_SOURCE_PROOF_NEEDS_CONTRACT_RECONCILIATION',{

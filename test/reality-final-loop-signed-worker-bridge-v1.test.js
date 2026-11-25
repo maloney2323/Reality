@@ -397,6 +397,19 @@ test('signed Final Loop consumes event shadow only for the same original, never 
  assert.equal(r.event_resume_shadow.event_dispatch_enabled,false);
  assert.equal(r.event_resume_shadow.ready_event_refs[0].executor_invoked,false);
  assert.equal(r.original_job_completed,false);
+ const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
+ const terminal=await caller(async(db,name)=>{
+  if(name==='reality_read_current_final_loop_proof_envelope_v1')
+   return {...pending,governed_qualification_handoffs:[{...qualifier,qualifier_next_action:terminalAction,
+    unresolved_proof_gates:[...qualifier.unresolved_proof_gates,'TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED']}]};
+  if(name==='reality_read_final_loop_event_resume_shadow_v1')
+   return {...shadow,subscriptions:[{...shadow.subscriptions[0],condition_kind:'QUALIFIER_PROOF_CHANGED',
+    next_qualified_action:'VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC'}],
+    events:[{...event,event_kind:'QUALIFIER_PROOF_CHANGED',source_receipt_sha256:qualifier.qualifier_receipt_sha256}]};
+  return collect(db,name);
+ },{env:state});
+ assert.equal(terminal.event_resume_shadow.ready_event_refs[0].next_qualified_action,terminalAction);
+ assert.equal(terminal.event_resume_shadow.ready_event_refs[0].execution_authorized,false);
  const forged=await caller(async(db,name)=>{
   if(name!=='reality_read_final_loop_event_resume_shadow_v1')
    return collect(db,name);

@@ -189,3 +189,11 @@ test('wrong original, owner or worker scope fails before a provider call',async(
   assert.equal(r.paths.length,0);
  }
 });
+
+test('terminal evidence readback verifies provider without creating contract, authorization or replay',async()=>{
+ const terminalProposal={status:'RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED',read_only:true,contract_candidate:null,previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false,terminal_requalification:{...contractProposal.contract_candidate,qualifier_receipt_sha256:sha('8'),next_qualified_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'}};
+ const route={...existingCiRoute,status:'RECOVERY_TERMINAL_EXISTING_CI_DIAGNOSTIC_READBACK_READY',read_only:true,contract_id:null,qualifier_receipt_sha256:sha('8'),previous_attempt_budget_preserved:true,new_attempt_authorized:false};
+ const r=runtime();const result=await verify(args(r.fetchImpl,{contractProposal:terminalProposal,existingCiRoute:route}));
+ assert.equal(result.status,'RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED');assert.equal(result.independent_technical_ci_verified,true);assert.equal(result.contract_id,null);assert.equal(result.new_attempt_authorized,false);assert.equal(result.previous_attempt_budget_preserved,true);assert.equal(result.proof_gate_advanced,false);assert.equal(result.original_job_completed,false);assert.equal(result.execution_authorized,false);
+ for(const invalid of [{...route,new_attempt_authorized:true},{...route,qualifier_receipt_sha256:sha('7')},{...route,contract_id:sha('1')}]){const r=runtime();const v=await verify(args(r.fetchImpl,{contractProposal:terminalProposal,existingCiRoute:invalid}));assert.equal(v.independent_technical_ci_verified,false);assert.equal(r.paths.length,0);}
+});

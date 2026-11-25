@@ -33,21 +33,29 @@ const result=(status,fields={})=>Object.freeze({
  ...fields
 });
 function authorized({db,env,proposal,route}){
- const c=proposal?.contract_candidate;
- return env?.VERCEL_ENV==='preview'&&
+ const terminal=proposal?.status==='RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED';
+ const c=terminal?proposal.terminal_requalification:proposal?.contract_candidate;
+ const scopeReady=terminal?
+  (proposal.contract_candidate===null&&proposal.previous_attempt_budget_preserved===true&&
+   proposal.repeat_prior_ci_dispatch_permitted===false&&
+   HASH.test(c?.qualifier_receipt_sha256||'')&&c.next_qualified_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+   route?.status==='RECOVERY_TERMINAL_EXISTING_CI_DIAGNOSTIC_READBACK_READY'&&route.read_only===true&&
+   route.qualifier_receipt_sha256===c.qualifier_receipt_sha256&&route.contract_id===null&&
+   route.previous_attempt_budget_preserved===true&&route.new_attempt_authorized===false):
+  (proposal?.status==='RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'&&
+   HASH.test(c?.contract_id||'')&&c?.ledger_freeze_verified===false&&
+   route?.status==='RECOVERY_REUSE_VERIFIED_CI_DIAGNOSTIC_FROZEN_CASE_SPEC_MISSING'&&
+   route.contract_id===c.contract_id);
+ return scopeReady&&env?.VERCEL_ENV==='preview'&&
   db?.strictSecrets===true&&
   db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
-  proposal?.status==='RECOVERY_PROOF_CONTRACT_CANDIDATE_NEEDS_DURABLE_FREEZE'&&
   proposal.read_only===true&&
-  HASH.test(c?.contract_id||'')&&UUID.test(c?.owner_id||'')&&
+  UUID.test(c?.owner_id||'')&&
   UUID.test(c?.shift_id||'')&&UUID.test(c?.continuity_root_id||'')&&
   WORK.test(c?.obligation_id||'')&&SRC.test(c?.source_ref||'')&&
   SHA.test(c?.source_revision||'')&&
-  c?.ledger_freeze_verified===false&&
-  route?.status==='RECOVERY_REUSE_VERIFIED_CI_DIAGNOSTIC_FROZEN_CASE_SPEC_MISSING'&&
   route.owner_id===c.owner_id&&route.shift_id===c.shift_id&&
   route.source_ref===c.source_ref&&route.obligation_id===c.obligation_id&&
-  route.contract_id===c.contract_id&&
   UUID.test(route.maintenance_id||'')&&
   HASH.test(route.existing_diagnostic_receipt_sha256||'')&&
   route.prior_diagnostic_verified===true&&
@@ -63,10 +71,14 @@ export async function verifySourceBoundTechnicalRecoveryCi({
  if(!authorized({db,env,proposal:contractProposal,route:existingCiRoute})||
   typeof fetchImpl!=='function')
   return result('RECOVERY_TECHNICAL_CI_EXACT_SOURCE_AND_WARRANT_REQUIRED');
- const c=contractProposal.contract_candidate,route=existingCiRoute;
+ const terminal=contractProposal.status==='RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED';
+ const c=terminal?contractProposal.terminal_requalification:contractProposal.contract_candidate,route=existingCiRoute;
  const base={owner_id:c.owner_id,shift_id:c.shift_id,
   obligation_id:c.obligation_id,source_ref:c.source_ref,
-  contract_id:c.contract_id,maintenance_id:route.maintenance_id,
+  contract_id:terminal?null:c.contract_id,maintenance_id:route.maintenance_id,
+  ...(terminal?{qualifier_receipt_sha256:c.qualifier_receipt_sha256,
+   previous_attempt_budget_preserved:true,new_attempt_authorized:false,
+   repeat_prior_ci_dispatch_permitted:false}:{}),
   technical_proof_scope:'PR307_LINKED_TECHNICAL_RECOVERY_HANDOFF_ONLY',
   original_obligation_open:true,source_revision:c.source_revision};
  const token=String(env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
@@ -170,7 +182,8 @@ export async function verifySourceBoundTechnicalRecoveryCi({
   if(js.length!==1||arts.length!==1)
    return result('RECOVERY_TECHNICAL_CI_GITHUB_JOB_OR_ARTIFACT_UNVERIFIED',{
     ...base,github_run_id:run.id});
-  return result('RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING',{
+  return result(terminal?'RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED':
+   'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING',{
    ...base,independent_technical_ci_verified:true,
    existing_diagnostic_receipt_sha256:route.existing_diagnostic_receipt_sha256,
    frozen_technical_red_verified:true,
@@ -182,7 +195,8 @@ export async function verifySourceBoundTechnicalRecoveryCi({
    independent_ci_provider_observation:true,
    artifact_content_independently_read:false,
    signed_database_receipt_recorded:false,
-   next_governed_action:'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'
+   next_governed_action:terminal?'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY':
+    'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'
   });
  }catch{
   return result('RECOVERY_TECHNICAL_CI_PROVIDER_RECONCILIATION_RETRY_DUE',{
