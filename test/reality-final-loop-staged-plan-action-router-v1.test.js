@@ -287,3 +287,36 @@ test('after-action Continuity readback detects real head revision but cannot sel
   assert.equal(r.recovery_verified,false);
  }
 });
+
+
+test('existing exact approved goal remains connected to reviewed recovery without preparing another approval',()=>{
+ const accepted={...preflight,plans:[{...preflight.plans[0],
+  independent_goal_acceptance_verified:true,owner_goal_acceptance_pending:false,
+  pending_exact_owner_approval:false,owner_approval_claim_window_current:true,
+  owner_approval_expired:false}]};
+ const routes=classify({graph,staged,preflight:accepted});
+ assert.equal(routes.status,'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED');
+ assert.equal(routes.prepared_owner_packet_candidate_count,0);
+ assert.equal(routes.routes[0].existing_owner_goal_acceptance_verified,true);
+ assert.equal(routes.routes[0].owner_action_required,false);
+ assert.equal(routes.routes[0].next_registered_handler,null);
+ assert.equal(routes.routes[0].child_execution_authorized,false);
+ const c=reconcile({graph,stagedActions:routes,
+  continuityClassification:classification,registeredRouting:recoveryRouting});
+ assert.equal(c.status,'FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL');
+ assert.equal(c.original_work_id,work);
+ assert.equal(c.execution_authorized,false);
+ const r=inspect({candidate:c,operatingLane});
+ assert.equal(r.status,'FINAL_LOOP_EXISTING_ACCEPTED_GOAL_REQUIRES_VERIFIED_CHILD_CLAIM');
+ assert.equal(r.owner_action_required,false);
+ assert.equal(r.child_execution_authorized,false);
+ assert.equal(r.original_job_completed,false);
+ for(const change of [{owner_approval_claim_window_current:false},
+  {owner_approval_expired:true},{source_manifest_sha256:hash('0')},
+  {owner_goal_acceptance_pending:true},{pending_exact_owner_approval:true}]){
+  const rejected=classify({graph,staged,preflight:{...accepted,
+   plans:[{...accepted.plans[0],...change}]}});
+  assert.notEqual(rejected.status,'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED');
+  assert.equal(rejected.action_dispatched,false);
+ }
+});
