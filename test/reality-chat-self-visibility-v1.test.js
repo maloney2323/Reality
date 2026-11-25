@@ -139,7 +139,10 @@ test('model receives self visibility in both Chat lanes, not solely if employee 
  assert.match(api,/id:'self_visibility'/);
  assert.match(api,/self_visibility:selfVisibilityObservations/);
  assert.match(api,/\.\.\.selfVisibilityObservations/);
- assert.match(api,/currentObservations:ownerCurrentUniverseObservations/);
+ assert.match(api,/currentObservations:observations,reconciledOriginals/);
+ assert.match(api,/makeOwnerUniverseReadModel\(\{\s*observations:ownerCurrentUniverseObservations,reconciledOriginals/);
+ assert.match(api,/makeOwnerUniverseReadModel\(\{observations\}\)/);
+ assert.match(api,/\.\.\.\(ctx\.values\.self_visibility\|\|\[\]\)/);
  assert.match(api,/verifiedUniverseObservations:ownerUniverse\.observations/);
  assert.match(api,/connected_world_observations:ownerUniverse\.observations/);
  assert.match(gateway,/REALITY SELF-VISIBILITY AND SELF-CORRECTION CONTRACT/);
