@@ -91,3 +91,51 @@ test('persistence rejects a write against a non-tail parent', async () => {
     global.fetch = originalFetch;
   }
 });
+
+
+test('reconstruction reads beyond the provider row cap using one scoped cutoff', async () => {
+  const root='aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa';
+  const worldline='bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb';
+  const cutoff='2026-10-08T00:00:00.000Z';
+  const rows=Array.from({length:1205},(_,i)=>({
+    event_id:'event:'+i, continuity_root_id:root, worldline_id:worldline,
+    assertion_time:cutoff, parent_event_id:i?'event:'+(i-1):null,
+  }));
+  const offsets=[];
+  const persistence=createUniversePostgresPersistence({
+    url:'https://example.supabase.co',secretKey:'test-key',
+    fetchImpl:async url=>{
+      const q=new URL(url).searchParams;
+      assert.equal(q.get('continuity_root_id'),'eq.'+root);
+      assert.equal(q.get('worldline_id'),'eq.'+worldline);
+      assert.equal(q.get('assertion_time'),'lte.'+cutoff);
+      assert.equal(q.get('order'),'assertion_time.asc,created_at.asc,event_id.asc');
+      const offset=Number(q.get('offset')||0);
+      const limit=Math.min(1000,Number(q.get('limit')||1000));
+      offsets.push(offset);
+      return new Response(JSON.stringify(rows.slice(offset,offset+limit)),{status:200});
+    }
+  });
+  const history=await persistence.reconstruct({
+    continuityRootId:root,worldlineId:worldline,assertionTime:cutoff
+  });
+  assert.deepEqual(history,rows);
+  assert.deepEqual(offsets,[0,400,800,1200]);
+});
+
+test('reconstruction rejects cross-worldline rows and overlapping pages', async () => {
+  const root='root:test', worldline='world:test';
+  const create=fetchImpl=>createUniversePostgresPersistence({
+    url:'https://example.supabase.co',secretKey:'test-key',fetchImpl
+  });
+  const scope={continuityRootId:root,worldlineId:worldline};
+  const wrong=create(async()=>new Response(JSON.stringify([{
+    event_id:'wrong',continuity_root_id:root,worldline_id:'world:other'
+  }]),{status:200}));
+  await assert.rejects(wrong.reconstruct(scope),/CONTINUITY_RECONSTRUCTION_SCOPE_MISMATCH/);
+  const rows=Array.from({length:400},(_,i)=>({
+    event_id:'event:'+i,continuity_root_id:root,worldline_id:worldline
+  }));
+  const repeated=create(async()=>new Response(JSON.stringify(rows),{status:200}));
+  await assert.rejects(repeated.reconstruct(scope),/CONTINUITY_RECONSTRUCTION_DUPLICATE_OR_INVALID/);
+});
