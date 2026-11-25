@@ -47,8 +47,14 @@ const args={db,env,wake,graph,continuityReturn,stagedRoutes,ownerPackets,
 const frozen={status:'RECOVERY_CONTRACT_SIGNED_OWNER_READBACK',
  contract_id:candidate.contract_id,contract:candidate,
  durableFreeze:{status:'RECOVERY_CONTRACT_ATOMIC_FREEZE_VERIFIED',
-  contract_id:candidate.contract_id,
+  contract_id:candidate.contract_id,contract_fingerprint:candidate.contract_id,
+  obligation_id:id,continuity_root_id:root,
   freeze_receipt_sha256:sha('b'),independently_observed:true},
+ budgetLedger:{source:'INDEPENDENT_SIGNED_RECOVERY_BUDGET_LEDGER_READBACK',
+  independent_verified:true,contract_id:candidate.contract_id,obligation_id:id,
+  continuity_root_id:root,receipt_sha256:sha('b'),total_attempts:0,
+  spent_wall_seconds:0,spent_cost_units:0,cumulative_touched_files:0},
+ attempts:[],proofReceipts:[],
  read_only:true,execution_authorized:false,original_job_completed:false};
 test('shared benchmark cannot freeze or dispatch despite approval',async()=>{
  const called=[];
@@ -154,4 +160,56 @@ test('SQL migration binds same original/ledger, service role, disabled registry 
  assert.ok(src.includes('final_loop_signed_proof_recovery:finalLoopSignedProofRecovery'));
  assert.ok(src.indexOf('let finalLoopSignedProofRecovery')>
   src.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
+});
+
+const verifier='87654321-4321-4321-8321-cba987654321';
+const attempt={attempt_id:'22222222-2222-4222-8222-222222222222',
+ strategy_fingerprint:sha('a'),executor_worker_run_id:run,verifier_worker_run_id:verifier,
+ state:'PROOF_INDEPENDENTLY_VERIFIED',wall_seconds:10,cost_units:1,changed_files:0};
+const redReport={contract_id:candidate.contract_id,obligation_id:id,continuity_root_id:root,
+ source_revision:head,gate:'RED',receipt_sha256:sha('d'),artifact_sha256:sha('e'),
+ origin_worker_run_id:run,verifier_worker_run_id:verifier,
+ source:'INDEPENDENT_SIGNED_VERIFIER_LEDGER_READBACK',independent_verified:true,
+ proof_delta_verified:true,test_reproduces_exact_failure:true,frozen_red_test_status:'FAILED_AS_EXPECTED'};
+const redRow={gate:redReport.gate,receipt_sha256:redReport.receipt_sha256,
+ artifact_sha256:redReport.artifact_sha256,origin_worker_run_id:run,verifier_worker_run_id:verifier,
+ independent_verified:true,proof_delta_verified:true,test_report:redReport};
+const ledgerWith=(attempts,proofReceipts=[])=>({...frozen,attempts,proofReceipts,
+ budgetLedger:{...frozen.budgetLedger,total_attempts:attempts.length,spent_wall_seconds:10*attempts.length,
+ spent_cost_units:attempts.length}});
+async function reconcileOnly(ledger){
+ const calls=[];
+ const result=await advanceOneSignedProofRecovery({...args,call:async(_,rpc)=>{
+  calls.push(rpc);
+  assert.equal(rpc,'reality_read_final_loop_recovery_contract_v1');
+  return ledger;
+ }});
+ assert.deepEqual(calls,['reality_read_final_loop_recovery_contract_v1']);
+ assert.equal(result.strategy_executed,false);
+ assert.equal(result.original_job_completed,false);
+ return result;
+}
+test('a durable pending claim survives the wake and prevents duplicate acquisition or dispatch',async()=>{
+ const result=await reconcileOnly(ledgerWith([{...attempt,state:'CLAIMED'}]));
+ assert.equal(result.status,'RECOVERY_DURABLE_STRATEGY_OUTCOME_UNCERTAIN_NO_REPLAY');
+});
+test('three independently recorded failed strategies reach the existing hard budget before acquiring anything',async()=>{
+ const attempts=['1','2','3'].map((s,i)=>({...attempt,state:'FAILED_INDEPENDENTLY_VERIFIED',
+  attempt_id:s.repeat(8)+'-'+s.repeat(4)+'-4'+s.repeat(3)+'-8'+s.repeat(3)+'-'+s.repeat(12),
+  strategy_fingerprint:sha(s),failure_class:'NO_PROOF_DELTA',independent_failure_receipt_sha256:sha(s)}));
+ const result=await reconcileOnly(ledgerWith(attempts));
+ assert.equal(result.status,'RECOVERY_BUDGET_EXHAUSTED');
+});
+test('signed RED report on existing obligation moves to isolated repair rather than repeating RED acquisition',async()=>{
+ const result=await reconcileOnly(ledgerWith([attempt],[redRow]));
+ assert.equal(result.status,'RECOVERY_DURABLE_NEXT_PROOF_REQUIRES_EXACT_SIGNED_HANDLER');
+ assert.equal(result.next_required_proof,'REPAIR_ISOLATED');
+ assert.equal(result.verified_proof_count,1);
+});
+test('missing or mismatched independent report cannot advance the same durable obligation',async()=>{
+ for(const report of [undefined,{...redReport,obligation_id:'work:'+'0'.repeat(32)},
+  {...redReport,test_reproduces_exact_failure:false}]){
+  const result=await reconcileOnly(ledgerWith([attempt],[{...redRow,test_report:report}]));
+  assert.equal(result.status,'RECOVERY_INDEPENDENT_PROOF_DELTA_UNVERIFIED');
+ }
 });

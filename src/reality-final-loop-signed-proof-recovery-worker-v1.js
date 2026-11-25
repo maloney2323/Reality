@@ -1,7 +1,7 @@
 // Signed Final Loop continuation for the existing original obligation.
 // This is NOT a second scheduler, executor, verifier or approval authority.
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
-import {projectRecoveryContractFromFinalLoop}
+import {projectRecoveryContractFromFinalLoop,decideNextRecoveryTransition}
  from './reality-final-loop-proof-carrying-recovery-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -16,6 +16,53 @@ const no=(status,extra={})=>Object.freeze({
  installation_authorized:false,external_effect_performed:false,
  next_governed_action:null,...extra
 });
+// The durable SQL reader returns relational proof/attempt metadata plus the
+// independent verifier's gate report. Adapt only those exact persisted rows;
+// a model suggestion or an in-flight claim cannot become a proof or retry.
+function evaluateDurableRecovery(c,durable){
+ const attempts=durable.attempts,proofs=durable.proofReceipts;
+ if(!Array.isArray(attempts)||!Array.isArray(proofs)||
+  durable.budgetLedger?.total_attempts!==attempts.length||
+  attempts.some(a=>!['CLAIMED','FAILED_INDEPENDENTLY_VERIFIED','PROOF_INDEPENDENTLY_VERIFIED'].includes(a?.state)||
+   !UUID.test(a.attempt_id||'')||!HASH.test(a.strategy_fingerprint||'')||
+   !UUID.test(a.executor_worker_run_id||''))||
+  new Set(attempts.map(a=>a.attempt_id)).size!==attempts.length||
+  new Set(attempts.map(a=>a.strategy_fingerprint)).size!==attempts.length)
+  return {status:'RECOVERY_DURABLE_ATTEMPT_LEDGER_UNVERIFIED'};
+ // A claim may have produced an effect before its receipt was persisted.
+ // Never allow another strategy to run until this claim is reconciled.
+ if(attempts.some(a=>a.state==='CLAIMED'))
+  return {status:'RECOVERY_DURABLE_STRATEGY_OUTCOME_UNCERTAIN_NO_REPLAY',
+   next_governed_action:'RECONCILE_EXISTING_SIGNED_STRATEGY_OUTCOME'};
+ const identity={contract_id:c.contract_id,obligation_id:c.obligation_id,
+  continuity_root_id:c.continuity_root_id,source_revision:c.source_revision};
+ const source='INDEPENDENT_SIGNED_VERIFIER_LEDGER_READBACK';
+ const failedAttempts=attempts.filter(a=>a.state==='FAILED_INDEPENDENTLY_VERIFIED').map(a=>({
+  ...a,...identity,source,independent_failure_verified:true
+ }));
+ // Gate-specific observations must be present in the verifier's report;
+ // SQL's row identity/receipt and the report must agree. Do not fill in a
+ // missing failing assertion, green result or continuation with defaults.
+ const proofReceipts=proofs.map(p=>{
+  const r=p?.test_report;
+  if(!r||typeof r!=='object'||Array.isArray(r)||
+   r.contract_id!==c.contract_id||r.obligation_id!==c.obligation_id||
+   r.continuity_root_id!==c.continuity_root_id||r.source_revision!==c.source_revision||
+   r.gate!==p.gate||r.receipt_sha256!==p.receipt_sha256||
+   r.artifact_sha256!==p.artifact_sha256||
+   r.origin_worker_run_id!==p.origin_worker_run_id||
+   r.verifier_worker_run_id!==p.verifier_worker_run_id||
+   r.source!==source||r.independent_verified!==true||r.proof_delta_verified!==true||
+   p.independent_verified!==true||p.proof_delta_verified!==true||
+   !attempts.some(a=>a.state==='PROOF_INDEPENDENTLY_VERIFIED'&&
+    a.executor_worker_run_id===p.origin_worker_run_id&&
+    a.verifier_worker_run_id===p.verifier_worker_run_id))
+   return null;
+  return r;
+ });
+ return decideNextRecoveryTransition({contract:c,durableFreeze:durable.durableFreeze,
+  budgetLedger:durable.budgetLedger,proofReceipts,failedAttempts});
+}
 export async function advanceOneSignedProofRecovery({
  db,env=process.env,wake,graph,continuityReturn,stagedRoutes,
  ownerPackets,workerRunId,existingCiRoute=null,call=shiftRpc
@@ -107,6 +154,28 @@ export async function advanceOneSignedProofRecovery({
   durable.original_job_completed!==false)
   return no('RECOVERY_FROZEN_CONTRACT_INDEPENDENT_READBACK_MISMATCH',{
    contract_id:c.contract_id,next_governed_action:'RECHECK_CANONICAL_CONTINUITY_HEAD'});
+ // The exact frozen obligation owns the decision. Existing failures,
+ // pending claims and independent proof gates must be considered BEFORE
+ // capability acquisition or another attempt is recommended.
+ const decision=evaluateDurableRecovery(c,durable);
+ if(decision.status!=='RECOVERY_DIFFERENT_STRATEGY_REQUIRED')
+  return no(decision.status,{
+   contract_id:c.contract_id,contract_frozen:true,
+   freeze_receipt_sha256:durable.durableFreeze.freeze_receipt_sha256,
+   next_required_proof:decision.next_required_proof||null,
+   verified_proof_count:decision.verified_proof_count||0,
+   next_governed_action:decision.next_governed_action||'RECONCILE_SIGNED_RECOVERY_LEDGER'
+  });
+ // After RED the next required proof is no longer RED. Do not dispatch
+ // the original diagnostic or request its construction again.
+ if(decision.next_required_proof!=='RED')
+  return no('RECOVERY_DURABLE_NEXT_PROOF_REQUIRES_EXACT_SIGNED_HANDLER',{
+   contract_id:c.contract_id,contract_frozen:true,
+   freeze_receipt_sha256:durable.durableFreeze.freeze_receipt_sha256,
+   next_required_proof:decision.next_required_proof,
+   verified_proof_count:decision.verified_proof_count,
+   next_governed_action:'QUALIFY_EXACT_REGISTERED_HANDLER_AND_WARRANT_FOR_NEXT_PROOF'
+  });
  // Already frozen and returned on this worker. The missing capability is
  // a next action; approval for READ_ONLY_INTERNAL_PR_REVIEW is NOT a warrant
  // to install test harnesses or source changes.
