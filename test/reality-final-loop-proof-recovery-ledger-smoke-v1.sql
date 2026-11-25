@@ -62,3 +62,22 @@ BEGIN
  THEN RAISE EXCEPTION 'TECHNICAL_CI_INVALID_PROOF_FAIL_OPEN';END IF;
 END $$;
 RESET ROLE;
+
+-- Compile the actual builder SQL in PostgreSQL, not just JS string assertions.
+-- This deliberately minimal empty relation is a compile-only fixture for the
+-- ALTER in the existing SQL. No real shift, warrant or provider proof is made.
+CREATE TABLE reality_internal.owner_internal_maintenance_jobs_v1(
+ incident_id uuid PRIMARY KEY
+);
+SET check_function_bodies = on;
+\ir ../sql/reality-signed-maintenance-frozen-test-build-v1.sql
+DO $$
+BEGIN
+ IF NOT has_function_privilege('service_role',
+  'reality_internal.signed_frozen_test_build_scope_v1(uuid,uuid,uuid,text)','EXECUTE')
+  OR has_function_privilege('authenticated',
+  'reality_internal.signed_frozen_test_build_scope_v1(uuid,uuid,uuid,text)','EXECUTE')
+ THEN RAISE EXCEPTION 'FROZEN_BUILDER_SCOPE_AUTHORITY_DRIFT';END IF;
+END $$;
+-- Do not leave the compile fixture in place for the next smoke script.
+DROP TABLE reality_internal.owner_internal_maintenance_jobs_v1;
