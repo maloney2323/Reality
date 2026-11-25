@@ -84,6 +84,8 @@ export function verifyActuallyCompletedSignedWorkerRelease({
   w.running_release_sha===candidate.sha&&
   w.running_release_ref===candidate.branch&&
   w.operating_lane==='NORMAL_SIGNED_SHIFT'&&
+  (candidate.environment!=='CANONICAL_BENCHMARK_PREVIEW'||
+   (UUID.test(approval.claim_id||'')&&w.release_claim_id===approval.claim_id))&&
   HASH.test(w.release_receipt_sha256||'')&&
   Number.isFinite(Date.parse(w.recorded_at||''))&&
   Number.isFinite(Date.parse(w.finished_at||''))&&

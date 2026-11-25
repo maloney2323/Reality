@@ -18,28 +18,30 @@ test('Home presents a single Chat-first automated employee shift card and retain
  assert.match(simple,/src="\/reality-chat-conversation-export-v1.js"/);
 });
 test('Chat prepares an exact source-bound draft without model-generated work authority',()=>{
- assert.match(main,/personal-governed-employee-shift\?hours=8/);
+ assert.match(main,/personal-governed-employee-shift\?hours='\+requestedHours/);
+ assert.match(main,/Number\.isSafeInteger\(p\?\.duration_hours\)&&p\.duration_hours>=1&&p\.duration_hours<=12\?p\.duration_hours:8/);
+ assert.match(main,/p\.shift_duration_hours===requestedHours&&p\.shift_duration_minutes===requestedHours\*60/);
  assert.match(main,/OWNER_SCOPED_EMPLOYEE_SHIFT_READBACK/);
  assert.match(main,/validDraft\(p\)/);
  assert.match(main,/p\.expected_fingerprint/);
  assert.match(main,/p\.owner_approval_created===false/);
  assert.match(main,/tasks\.operating_model==='ONE_OPENAI_MODEL_SWITCHES_EMPLOYEE_ROLE_CONTEXT'/);
  assert.match(main,/new Set\(\['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'\]\)/);
- assert.match(main,/if\(existing\)\{showExisting\(existing,data\.governed_auto_trigger\);return;\}/);
+ assert.match(main,/if\(existing\)\{showExisting\(existing,data\.governed_auto_trigger\);if\(allEmployees\)await appendAllRoleProposals\(\);return;\}/);
  assert.match(main,/No job has started/);
 });
 test('Only explicit click approves the current fingerprint; edits revoke that approval path',()=>{
  assert.match(main,/approve\.addEventListener\('click'/);
  assert.match(main,/action:'AUTHORIZE_EXACT_EMPLOYEE_SHIFT'/);
  assert.match(main,/expected_fingerprint:p\.expected_fingerprint/);
- assert.match(main,/completion_bound:true,requested_hours:8/);
+ assert.match(main,/completion_bound:true,requested_hours:p\.shift_duration_hours/);
  assert.match(main,/editing=true/);
  assert.match(main,/revisionRequested=true/);
  assert.match(main,/approval is disabled until a revised plan has its own verified fingerprint/i);
  assert.match(main,/if\(p\.combined_employee_work_orders\.task_count>0&&!revisionRequested\)/);
  assert.match(main,/reset\.addEventListener\('click'/);
  assert.match(main,/approve\.hidden=true;approve\.disabled=true/);
- assert.match(main,/if\(processing\|\|editing\|\|revisionRequested\|\|!draft/);
+ assert.match(main,/if\(processing\|\|allEmployees\|\|editing\|\|revisionRequested\|\|!draft\|\|!validDraft\(draft\)/);
  assert.doesNotMatch(main,/install_approval_authorized_by_triage:true|installation_authorized:true/);
  assert.match(main,/governed amendment/);
 });

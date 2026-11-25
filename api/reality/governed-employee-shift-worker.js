@@ -2479,8 +2479,14 @@ export default async function handler(req,res){
    release_activated:false,original_job_completed:false
   };
   if(process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED==='true'){
-   if(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
-      db.project!==process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF||
+   const canonicalReleaseWake=process.env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW'&&
+    db.project===process.env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&
+    db.project===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+    signedWorkerReleaseOperatingLane.status==='FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'&&
+    unifiedGraph.owner_id===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&
+    wakeReceipt.shift_id===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID;
+   if((!canonicalReleaseWake&&(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+      db.project!==process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF))||
       signedWorkerReleaseOperatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||
       signedWorkerCapabilityDelivery.status!==
        'SIGNED_WORKER_RELEASE_AND_REGISTERED_ACTIONS_OBSERVED'){
@@ -2495,7 +2501,9 @@ export default async function handler(req,res){
       p_owner_id:unifiedGraph.owner_id,p_shift_id:wakeReceipt.shift_id,
       p_release_sha:signedWorkerCapabilityDelivery.running_release_sha,
       p_release_ref:signedWorkerCapabilityDelivery.running_release_ref,
-      p_registered_capabilities:registeredRecoveryActionKeys
+      p_registered_capabilities:registeredRecoveryActionKeys,
+      ...(canonicalReleaseWake?{p_wake_claim_id:governedWakeClaimId,
+       p_capability_key:process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY}:{})
      },{timeoutMs:6000});
      signedWorkerDurableReleaseWake=
       actual?.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
