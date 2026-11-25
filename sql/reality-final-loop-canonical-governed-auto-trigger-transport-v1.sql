@@ -130,7 +130,9 @@ BEGIN
         AND q.reconciliation_snapshot->'recovery_terminal_history'->>'remaining_attempts'='0'
         AND q.reconciliation_snapshot->'recovery_terminal_history'->>'replay_permitted'='false'
         AND q.reconciliation_snapshot->'recovery_terminal_history'->>'new_attempt_authorized'='false'
-        AND q.reconciliation_snapshot->'recovery_terminal_history'->>'last_attempt_receipt_sha256' ~ '^sha256:[a-f0-9]{64}'sha256:'||pg_catalog.encode(pg_catalog.sha256(
+        AND q.reconciliation_snapshot->'recovery_terminal_history'->>'last_attempt_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$'
+        AND q.reconciliation_snapshot->'recovery_terminal_history'->>'last_decision_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$'))
+      AND q.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(
         pg_catalog.convert_to(q.reconciliation_snapshot::text,'UTF8')),'hex')
     )) OR (ev.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' AND EXISTS(
      SELECT 1 FROM reality_internal.owner_maintenance_independent_case_ci_v1 ci
