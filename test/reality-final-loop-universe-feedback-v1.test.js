@@ -245,3 +245,12 @@ test('worker refreshes Universe and executive priorities after recovery evidence
  assert.match(section,/timeHorizon:universeReturnView\.time_horizon/);
  assert.doesNotMatch(section,/canonicalView:finalLoopEngineShadow/);
 });
+
+
+test('newly acknowledged atomic checkpoint defers Universe and executive publication until the next signed wake',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const section=worker.slice(worker.indexOf("workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN'"),worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",worker.indexOf("workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN'")));
+ assert.match(section,/finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief\(\{\}\)/);
+ assert.match(section,/if\(finalLoopEvidenceCheckpoint\?\.evidence_checkpoint_acknowledged!==true\)\{[\s\S]*?const universeReturnView=await requireFreshFinalLoopContinuity\(\)/);
+ assert.match(section,/\}else\{\s*finalLoopUniverseFeedback=\{\s*status:'FINAL_LOOP_UNIVERSE_CHECKPOINT_REBOUND_NEXT_WAKE_REQUIRED'/);
+});

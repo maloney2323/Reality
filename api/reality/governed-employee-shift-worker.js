@@ -4000,6 +4000,10 @@ export default async function handler(req,res){
    // Suppress pre-effect executive priorities if the new head cannot be
    // independently read. A stale projection is not current operational truth.
    finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief({});
+   // A newly acknowledged checkpoint rebounded event subscriptions to a
+   // new revision. Preserve the existing one-wake checkpoint boundary:
+   // publish no Universe/executive projection until the next signed wake.
+   if(finalLoopEvidenceCheckpoint?.evidence_checkpoint_acknowledged!==true){
    try{
     const universeReturnView=await requireFreshFinalLoopContinuity();
     const universeOutcomes=await shiftRpc(db,
@@ -4022,6 +4026,13 @@ export default async function handler(req,res){
    }catch{
     finalLoopUniverseFeedback={
      status:'FINAL_LOOP_UNIVERSE_OUTCOME_READBACK_UNAVAILABLE',
+     read_only:true,universe_readback_verified:false,
+     execution_authorized:false,original_job_completed:false
+    };
+   }
+   }else{
+    finalLoopUniverseFeedback={
+     status:'FINAL_LOOP_UNIVERSE_CHECKPOINT_REBOUND_NEXT_WAKE_REQUIRED',
      read_only:true,universe_readback_verified:false,
      execution_authorized:false,original_job_completed:false
     };
