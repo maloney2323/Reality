@@ -22,7 +22,7 @@ const result=(status,routes=[])=>Object.freeze({
   x.next_governed_action==='QUALIFY_AND_ADMIT_EXACT_PARENT_ORIGINAL').length
 });
 export function classifySignedFinalLoopStagedPlanActions({
- graph,staged,preflight
+ graph,staged,preflight,continuity
 }={}){
  if(graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
   !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
@@ -120,6 +120,9 @@ export function classifySignedFinalLoopStagedPlanActions({
     accepted?'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':null,
    handler_requires_isolated_service_claim:Boolean(p),
    existing_owner_goal_acceptance_verified:accepted,
+   canonical_execution_handoff:accepted?projectCanonicalApprovedReviewHandoff({
+    graph,plan,approval:p,continuity
+   }):null,
    source_plan_only:true,owner_action_required:pending,
    handler_dispatched:false,owner_approval_granted:false,
    child_execution_authorized:false,original_job_completed:false
@@ -130,6 +133,76 @@ export function classifySignedFinalLoopStagedPlanActions({
  return result('FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED',routes);
 }
 
+
+// Exact portable scope description from the existing canonical preflight and
+// shared Continuity verifier. It is not a bearer grant, lease or new ledger.
+// The canonical service must independently re-read and atomically claim work
+// before any isolated model invocation. Never import this as an owner approval.
+export function projectCanonicalApprovedReviewHandoff({graph,plan,approval,continuity}={}){
+ const h=approval?.canonical_review_handoff,g=continuity?.shared_continuity_guard;
+ const root=continuity?.canonical_continuity_handoff;
+ if(!h||h.schema!=='reality-canonical-approved-review-scope-v1'||
+  h.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||h.canonical_claim_required!==true||
+  h.execution_authorized!==false||h.original_job_completed!==false||h.production_changed!==false||
+  approval.independent_goal_acceptance_verified!==true||
+  approval.owner_approval_claim_window_current!==true||approval.owner_approval_expired!==false||
+  approval.owner_goal_acceptance_pending!==false||approval.pending_exact_owner_approval!==false||
+  approval.child_review_automatically_authorized!==false||
+  !UUID.test(h.packet_id||'')||!UUID.test(h.approval_request_id||'')||
+  !UUID.test(h.acceptance_event_id||'')||!HASH.test(h.owner_approval_receipt_sha256||'')||
+  !/^[a-f0-9]{64}$/.test(h.acceptance_event_content_hash||'')||
+  graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+  !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
+  !HASH.test(graph.plan_fingerprint||'')||
+  h.owner_id!==graph.owner_id||h.shift_id!==graph.shift_id||
+  h.plan_fingerprint!==graph.plan_fingerprint||
+  !UUID.test(h.plan_id||'')||h.plan_id!==plan?.plan_id||h.plan_id!==approval.plan_id||
+  !WORK.test(h.parent_original_work_id||'')||
+  h.parent_original_work_id!==plan.parent_original_work_id||h.parent_original_work_id!==approval.parent_original_work_id||
+  !PR.test(h.source_ref||'')||h.source_ref!==plan.source_ref||h.source_ref!==approval.source_ref||
+  !SHA.test(h.source_head_sha||'')||h.source_head_sha!==plan.source_head_sha||
+  !HASH.test(h.source_manifest_sha256||'')||h.source_manifest_sha256!==plan.source_manifest_sha256||
+  h.source_manifest_sha256!==approval.source_manifest_sha256||
+  !HASH.test(h.acceptance_contract_sha256||'')||h.acceptance_contract_sha256!==approval.acceptance_contract_sha256||
+  !HASH.test(h.source_proof_sha256||'')||
+  !Array.isArray(graph.jobs)||graph.jobs.filter(j=>j.source_ref===h.source_ref&&
+   j.original_work_id===h.parent_original_work_id&&j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+   j.phase==='BLOCKED'&&j.independent_source_proof_verified===true&&
+   j.source_proof_sha256===h.source_proof_sha256).length!==1||
+  !Number.isSafeInteger(h.scope_count)||h.scope_count<2||h.scope_count>63||
+  h.scope_count!==plan.proposed_scope_count||!Array.isArray(h.scope_fingerprints)||
+  h.scope_fingerprints.length!==h.scope_count||
+  !h.scope_fingerprints.every((s,i)=>s?.index===i&&HASH.test(s.scope_sha256||''))||
+  new Set(h.scope_fingerprints.map(s=>s.scope_sha256)).size!==h.scope_count||
+  continuity?.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+  continuity.owner_id!==h.owner_id||continuity.shift_id!==h.shift_id||
+  continuity.original_job_completed!==false||
+  g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+  g.owner_id!==h.owner_id||g.shift_id!==h.shift_id||g.read_only!==true||
+  g.execution_authorized!==false||g.original_job_completed!==false||
+  root?.canonical_handoff_verified!==true||root.execution_authorized!==false||
+  !UUID.test(g.continuity_root_id||'')||g.continuity_root_id!==root.continuity_root_id||
+  !HASH.test(g.continuity_head_sha256||'')||g.continuity_head_sha256!==root.continuity_head_sha256||
+  g.continuity_head_sha256!==continuity.continuity_head_sha256||
+  !Number.isSafeInteger(g.revision)||g.revision<1||g.revision!==root.revision||g.revision!==continuity.revision)
+  return null;
+ return Object.freeze({
+  schema:h.schema,status:'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED',
+  packet_id:h.packet_id,approval_request_id:h.approval_request_id,
+  owner_approval_receipt_sha256:h.owner_approval_receipt_sha256,
+  acceptance_event_id:h.acceptance_event_id,acceptance_event_content_hash:h.acceptance_event_content_hash,
+  owner_id:h.owner_id,shift_id:h.shift_id,plan_id:h.plan_id,plan_fingerprint:h.plan_fingerprint,
+  parent_original_work_id:h.parent_original_work_id,source_ref:h.source_ref,
+  source_head_sha:h.source_head_sha,source_proof_sha256:h.source_proof_sha256,
+  source_manifest_sha256:h.source_manifest_sha256,acceptance_contract_sha256:h.acceptance_contract_sha256,
+  scope_count:h.scope_count,scope_fingerprints:Object.freeze(h.scope_fingerprints.map(s=>
+   Object.freeze({index:s.index,scope_sha256:s.scope_sha256}))),
+  continuity_root_id:g.continuity_root_id,continuity_head_sha256:g.continuity_head_sha256,revision:g.revision,
+  effect_type:h.effect_type,canonical_claim_required:true,
+  next_governed_action:'CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER',
+  read_only:true,execution_authorized:false,original_job_completed:false,production_changed:false
+ });
+}
 
 // The accepted route selects the existing child worker, not its authority.
 // The current isolated worker and the service-role claim still independently

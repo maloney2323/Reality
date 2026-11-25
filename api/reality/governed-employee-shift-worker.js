@@ -2912,7 +2912,7 @@ export default async function handler(req,res){
      },{timeoutMs:6000})
     ]);
     finalLoopStagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
-     graph:unifiedGraph,staged,preflight
+     graph:unifiedGraph,staged,preflight,continuity:lastFinalLoopContinuity
     });
    }catch{
     finalLoopStagedActionRoutes={

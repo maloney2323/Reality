@@ -955,6 +955,28 @@ BEGIN
     SELECT 1 FROM reality_internal.final_loop_child_approval_packets_v1 a
     WHERE a.plan_id=p.plan_id AND
      a.acceptance_contract_sha256=u.acceptance_hash),
+   'canonical_review_handoff',CASE WHEN proof.accepted AND proof.current_window
+    THEN pg_catalog.jsonb_build_object(
+     'schema','reality-canonical-approved-review-scope-v1',
+     'packet_id',proof.packet_id,'approval_request_id',proof.approval_request_id,
+     'owner_approval_receipt_sha256',proof.approval_receipt,
+     'acceptance_event_id',proof.event_id,'acceptance_event_content_hash',proof.event_hash,
+     'owner_id',p.owner_id,'shift_id',p.shift_id,'plan_id',p.plan_id,
+     'plan_fingerprint',p.plan_fingerprint,'parent_original_work_id',p.parent_original_work_id,
+     'source_ref',p.source_ref,'source_head_sha',p.source_head_sha,
+     'source_proof_sha256',p.source_proof_sha256,
+     'source_manifest_sha256',p.source_manifest_sha256,
+     'acceptance_contract_sha256',u.acceptance_hash,
+     'scope_count',p.proposed_scope_count,
+     'scope_fingerprints',(SELECT pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object('index',(item.value->>'index')::integer,
+       'scope_sha256',item.value->>'proposed_scope_sha256')
+      ORDER BY (item.value->>'index')::integer)
+      FROM pg_catalog.jsonb_array_elements(p.source_plan->'bounded_scopes') item(value)),
+     'effect_type','READ_ONLY_INTERNAL_PR_REVIEW',
+     'canonical_claim_required',true,'execution_authorized',false,
+     'original_job_completed',false,'production_changed',false)
+    ELSE NULL END,
    'child_review_automatically_authorized',false
   ) ORDER BY p.staged_at),'[]'::jsonb) INTO v_plans
  FROM reality_internal.final_loop_pr_source_plans_v1 p
@@ -964,6 +986,10 @@ BEGIN
  ) u
  CROSS JOIN LATERAL (
   SELECT count(e.event_id)=1 AS accepted,
+   min(a.packet_id::text) AS packet_id,
+   min(a.owner_approval_request_id::text) AS approval_request_id,
+   min(a.owner_approval_receipt_sha256) AS approval_receipt,
+   min(e.event_id::text) AS event_id,min(e.content_hash) AS event_hash,
    -- Compatibility field: current means exact accepted scope on an active
    -- signed shift, not time elapsed since the owner accepted the goal.
    count(e.event_id)=1 AND coalesce(bool_and(a.approved_at IS NOT NULL

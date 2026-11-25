@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {classifySignedFinalLoopStagedPlanActions as classify,
  hasCurrentApprovedChildReviewRoute as canRoute,
+ projectCanonicalApprovedReviewHandoff as handoff,
  reconcileReviewedRecoveryToFinalLoopSource as reconcile,
  inspectFinalLoopRecoveryContinuation as inspect,
  verifyFinalLoopRecoveryContinuityReadback as observe}
@@ -326,4 +327,49 @@ test('existing exact approved goal remains connected to reviewed recovery withou
   assert.notEqual(rejected.status,'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED');
   assert.equal(rejected.action_dispatched,false);
  }
+});
+
+test('canonical approved scope binds exact receipt and five scopes to the shared head, without authority transfer',()=>{
+ const p={...preflight.plans[0],independent_goal_acceptance_verified:true,
+  owner_goal_acceptance_pending:false,pending_exact_owner_approval:false,
+  owner_approval_claim_window_current:true,owner_approval_expired:false};
+ const h={schema:'reality-canonical-approved-review-scope-v1',
+  packet_id:'44444444-4444-4444-8444-444444444444',
+  approval_request_id:'55555555-5555-4555-8555-555555555555',
+  acceptance_event_id:'66666666-6666-4666-8666-666666666666',
+  owner_approval_receipt_sha256:hash('1'),acceptance_event_content_hash:'2'.repeat(64),
+  owner_id:owner,shift_id:shift,plan_id:admitted.plan_id,plan_fingerprint:graph.plan_fingerprint,
+  parent_original_work_id:work,source_ref:admitted.source_ref,source_head_sha:admitted.source_head_sha,
+  source_proof_sha256:hash('3'),source_manifest_sha256:admitted.source_manifest_sha256,
+  acceptance_contract_sha256:p.acceptance_contract_sha256,scope_count:5,
+  scope_fingerprints:Array.from({length:5},(_,i)=>({index:i,scope_sha256:hash(String(i+4))})),
+  effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',canonical_claim_required:true,
+  execution_authorized:false,original_job_completed:false,production_changed:false};
+ const guard={status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+  owner_id:owner,shift_id:shift,continuity_root_id:'77777777-7777-4777-8777-777777777777',
+  continuity_head_sha256:hash('9'),revision:2,read_only:true,
+  execution_authorized:false,original_job_completed:false};
+ const continuity={status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',owner_id:owner,
+  shift_id:shift,continuity_head_sha256:guard.continuity_head_sha256,revision:2,
+  original_job_completed:false,shared_continuity_guard:guard,
+  canonical_continuity_handoff:{...guard,canonical_handoff_verified:true}};
+ const input={graph:{...graph,jobs:graph.jobs.map(j=>j.source_ref===admitted.source_ref?
+  {...j,source_proof_sha256:h.source_proof_sha256}:j)},plan:admitted,
+  approval:{...p,canonical_review_handoff:h},continuity};
+ const result=handoff(input);
+ assert.equal(result.status,'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED');
+ assert.equal(result.scope_count,5);
+ assert.equal(result.canonical_claim_required,true);
+ assert.equal(result.execution_authorized,false);
+ assert.equal(result.original_job_completed,false);
+ for(const drift of [{owner_id:shift},{source_head_sha:'0'.repeat(40)},{effect_type:'PUBLISH'},
+  {execution_authorized:true},{scope_fingerprints:h.scope_fingerprints.slice(1)},
+  {acceptance_contract_sha256:hash('0')},{owner_approval_receipt_sha256:null}]){
+  assert.equal(handoff({...input,approval:{...input.approval,canonical_review_handoff:{...h,...drift}}}),null);
+ }
+ assert.equal(handoff({...input,continuity:{...continuity,revision:3}}),null);
+ assert.equal(handoff({...input,approval:{...input.approval,owner_approval_expired:true}}),null);
+ const routes=classify({graph:input.graph,staged,preflight:{...preflight,plans:[input.approval]},continuity});
+ assert.equal(routes.routes[0].canonical_execution_handoff.status,result.status);
+ assert.equal(routes.routes[1].canonical_execution_handoff,null);
 });
