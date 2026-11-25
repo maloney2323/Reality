@@ -194,6 +194,8 @@ import {planGovernedCapabilitiesFromOwnerReceipts,
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
+import {createTrustedSignedWorkerReleaseControlPlaneAdapters}
+ from '../../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
 import {inspectFinalLoopSignedWorkerOperatingLane}
  from '../../src/reality-signed-worker-operating-lane-v1.js';
 import {continueSignedMaintenanceCaseCiVerification,selectSignedCaseCiResumeEvent}
@@ -2435,6 +2437,18 @@ export default async function handler(req,res){
   const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
    env:process.env,dbProject:db.project
   });
+  // The current signed worker may independently observe release direction,
+  // never switch itself or grant deployment authority. Existing schedule only.
+  let signedWorkerReleaseDirection={status:'GOVERNED_RELEASE_DIRECTION_OBSERVATION_NOT_ENABLED',release_activated:false};
+  if(process.env.REALITY_GOVERNED_RELEASE_DIRECTION_OBSERVATION_ENABLED==='true'){
+   try{
+    const observer=createTrustedSignedWorkerReleaseControlPlaneAdapters({env:process.env,db,inspectionOnly:true,fetchImpl:fetch});
+    signedWorkerReleaseDirection=observer.ready===true?
+     await observer.readDirection({ownerId:unifiedGraph.owner_id,shiftId:wakeReceipt.shift_id,
+      runningReleaseSha:process.env.VERCEL_GIT_COMMIT_SHA}):
+     {status:observer.status,release_activated:false};
+   }catch{signedWorkerReleaseDirection={status:'GOVERNED_RELEASE_DIRECTION_INDEPENDENT_READ_UNAVAILABLE',release_activated:false};}
+  }
   const registeredRecoveryActionKeys=Object.freeze([
    'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
    ...((signedWorkerReleaseOperatingLane.status===
@@ -4147,6 +4161,7 @@ export default async function handler(req,res){
     governed_continuity_registered_recovery_route:continuityRecoveryRegisteredRouting,
     signed_worker_capability_delivery:signedWorkerCapabilityDelivery,
     signed_worker_release_operating_lane:signedWorkerReleaseOperatingLane,
+    signed_worker_release_direction:signedWorkerReleaseDirection,
     signed_worker_durable_release_wake:signedWorkerDurableReleaseWake,
     signed_schedule_evidence_admission:signedScheduleAdmission,
     signed_maintenance_completion_report:signedMaintenanceClose,

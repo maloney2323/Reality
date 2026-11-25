@@ -189,3 +189,34 @@ test('existing release preparation creates only the exact owner packet, no activ
  }
  assert.equal(f.calls.length,1);
 });
+
+test('read-only direction inspection works before target release or switch permission exists',async()=>{
+ const owner='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',shift='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+ const scope={...env,REALITY_GOVERNED_RELEASE_SWITCH_TRIGGER_ENABLED:'false',
+  REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED:'false',REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA:'',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:project,
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:owner,REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:shift};
+ const f=fixture({cron:{...schedule,host:alias}});
+ const calls=[];
+ const observed=create({env:scope,db,inspectionOnly:true,fetchImpl:async(address,options)=>{
+  calls.push(String(address));
+  if(String(address).endsWith('/reality_read_current_shift_execution_graph_v1'))
+   return {ok:true,json:async()=>({status:'OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED',owner_id:owner,shift_id:shift,production_changed:false,plan_fingerprint:'sha256:'+'a'.repeat(64)})};
+  if(String(address).endsWith('/reality_read_final_loop_shared_continuity_guard_v1'))
+   return {ok:true,json:async()=>({status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',owner_id:owner,shift_id:shift,read_only:true,execution_authorized:false,continuity_root_id:shift,continuity_head_sha256:'sha256:'+'b'.repeat(64),revision:3})};
+  return f.fetchImpl(address,options);
+ }});
+ assert.equal(observed.ready,true);
+ assert.equal(observed.read_only,true);
+ const r=await observed.readDirection({ownerId:owner,shiftId:shift});
+ assert.equal(r.status,'GOVERNED_RELEASE_TARGET_QUALIFICATION_REQUIRED');
+ assert.equal(r.authoritative_database,project);
+ assert.equal(r.release_activated,false);
+ assert.equal(r.target_runtime_database_independently_verified,false);
+ await assert.rejects(()=>observed.assignAlias({}),/RELEASE_INSPECTION_MUTATION_FORBIDDEN/);
+ assert.equal(f.calls.filter(x=>x.url.includes('/v2/deployments/')).length,0);
+ const count=calls.length;
+ assert.equal((await observed.readDirection({ownerId:owner,shiftId:owner})).status,'GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_SCOPE_REQUIRED');
+ assert.equal(calls.length,count);
+});

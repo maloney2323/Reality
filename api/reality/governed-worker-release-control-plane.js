@@ -46,10 +46,15 @@ export default async function handler(req,res){
  try{
   const db=shiftDatabase(env);
   const adapters=createTrustedSignedWorkerReleaseControlPlaneAdapters({
-   env,db,fetchImpl:fetch
+   env,db,fetchImpl:fetch,inspectionOnly:req.body.intent==='INSPECT'
   });
   if(adapters.ready!==true)
    return result(res,503,'RELEASE_CONTROL_TRUSTED_ADAPTERS_NOT_READY');
+  if(req.body.intent==='INSPECT'&&db.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF){
+   const direction=await adapters.readDirection({ownerId:env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID,
+    shiftId:env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID});
+   return result(res,200,direction.status,{direction,read_only:true,release_switch_attempted:false});
+  }
   const schedule=await adapters.readSchedule();
   const currentAlias=await adapters.observeAlias(schedule.host);
   const current={

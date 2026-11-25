@@ -18,10 +18,8 @@ const projectRef=url=>{
    !u.search&&!u.hash?m?.[1]??null:null;
  }catch{return null}
 };
-function validEnv(env,db){
+function validObservationEnv(env,db){
  return env.VERCEL_ENV==='preview'&&
-  env.REALITY_GOVERNED_RELEASE_SWITCH_TRIGGER_ENABLED==='true'&&
-  env.REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED==='true'&&
   db?.strictSecrets===true&&
   typeof db.secretKey==='string'&&db.secretKey.length>=20&&
   db.project===projectRef(db.url)&&
@@ -34,7 +32,12 @@ function validEnv(env,db){
   Number.isSafeInteger(Number(env.REALITY_SIGNED_WORKER_CRON_JOB_ID))&&
   Number(env.REALITY_SIGNED_WORKER_CRON_JOB_ID)>0&&
   HOST.test(env.REALITY_SIGNED_WORKER_STABLE_ALIAS||'')&&
-  !env.REALITY_SIGNED_WORKER_STABLE_ALIAS.startsWith('reality-git-')&&
+  !env.REALITY_SIGNED_WORKER_STABLE_ALIAS.startsWith('reality-git-');
+}
+function validEnv(env,db){
+ return validObservationEnv(env,db)&&
+  env.REALITY_GOVERNED_RELEASE_SWITCH_TRIGGER_ENABLED==='true'&&
+  env.REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED==='true'&&
   ID.test(env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||'')&&
   SHA.test(env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||'')&&
   BRANCH.test(env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||'')&&
@@ -56,9 +59,9 @@ async function requestJson(fetchImpl,url,init,timeout=7000){
  }finally{clearTimeout(t)}
 }
 export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
- env=process.env,db,fetchImpl=fetch
+ env=process.env,db,fetchImpl=fetch,inspectionOnly=false
 }={}){
- if(typeof fetchImpl!=='function'||!validEnv(env,db))
+ if(typeof fetchImpl!=='function'||!(inspectionOnly===true?validObservationEnv(env,db):validEnv(env,db)))
   return Object.freeze({
    status:'RELEASE_CONTROL_TRUSTED_PROVIDER_CONFIG_NOT_READY',
    ready:false,read_only:true,owner_approval_granted:false,
@@ -76,7 +79,10 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  };
  const serviceRpc=async(name,payload)=>{
   // Static allowlist: never put caller input into an RPC pathname.
-  if(!['reality_read_governed_worker_release_schedule_v1',
+  const readRpcs=['reality_read_governed_worker_release_schedule_v1',
+   'reality_read_current_shift_execution_graph_v1','reality_read_final_loop_shared_continuity_guard_v1'];
+  if(inspectionOnly===true&&!readRpcs.includes(name))throw Error('RELEASE_INSPECTION_MUTATION_FORBIDDEN');
+  if(![...readRpcs,
     'reality_claim_governed_signed_worker_release_v1',
     'reality_read_governed_signed_worker_release_approval_v1',
     'reality_prepare_governed_signed_worker_release_v1'].includes(name))
@@ -146,6 +152,53 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    dedicated_stable_release_alias:
     info.host===env.REALITY_SIGNED_WORKER_STABLE_ALIAS
   });
+ }
+ // Observe the actual authoritative shift and scheduler, even when no
+ // eligible target or release authority exists. No approval/claim/provider write.
+ async function readDirection({ownerId,shiftId,runningReleaseSha=null}={}){
+  const safe=(status,extra={})=>Object.freeze({status,read_only:true,
+   release_activated:false,owner_approval_granted:false,original_job_completed:false,
+   production_changed:false,provider_assignment_attempted:false,...extra});
+  if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+   db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||
+   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+   ownerId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||
+   shiftId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID)
+   return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_SCOPE_REQUIRED');
+  const graph=await serviceRpc('reality_read_current_shift_execution_graph_v1',{});
+  if(graph?.status!=='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'||
+   graph.owner_id!==ownerId||graph.shift_id!==shiftId||
+   graph.production_changed!==false||!HASH.test(graph.plan_fingerprint||''))
+   return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_NOT_VERIFIED');
+  const guard=await serviceRpc('reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:shiftId});
+  if(guard?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+   guard.owner_id!==ownerId||guard.shift_id!==shiftId||guard.read_only!==true||
+   guard.execution_authorized!==false||!UUID.test(guard.continuity_root_id||'')||
+   !HASH.test(guard.continuity_head_sha256||'')||!Number.isSafeInteger(guard.revision))
+   return safe('GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED');
+  const schedule=await readSchedule();
+  const alias=await observeAlias(schedule.host);
+  const target=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA;
+  const targetRef=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF;
+  const targetPinned=SHA.test(target||'')&&BRANCH.test(targetRef||'');
+  const current={owner_id:ownerId,shift_id:shiftId,authoritative_database:db.project,
+   plan_fingerprint:graph.plan_fingerprint,continuity_root_id:guard.continuity_root_id,
+   continuity_head_sha256:guard.continuity_head_sha256,continuity_revision:guard.revision,
+   scheduled_host:schedule.host,cron_job_id:schedule.job_id,
+   observed_alias_release_sha:alias.resolved_release_sha,observed_alias_release_ref:alias.resolved_branch,
+   running_release_sha:SHA.test(runningReleaseSha||'')?runningReleaseSha:null,
+   configured_target_release_sha:targetPinned?target:null,
+   target_runtime_database_independently_verified:false};
+  if(!schedule.dedicated_stable_release_alias||schedule.branch_automanaged)
+   return safe('GOVERNED_RELEASE_SCHEDULER_DIRECTION_NOT_STABLE',{...current,
+    next_governed_action:'QUALIFY_EXISTING_STABLE_WORKER_ALIAS_WITH_EXACT_AUTHORITY'});
+  if(!targetPinned)return safe('GOVERNED_RELEASE_TARGET_QUALIFICATION_REQUIRED',{...current,
+   next_governed_action:'QUALIFY_EXACT_REGISTERED_CAPABILITY_RELEASE_FOR_SAME_SHIFT'});
+  const drift=alias.resolved_release_sha!==target||alias.resolved_branch!==targetRef;
+  return safe(drift?'GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED':'GOVERNED_RELEASE_DIRECTION_MATCHES_PIN_UNVERIFIED_ACTIVATION',{
+   ...current,release_direction_drift:drift,
+   next_governed_action:drift?'VERIFY_CANDIDATE_RUNTIME_DATABASE_AND_SAME_SHIFT_BEFORE_EXACT_APPROVAL':
+    'INDEPENDENTLY_VERIFY_ACTUAL_SIGNED_SCHEDULED_WAKE_AND_CAPABILITY'});
  }
  async function readApprovedRelease({
   owner_id,shift_id,release_sha,scheduled_alias,capability_key
@@ -248,6 +301,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  async function assignAlias({
   alias,release_sha,release_ref,owner_id,shift_id,capability_key,claim_id
  }={}){
+  if(inspectionOnly===true)throw Error('RELEASE_INSPECTION_MUTATION_FORBIDDEN');
   if(alias!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
    release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
    release_ref!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||
@@ -272,8 +326,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  }
  return Object.freeze({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
-  ready:true,read_only:false,
-  readSchedule,observeAlias,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,
+  ready:true,read_only:inspectionOnly===true,
+  readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,
   owner_approval_granted:false,provider_assignment_attempted:false
  });
 }
