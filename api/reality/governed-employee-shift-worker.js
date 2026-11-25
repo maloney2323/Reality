@@ -219,7 +219,7 @@ import {classifyRealityGovernedContinuityEvidence,
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {advanceSignedExistingMaintenanceRepairHandoff}
  from '../../src/reality-signed-maintenance-repair-handoff-v1.js';
-import {generateOneSignedMaintenanceRepairCandidate}
+import {generateOneSignedMaintenanceRepairCandidate,generateOneSignedMaintenanceFrozenTestDraft}
  from '../../src/reality-signed-maintenance-repair-model-candidate-v1.js';
 import {independentlyReviewSignedMaintenanceTarget}
  from '../../src/reality-signed-maintenance-candidate-target-review-v1.js';
@@ -713,7 +713,7 @@ export default async function handler(req,res){
   const shiftContinuityInvestigation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await investigateOneSignedShiftContinuityIncident({
-     db,env:process.env,shiftId:wakeReceipt.shift_id,fetchImpl:fetch
+     db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
     }).catch(error=>({
      status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
      failure_code:classifySignedContinuityClaimTransportError(error),
@@ -1216,6 +1216,27 @@ export default async function handler(req,res){
      production_changed:false,new_shift_started:false};
   // One source-pinned LLM candidate for the existing warrant/maintenance
   // work order, never an installation, frozen CI verdict, or final receipt.
+  // Existing signed maintenance builder acquires one missing test capability
+  // per wake. The DB independently selects the current eligible source and
+  // exact authority. Draft bytes are inert; no installation or CI verdict.
+  workerStage='SIGNED_MAINTENANCE_FROZEN_TEST_CAPABILITY_BUILD';
+  const signedMaintenanceFrozenTestBuild=
+   wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   process.env.REALITY_MAINTENANCE_EXECUTOR_CONNECTED==='true'?
+    (async()=>{
+     if(strictContinuityCycle)await requireFreshFinalLoopContinuity();
+     return 
+    await generateOneSignedMaintenanceFrozenTestDraft({
+     db,env:process.env,shiftId:wakeReceipt.shift_id,
+     workerRunId:actualWorkerRunId,fetchImpl:fetch
+    });
+    })().catch(()=>({status:'SIGNED_FROZEN_TEST_BUILD_OUTCOME_UNVERIFIED_NO_REPLAY',
+     model_generated:false,independent_ci_verified:false,
+     repair_executed:false,installation_authorized:false,
+     original_job_completed:false,production_changed:false})):
+    {status:'NO_SIGNED_FROZEN_TEST_CAPABILITY_WAKE',
+     model_generated:false,independent_ci_verified:false,
+     installation_authorized:false,original_job_completed:false,production_changed:false};
   workerStage='SIGNED_MAINTENANCE_REPAIR_MODEL_SOURCE_CANDIDATE';
   const signedMaintenanceRepairModelCandidate=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
@@ -4084,6 +4105,7 @@ export default async function handler(req,res){
     signed_maintenance_sourcecase_ci_reconciliation:signedMaintenanceCaseCiReconciliation,
      final_loop_governed_resume_trigger:finalLoopGovernedResumeTrigger,
     signed_maintenance_diagnostic_to_repair_handoff:signedMaintenanceRepairHandoff,
+    signed_maintenance_frozen_test_build:signedMaintenanceFrozenTestBuild,
     signed_maintenance_repair_model_candidate:signedMaintenanceRepairModelCandidate,
     signed_maintenance_candidate_target_review:signedMaintenanceCandidateTargetReview,
     signed_maintenance_verified_repair_artifact:signedMaintenanceArtifactHandoff,

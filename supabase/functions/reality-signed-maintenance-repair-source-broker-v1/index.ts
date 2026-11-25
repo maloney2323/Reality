@@ -34,6 +34,7 @@ function config(){
 async function rpc(c:{url:string,key:string},name:string,args:Record<string,unknown>){
  if(![
   'reality_read_signed_maintenance_repair_source_scope_v1',
+  'reality_read_signed_maintenance_frozen_test_draft_scope_v1',
   'reality_read_signed_existing_maintenance_case_ci_scope_v1',
   'reality_read_final_loop_event_resume_shadow_v1',
   'reality_record_signed_existing_maintenance_case_ci_v1',
@@ -561,18 +562,21 @@ Deno.serve(async req=>{
   if(b?.mode==='target'){
    return await verifiedTarget(c,b);
   }
+  const testDraft=['test_manifest','test_source'].includes(b?.mode);
+  const mode=testDraft?b.mode.slice(5):b?.mode;
   if(!b||Array.isArray(b)||typeof b!=='object'||
-     !['manifest','source'].includes(b.mode)||
+     !['manifest','source'].includes(mode)||
      !UUID.test(b.maintenance_id||'')||
      !UUID.test(b.request_id||'')||
      !SHA.test(b.release_sha||'')||
      Object.keys(b).sort().join(',')!==
-      (b.mode==='manifest'?'maintenance_id,mode,release_sha,request_id':
+      (mode==='manifest'?'maintenance_id,mode,release_sha,request_id':
        'maintenance_id,mode,release_sha,request_id,target_path')||
-     (b.mode==='source'&&(!FILE.test(b.target_path||'')||
+     (mode==='source'&&(!FILE.test(b.target_path||'')||
        b.target_path.includes('..')||b.target_path.includes('//'))))
    return response(400,'SIGNED_SOURCE_BROKER_SCOPE_INVALID');
-  const scope=await rpc(c,'reality_read_signed_maintenance_repair_source_scope_v1',{
+  const scope=await rpc(c,testDraft?'reality_read_signed_maintenance_frozen_test_draft_scope_v1':
+   'reality_read_signed_maintenance_repair_source_scope_v1',{
    p_maintenance_id:b.maintenance_id,p_request_id:b.request_id,
    p_release_sha:b.release_sha
   });
@@ -588,6 +592,32 @@ Deno.serve(async req=>{
      scope.original_job_completed!==false||
      scope.production_changed!==false)
    return response(403,'SIGNED_SOURCE_BROKER_LEDGER_SCOPE_REQUIRED');
+  // Approved repair scope can inspect only its one exact already approved blob.
+  // The maintenance warrant uses the same existing runtime-module manifest.
+  if(testDraft&&scope.authority_basis==='APPROVED_EXACT_SOURCE_SCOPE'){
+   const path=scope.approved_target_path,rev=scope.source_revision;
+   if(!FILE.test(path||'')||path.includes('..')||!SHA.test(rev||'')||
+      !SHA.test(scope.approved_target_blob_sha||'')||(mode==='source'&&b.target_path!==path))
+    return response(403,'SIGNED_FROZEN_TEST_APPROVED_TARGET_SCOPE_INVALID');
+   const file=await github(c,'/contents/'+path+'?ref='+rev);
+   if(file.path!==path||file.sha!==scope.approved_target_blob_sha||
+      file.encoding!=='base64'||typeof file.content!=='string'||
+      !Number.isSafeInteger(file.size)||file.size<300||file.size>60000)
+    fail('FROZEN_TEST_APPROVED_SOURCE_DRIFT');
+   const bytes=Uint8Array.from(atob(file.content.replace(/\s/g,'')),v=>v.charCodeAt(0));
+   if(bytes.length!==file.size||await gitBlobSha(bytes)!==file.sha)
+    fail('FROZEN_TEST_APPROVED_BLOB_HASH_MISMATCH');
+   const commit=await github(c,'/git/commits/'+rev);
+   if(commit.sha!==rev||!SHA.test(commit.tree?.sha||''))fail('FROZEN_TEST_APPROVED_COMMIT_DRIFT');
+   const id={maintenance_id:b.maintenance_id,request_id:b.request_id,
+    release_sha:b.release_sha,source_tree_sha:commit.tree.sha};
+   return mode==='manifest'?response(200,'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',{
+    ...id,runtime_imports_count:1,files:[{path,sha:file.sha,size:file.size}]}):
+    response(200,'SIGNED_MAINTENANCE_SOURCE_FILE_VERIFIED',{
+    ...id,path,sha:file.sha,size:file.size,encoding:'base64',content:file.content});
+  }
+  if(testDraft&&(scope.authority_basis!=='SIGNED_EXISTING_WARRANT'||scope.source_revision!==b.release_sha))
+   return response(403,'SIGNED_FROZEN_TEST_WARRANT_SCOPE_INVALID');
   const commit=await github(c,'/git/commits/'+b.release_sha);
   if(commit.sha!==b.release_sha||!SHA.test(commit.tree?.sha||''))
    fail('PINNED_GIT_COMMIT_DRIFT');
@@ -625,7 +655,7 @@ Deno.serve(async req=>{
   const eligible=files.filter((x:{path:string})=>imported.has(x.path));
   if(!eligible.length||eligible.length>350)
    fail('SIGNED_WORKER_EXECUTABLE_MODULE_GRAPH_UNVERIFIED');
-  if(b.mode==='manifest')
+  if(mode==='manifest')
    return response(200,'SIGNED_MAINTENANCE_SOURCE_MANIFEST_VERIFIED',{
     maintenance_id:b.maintenance_id,request_id:b.request_id,
     release_sha:b.release_sha,source_tree_sha:tree.sha,
