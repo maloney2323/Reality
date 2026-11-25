@@ -348,13 +348,31 @@ test('a comparison that participates in the changed decision is not rejected by 
 });
 
 
+const boundHistoricalEvidence={
+ schema:'reality-signed-frozen-test-observation-v1',owner_id:owner,shift_id:shift,
+ origin_shift_id:run,maintenance_id:maint,source_ref:claim.source_ref,
+ existing_original_work_id:claim.original_work_id,
+ historical_failure_kind:claim.historical_failure_kind,
+ baseline_receipt_sha256:claim.independent_baseline_receipt_sha256,
+ diagnostic_receipt_sha256:claim.independent_diagnostic_receipt_sha256,
+ source_epoch_receipt_sha256:claim.source_epoch_receipt_sha256,
+ independent_review_receipt_sha256:hash('6'),investigation_receipt_sha256:hash('7'),
+ diagnostic_artifact_digest:hash('8'),diagnostic_run_id:1,diagnostic_artifact_id:2,
+ historical_observation:{review_status:'NO_ORIGINAL_ADMISSION_CONFIRMED',original_claim_count:0,
+  prior_inquiry_count:2,source_provider_sha256:hash('a'),reviewed_at:'2026-11-21T20:40:00Z'},
+ investigation_hypothesis:{diagnosis:'Observed inquiry counts without admission; cause unverified.'},
+ historical_observation_only:true,root_cause_verified:false,frozen_red_verified:false,
+ original_job_completed:false,installation_authorized:false
+};
+
 test('both exact qualified actions enter the existing signed builder, with one inert durable result and no CI or install claim',async()=>{
  for(const approved of [true,false]){
   const leased={...claim,status:'SIGNED_FROZEN_TEST_DRAFT_LEASED',source_revision:sha,
    authority_receipt_sha256:hash('1'),
    action:approved?'EXECUTE_NEW_INDEPENDENT_CASE_SPECIFIC_FROZEN_CI':'RUN_CASE_SPECIFIC_FROZEN_RED_AND_RECHECK_SOURCE',
    authority_basis:approved?'APPROVED_EXACT_SOURCE_SCOPE':'SIGNED_EXISTING_WARRANT',
-   ...(approved?{approved_target_path:path,approved_target_blob_sha:blob}:{})};
+   ...(approved?{approved_target_path:path,approved_target_blob_sha:blob}:{
+    existing_original_work_id:claim.original_work_id,failure_evidence:boundHistoricalEvidence})};
   const calls=[],requests=[];
   const call=async(_db,name,args)=>{
    calls.push({name,args});
@@ -379,6 +397,7 @@ test('both exact qualified actions enter the existing signed builder, with one i
    }
    assert.equal(url,'https://api.openai.com/v1/responses');
    assert.equal(b.tool_choice,'none');
+   if(!approved)assert.ok(b.input[1].content[0].text.includes('"original_claim_count":0'));
    return {ok:true,json:async()=>({status:'completed',id:'resp_fixture_1234',output_text:JSON.stringify(
     b.text.format.name==='reality_signed_maintenance_target_candidate'?{path,reason:'Exact runtime qualification module'}:
     {state:'DRAFT',test_source:"import test from 'node:test'; import assert from 'node:assert/strict'; test('preserve authority',()=>assert.equal(false,false));",expected_failure:'Observe exact source failure without changing authorization.'})})};
@@ -470,4 +489,39 @@ test('Final Loop release retains existing frozen builder and incident recovery o
 test('worker returns the actual frozen builder receipt rather than an ASI-terminated return',()=>{
  const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  assert.match(worker,/return await generateOneSignedMaintenanceFrozenTestDraft\(/);
+});
+
+test('missing, cross-owner, wrong source, mismatched receipt or invented RED evidence never reaches the builder model',async()=>{
+ for(const failure_evidence of [undefined,{...boundHistoricalEvidence,owner_id:run},
+  {...boundHistoricalEvidence,source_ref:'https://github.com/maloney2323/Reality/pull/308'},
+  {...boundHistoricalEvidence,diagnostic_receipt_sha256:hash('f')},
+  {...boundHistoricalEvidence,frozen_red_verified:true},
+  {...boundHistoricalEvidence,historical_observation:{...boundHistoricalEvidence.historical_observation,original_claim_count:1}}]){
+  const leased={...claim,status:'SIGNED_FROZEN_TEST_DRAFT_LEASED',source_revision:sha,
+   authority_receipt_sha256:hash('1'),action:'RUN_CASE_SPECIFIC_FROZEN_RED_AND_RECHECK_SOURCE',
+   authority_basis:'SIGNED_EXISTING_WARRANT',existing_original_work_id:claim.original_work_id,failure_evidence};
+  let calls=0;
+  const result=await generateOneSignedMaintenanceFrozenTestDraft({db,env,shiftId:shift,workerRunId:run,
+   fetchImpl:async()=>{assert.fail('No provider or model call permitted')},
+   call:async(_db,name,args)=>{
+    calls++;
+    if(name==='reality_claim_signed_maintenance_frozen_test_draft_v1')return leased;
+    assert.equal(name,'reality_record_signed_maintenance_frozen_test_draft_v1');
+    assert.equal(args.p_candidate.state,'INSUFFICIENT_EVIDENCE');
+    return {status:'SIGNED_FROZEN_TEST_BUILD_RESULT_RECORDED',maintenance_id:maint,request_id:req,
+     draft_state:'INSUFFICIENT_EVIDENCE',receipt_sha256:hash('9'),independent_ci_verified:false,
+     installation_authorized:false,original_job_completed:false,production_changed:false};
+   }});
+  assert.equal(calls,2);assert.equal(result.model_generated,false);
+  assert.equal(result.original_job_completed,false);
+ }
+});
+test('existing signed SQL resolves independently observed facts before granting the frozen draft lease',()=>{
+ const sql=readFileSync(new URL('../sql/reality-signed-maintenance-frozen-test-build-v1.sql',import.meta.url),'utf8');
+ for(const term of ['shift_business_qualification_reviews_v1','shift_continuity_independent_reviews_v1',
+  'investigation_receipt_sha256=m.investigation_receipt_sha256','receipt_sha256=m.independent_review_receipt_sha256',
+  'source_epoch_receipt_sha256=h.source_epoch_receipt_sha256',
+  'ci_independent_diagnostic_receipt_sha256=h.independent_diagnostic_receipt_sha256',
+  "'historical_observation',facts","'root_cause_verified',false","'frozen_red_verified',false",
+  "'failure_evidence',failure_evidence"])assert.ok(sql.includes(term),term);
 });
