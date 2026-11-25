@@ -75,99 +75,7 @@ BEGIN
    WHERE incident_id=m.incident_id AND owner_id=m.owner_id
     AND shift_id=m.origin_shift_id
     AND investigation_receipt_sha256=m.investigation_receipt_sha256
-    AND investigation_receipt_sha256 ~ '^sha256:[a-f0-9]{64}
-   'authority_basis','SIGNED_EXISTING_WARRANT','authority_receipt_sha256',h.handoff_receipt_sha256,
-   'source_revision',p_release_sha,'existing_original_work_id',h.existing_original_work_id,
-   'source_epoch_receipt_sha256',h.source_epoch_receipt_sha256,
-   'independent_diagnostic_receipt_sha256',h.independent_diagnostic_receipt_sha256,
-   'failure_evidence',failure_evidence);
- END IF;
- RETURN basis||pg_catalog.jsonb_build_object('maintenance_id',m.incident_id,'owner_id',s.owner_id,
-  'shift_id',p_shift_id,'source_ref',m.source_ref,'release_sha',p_release_sha,
-  'historical_failure_kind',m.failure_baseline_kind,'maintenance_kind',m.maintenance_kind,
-  'independent_baseline_receipt_sha256',m.independent_failure_baseline_receipt_sha256);
-END $fn$;
-CREATE OR REPLACE FUNCTION public.reality_claim_signed_maintenance_frozen_test_draft_v1(
- p_shift_id uuid,p_worker_run_id uuid,p_release_sha text)
-RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
-DECLARE m record;v jsonb;lease jsonb;
-BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FROZEN_TEST_BUILD_SERVICE_ONLY';END IF;
- FOR m IN SELECT incident_id FROM reality_internal.owner_internal_maintenance_jobs_v1
- WHERE claimed_shift_id=p_shift_id AND frozen_test_build IS NULL AND original_job_completed=false
- ORDER BY created_at,incident_id FOR UPDATE SKIP LOCKED LOOP
-  v:=reality_internal.signed_frozen_test_build_scope_v1(p_shift_id,m.incident_id,p_worker_run_id,p_release_sha);
-  IF v IS NULL THEN CONTINUE;END IF;
-  lease:=pg_catalog.jsonb_build_object('state','CLAIMED','request_id',pg_catalog.gen_random_uuid(),
-   'worker_run_id',p_worker_run_id,'scope',v,'claimed_at',pg_catalog.clock_timestamp());
-  UPDATE reality_internal.owner_internal_maintenance_jobs_v1 SET frozen_test_build=lease WHERE incident_id=m.incident_id;
-  RETURN v||pg_catalog.jsonb_build_object('status','SIGNED_FROZEN_TEST_DRAFT_LEASED',
-   'request_id',lease->>'request_id','model_invocation_authorized',true,
-   'independent_ci_verified',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
- END LOOP;
- RETURN pg_catalog.jsonb_build_object('status','NO_NEW_SIGNED_FROZEN_TEST_DRAFT_READY',
-  'model_invocation_authorized',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-END $fn$;
-CREATE OR REPLACE FUNCTION public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(
- p_maintenance_id uuid,p_request_id uuid,p_release_sha text)
-RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
-DECLARE l jsonb;v jsonb;
-BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FROZEN_TEST_BUILD_SERVICE_ONLY';END IF;
- SELECT frozen_test_build INTO l FROM reality_internal.owner_internal_maintenance_jobs_v1 WHERE incident_id=p_maintenance_id;
- IF l->>'state'='CLAIMED' AND l->>'request_id'=p_request_id::text
- AND l->'scope'->>'release_sha'=p_release_sha THEN
-  v:=reality_internal.signed_frozen_test_build_scope_v1((l->'scope'->>'shift_id')::uuid,p_maintenance_id,(l->>'worker_run_id')::uuid,p_release_sha);
-  IF v IS NOT NULL AND v=l->'scope' THEN
-   RETURN v||pg_catalog.jsonb_build_object('status','SIGNED_MAINTENANCE_CANDIDATE_SOURCE_BROKER_SCOPE_VERIFIED',
-   'request_id',p_request_id,'source_read_authorized',true,'model_candidate_only',true,
-   'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-  END IF;
- END IF;
- RETURN pg_catalog.jsonb_build_object('status','SIGNED_FROZEN_TEST_DRAFT_SCOPE_UNAVAILABLE');
-END $fn$;
-CREATE OR REPLACE FUNCTION public.reality_record_signed_maintenance_frozen_test_draft_v1(
- p_maintenance_id uuid,p_request_id uuid,p_release_sha text,p_candidate jsonb)
-RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
-DECLARE l jsonb;v jsonb;h text;
-BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FROZEN_TEST_BUILD_SERVICE_ONLY';END IF;
- SELECT frozen_test_build INTO l FROM reality_internal.owner_internal_maintenance_jobs_v1
- WHERE incident_id=p_maintenance_id FOR UPDATE;
- v:=public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(p_maintenance_id,p_request_id,p_release_sha);
- IF v->>'status' IS DISTINCT FROM 'SIGNED_MAINTENANCE_CANDIDATE_SOURCE_BROKER_SCOPE_VERIFIED'
- THEN RETURN pg_catalog.jsonb_build_object('status','FROZEN_TEST_DRAFT_SCOPE_CHANGED_NO_WRITE');END IF;
- IF pg_catalog.jsonb_typeof(p_candidate) IS DISTINCT FROM 'object' OR length(p_candidate::text)>24000
- OR coalesce(p_candidate->>'state','') NOT IN ('DRAFT','PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE')
- OR (p_candidate->>'state'='DRAFT' AND (
- coalesce(p_candidate->>'model_response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}$'
- OR coalesce(p_candidate->>'target_path','') !~ '^src/[A-Za-z0-9_./-]+[.]js$'
- OR p_candidate->>'target_path' LIKE '%..%'
- OR coalesce(p_candidate->>'target_blob_sha','') !~ '^[a-f0-9]{40}$'
- OR length(coalesce(p_candidate->>'test_source','')) NOT BETWEEN 100 AND 16000
- OR length(coalesce(p_candidate->>'expected_failure','')) NOT BETWEEN 20 AND 1000
- OR (v->>'approved_target_path' IS NOT NULL AND (v->>'approved_target_path'<>p_candidate->>'target_path'
- OR v->>'approved_target_blob_sha'<>p_candidate->>'target_blob_sha'))))
- THEN RAISE EXCEPTION 'FROZEN_TEST_DRAFT_INVALID';END IF;
- h:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(pg_catalog.jsonb_build_object(
- 'scope',l->'scope','request_id',p_request_id,'candidate',p_candidate)::text,'UTF8')),'hex');
- UPDATE reality_internal.owner_internal_maintenance_jobs_v1
- SET frozen_test_build=l||pg_catalog.jsonb_build_object('state',p_candidate->>'state',
- 'candidate',p_candidate,'receipt_sha256',h,'recorded_at',pg_catalog.clock_timestamp())
- WHERE incident_id=p_maintenance_id;
- RETURN pg_catalog.jsonb_build_object('status','SIGNED_FROZEN_TEST_BUILD_RESULT_RECORDED',
-  'maintenance_id',p_maintenance_id,'request_id',p_request_id,'draft_state',p_candidate->>'state',
-  'receipt_sha256',h,'independent_ci_verified',false,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false);
-END $fn$;
-REVOKE ALL ON FUNCTION reality_internal.signed_frozen_test_build_scope_v1(uuid,uuid,uuid,text),
- public.reality_claim_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text),
- public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(uuid,uuid,text),
- public.reality_record_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text,jsonb) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION reality_internal.signed_frozen_test_build_scope_v1(uuid,uuid,uuid,text),
- public.reality_claim_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text),
- public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(uuid,uuid,text),
- public.reality_record_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text,jsonb) TO service_role;
+    AND investigation_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
     AND investigated_at IS NOT NULL;
   IF NOT FOUND THEN RETURN NULL;END IF;
   IF m.failure_baseline_kind='HISTORICAL_ZERO_ORIGINAL_CLAIMS_WITH_SIGNED_INQUIRIES' THEN
@@ -208,98 +116,7 @@ GRANT EXECUTE ON FUNCTION reality_internal.signed_frozen_test_build_scope_v1(uui
     AND ci_independent_diagnostic_receipt_sha256=h.independent_diagnostic_receipt_sha256
     AND ci_independent_verified_at IS NOT NULL
     AND ci_independent_diagnostic_run_id>0 AND ci_independent_diagnostic_artifact_id>0
-    AND ci_independent_artifact_digest ~ '^sha256:[a-f0-9]{64}
-   'authority_basis','SIGNED_EXISTING_WARRANT','authority_receipt_sha256',h.handoff_receipt_sha256,
-   'source_revision',p_release_sha,'existing_original_work_id',h.existing_original_work_id,
-   'source_epoch_receipt_sha256',h.source_epoch_receipt_sha256,
-   'independent_diagnostic_receipt_sha256',h.independent_diagnostic_receipt_sha256);
- END IF;
- RETURN basis||pg_catalog.jsonb_build_object('maintenance_id',m.incident_id,'owner_id',s.owner_id,
-  'shift_id',p_shift_id,'source_ref',m.source_ref,'release_sha',p_release_sha,
-  'historical_failure_kind',m.failure_baseline_kind,'maintenance_kind',m.maintenance_kind,
-  'independent_baseline_receipt_sha256',m.independent_failure_baseline_receipt_sha256);
-END $fn$;
-CREATE OR REPLACE FUNCTION public.reality_claim_signed_maintenance_frozen_test_draft_v1(
- p_shift_id uuid,p_worker_run_id uuid,p_release_sha text)
-RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
-DECLARE m record;v jsonb;lease jsonb;
-BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FROZEN_TEST_BUILD_SERVICE_ONLY';END IF;
- FOR m IN SELECT incident_id FROM reality_internal.owner_internal_maintenance_jobs_v1
- WHERE claimed_shift_id=p_shift_id AND frozen_test_build IS NULL AND original_job_completed=false
- ORDER BY created_at,incident_id FOR UPDATE SKIP LOCKED LOOP
-  v:=reality_internal.signed_frozen_test_build_scope_v1(p_shift_id,m.incident_id,p_worker_run_id,p_release_sha);
-  IF v IS NULL THEN CONTINUE;END IF;
-  lease:=pg_catalog.jsonb_build_object('state','CLAIMED','request_id',pg_catalog.gen_random_uuid(),
-   'worker_run_id',p_worker_run_id,'scope',v,'claimed_at',pg_catalog.clock_timestamp());
-  UPDATE reality_internal.owner_internal_maintenance_jobs_v1 SET frozen_test_build=lease WHERE incident_id=m.incident_id;
-  RETURN v||pg_catalog.jsonb_build_object('status','SIGNED_FROZEN_TEST_DRAFT_LEASED',
-   'request_id',lease->>'request_id','model_invocation_authorized',true,
-   'independent_ci_verified',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
- END LOOP;
- RETURN pg_catalog.jsonb_build_object('status','NO_NEW_SIGNED_FROZEN_TEST_DRAFT_READY',
-  'model_invocation_authorized',false,'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-END $fn$;
-CREATE OR REPLACE FUNCTION public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(
- p_maintenance_id uuid,p_request_id uuid,p_release_sha text)
-RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
-DECLARE l jsonb;v jsonb;
-BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FROZEN_TEST_BUILD_SERVICE_ONLY';END IF;
- SELECT frozen_test_build INTO l FROM reality_internal.owner_internal_maintenance_jobs_v1 WHERE incident_id=p_maintenance_id;
- IF l->>'state'='CLAIMED' AND l->>'request_id'=p_request_id::text
- AND l->'scope'->>'release_sha'=p_release_sha THEN
-  v:=reality_internal.signed_frozen_test_build_scope_v1((l->'scope'->>'shift_id')::uuid,p_maintenance_id,(l->>'worker_run_id')::uuid,p_release_sha);
-  IF v IS NOT NULL AND v=l->'scope' THEN
-   RETURN v||pg_catalog.jsonb_build_object('status','SIGNED_MAINTENANCE_CANDIDATE_SOURCE_BROKER_SCOPE_VERIFIED',
-   'request_id',p_request_id,'source_read_authorized',true,'model_candidate_only',true,
-   'installation_authorized',false,'original_job_completed',false,'production_changed',false);
-  END IF;
- END IF;
- RETURN pg_catalog.jsonb_build_object('status','SIGNED_FROZEN_TEST_DRAFT_SCOPE_UNAVAILABLE');
-END $fn$;
-CREATE OR REPLACE FUNCTION public.reality_record_signed_maintenance_frozen_test_draft_v1(
- p_maintenance_id uuid,p_request_id uuid,p_release_sha text,p_candidate jsonb)
-RETURNS jsonb LANGUAGE plpgsql SET search_path='' AS $fn$
-DECLARE l jsonb;v jsonb;h text;
-BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FROZEN_TEST_BUILD_SERVICE_ONLY';END IF;
- SELECT frozen_test_build INTO l FROM reality_internal.owner_internal_maintenance_jobs_v1
- WHERE incident_id=p_maintenance_id FOR UPDATE;
- v:=public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(p_maintenance_id,p_request_id,p_release_sha);
- IF v->>'status' IS DISTINCT FROM 'SIGNED_MAINTENANCE_CANDIDATE_SOURCE_BROKER_SCOPE_VERIFIED'
- THEN RETURN pg_catalog.jsonb_build_object('status','FROZEN_TEST_DRAFT_SCOPE_CHANGED_NO_WRITE');END IF;
- IF pg_catalog.jsonb_typeof(p_candidate) IS DISTINCT FROM 'object' OR length(p_candidate::text)>24000
- OR coalesce(p_candidate->>'state','') NOT IN ('DRAFT','PROVIDER_UNVERIFIED','INSUFFICIENT_EVIDENCE')
- OR (p_candidate->>'state'='DRAFT' AND (
- coalesce(p_candidate->>'model_response_id','') !~ '^resp_[A-Za-z0-9_-]{4,160}$'
- OR coalesce(p_candidate->>'target_path','') !~ '^src/[A-Za-z0-9_./-]+[.]js$'
- OR p_candidate->>'target_path' LIKE '%..%'
- OR coalesce(p_candidate->>'target_blob_sha','') !~ '^[a-f0-9]{40}$'
- OR length(coalesce(p_candidate->>'test_source','')) NOT BETWEEN 100 AND 16000
- OR length(coalesce(p_candidate->>'expected_failure','')) NOT BETWEEN 20 AND 1000
- OR (v->>'approved_target_path' IS NOT NULL AND (v->>'approved_target_path'<>p_candidate->>'target_path'
- OR v->>'approved_target_blob_sha'<>p_candidate->>'target_blob_sha'))))
- THEN RAISE EXCEPTION 'FROZEN_TEST_DRAFT_INVALID';END IF;
- h:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(pg_catalog.jsonb_build_object(
- 'scope',l->'scope','request_id',p_request_id,'candidate',p_candidate)::text,'UTF8')),'hex');
- UPDATE reality_internal.owner_internal_maintenance_jobs_v1
- SET frozen_test_build=l||pg_catalog.jsonb_build_object('state',p_candidate->>'state',
- 'candidate',p_candidate,'receipt_sha256',h,'recorded_at',pg_catalog.clock_timestamp())
- WHERE incident_id=p_maintenance_id;
- RETURN pg_catalog.jsonb_build_object('status','SIGNED_FROZEN_TEST_BUILD_RESULT_RECORDED',
-  'maintenance_id',p_maintenance_id,'request_id',p_request_id,'draft_state',p_candidate->>'state',
-  'receipt_sha256',h,'independent_ci_verified',false,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false);
-END $fn$;
-REVOKE ALL ON FUNCTION reality_internal.signed_frozen_test_build_scope_v1(uuid,uuid,uuid,text),
- public.reality_claim_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text),
- public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(uuid,uuid,text),
- public.reality_record_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text,jsonb) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION reality_internal.signed_frozen_test_build_scope_v1(uuid,uuid,uuid,text),
- public.reality_claim_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text),
- public.reality_read_signed_maintenance_frozen_test_draft_scope_v1(uuid,uuid,text),
- public.reality_record_signed_maintenance_frozen_test_draft_v1(uuid,uuid,text,jsonb) TO service_role;;
+    AND ci_independent_artifact_digest ~ '^sha256:[a-f0-9]{64}$';
   IF NOT FOUND THEN RETURN NULL;END IF;
   failure_evidence:=pg_catalog.jsonb_build_object(
    'schema','reality-signed-frozen-test-observation-v1',
@@ -327,7 +144,8 @@ GRANT EXECUTE ON FUNCTION reality_internal.signed_frozen_test_build_scope_v1(uui
    'authority_basis','SIGNED_EXISTING_WARRANT','authority_receipt_sha256',h.handoff_receipt_sha256,
    'source_revision',p_release_sha,'existing_original_work_id',h.existing_original_work_id,
    'source_epoch_receipt_sha256',h.source_epoch_receipt_sha256,
-   'independent_diagnostic_receipt_sha256',h.independent_diagnostic_receipt_sha256);
+   'independent_diagnostic_receipt_sha256',h.independent_diagnostic_receipt_sha256,
+   'failure_evidence',failure_evidence);
  END IF;
  RETURN basis||pg_catalog.jsonb_build_object('maintenance_id',m.incident_id,'owner_id',s.owner_id,
   'shift_id',p_shift_id,'source_ref',m.source_ref,'release_sha',p_release_sha,
