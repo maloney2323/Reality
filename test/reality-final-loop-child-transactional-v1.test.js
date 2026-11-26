@@ -678,3 +678,15 @@ test('transport is attached to existing signed worker and canonical service-only
  assert.match(worker,/signedWorkerDurableReleaseWake\.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'/);
  assert.match(worker,/runIsolatedAdvisory:transport\.runIsolatedAdvisory/);
 });
+
+test('release continuation retains qualifier evidence and one-use historical invocation fences',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-release-continuation-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/CREATE UNIQUE INDEX IF NOT EXISTS final_loop_release_continuation_once_v1/);
+ assert.match(sql,/prev\.running_release_sha<>a\.release_sha/);
+ assert.match(sql,/old_event\.source_receipt_sha256/);
+ assert.match(sql,/c\.phase='ADMITTED' AND c\.canonical_prepare_invocation_id IS NULL/);
+ assert.match(sql,/ev\.release_continuation_claim_id=release_claim/);
+ assert.match(sql,/a\.claim_id=e\.release_continuation_claim_id AND a\.release_sha=p_release_sha/);
+ assert.match(sql,/e\.governed_wake_queued_at>=a\.claimed_at/);
+ assert.doesNotMatch(sql,/UPDATE reality_internal\.final_loop_child_review_work_v1/);
+});
