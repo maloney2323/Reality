@@ -168,3 +168,17 @@ test('idle Chat has no main-dashboard timers; detailed reads are on demand',()=>
  assert.match(release,/!thread.contains\(card\)/);
  assert.doesNotMatch(release,/realityChatPanelWork|setInterval|setTimeout/);
 });
+
+test('release explanation separates verified delivery from completion and preserves conversational choice',()=>{
+ const ui=readFileSync(new URL('../reality-chat-governed-release-v1.js',import.meta.url),'utf8');
+ assert.match(ui,/evidenceDetails.open=false/);
+ assert.match(ui,/whether the worker actually runs and whether the original job passes independent verification/);
+ assert.match(ui,/You do not need to approve this release again/);
+ assert.match(ui,/Ask Reality what happens next/);
+ const followup=ui.slice(ui.indexOf("discuss.addEventListener('click'"),ui.indexOf('const valid='));
+ assert.match(followup,/prompt.value=/);
+ assert.doesNotMatch(followup,/fetch\(|\.click\(|request\(/);
+ const chat=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.match(chat,/id:'worker_observation',read:\(\)=>readVerifiedIndependentWorkerForChat/);
+ assert.match(chat,/ctx.values.worker_observation\|\|\[\]/);
+});
