@@ -122,6 +122,7 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
   plan_fingerprint:'sha256:'+'1'.repeat(64),continuity_head_sha256:'sha256:'+'2'.repeat(64),qualifier_receipt_sha256:'sha256:'+'3'.repeat(64),
   original_work_id:'work:'+'4'.repeat(32),source_ref:'https://github.com/maloney2323/Reality/pull/307'};
  const calls=[];let gatewayPass=true;
+ const transportCap='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
  const fetchImpl=async url=>{
   calls.push(String(url));
   let data;
@@ -145,4 +146,15 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  gatewayPass=false;
  assert.equal((await run()).status,'INDEPENDENT_GATEWAY_CI_NOT_PASSED');
  assert.equal((await run({direction:{...direction,shift_id:owner}})).status,'CANONICAL_RUNTIME_SAME_SHIFT_OR_GATEWAY_CONFIG_NOT_VERIFIED');
+ gatewayPass=true;
+ const transportEnv={...e,REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY:transportCap,
+  REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'CANONICAL'};
+ const transportDirection={...direction,next_qualified_action:transportCap};
+ const transportDb={project:parent,strictSecrets:true};
+ const transportRun=extra=>run({env:transportEnv,direction:transportDirection,db:transportDb,...extra});
+ assert.equal((await transportRun({direction})).status,'CANONICAL_RUNTIME_SAME_SHIFT_OR_GATEWAY_CONFIG_NOT_VERIFIED');
+ assert.equal((await transportRun()).status,'ISOLATED_REVIEW_DEPLOYMENT_NOT_PINNED');
+ const peerEnv={...transportEnv,REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID:'dpl_peer12345678',
+  REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST:'isolated-pinned-test.vercel.app'};
+ assert.equal((await transportRun({env:peerEnv})).status,'ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
 });
