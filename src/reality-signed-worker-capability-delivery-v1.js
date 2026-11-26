@@ -39,7 +39,11 @@ export function qualifiedWorkerRuntime(candidate,env){
   UUID.test(s.continuity_root_id||'')&&Number.isSafeInteger(s.continuity_revision)&&s.continuity_revision>0&&
   Number.isSafeInteger(s.cron_job_id)&&s.cron_job_id>0&&Number.isSafeInteger(s.gateway_ci_run_id)&&s.gateway_ci_run_id>0&&
   /^work:[a-f0-9]{32}$/.test(s.original_work_id||'')&&/^https:\/\/github[.]com\/maloney2323\/Reality\/(issues|pull)\/[1-9][0-9]*$/.test(s.source_ref||'')&&
-  ['REQUALIFY_EXISTING_CONTINUITY_SOURCE','PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'].includes(s.capability_key);
+  ['REQUALIFY_EXISTING_CONTINUITY_SOURCE','PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET','VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'].includes(s.capability_key)&&
+  (s.capability_key!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||(
+   /^dpl_[A-Za-z0-9_-]{8,75}$/.test(s.isolated_deployment_id||'')&&s.isolated_deployment_id!==s.target_deployment_id&&
+   /^[-a-z0-9]+\.vercel\.app$/.test(s.isolated_transport_host||'')&&HASH.test(s.independent_transport_proof_sha256||'')&&
+   (!env||(s.isolated_deployment_id===env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID&&s.isolated_transport_host===env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST))));
 }
 export function matchesWorkerReleaseAuthority(candidate,authority){
  if(authority?.target_environment!==candidate?.environment)return false;
