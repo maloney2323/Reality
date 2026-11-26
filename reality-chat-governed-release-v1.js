@@ -27,7 +27,12 @@
  dismiss.type='button';dismiss.setAttribute('aria-label','Dismiss release details');
  header.append(title,dismiss);
  const detail=node('p','reality-final-loop-child-detail','Check the independently tested release for your existing authorized shift.');
- const evidence=node('p','reality-final-loop-child-evidence','');
+ const evidenceDetails=node('details','reality-final-loop-child-evidence');
+ const evidenceLabel=node('summary','','Technical evidence');
+ const evidence=node('p','','');
+ const receipt=node('p','','');
+ evidenceDetails.hidden=true;
+ evidenceDetails.append(evidenceLabel,evidence,receipt);
  const limits=node('p','reality-final-loop-child-limits','Preview only. No new shift, production change, original-job settlement or extra work authority.');
  const actions=node('div','reality-final-loop-child-actions');
  const check=node('button','reality-final-loop-child-refresh','Check release qualification');
@@ -35,14 +40,27 @@
  check.type=approve.type='button';approve.hidden=true;approve.disabled=true;
  const message=node('p','reality-final-loop-child-message','');
  message.setAttribute('role','status');message.setAttribute('aria-live','polite');
- actions.append(check,approve);card.append(header,detail,evidence,limits,actions,message);
+ const discuss=node('button','reality-final-loop-child-refresh','Ask Reality what happens next');
+ discuss.type='button';discuss.hidden=true;
+ actions.append(check,approve,discuss);card.append(header,detail,limits,actions,message,evidenceDetails);
  thread.append(card);
  let packet=null,busy=false,uncertain=false,dismissed=false,epoch=0;
  // Keep the visible Chat decision through saved-history rerenders.
  // Never force scroll, open a drawer, or perform a network read on render.
  new MutationObserver(()=>{if(signed()&&!card.hidden&&!thread.contains(card))thread.append(card);})
   .observe(thread,{childList:true});
- const clear=()=>{packet=null;approve.hidden=true;approve.disabled=true;evidence.textContent='';};
+ const clear=()=>{packet=null;approve.hidden=true;approve.disabled=true;};
+ let discussionSubject=null;
+ discuss.addEventListener('click',()=>{
+  if(!signed()||!discussionSubject)return;
+  const prompt=document.getElementById('privatePrompt');
+  if(!prompt||String(prompt.value||'').trim())return;
+  // An unsent conversational question. The model must check its own sources;
+  // this client display cannot supply verified state or action authority.
+  prompt.value='What happened after my release approval, and what happens next for my existing authorized shift? Check current independent worker and original-work evidence. Explain whether I need to do anything. Shift: '+discussionSubject+'.';
+  prompt.dispatchEvent(new Event('input',{bubbles:true}));
+  prompt.focus({preventScroll:true});
+ });
  const valid=p=>p?.status==='SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED'&&
   UUID.test(p.request_id||'')&&UUID.test(p.shift_id||'')&&SHA.test(p.release_sha||'')&&
   HASH.test(p.proposal_fingerprint||'')&&KEY.test(p.capability_key||'')&&
@@ -76,7 +94,10 @@
    if(data.status==='SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED'&&
       data.release_switch_attempted===false&&valid(data.release_preparation)){
     const p=data.release_preparation;
-    detail.textContent='Activate only the verified Preview worker for the existing shift '+p.shift_id+'.';
+    detail.textContent='The tested worker is ready for an exact approval. If you approve, Reality will attempt to activate this version for your existing shift.';
+    evidenceDetails.hidden=false;
+    evidenceDetails.open=true;
+    receipt.textContent='';
     evidence.textContent='Commit '+p.release_sha+' · branch '+p.release_ref+' · '+p.capability_key+
      ' · target '+p.scheduled_alias+' · original '+(p.runtime_scope.original_work_id||'unverified')+
      ' · packet '+p.request_id+' · fingerprint '+p.proposal_fingerprint;
@@ -101,17 +122,23 @@
    if(data?.production_changed!==false||data.original_job_completed!==false)throw Error('Unverified');
    if(data.status==='GOVERNED_RELEASE_SWITCH_DELIVERED_AWAITING_SIGNED_WORKER_WAKE'&&
       HASH.test(data.owner_approval_receipt_sha256||'')&&data.signed_worker_new_release_observed===false){
-    message.textContent='Exact approval receipt '+data.owner_approval_receipt_sha256+
-     '. Release delivery reported; actual worker execution and original work completion are not yet verified.';
-    if(data.governed_trigger_observation?.wake_queued===true)
-     message.textContent+=' Governed wake queued.';
+    title.textContent='Reality · Upgrade delivered';
+    detail.textContent='Your approval was recorded, and Reality reported delivery of the corrected Preview worker.';
+    const queued=data.governed_trigger_observation?.wake_queued===true;
+    message.textContent=queued?
+     'The next worker request is queued to continue your existing authorized work. The next checks are whether the worker actually runs and whether the original job passes independent verification. You do not need to approve this release again.':
+     'The next step is to verify worker execution and reconcile the original work. Delivery does not prove the job is complete. You do not need to approve this release again.';
+    evidenceDetails.hidden=false;evidenceDetails.open=false;
+    receipt.textContent='Approval receipt: '+data.owner_approval_receipt_sha256;
+    discussionSubject=p.shift_id;discuss.hidden=false;
+    check.textContent='Recheck release qualification';
    }else message.textContent=report(data)+'. Do not repeat approval; reconcile existing authority and effects.';
   }catch{if(started===epoch)message.textContent='Approval or delivery outcome uncertain. Do not repeat. Check verified status.';}
   finally{busy=false;clear();check.disabled=false;}
  });
  dismiss.addEventListener('click',()=>{dismissed=true;card.hidden=true;});
  function sync(){
-  if(!signed()){epoch++;clear();card.hidden=true;dismissed=false;return;}
+  if(!signed()){epoch++;clear();card.hidden=true;dismissed=false;discussionSubject=null;discuss.hidden=true;evidenceDetails.hidden=true;evidence.textContent='';receipt.textContent='';message.textContent='';title.textContent='Reality · release qualification';detail.textContent='Check the independently tested release for your existing authorized shift.';check.textContent='Check release qualification';return;}
   card.hidden=dismissed;
   if(!dismissed&&!thread.contains(card))thread.append(card);
  }
