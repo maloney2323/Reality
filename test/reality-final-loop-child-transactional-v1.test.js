@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview}
  from '../src/reality-final-loop-child-review-worker-v1.js';
+import {connectExistingIsolatedChildTransport,handleExistingChildTransport}
+ from '../src/reality-final-loop-child-transport-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../src/reality-final-loop-child-approval-request-v1.js';
 import {inspectLargePrSourceForBoundedReview}
@@ -522,4 +524,99 @@ test('canonical SQL reads and writes share the same continuity and signed releas
  assert.match(sql,/'canonical_continuity_head_sha256',p_canonical_handoff->'continuity_head_sha256'/);
  assert.match(sql,/'canonical_continuity_head_sha256',p_evidence->'canonical_continuity_head_sha256'/);
  assert.match(sql,/FINAL_LOOP_CANONICAL_VERIFIER_CONTINUITY_DRIFT_NO_REPLAY/);
+});
+
+test('actual signed transport connects the canonical claim to isolated model computation, fences replay and returns evidence',async()=>{
+ const files=completeLargeFiles(),plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
+ const body='Source review of '+scope.files.map(f=>f.path).join(', ')+'. Test each changed behavior and independently verify regression.';
+ const packet='11111111-1111-4111-8111-111111111111';
+ const h={schema:'reality-canonical-approved-review-scope-v1',
+  owner_id:owner,shift_id:shift,plan_id:packet,packet_id:packet,
+  parent_original_work_id:parent,source_ref:pr,source_head_sha:plan.live_head_sha,
+  source_proof_sha256:sourceHash,source_manifest_sha256:plan.source_manifest_sha256,
+  acceptance_contract_sha256:acceptance,scope_fingerprints:plan.bounded_scopes.map(x=>({index:x.index,scope_sha256:x.proposed_scope_sha256})),
+  continuity_root_id:'33333333-3333-4333-8333-333333333333',continuity_head_sha256:hash('e'),revision:2,
+  effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',canonical_claim_required:true,
+  execution_authorized:false,original_job_completed:false,production_changed:false};
+ const claim={status:'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',owner_id:owner,shift_id:shift,
+  child_work_id:child,claim_id:'44444444-4444-4444-8444-444444444444',claimant_worker_run_id:run,
+  parent_original_work_id:parent,source_ref:pr,source_head_sha:h.source_head_sha,source_proof_sha256:sourceHash,
+  source_manifest_sha256:h.source_manifest_sha256,acceptance_contract_sha256:acceptance,
+  scope_index:scope.index,scope_sha256:scope.proposed_scope_sha256,scope,phase:'CLAIMED',child_claimed:true,
+  canonical_scope_bound:true,plan_id:packet,packet_id:packet,continuity_head_sha256:h.continuity_head_sha256,
+  revision:2,original_job_completed:false,production_changed:false};
+ const current={...claim,status:'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK',worker_run_id:run,
+  model_authorized:true,model_response_id:null};
+ const canonicalDb={strictSecrets:true,project:'canonicaltestproject'};
+ const isolatedDb={strictSecrets:true,project:'isolatedtestprojectx'};
+ const common={...env,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'true',
+  REALITY_FINAL_LOOP_REVIEW_CANONICAL_HOST:'canonical-test-deploy.vercel.app',
+  REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST:'isolated-test-deploy.vercel.app',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:canonicalDb.project,
+  REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:isolatedDb.project,
+  REALITY_FINAL_LOOP_REVIEW_TRANSPORT_KEY:'b'.repeat(64),
+  REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false',VERCEL_GIT_COMMIT_SHA:'f'.repeat(40)};
+ const canonicalEnv={...common,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'CANONICAL',
+  VERCEL_URL:common.REALITY_FINAL_LOOP_REVIEW_CANONICAL_HOST,
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:canonicalDb.project,
+  REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false'};
+ const isolatedEnv={...common,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'ISOLATED',
+  VERCEL_URL:common.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST,
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:isolatedDb.project};
+ const now=()=>1234567890000;
+ let nonce=null,begins=0,checks=0,modelCalls=0,recordedCompute,drift=false;
+ const call=async(_db,name,args)=>{
+  assert.equal(_db,canonicalDb);assert.equal(name,'reality_fence_final_loop_child_transport_v1');
+  assert.deepEqual(args.p_canonical_handoff,h);
+  assert.equal(args.p_child_work_id,child);assert.equal(args.p_worker_run_id,run);
+  if(args.p_begin){begins++;if(nonce!==null)return {status:'FINAL_LOOP_CHILD_TRANSPORT_ALREADY_FENCED_NO_REPLAY'};nonce=args.p_invocation_id;}
+  else{checks++;if(drift||nonce!==args.p_invocation_id)return {status:'STALE'};}
+  return current;
+ };
+ const mockProvider=provider({id:'resp_transport1234',text:body},files,()=>modelCalls++);
+ const fetchImpl=async(url,options)=>{
+  if(url.startsWith('https://api.github.com/')||url.startsWith('https://api.openai.com/'))return mockProvider(url,options);
+  assert.equal(options.method,'POST');assert.equal(options.redirect,'error');
+  assert.equal(options.headers.authorization,undefined);
+  assert.equal(options.headers.apikey,undefined);
+  const req=JSON.parse(options.body);const p=JSON.parse(req.payload);
+  const canonical=url==='https://'+canonicalEnv.VERCEL_URL+'/api/reality/governed-final-loop-child-transport';
+  assert.ok(canonical||url==='https://'+isolatedEnv.VERCEL_URL+'/api/reality/governed-final-loop-child-transport');
+  if(p.action==='COMPUTE')recordedCompute=req;
+  const r=await handleExistingChildTransport({db:canonical?canonicalDb:isolatedDb,body:req,
+   env:canonical?canonicalEnv:isolatedEnv,call,fetchImpl,now});
+  return {ok:r.http===200,status:r.http,json:async()=>r.body};
+ };
+ const base={db:canonicalDb,handoff:h,env:canonicalEnv,fetchImpl,now};
+ const missing=await connectExistingIsolatedChildTransport({...base,env:{...canonicalEnv,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'false'}});
+ assert.equal(missing.ready,undefined);assert.equal(begins,0);
+ const connected=await connectExistingIsolatedChildTransport(base);
+ assert.equal(connected.ready,true);assert.equal(begins,0);assert.equal(modelCalls,0);
+ const input={claim,mode:'PREPARE',shiftId:shift,workerRunId:run};
+ const result=await connected.runIsolatedAdvisory(input);
+ assert.equal(result.status,'FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED');
+ assert.equal(result.candidate,body);assert.equal(result.original_job_completed,false);
+ assert.equal(begins,1);assert.equal(checks,1);assert.equal(modelCalls,1);
+ await assert.rejects(()=>connected.runIsolatedAdvisory(input),/NO_REPLAY/);
+ const replay=await handleExistingChildTransport({db:isolatedDb,body:recordedCompute,env:isolatedEnv,call,fetchImpl,now});
+ assert.equal(JSON.parse(replay.body.payload).status,'FINAL_LOOP_ISOLATED_CHILD_ADVISORY_UNVERIFIED_NO_REPLAY');
+ assert.equal(modelCalls,1);
+ const forged=await handleExistingChildTransport({db:isolatedDb,body:{...recordedCompute,signature:'0'.repeat(64)},env:isolatedEnv,call,fetchImpl,now});
+ assert.equal(forged.http,403);assert.equal(modelCalls,1);
+ nonce=null;drift=true;
+ const next=await connectExistingIsolatedChildTransport(base);
+ await assert.rejects(()=>next.runIsolatedAdvisory(input),/ADVISORY_UNVERIFIED/);
+ assert.equal(modelCalls,2); // inference may happen, but drift prevents any return/receipt
+});
+
+test('transport is attached to existing signed worker and canonical service-only fence',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-child-transactional-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/canonical_prepare_invocation_id IS NULL/);
+ assert.match(sql,/canonical_verify_invocation_id IS NULL/);
+ assert.match(sql,/premodel_recovery_count=greatest\(premodel_recovery_count,1\)/);
+ assert.match(sql,/reality_fence_final_loop_child_transport_v1\(text,uuid,uuid,text,uuid,boolean,jsonb\)[\s\n]+FROM PUBLIC,anon,authenticated/);
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.match(worker,/signedWorkerDurableReleaseWake\.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'/);
+ assert.match(worker,/runIsolatedAdvisory:transport\.runIsolatedAdvisory/);
 });
