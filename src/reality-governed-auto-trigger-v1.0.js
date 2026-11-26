@@ -292,7 +292,7 @@ export function routeSignedMaintenanceContinuityTrigger({
 
 // Existing governor: choose only an independently verified, current event.
 // The service broker remains responsible for its own atomic warrant and proof.
-export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
+export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claimedEventId=null,stagedActions=null}={}){
  const safe=(status,extra={})=>Object.freeze({status,...extra,
   execution_authorized_by_trigger:false,installation_authorized:false,
   original_job_completed:false,production_changed:false,new_shift_started:false});
@@ -321,8 +321,14 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
     e.shadow_ready_event_count!==e.ready_event_refs.length)
   return reject('INDEPENDENT_EVENT_READBACK_REQUIRED');
  if(e.ready_event_refs.length===0)return reject('NO_CURRENT_VERIFIED_EVENT');
- if(e.ready_event_refs.length!==1)return reject('AMBIGUOUS_EVENT_SCOPE');
- const r=e.ready_event_refs[0];
+ // A canonical RESUME delivery already owns one exact event. Unrelated
+ // qualified events remain queued rather than creating an ambiguous shift.
+ if(claimedEventId!==null&&!signedShiftUUID.test(claimedEventId||''))
+  return reject('CLAIMED_EVENT_ID_INVALID');
+ const selected=claimedEventId===null?e.ready_event_refs:
+  e.ready_event_refs.filter(item=>item?.event_id===claimedEventId);
+ if(selected.length!==1)return reject(claimedEventId===null?'AMBIGUOUS_EVENT_SCOPE':'CLAIMED_EVENT_NOT_CURRENT_OR_AMBIGUOUS');
+ const r=selected[0];
  if(!r||!signedShiftUUID.test(r.event_id||'')||
     !signedShiftWORK.test(r.original_work_id||'')||
     !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(r.source_ref||'')||
@@ -352,6 +358,62 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
  }
  const qualified=c.governed_qualification_handoffs.filter(q=>
   q?.source_ref===r.source_ref&&q.original_work_id===r.original_work_id);
+ const reviewAction='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
+ // An exact review route is independently accepted, READ-ONLY review scope.
+ // Its trigger is not the maintenance verifier and cannot renew repair budget.
+ if(r.event_kind==='QUALIFIER_PROOF_CHANGED'&&r.next_qualified_action===reviewAction){
+  if(claimedEventId===null||h.next_qualified_action!==reviewAction||
+     h.qualifier_receipt_sha256!==r.source_receipt_sha256||
+     qualified.length!==1||qualified[0].qualifier_receipt_sha256!==r.source_receipt_sha256||
+     qualified[0].next_qualified_action!==reviewAction||
+     !Array.isArray(h.unresolved_proof_gates)||
+     h.unresolved_proof_gates.includes('OWNER_GOAL_ACCEPTANCE_EVENT_MISSING')||
+     h.unresolved_proof_gates.includes('EXACT_ACCEPTANCE_APPROVAL_MISSING'))
+   return reject('EXACT_REVIEW_EVENT_QUALIFICATION_REQUIRED');
+  if(stagedActions?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+     stagedActions.read_only!==true||stagedActions.action_dispatched!==false||
+     stagedActions.model_execution_authorized!==false||stagedActions.original_job_completed!==false||
+     !Array.isArray(stagedActions.routes))
+   return reject('CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED');
+  const routes=stagedActions.routes.filter(x=>x?.source_ref===r.source_ref&&
+   x.parent_original_work_id===r.original_work_id);
+  if(routes.length!==1)return reject('EXACT_CATEGORIZED_REVIEW_ROUTE_REQUIRED');
+  const route=routes[0],scope=route.canonical_execution_handoff;
+  if(route.operation_category!=='EXECUTION'||route.authority_scope!=='EXACT_ACCEPTED_READ_ONLY_REVIEW'||
+     route.next_governed_action!==reviewAction||route.next_registered_handler!==reviewAction||
+     route.existing_owner_goal_acceptance_verified!==true||route.owner_action_required!==false||
+     route.child_execution_authorized!==false||route.handler_dispatched!==false||
+     route.original_job_completed!==false||route.parent_source_phase!=='BLOCKED'||
+     scope?.status!=='CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED'||
+     scope.schema!=='reality-canonical-approved-review-scope-v1'||
+     scope.owner_id!==c.owner_id||scope.shift_id!==shiftId||
+     scope.parent_original_work_id!==r.original_work_id||scope.source_ref!==r.source_ref||
+     !signedShiftUUID.test(scope.plan_id||'')||scope.plan_id!==route.plan_id||
+     !signedShiftUUID.test(scope.packet_id||'')||
+     !signedShiftSHA.test(scope.owner_approval_receipt_sha256||'')||
+     !signedShiftSHA.test(scope.plan_fingerprint||'')||
+     !/^[a-f0-9]{40}$/.test(scope.source_head_sha||'')||scope.source_head_sha!==route.source_head_sha||
+     !signedShiftSHA.test(scope.source_manifest_sha256||'')||
+     scope.source_manifest_sha256!==route.source_manifest_sha256||
+     !signedShiftSHA.test(scope.acceptance_contract_sha256||'')||
+     scope.acceptance_contract_sha256!==route.acceptance_contract_sha256||
+     scope.continuity_root_id!==g.continuity_root_id||
+     scope.continuity_head_sha256!==g.continuity_head_sha256||scope.revision!==g.revision||
+     scope.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||scope.canonical_claim_required!==true||
+     scope.next_governed_action!=='CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER'||
+     scope.read_only!==true||scope.execution_authorized!==false||
+     scope.original_job_completed!==false||scope.production_changed!==false)
+   return reject('CATEGORIZED_REVIEW_AUTHORITY_OR_CONTINUITY_DRIFT');
+  return safe('FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY',{
+   ...base,operation_category:'EXECUTION',authority_scope:'EXACT_ACCEPTED_READ_ONLY_REVIEW',
+   next_action:reviewAction,qualifier_receipt_sha256:r.source_receipt_sha256,
+   // This is permission to route to the existing canonical claim boundary,
+   // not a claim, live execution grant, or the maintenance CI resume event.
+   dispatch_permitted:false,resume_event:null,review_claim_route_ready:true,
+   canonical_claim_handoff:scope,canonical_claim_required:true,
+   previous_attempt_budget_preserved:true,new_attempt_authorized:false,
+   repeat_prior_ci_dispatch_permitted:false});
+ }
  const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
  // The exhausted builder may qualify DISTINCT evidence, not replay CI or
  // lease another build. The existing verifier is the only permitted reader.
@@ -366,7 +428,8 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId}={}){
      h.independent_internal_ci_verified!==false)
    return reject('TERMINAL_RECOVERY_CURRENT_EVIDENCE_UNVERIFIED');
   return safe('FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE',{
-   ...base,dispatch_permitted:false,resume_event:null,
+   ...base,operation_category:'RECOVERY',authority_scope:'DISTINCT_EVIDENCE_ONLY',
+   dispatch_permitted:false,resume_event:null,
    evidence_readback_permitted:true,next_action:terminalAction,
    qualifier_receipt_sha256:r.source_receipt_sha256,
    previous_attempt_budget_preserved:true,new_attempt_authorized:false,
