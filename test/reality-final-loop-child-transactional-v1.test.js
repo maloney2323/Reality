@@ -569,8 +569,14 @@ test('actual signed transport connects the canonical claim to isolated model com
   VERCEL_DEPLOYMENT_ID:'dpl_isolatedtest1234',
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:isolatedDb.project};
  const now=()=>1234567890000;
- let nonce=null,begins=0,checks=0,modelCalls=0,recordedCompute,drift=false;
+ let nonce=null,begins=0,checks=0,modelCalls=0,recordedCompute,drift=false,dbProof=true,foreignGraph=false;
  const call=async(_db,name,args)=>{
+  if(name==='reality_read_final_loop_governed_start_v1')return {status:dbProof?'GOVERNED_START_SCOPE_UNVERIFIED':'NOT_AUTHORIZED'};
+  if(name==='reality_read_current_shift_execution_graph_v1'){
+   assert.equal(_db,isolatedDb);return {status:foreignGraph?'UNEXPECTED_ACTIVE_SHIFT':'NO_CURRENT_OWNER_SHIFT_EXECUTION_GRAPH'};
+  }
+  if(name==='reality_fence_final_loop_child_transport_v1'&&args.p_child_work_id===null)
+   return {status:'FINAL_LOOP_CHILD_TRANSPORT_SCOPE_INVALID'};
   assert.equal(_db,canonicalDb);assert.equal(name,'reality_fence_final_loop_child_transport_v1');
   assert.deepEqual(args.p_canonical_handoff,h);
   assert.equal(args.p_child_work_id,child);assert.equal(args.p_worker_run_id,run);
@@ -592,7 +598,13 @@ test('actual signed transport connects the canonical claim to isolated model com
    env:canonical?canonicalEnv:isolatedEnv,call,fetchImpl,now});
   return {ok:r.http===200,status:r.http,json:async()=>r.body};
  };
- const base={db:canonicalDb,handoff:h,env:canonicalEnv,fetchImpl,now};
+ const base={db:canonicalDb,handoff:h,env:canonicalEnv,fetchImpl,call,now};
+ dbProof=false;
+ assert.equal((await connectExistingIsolatedChildTransport(base)).ready,undefined);
+ dbProof=true;foreignGraph=true;
+ assert.equal((await connectExistingIsolatedChildTransport(base)).ready,undefined);
+ foreignGraph=false;
+ assert.equal(begins,0);assert.equal(modelCalls,0);
  const missing=await connectExistingIsolatedChildTransport({...base,env:{...canonicalEnv,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'false'}});
  assert.equal(missing.ready,undefined);assert.equal(begins,0);
  const wrongPeer=await connectExistingIsolatedChildTransport({...base,env:{...canonicalEnv,
@@ -600,6 +612,8 @@ test('actual signed transport connects the canonical claim to isolated model com
  assert.equal(wrongPeer.ready,undefined);assert.equal(begins,0);
  const connected=await connectExistingIsolatedChildTransport(base);
  assert.equal(connected.ready,true);
+ assert.equal(connected.database_contract_verified,true);
+ assert.equal(connected.probe_only,false);
  assert.equal(connected.isolated_deployment_id,isolatedEnv.VERCEL_DEPLOYMENT_ID);
  assert.equal(connected.canonical_deployment_id,canonicalEnv.VERCEL_DEPLOYMENT_ID);assert.equal(begins,0);assert.equal(modelCalls,0);
  const input={claim,mode:'PREPARE',shiftId:shift,workerRunId:run};
