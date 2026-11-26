@@ -105,6 +105,7 @@ export default async function handler(req,res){
   const db=shiftDatabase(env);
   const event=signedPrepare?authenticateSignedReleasePreparation({body:req.body,env,db}):null;
   if(signedPrepare&&!event)return result(res,403,'SIGNED_RELEASE_PREPARATION_AUTH_REQUIRED');
+  let verifiedEvent=null;
   if(event){
    const e=await shiftRpc(db,'reality_read_signed_release_preparation_event_v1',{
     p_owner_id:event.owner_id,p_shift_id:event.shift_id,p_plan_fingerprint:event.plan,p_event_id:event.event_id,
@@ -114,6 +115,7 @@ export default async function handler(req,res){
       e.worker_run_id!==event.worker_run_id||e.shift_id!==event.shift_id||e.read_only!==true||
       e.execution_authorized!==false||e.owner_approval_granted!==false||e.production_changed!==false||e.original_job_completed!==false)
     return result(res,409,'SIGNED_RELEASE_PREPARATION_EVENT_UNVERIFIED',{release_switch_attempted:false});
+   verifiedEvent=e;
   }
   if(ownerChannel&&!ownerReleaseScopeMatches(session,db,env))
    return result(res,403,'GOVERNED_RELEASE_CHAT_OWNER_SCOPE_DENIED');
@@ -160,6 +162,8 @@ export default async function handler(req,res){
   if(event&&(direction?.status!=='GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED'||direction.owner_id!==event.owner_id||
      direction.shift_id!==event.shift_id||direction.plan_fingerprint!==event.plan||
      direction.continuity_head_sha256!==event.head||direction.continuity_revision!==event.revision||
+     direction.original_work_id!==verifiedEvent.original_work_id||direction.source_ref!==verifiedEvent.source_ref||
+     direction.qualifier_receipt_sha256!==verifiedEvent.qualifier_receipt_sha256||
      direction.observed_alias_release_sha!==event.running_release||direction.configured_target_release_sha!==event.target_release))
    return result(res,409,'SIGNED_RELEASE_PREPARATION_DIRECTION_CHANGED',{release_switch_attempted:false});
   const proof=await qualifyCurrentIsolatedSignedWorkerRelease({
