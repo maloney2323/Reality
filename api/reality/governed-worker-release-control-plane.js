@@ -145,7 +145,14 @@ export default async function handler(req,res){
    claimApprovedRelease:adapters.claimApprovedRelease,
    assignAlias:adapters.assignAlias
   });
+  let governedTrigger=null;
+  if(action.status==='GOVERNED_RELEASE_SWITCH_DELIVERED_AWAITING_SIGNED_WORKER_WAKE'&&
+   canonical&&env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'){
+   try{governedTrigger=await adapters.recordObservedReviewDelivery();}
+   catch{governedTrigger={status:'REVIEW_RELEASE_ALIAS_OBSERVATION_UNVERIFIED_NO_REPLAY',wake_queued:false};}
+  }
   return result(res,200,action.status,{
+   governed_trigger_observation:governedTrigger,
    delivery_status:action.delivery_status??null,
    provider_write_attempted:action.provider_write_attempted===true,
    next_governed_action:action.next_governed_action??
