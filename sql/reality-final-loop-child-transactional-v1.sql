@@ -1456,3 +1456,79 @@ REVOKE ALL ON FUNCTION
 GRANT EXECUTE ON FUNCTION
  public.reality_reconcile_final_loop_child_premodel_v1(uuid,uuid)
  TO service_role;
+
+-- One-use transport fence on the EXISTING child obligation, not a new ledger.
+-- A lost BEGIN response is uncertain, never permission to start another model.
+ALTER TABLE reality_internal.final_loop_child_review_work_v1
+ ADD COLUMN IF NOT EXISTS premodel_recovery_count integer NOT NULL DEFAULT 0,
+ ADD COLUMN IF NOT EXISTS canonical_prepare_invocation_id uuid,
+ ADD COLUMN IF NOT EXISTS canonical_verify_invocation_id uuid,
+ ADD COLUMN IF NOT EXISTS canonical_verify_invocation_run_id uuid;
+CREATE OR REPLACE FUNCTION public.reality_fence_final_loop_child_transport_v1(
+ p_child_work_id text,p_claim_id uuid,p_worker_run_id uuid,p_mode text,
+ p_invocation_id uuid,p_begin boolean,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE a jsonb; n integer; v reality_internal.final_loop_child_review_work_v1%rowtype;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_CHILD_TRANSPORT_SERVICE_ONLY';END IF;
+ IF p_begin IS NULL OR p_invocation_id IS NULL OR p_worker_run_id IS NULL
+  OR coalesce(p_child_work_id,'') !~ '^work:[a-f0-9]{32}$'
+  OR coalesce(p_mode,'') NOT IN ('PREPARE','VERIFY')
+  OR (p_mode='PREPARE' AND p_claim_id IS NULL)
+  OR (p_mode='VERIFY' AND p_claim_id IS NOT NULL)
+ THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_SCOPE_INVALID');END IF;
+ -- Existing canonical scope and release guard takes the shift/warrant lock.
+ IF p_mode='PREPARE' THEN
+  a:=public.reality_read_final_loop_child_model_scope_v1(
+   p_child_work_id,p_claim_id,p_worker_run_id,p_canonical_handoff);
+  IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK'
+   OR a->>'model_authorized' IS DISTINCT FROM 'true'
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_AUTHORITY_UNVERIFIED');END IF;
+ ELSE
+  a:=public.reality_read_final_loop_child_verify_v1(
+   (p_canonical_handoff->>'shift_id')::uuid,p_worker_run_id,p_canonical_handoff);
+  IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE'
+   OR a->>'child_work_id' IS DISTINCT FROM p_child_work_id
+   OR a->>'independent_verifier_run_id' IS DISTINCT FROM p_worker_run_id::text
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_VERIFIER_UNVERIFIED');END IF;
+ END IF;
+ SELECT * INTO v FROM reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.child_work_id=p_child_work_id FOR UPDATE;
+ IF NOT FOUND OR NOT reality_internal.final_loop_canonical_child_matches_v1(p_child_work_id,p_canonical_handoff)
+ THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_ORIGINAL_DRIFT');END IF;
+ IF p_mode='PREPARE' THEN
+  IF v.phase<>'CLAIMED' OR v.claim_id IS DISTINCT FROM p_claim_id
+   OR v.claimant_worker_run_id IS DISTINCT FROM p_worker_run_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_CLAIM_DRIFT');END IF;
+  IF p_begin THEN
+   UPDATE reality_internal.final_loop_child_review_work_v1
+   SET canonical_prepare_invocation_id=p_invocation_id,
+    -- Existing premodel recovery must NOT readmit a possibly invoked model.
+    premodel_recovery_count=greatest(premodel_recovery_count,1)
+   WHERE child_work_id=p_child_work_id AND canonical_prepare_invocation_id IS NULL
+    AND phase='CLAIMED' AND claim_id=p_claim_id AND claimant_worker_run_id=p_worker_run_id;
+   GET DIAGNOSTICS n=ROW_COUNT;
+   IF n<>1 THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_ALREADY_FENCED_NO_REPLAY');END IF;
+  ELSIF v.canonical_prepare_invocation_id IS DISTINCT FROM p_invocation_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_INVOCATION_MISMATCH');END IF;
+ ELSE
+  IF v.phase<>'PREPARED' OR v.claimant_worker_run_id=p_worker_run_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_VERIFIER_DRIFT');END IF;
+  IF p_begin THEN
+   UPDATE reality_internal.final_loop_child_review_work_v1
+   SET canonical_verify_invocation_id=p_invocation_id,
+    canonical_verify_invocation_run_id=p_worker_run_id
+   WHERE child_work_id=p_child_work_id AND phase='PREPARED'
+    AND canonical_verify_invocation_id IS NULL AND claimant_worker_run_id<>p_worker_run_id;
+   GET DIAGNOSTICS n=ROW_COUNT;
+   IF n<>1 THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_ALREADY_FENCED_NO_REPLAY');END IF;
+  ELSIF v.canonical_verify_invocation_id IS DISTINCT FROM p_invocation_id
+   OR v.canonical_verify_invocation_run_id IS DISTINCT FROM p_worker_run_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_INVOCATION_MISMATCH');END IF;
+ END IF;
+ RETURN a;
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_fence_final_loop_child_transport_v1(text,uuid,uuid,text,uuid,boolean,jsonb)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_fence_final_loop_child_transport_v1(text,uuid,uuid,text,uuid,boolean,jsonb)
+ TO service_role;
