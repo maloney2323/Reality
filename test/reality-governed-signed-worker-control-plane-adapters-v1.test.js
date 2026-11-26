@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTrustedSignedWorkerReleaseControlPlaneAdapters as create,releaseFailureReceipt,requestReleaseProviderJson}
+import {createTrustedSignedWorkerReleaseControlPlaneAdapters as create,releaseFailureReceipt,requestReleaseProviderJson,verifiedVercelDeploymentReadiness}
  from '../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
 const sha='a'.repeat(40),oldSha='b'.repeat(40);
 const project='abcdefghijklmnopqrst';
@@ -302,4 +302,38 @@ test('provider effect failure never authorizes replay and raw errors are not exp
   'https://example.invalid',{method:'GET'},'SUPABASE_BRANCH_READ'),error=>{
    assert.equal(releaseFailureReceipt(error).classification,'TIMEOUT');return true;
   });
+});
+
+test('Vercel readiness follows the documented field and fails closed on contradictions',()=>{
+ for(const [value,expected] of [
+  [{readyState:'READY'},'READY'],[{state:'READY'},'READY'],
+  [{state:'READY',readyState:'READY'},'READY'],
+  [{readyState:'BUILDING'},'BUILDING'],[{readyState:'ERROR'},'ERROR'],
+  [{state:'READY',readyState:'BUILDING'},null],
+  [{state:'ERROR',readyState:'READY'},null],
+  [{state:'READY',readyState:null},null],[{},null],[null,null],
+  [{readyState:'ready'},null],[{readyState:true},null]
+ ])assert.equal(verifiedVercelDeploymentReadiness(value),expected);
+});
+test('active alias verification accepts documented readyState, rejects non-ready or conflicting fields',async()=>{
+ for(const [readiness,accepted] of [
+  [{readyState:'READY'},true],[{state:'READY'},true],
+  [{readyState:'READY',state:'READY'},true],[{},false],
+  [{readyState:'BUILDING'},false],[{readyState:'ERROR'},false],
+  [{readyState:'READY',state:'ERROR'},false]
+ ]){
+  let reads=0;
+  const adapter=create({env,db,fetchImpl:async address=>{
+   reads++;const data=String(address).includes('/v4/aliases/')?
+    {alias,projectId:env.REALITY_VERIFIED_VERCEL_PROJECT_ID,deploymentId}:
+    {id:deploymentId,project:{id:env.REALITY_VERIFIED_VERCEL_PROJECT_ID},target:null,
+     meta:{githubOrg:'example-org',githubRepo:'example-repo',githubCommitSha:sha,githubCommitRef:branch},...readiness};
+   return {ok:true,status:200,json:async()=>data};
+  }});
+  if(accepted)assert.equal((await adapter.observeAlias(alias)).resolved_release_sha,sha);
+  else await assert.rejects(()=>adapter.observeAlias(alias),e=>{
+   assert.deepEqual(releaseFailureReceipt(e).mismatched_fields,['ready_state']);return true;
+  });
+  assert.equal(reads,2);
+ }
 });
