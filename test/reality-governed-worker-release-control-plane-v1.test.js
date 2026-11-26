@@ -150,3 +150,21 @@ test('Chat consent requalifies and reads exact approval back before original fen
  assert.match(ui,/if\(!signed\(\)\|\|busy\|\|uncertain/);
  assert.doesNotMatch(ui,/setInterval|localStorage|OPERATOR_TOKEN/);
 });
+
+test('idle Chat has no main-dashboard timers; detailed reads are on demand',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const workspace=readFileSync(new URL('../reality-chat-workspace-v1.js',import.meta.url),'utf8');
+ assert.match(html,/onRoute\('work','shifts'\)&&!wcEasyRepairBusy/);
+ assert.match(html,/onRoute\('home','value'\)\)void realityBusinessRefresh/);
+ assert.doesNotMatch(html,/setInterval\(\(\)=>\{if\(homeOwnerSignedIn\(\)\)void realityChatRefreshEvents/);
+ assert.match(html,/window.addEventListener\('reality:chat-work-opened',async/);
+ assert.match(workspace,/next==='work'\)window.dispatchEvent\(new CustomEvent\('reality:chat-work-opened'\)\)/);
+ const detail=readFileSync(new URL('../reality-chat-continuous-qualification-v1.js',import.meta.url),'utf8');
+ assert.match(detail,/reality:chat-work-opened/);
+ assert.doesNotMatch(detail,/setInterval\(/);
+ const release=readFileSync(new URL('../reality-chat-governed-release-v1.js',import.meta.url),'utf8');
+ assert.match(release,/document.getElementById\('privateTranscript'\)/);
+ assert.match(release,/thread.append\(card\)/);
+ assert.match(release,/!thread.contains\(card\)/);
+ assert.doesNotMatch(release,/realityChatPanelWork|setInterval|setTimeout/);
+});
