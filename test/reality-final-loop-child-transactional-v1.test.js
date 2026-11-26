@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {createHash} from 'node:crypto';
 import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview}
  from '../src/reality-final-loop-child-review-worker-v1.js';
@@ -518,10 +519,18 @@ test('canonical claim, isolated computation and independent return preserve one 
  const returnCall=async(db,name,args)=>{
   if(name!=='reality_return_final_loop_invocation_observations_v1')return call(db,name,args);
   assert.equal(args.p_original_work_id,parent);assert.equal(args.p_expected_revision,2);
-  returned=true;
-  return {status:'FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',canonical_return_committed:true,
-   execution_authorized:false,replay_authorized:false,original_job_completed:false,event_id:returnedEvent,
-   observation_sha256:hash('6'),continuity_head_sha256:observedHead,revision:3};
+  // Exercise the actual production RPC allowlist, request encoding and
+  // transport contract. Inject only the remote HTTP response.
+  return shiftRpc({url:'https://fixture.invalid',secretKey:'test-key'},name,args,{
+   fetchImpl:async(url,options)=>{
+    assert.equal(url,'https://fixture.invalid/rest/v1/rpc/reality_return_final_loop_invocation_observations_v1');
+    assert.equal(options.method,'POST');assert.deepEqual(JSON.parse(options.body),args);
+    returned=true;
+    return {ok:true,status:200,json:async()=>({
+     status:'FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',canonical_return_committed:true,
+     execution_authorized:false,replay_authorized:false,original_job_completed:false,event_id:returnedEvent,
+     observation_sha256:hash('6'),continuity_head_sha256:observedHead,revision:3})};
+   }});
  };
  const observationReturn=await advanceCanonicalFinalLoopChildReview({...base,call:returnCall,
   readCurrentContinuity:async()=>returned?withObservation(returnedEvidence,observedHead,3):withObservation(pendingObservation)});
@@ -800,4 +809,18 @@ test('Reality owns exact indexed source coverage and the review output budget',a
  assert.ok(lb.field_max_chars<160);
  const maximal=JSON.stringify({files:longScope.files.map((f,index)=>({index,finding:'x'.repeat(lb.field_max_chars),test:'y'.repeat(lb.field_max_chars)}))});
  assert.ok(assembleBoundedChildReview(maximal,longScope).length<=4000);
+});
+
+test('canonical continuity RPCs use the existing exact gateway allowlist',async()=>{
+ const db={url:'https://fixture.invalid',secretKey:'test-key'};
+ const called=[];
+ const fetchImpl=async(url,options)=>{
+  called.push(url.split('/').at(-1));assert.equal(options.method,'POST');
+  return {ok:true,status:200,json:async()=>({status:'FIXTURE_ONLY'})};
+ };
+ for(const name of ['reality_return_final_loop_invocation_observations_v1','reality_record_final_loop_child_rejection_v1'])
+  assert.equal((await shiftRpc(db,name,{}, {fetchImpl})).status,'FIXTURE_ONLY');
+ await assert.rejects(shiftRpc(db,'reality_return_final_loop_invocation_observations_v2',{}, {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
+ await assert.rejects(shiftRpc(db,'reality_unregistered_effect_v1',{}, {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
+ assert.deepEqual(called,['reality_return_final_loop_invocation_observations_v1','reality_record_final_loop_child_rejection_v1']);
 });
