@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {authorizedReleaseOperator,validOwnerReleaseIntent,ownerReleaseScopeMatches,default as handler}
  from '../api/reality/governed-worker-release-control-plane.js';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 
 function res(){
  const out={statusCode:200,headers:{},body:null};
@@ -181,4 +182,50 @@ test('release explanation separates verified delivery from completion and preser
  const chat=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  assert.match(chat,/id:'worker_observation',read:\(\)=>readVerifiedIndependentWorkerForChat/);
  assert.match(chat,/ctx.values.worker_observation\|\|\[\]/);
+});
+
+
+test('authenticated Chat automatically prepares once per signed epoch without approving or polling',async()=>{
+ const source=readFileSync(new URL('../reality-chat-governed-release-v1.js',import.meta.url),'utf8');
+ const elements=[];
+ const make=(tag)=>{
+  const el={tag,children:[],style:{},hidden:false,disabled:false,listeners:{},
+   append(...children){this.children.push(...children)},
+   contains(child){return this.children.includes(child)},
+   setAttribute(){},addEventListener(type,fn){this.listeners[type]=fn}};
+  elements.push(el);return el;
+ };
+ const ready=make('ready'),thread=make('thread');
+ ready.style.display='none';
+ let sync;
+ class Observer{constructor(fn){this.fn=fn}observe(el){if(el===ready)sync=this.fn}}
+ const calls=[];
+ let release;
+ const fetch=async(url,init)=>{
+  calls.push({url,body:JSON.parse(init.body)});
+  await new Promise(resolve=>{release=resolve});
+  return {status:409,json:async()=>({status:'GOVERNED_RELEASE_INDEPENDENT_QUALIFICATION_BLOCKED',
+   production_changed:false,original_job_completed:false})};
+ };
+ const flush=()=>new Promise(resolve=>setImmediate(resolve));
+ runInNewContext(source,{location:{pathname:'/chat'},document:{
+  getElementById:id=>id==='privateReady'?ready:id==='privateTranscript'?thread:null,
+  createElement:make},MutationObserver:Observer,fetch,AbortSignal});
+ assert.equal(calls.length,0);
+ ready.style.display='block';sync();sync();
+ assert.equal(calls.length,1);
+ assert.deepEqual(calls[0].body,{intent:'OWNER_PREPARE_EXACT_RELEASE'});
+ release();await flush();sync();
+ assert.equal(calls.length,1);
+ const approve=elements.find(el=>el.textContent==='Approve exact Preview release');
+ assert.equal(approve.disabled,true);
+ const dismiss=elements.find(el=>el.textContent==='×');
+ dismiss.listeners.click();sync();
+ assert.equal(calls.length,1);
+ ready.style.display='none';sync();
+ ready.style.display='block';sync();
+ assert.equal(calls.length,2);
+ assert.deepEqual(calls[1].body,{intent:'OWNER_PREPARE_EXACT_RELEASE'});
+ release();await flush();
+ assert.ok(calls.every(c=>c.url==='/api/reality/governed-worker-release-control-plane'));
 });
