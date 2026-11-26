@@ -45,8 +45,9 @@
  actions.append(check,approve,discuss);card.append(header,detail,limits,actions,message,evidenceDetails);
  thread.append(card);
  let packet=null,busy=false,uncertain=false,dismissed=false,epoch=0;
+ let signedEpoch=false,autoPreparedEpoch=null;
  // Keep the visible Chat decision through saved-history rerenders.
- // Never force scroll, open a drawer, or perform a network read on render.
+ // Never force scroll, open a drawer, or perform a network read on transcript rerender.
  new MutationObserver(()=>{if(signed()&&!card.hidden&&!thread.contains(card))thread.append(card);})
   .observe(thread,{childList:true});
  const clear=()=>{packet=null;approve.hidden=true;approve.disabled=true;};
@@ -83,8 +84,9 @@
   const next=typeof data?.next_governed_action==='string'?data.next_governed_action:'';
   return [status,reason,next].filter(Boolean).join(' · ').replaceAll('_',' ');
  }
- check.addEventListener('click',async()=>{
-  if(!signed()||busy)return;
+ async function prepareRelease(){
+  if(!signed()||busy||uncertain)return;
+  autoPreparedEpoch=epoch;
   busy=true;const started=epoch;check.disabled=true;clear();
   message.textContent='Reading independent release and continuity evidence…';
   try{
@@ -108,8 +110,9 @@
     message.textContent=report(data);
    }
   }catch{if(started===epoch)message.textContent='Qualification response unavailable. No approval or release activation is confirmed.';}
-  finally{busy=false;check.disabled=false;}
- });
+  finally{busy=false;check.disabled=false;if(started!==epoch)sync();}
+ }
+ check.addEventListener('click',()=>{void prepareRelease();});
  approve.addEventListener('click',async()=>{
   if(!signed()||busy||uncertain||!packet||approve.disabled)return;
   const p=packet,started=epoch;busy=true;uncertain=true;
@@ -134,13 +137,20 @@
     check.textContent='Recheck release qualification';
    }else message.textContent=report(data)+'. Do not repeat approval; reconcile existing authority and effects.';
   }catch{if(started===epoch)message.textContent='Approval or delivery outcome uncertain. Do not repeat. Check verified status.';}
-  finally{busy=false;clear();check.disabled=false;}
+  finally{busy=false;clear();check.disabled=false;if(started!==epoch)sync();}
  });
  dismiss.addEventListener('click',()=>{dismissed=true;card.hidden=true;});
  function sync(){
-  if(!signed()){epoch++;clear();card.hidden=true;dismissed=false;discussionSubject=null;discuss.hidden=true;evidenceDetails.hidden=true;evidence.textContent='';receipt.textContent='';message.textContent='';title.textContent='Reality · release qualification';detail.textContent='Check the independently tested release for your existing authorized shift.';check.textContent='Check release qualification';return;}
+  if(!signed()){if(signedEpoch){epoch++;signedEpoch=false;}clear();card.hidden=true;dismissed=false;discussionSubject=null;discuss.hidden=true;evidenceDetails.hidden=true;evidence.textContent='';receipt.textContent='';message.textContent='';title.textContent='Reality · release qualification';detail.textContent='Check the independently tested release for your existing authorized shift.';check.textContent='Check release qualification';return;}
+  signedEpoch=true;
   card.hidden=dismissed;
   if(!dismissed&&!thread.contains(card))thread.append(card);
+  // One automatic preparation per authenticated Chat epoch. The existing
+  // server controller reads canonical direction and independently qualifies
+  // before writing a packet; this event cannot approve or switch a release.
+  // Never poll, reopen dismissed notices, or replay uncertain approval.
+  if(!dismissed&&!busy&&!uncertain&&autoPreparedEpoch!==epoch)
+   void prepareRelease();
  }
  new MutationObserver(sync).observe(ready,{attributes:true,attributeFilter:['style']});
  sync();
