@@ -11,12 +11,17 @@ const SHA=/^[a-f0-9]{40}$/;
 const WORK=/^work:[a-f0-9]{32}$/;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const PROJECT=/^[a-z0-9]{16,32}$/;
+const DEPLOYMENT=/^dpl_[A-Za-z0-9_-]{8,75}$/;
 const host=/^[a-z0-9-]{8,180}\.vercel\.app$/;
 const safe=(status,extra={})=>({status,...extra,original_job_completed:false,production_changed:false});
 function config(env,db){
  const canonical=env.REALITY_FINAL_LOOP_REVIEW_CANONICAL_HOST;
- const isolated=env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST;
  const role=env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE;
+ // The isolated deployment derives its own immutable URL at runtime.
+ // The canonical side pins that URL and ID after the isolated build exists.
+ const isolated=role==='ISOLATED'?env.VERCEL_URL:env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST;
+ const self=env.VERCEL_DEPLOYMENT_ID;
+ const isolatedId=role==='ISOLATED'?self:env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID;
  const canonicalProject=env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF;
  const isolatedProject=env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF;
  const release=env.VERCEL_GIT_COMMIT_SHA;
@@ -24,7 +29,10 @@ function config(env,db){
  if(env.VERCEL_ENV!=='preview'||env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='true'||
     !['CANONICAL','ISOLATED'].includes(role)||
     !host.test(canonical||'')||!host.test(isolated||'')||canonical===isolated||
-    env.VERCEL_URL!==(role==='CANONICAL'?canonical:isolated)||
+    !DEPLOYMENT.test(self||'')||!DEPLOYMENT.test(isolatedId||'')||
+    (role==='CANONICAL'&&(self===isolatedId||canonical!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS))||
+    (role==='ISOLATED'&&env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST&&
+     env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST!==isolated)||
     !SHA.test(release||'')||!PROJECT.test(canonicalProject||'')||
     !PROJECT.test(isolatedProject||'')||canonicalProject===isolatedProject||
     db?.strictSecrets!==true||db.project!==(role==='CANONICAL'?canonicalProject:isolatedProject)||
@@ -37,7 +45,7 @@ function config(env,db){
      env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'||
      env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='false')))
   return null;
- return {canonical,isolated,role,canonicalProject,isolatedProject,release,key,
+ return {canonical,isolated,role,canonicalProject,isolatedProject,release,key,self,isolatedId,
   canonicalBypass:env.REALITY_FINAL_LOOP_REVIEW_CANONICAL_BYPASS,
   isolatedBypass:env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_BYPASS};
 }
@@ -58,6 +66,9 @@ const unpack=(c,domain,body)=>{
 function validRequest(c,p,now){
  return p.schema==='reality-existing-child-transport-v1'&&
   p.release===c.release&&p.canonical===c.canonical&&p.isolated===c.isolated&&
+  DEPLOYMENT.test(p.canonical_deployment_id||'')&&p.isolated_deployment_id===c.isolatedId&&
+  p.canonical_deployment_id!==p.isolated_deployment_id&&
+  (c.role!=='CANONICAL'||p.canonical_deployment_id===c.self)&&
   UUID.test(p.invocation_id||'')&&Number.isSafeInteger(p.issued_at)&&
   p.issued_at<=now+5000&&p.issued_at>=now-90000;
 }
@@ -94,13 +105,15 @@ async function exchange(c,target,p,fetchImpl,timeoutMs){
  if(!r?.ok)throw Error('REVIEW_TRANSPORT_REMOTE_REFUSED');
  const x=unpack(c,'response:'+target,await r.json());
  if(x.invocation_id!==p.invocation_id||x.action!==p.action||x.release!==c.release||
+    x.deployment_id!==p[target+'_deployment_id']||
     x.issued_at!==p.issued_at||x.original_job_completed!==false||x.production_changed!==false)
   throw Error('REVIEW_TRANSPORT_RESPONSE_SCOPE');
  return x;
 }
 function request(c,action,now,more={}){
  return {schema:'reality-existing-child-transport-v1',release:c.release,
-  canonical:c.canonical,isolated:c.isolated,invocation_id:randomUUID(),
+  canonical:c.canonical,isolated:c.isolated,canonical_deployment_id:c.self,
+  isolated_deployment_id:c.isolatedId,invocation_id:randomUUID(),
   issued_at:now(),action,...more};
 }
 // Called by the existing canonical signed worker. Probe carries no claim,
@@ -118,7 +131,8 @@ export async function connectExistingIsolatedChildTransport({db,handoff,env=proc
  }catch{return safe('FINAL_LOOP_CHILD_TRANSPORT_PROBE_UNVERIFIED');}
  let used=false;
  return safe('FINAL_LOOP_CHILD_TRANSPORT_CONNECTED',{
-  ready:true,
+  ready:true,isolated_deployment_id:c.isolatedId,isolated_host:c.isolated,
+  canonical_deployment_id:c.self,isolated_project_ref:c.isolatedProject,
   runIsolatedAdvisory:async({claim,mode,shiftId,workerRunId})=>{
    if(used)throw Error('REVIEW_TRANSPORT_NO_REPLAY');used=true;
    const p=request(c,'COMPUTE',now,{claim,mode,shift_id:shiftId,worker_run_id:workerRunId,handoff});
@@ -143,7 +157,8 @@ export async function handleExistingChildTransport({db,body,env=process.env,
   const p=unpack(c,'request:'+target,body);
   if(!validRequest(c,p,now()))throw Error('REVIEW_TRANSPORT_REQUEST_SCOPE');
   const reply=(status,more={})=>({http:200,body:pack(c,'response:'+target,safe(status,{
-   invocation_id:p.invocation_id,action:p.action,release:c.release,issued_at:p.issued_at,...more}))});
+   invocation_id:p.invocation_id,action:p.action,release:c.release,issued_at:p.issued_at,
+   deployment_id:c.self,...more}))});
   if(c.role==='ISOLATED'&&p.action==='PROBE')
    return reply('FINAL_LOOP_ISOLATED_CHILD_TRANSPORT_AVAILABLE',{project:db.project,model_invoked:false,authority_granted:false});
   if(!isBound(p))throw Error('REVIEW_TRANSPORT_ORIGINAL_SCOPE');
