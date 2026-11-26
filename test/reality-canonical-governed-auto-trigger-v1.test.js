@@ -41,3 +41,32 @@ test('transport consumes existing event only after real lease and release witnes
  assert.ok(worker.indexOf("reality_claim_canonical_governed_wake_v1")<worker.indexOf("FINAL_LOOP_SOURCE_PLAN_PREVIEW_ONLY"));
  assert.match(worker,/UNGOVERNED_PERIODIC_WAKE_IGNORED/);
 });
+
+test('categorized review reuses exact preflight, prior maintenance budget and existing event transport',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-canonical-governed-auto-trigger-transport-v1.sql',import.meta.url),'utf8');
+ const upgrade=readFileSync(new URL('../sql/reality-final-loop-categorized-qualification-v1.sql',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const bridge=readFileSync(new URL('../src/reality-final-loop-signed-worker-bridge-v1.js',import.meta.url),'utf8');
+ const notify='CREATE OR REPLACE FUNCTION reality_internal.notify_final_loop_governed_trigger_v1(';
+ const end='REVOKE ALL ON FUNCTION reality_internal.notify_final_loop_governed_trigger_v1(uuid) FROM PUBLIC,anon,authenticated,service_role;';
+ assert.equal(sql.split(notify).length,2);
+ assert.equal(upgrade.split(notify).length,2);
+ assert.equal(sql.slice(sql.indexOf(notify),sql.indexOf(end)+end.length),
+  upgrade.slice(upgrade.indexOf(notify),upgrade.indexOf(end)+end.length));
+ assert.match(upgrade,/current_user NOT IN \('service_role','postgres'\)/);
+ assert.match(upgrade,/RETURN reality_internal\.read_final_loop_child_approval_preflight_v1\(p_shift_id\)/);
+ assert.match(upgrade,/reality_internal\.read_final_loop_child_approval_preflight_v1\(c.shift_id\)->'plans'/);
+ assert.match(upgrade,/and not o.original_final_receipt_verified\) as review_scope_qualified/);
+ assert.match(upgrade,/when d.review_scope_qualified then 'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'/);
+ assert.match(upgrade,/'maintenance_recovery_next_action'/);
+ assert.match(upgrade,/'remaining_attempts'/);
+ assert.match(upgrade,/'new_attempt_authorized',false/);
+ assert.match(sql,/a\.claim_id=release_claim[\s\S]*?a\.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'/);
+ assert.match(sql,/accepted_review_scope'->>'execution_authorized'='false'/);
+ assert.match(sql,/to_regprocedure\('public\.reality_claim_final_loop_child_review_v1\(uuid,uuid,jsonb\)'\)/);
+ assert.doesNotMatch(upgrade,/CREATE TABLE|CREATE TRIGGER|cron\.schedule\(|cron\.unschedule\(|cron\.alter_job\(/i);
+ assert.match(bridge,/const acceptedReview=e.event_kind==='QUALIFIER_PROOF_CHANGED'/);
+ assert.match(worker,/claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes/);
+ assert.match(worker,/finalLoopGovernedResumeTrigger.reason==='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'/);
+ assert.match(worker,/final_loop_categorized_review_trigger:finalLoopCategorizedReviewTrigger/);
+});
