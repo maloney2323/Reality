@@ -46,19 +46,77 @@ function validEnv(env,db){
   BRANCH.test(env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||'')&&
   !env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF.includes('..');
 }
-async function requestJson(fetchImpl,url,init,timeout=7000){
+// Bounded provider evidence, never provider body, raw exception, URL or headers.
+const httpCodes=new WeakMap();
+const operations=new Set(['VERCEL_ALIAS_READ','VERCEL_DEPLOYMENT_READ','VERCEL_ALIAS_ASSIGN',
+ 'SUPABASE_BRANCH_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ',
+ 'VERCEL_CANDIDATE_READ','VERCEL_ISOLATED_PEER_READ',
+ 'reality_read_governed_worker_release_schedule_v1','reality_read_current_shift_execution_graph_v1',
+ 'reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1',
+ 'reality_claim_governed_signed_worker_release_v1','reality_read_governed_signed_worker_release_approval_v1',
+ 'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
+const identityFields=new Set(['alias','project_id','deployment_id','repository','release_sha','release_ref',
+ 'ready_state','preview_target','schedule_contract','branch_ancestry','ci_identity','ci_result','peer_host']);
+const writeOps=new Set(['VERCEL_ALIAS_ASSIGN','reality_claim_governed_signed_worker_release_v1',
+ 'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
+const numericHttp=n=>Number.isInteger(n)&&n>=100&&n<=599?n:null;
+export const observedReleaseHttpStatus=value=>value&&typeof value==='object'?httpCodes.get(value)??null:null;
+class ReleaseProviderError extends Error{
+ constructor(code,operation,kind,httpStatus=null,mismatches=[]){
+  super(code);
+  const op=operations.has(operation)?operation:'UNKNOWN_RELEASE_OPERATION';
+  const effect=writeOps.has(op);
+  const status=numericHttp(httpStatus);
+  const next=effect?'RECONCILE_EXACT_EFFECT_WITHOUT_REPLAY':
+   kind==='AUTHENTICATION_REJECTED'?'VERIFY_BOUND_PROVIDER_CREDENTIAL':
+   kind==='ACCESS_DENIED'?'VERIFY_PROVIDER_TOKEN_SCOPE_AND_RESOURCE_ACCESS':
+   kind==='RESOURCE_NOT_FOUND_OR_HIDDEN'?'VERIFY_RESOURCE_ID_AND_PROVIDER_ACCESS':
+   kind==='RATE_LIMITED'?'WAIT_FOR_PROVIDER_RATE_LIMIT_RESET':
+   kind==='IDENTITY_MISMATCH'?'RECONCILE_EXPECTED_PROVIDER_IDENTITY':
+   kind==='INVALID_RESPONSE'?'VERIFY_PROVIDER_RESPONSE_CONTRACT':
+   'RECHECK_PROVIDER_READ_CONNECTIVITY';
+  this.receipt=Object.freeze({operation:op,provider:op.startsWith('VERCEL_')?'VERCEL':
+   op.startsWith('GITHUB_')?'GITHUB':op==='UNKNOWN_RELEASE_OPERATION'?'UNKNOWN':'SUPABASE',
+   classification:kind,http_status:status,
+   credential_rejected:kind==='AUTHENTICATION_REJECTED',
+   access_denied:kind==='ACCESS_DENIED',
+   identity_matches:kind==='IDENTITY_MISMATCH'?false:null,
+   mismatched_fields:Object.freeze(mismatches.filter(f=>identityFields.has(f))),
+   next_governed_action:next,automatic_replay_permitted:false,
+   effect_reconciliation_required:effect,credential_values_exposed:false});
+ }
+}
+export function releaseFailureReceipt(error){
+ return error instanceof ReleaseProviderError?error.receipt:null;
+}
+export function releaseIdentityFailure(code,operation,value,fields){
+ return new ReleaseProviderError(code,operation,'IDENTITY_MISMATCH',observedReleaseHttpStatus(value),fields);
+}
+export async function requestReleaseProviderJson(fetchImpl,url,init,operation,timeout=7000){
  const controller=new AbortController();
  const t=setTimeout(()=>controller.abort(),timeout);
+ let status=null;
  try{
-  const response=await fetchImpl(url,{
-   ...init,signal:controller.signal,redirect:'error',
-   cache:'no-store'
-  });
-  if(!response?.ok)throw Error('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK');
-  const data=await response.json();
-  if(!data||typeof data!=='object'||Array.isArray(data))
-   throw Error('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID');
+  const response=await fetchImpl(url,{...init,signal:controller.signal,redirect:'error',cache:'no-store'});
+  status=numericHttp(response?.status);
+  if(!response?.ok){
+   const kind=status===401?'AUTHENTICATION_REJECTED':status===403?'ACCESS_DENIED':
+    status===404?'RESOURCE_NOT_FOUND_OR_HIDDEN':status===429?'RATE_LIMITED':
+    status!==null&&status>=500?'PROVIDER_SERVER_ERROR':'HTTP_REQUEST_REJECTED';
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK',operation,kind,status);
+  }
+  let data;
+  try{data=await response.json()}catch{
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID',operation,'INVALID_RESPONSE',status);
+  }
+  if(!data||typeof data!=='object')
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID',operation,'INVALID_RESPONSE',status);
+  httpCodes.set(data,status);
   return data;
+ }catch(error){
+  if(error instanceof ReleaseProviderError)throw error;
+  throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_READ_OR_EFFECT_UNAVAILABLE',operation,
+   controller.signal.aborted||error?.name==='AbortError'||error?.name==='TimeoutError'?'TIMEOUT':'NETWORK_OR_TRANSPORT_ERROR',status);
  }finally{clearTimeout(t)}
 }
 export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
@@ -70,6 +128,15 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    ready:false,read_only:true,owner_approval_granted:false,
    provider_assignment_attempted:false
   });
+ let lastFailure=null;
+ const fail=error=>{lastFailure=releaseFailureReceipt(error);throw error;};
+ const requestJson=async(fetcher,url,init,operation)=>{
+  try{
+   const data=await requestReleaseProviderJson(fetcher,url,init,operation);
+   if(Array.isArray(data))throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID',operation,'INVALID_RESPONSE',observedReleaseHttpStatus(data));
+   return data;
+  }catch(error){return fail(error)}
+ };
  const team=encodeURIComponent(env.REALITY_VERIFIED_VERCEL_TEAM_ID);
  const api='https://api.vercel.com';
  const providerHeaders={
@@ -93,34 +160,35 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    throw Error('RELEASE_CONTROL_RPC_NOT_ALLOWLISTED');
   return requestJson(fetchImpl,db.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{
    method:'POST',headers:dbHeaders,body:JSON.stringify(payload)
-  });
+  },name);
  };
  const deployment=async id=>{
   if(!ID.test(id||''))throw Error('RELEASE_DEPLOYMENT_ID_UNVERIFIED');
   const d=await requestJson(fetchImpl,
    api+'/v13/deployments/'+encodeURIComponent(id)+'?teamId='+team,
-   {method:'GET',headers:providerHeaders});
+   {method:'GET',headers:providerHeaders},'VERCEL_DEPLOYMENT_READ');
   const info=d.deployment??d;
   const expectedRepo=env.REALITY_VERIFIED_GITHUB_REPOSITORY.split('/');
-  if(info.id!==id||
-    (info.project?.id??info.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
-    info.meta?.githubOrg!==expectedRepo[0]||
-    info.meta?.githubRepo!==expectedRepo[1]||
-    !SHA.test(info.meta?.githubCommitSha||'')||
-    !BRANCH.test(info.meta?.githubCommitRef||'')||
-    info.state!=='READY'||info.target==='production')
-   throw Error('RELEASE_PROVIDER_PROJECT_OR_COMMIT_UNVERIFIED');
+  const mismatches=[
+   ...(info.id!==id?['deployment_id']:[]),
+   ...((info.project?.id??info.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),
+   ...(info.meta?.githubOrg!==expectedRepo[0]||info.meta?.githubRepo!==expectedRepo[1]?['repository']:[]),
+   ...(!SHA.test(info.meta?.githubCommitSha||'')?['release_sha']:[]),
+   ...(!BRANCH.test(info.meta?.githubCommitRef||'')?['release_ref']:[]),
+   ...(info.state!=='READY'?['ready_state']:[]),
+   ...(info.target==='production'?['preview_target']:[])];
+  if(mismatches.length)fail(releaseIdentityFailure('RELEASE_PROVIDER_PROJECT_OR_COMMIT_UNVERIFIED','VERCEL_DEPLOYMENT_READ',d,mismatches));
   return info;
  };
  async function observeAlias(host){
   if(!HOST.test(host||''))throw Error('RELEASE_ALIAS_HOST_UNVERIFIED');
   const a=await requestJson(fetchImpl,
    api+'/v4/aliases/'+encodeURIComponent(host)+'?teamId='+team,
-   {method:'GET',headers:providerHeaders});
-  if(a.alias!==host||
-    a.projectId!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
-    !ID.test(a.deploymentId||''))
-   throw Error('RELEASE_ALIAS_PROJECT_BINDING_UNVERIFIED');
+   {method:'GET',headers:providerHeaders},'VERCEL_ALIAS_READ');
+  const mismatches=[...(a.alias!==host?['alias']:[]),
+   ...(a.projectId!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),
+   ...(!ID.test(a.deploymentId||'')?['deployment_id']:[])];
+  if(mismatches.length)fail(releaseIdentityFailure('RELEASE_ALIAS_PROJECT_BINDING_UNVERIFIED','VERCEL_ALIAS_READ',a,mismatches));
   const d=await deployment(a.deploymentId);
   return Object.freeze({
    provider:'VERCEL',independently_observed:true,
@@ -140,7 +208,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    info.endpoint_path!==ROUTE||!HOST.test(info.host||'')||
    typeof info.schedule!=='string'||
    info.credential_values_exposed!==false)
-   throw Error('RELEASE_SCHEDULE_INDEPENDENT_DB_READBACK_UNVERIFIED');
+   fail(releaseIdentityFailure('RELEASE_SCHEDULE_INDEPENDENT_DB_READBACK_UNVERIFIED','reality_read_governed_worker_release_schedule_v1',info,['schedule_contract']));
   // A parsed DB hostname is not sufficient: verify the actual provider
   // alias resolves to the configured project and a READY preview commit.
   const alias=await observeAlias(info.host);
@@ -335,7 +403,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   const target=await deployment(id);
   if(target.meta.githubCommitSha!==release_sha||
    target.meta.githubCommitRef!==release_ref)
-   throw Error('RELEASE_PROVIDER_PINNED_DEPLOYMENT_DRIFT');
+   fail(releaseIdentityFailure('RELEASE_PROVIDER_PINNED_DEPLOYMENT_DRIFT','VERCEL_DEPLOYMENT_READ',target,[...(target.meta.githubCommitSha!==release_sha?['release_sha']:[]),...(target.meta.githubCommitRef!==release_ref?['release_ref']:[])]));
   // Exactly one provider POST after the caller consumed a database-backed
   // one-use approval. No retry here, including on timeout.
   const result=await requestJson(fetchImpl,
@@ -343,8 +411,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
     method:'POST',headers:{...providerHeaders,
      'Content-Type':'application/json'},
     body:JSON.stringify({alias})
-   });
-  if(result.alias!==alias)throw Error('RELEASE_PROVIDER_ASSIGNMENT_ACK_UNVERIFIED');
+   },'VERCEL_ALIAS_ASSIGN');
+  if(result.alias!==alias)fail(releaseIdentityFailure('RELEASE_PROVIDER_ASSIGNMENT_ACK_UNVERIFIED','VERCEL_ALIAS_ASSIGN',result,['alias']));
   return Object.freeze({provider:'VERCEL',alias,release_sha,claim_id});
  }
  async function recordObservedReviewDelivery(){
@@ -368,6 +436,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
   ready:true,read_only:inspectionOnly===true,
   readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,recordObservedReviewDelivery,
+  readLastProviderFailure:()=>lastFailure,
   owner_approval_granted:false,provider_assignment_attempted:false
  });
 }
