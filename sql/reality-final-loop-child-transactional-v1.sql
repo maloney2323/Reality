@@ -787,7 +787,15 @@ BEGIN
    'independently_verified',c.phase='INDEPENDENTLY_VERIFIED',
    'verifier_independent',c.phase='INDEPENDENTLY_VERIFIED'
     AND c.independent_verifier_run_id<>c.claimant_worker_run_id,
-   'independent_receipt_sha256',c.independent_review_receipt_sha256
+   'independent_receipt_sha256',c.independent_review_receipt_sha256,
+   'canonical_continuity_binding',CASE WHEN c.phase='INDEPENDENTLY_VERIFIED'
+    AND c.verifier_evidence ? 'canonical_continuity_root_id'
+    THEN pg_catalog.jsonb_build_object(
+     'continuity_root_id',c.verifier_evidence->'canonical_continuity_root_id',
+     'continuity_head_sha256',c.verifier_evidence->'canonical_continuity_head_sha256',
+     'revision',c.verifier_evidence->'canonical_continuity_revision',
+     'owner_approval_receipt_sha256',c.verifier_evidence->'canonical_owner_approval_receipt_sha256')
+    ELSE NULL END
   ) ORDER BY c.scope_index),'[]'::jsonb)
  INTO v_count,v_children FROM reality_internal.final_loop_child_review_work_v1 c
  WHERE c.plan_id=v_plan.plan_id AND c.packet_id=v_packet.packet_id
