@@ -4,11 +4,11 @@ CREATE OR REPLACE FUNCTION public.reality_read_signed_release_preparation_event_
  p_owner_id uuid,p_shift_id uuid,p_plan_fingerprint text,p_event_id uuid,
  p_worker_run_id uuid,p_lease_id uuid,p_running_release text,p_head text,p_revision bigint)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE ok boolean;
+DECLARE ok boolean; original_id text; source text; qualifier text;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'RELEASE_PREPARATION_EVENT_SERVICE_ONLY';END IF;
- SELECT EXISTS(
- SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+ SELECT e.original_work_id,e.source_ref,e.source_receipt_sha256 INTO original_id,source,qualifier
+ FROM reality_internal.final_loop_resume_events_v1 e
  JOIN reality_internal.governed_employee_shifts_v1 s ON s.shift_id=e.shift_id AND s.owner_id=e.owner_id
  JOIN reality_internal.governed_employee_completion_warrants_v1 w ON w.shift_id=s.shift_id AND w.owner_id=s.owner_id AND w.plan_fingerprint=s.plan_fingerprint
  JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=e.governed_wake_worker_run_id
@@ -31,9 +31,13 @@ BEGIN
  WHERE c.owner_id=e.owner_id AND c.shift_id=e.shift_id AND c.original_work_id=e.original_work_id
  AND c.source_ref=e.source_ref AND c.condition_kind=e.signal_kind
  AND c.continuity_revision=e.continuity_revision AND c.continuity_head_sha256=e.continuity_head_sha256
- AND c.subscribed_receipt_sha256=e.previous_receipt_sha256)) INTO ok;
+ AND c.subscribed_receipt_sha256=e.previous_receipt_sha256)
+ AND e.signal_kind='QUALIFIER_PROOF_CHANGED'
+ LIMIT 1;
+ ok:=FOUND;
  RETURN pg_catalog.jsonb_build_object('status',CASE WHEN ok THEN 'SIGNED_RELEASE_PREPARATION_EVENT_VERIFIED' ELSE 'SIGNED_RELEASE_PREPARATION_EVENT_UNVERIFIED' END,
  'event_id',p_event_id,'worker_run_id',p_worker_run_id,'shift_id',p_shift_id,'read_only',true,
+ 'original_work_id',original_id,'source_ref',source,'qualifier_receipt_sha256',qualifier,
  'execution_authorized',false,'owner_approval_granted',false,'production_changed',false,'original_job_completed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_read_signed_release_preparation_event_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,bigint) FROM PUBLIC,anon,authenticated;
