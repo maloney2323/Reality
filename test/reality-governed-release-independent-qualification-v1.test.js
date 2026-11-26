@@ -126,15 +126,19 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
   original_work_id:'work:'+'4'.repeat(32),source_ref:'https://github.com/maloney2323/Reality/pull/307'};
  const calls=[];let gatewayPass=true;let branchStatus='FUNCTIONS_DEPLOYED';
  let peerReadiness=null;
+ let publicMode=false,publicGatewayRepoMatches=true;
+ const publicRepo={id:91423,full_name:'org/repo',private:false,visibility:'public'};
  const transportCap='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
- const fetchImpl=async url=>{
+ const fetchImpl=async (url,init)=>{
   calls.push(String(url));
+  if(publicMode&&String(url).includes('api.github.com'))assert.equal(Object.hasOwn(init.headers,'Authorization'),false);
   let data;
   if(String(url).includes('api.supabase.com'))data=[{project_ref:project,parent_project_ref:parent,is_default:false,preview_project_status:'ACTIVE_HEALTHY',status:branchStatus}];
+  else if(String(url).endsWith('/org/repo'))data=publicRepo;
   else if(String(url).endsWith('/2004'))data={id:2004,head_sha:sha,head_branch:branch,name:'Reality Final Loop Engine lifecycle acceptance',
-   path:'.github/workflows/reality-final-loop-engine-v1-ci.yml',status:'completed',conclusion:'success',event:'push'};
+   path:'.github/workflows/reality-final-loop-engine-v1-ci.yml',status:'completed',conclusion:'success',event:'push',repository:publicRepo};
   else if(String(url).endsWith('/2005'))data={id:2005,head_sha:sha,head_branch:branch,name:'Reality — Isolated governed OpenAI gateway proof',
-   path:gatewayPath,status:'completed',conclusion:gatewayPass?'success':'failure',event:'push'};
+   path:gatewayPath,status:'completed',conclusion:gatewayPass?'success':'failure',event:'push',repository:publicGatewayRepoMatches?publicRepo:{...publicRepo,id:91424}};
   else if(String(url).includes('dpl_peer12345678')&&peerReadiness!==null)
    data={id:'dpl_peer12345678',url:'isolated-pinned-test.vercel.app',project:{id:env.REALITY_VERIFIED_VERCEL_PROJECT_ID},target:null,
     meta:{githubCommitSha:sha,githubCommitRef:'feature/isolated-peer',githubOrg:'org',githubRepo:'repo'},...peerReadiness};
@@ -154,6 +158,16 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  assert.equal((await run()).status,'INDEPENDENT_GATEWAY_CI_NOT_PASSED');
  assert.equal((await run({direction:{...direction,shift_id:owner}})).status,'CANONICAL_RUNTIME_SAME_SHIFT_OR_GATEWAY_CONFIG_NOT_VERIFIED');
  gatewayPass=true;
+ publicMode=true;
+ const publicEnv={...e,REALITY_RELEASE_GITHUB_CI_READ_MODE:'PUBLIC_ONLY',REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:undefined};
+ const publicResult=await run({env:publicEnv});
+ assert.equal(publicResult.status,'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY');
+ assert.equal(publicResult.github_ci_read_mode,'PUBLIC_ONLY');
+ publicGatewayRepoMatches=false;
+ assert.equal((await run({env:publicEnv})).status,'INDEPENDENT_PUBLIC_GATEWAY_REPOSITORY_IDENTITY_NOT_VERIFIED');
+ publicGatewayRepoMatches=true;gatewayPass=false;
+ assert.equal((await run({env:publicEnv})).status,'INDEPENDENT_GATEWAY_CI_NOT_PASSED');
+ gatewayPass=true;publicMode=false;
  const transportEnv={...e,REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY:transportCap,
   REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'CANONICAL'};
  const transportDirection={...direction,next_qualified_action:transportCap};
