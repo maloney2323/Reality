@@ -740,14 +740,7 @@
   prompt.dispatchEvent(new Event('input',{bubbles:true}));
   prompt.focus({preventScroll:true});
  });
- if(isReady())void load();
- else{
-  const observer=new MutationObserver(()=>{
-   if(isReady()){observer.disconnect();void load();}
-  });
-  observer.observe(ready,{attributes:true,attributeFilter:['style']});
- }
- // React to changes in the durable signed intake; never auto-execute or
- // issue owner approvals while refreshing the informational readback.
- setInterval(()=>{if(isReady())void load();},120000);
+ // The detailed inventory fans out into several independent providers.
+ // Load on owner demand, not on every login or idle timer.
+ window.addEventListener('reality:chat-work-opened',()=>{if(isReady())void load()});
 })();
