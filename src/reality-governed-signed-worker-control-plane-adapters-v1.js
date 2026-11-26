@@ -88,7 +88,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   if(![...readRpcs,
     'reality_claim_governed_signed_worker_release_v1',
     'reality_read_governed_signed_worker_release_approval_v1',
-    'reality_prepare_governed_signed_worker_release_v1'].includes(name))
+    'reality_prepare_governed_signed_worker_release_v1',
+    'reality_record_review_release_alias_observation_v1'].includes(name))
    throw Error('RELEASE_CONTROL_RPC_NOT_ALLOWLISTED');
   return requestJson(fetchImpl,db.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{
    method:'POST',headers:dbHeaders,body:JSON.stringify(payload)
@@ -346,10 +347,27 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   if(result.alias!==alias)throw Error('RELEASE_PROVIDER_ASSIGNMENT_ACK_UNVERIFIED');
   return Object.freeze({provider:'VERCEL',alias,release_sha,claim_id});
  }
+ async function recordObservedReviewDelivery(){
+  if(inspectionOnly===true||env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+   env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+   env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY==='true')
+   throw Error('REVIEW_RELEASE_OBSERVATION_SCOPE_UNVERIFIED');
+  const a=await observeAlias(env.REALITY_SIGNED_WORKER_STABLE_ALIAS);
+  if(a.deployment_id!==env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||
+   a.resolved_release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   a.resolved_branch!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF)
+   throw Error('REVIEW_RELEASE_ALIAS_DRIFT_NO_REPLAY');
+  return serviceRpc('reality_record_review_release_alias_observation_v1',{
+   p_owner_id:env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID,
+   p_shift_id:env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID,
+   p_release_sha:a.resolved_release_sha,p_release_ref:a.resolved_branch,
+   p_scheduled_alias:a.alias,p_deployment_id:a.deployment_id
+  });
+ }
  return Object.freeze({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
   ready:true,read_only:inspectionOnly===true,
-  readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,
+  readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,recordObservedReviewDelivery,
   owner_approval_granted:false,provider_assignment_attempted:false
  });
 }
