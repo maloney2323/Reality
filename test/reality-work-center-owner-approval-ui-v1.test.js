@@ -49,7 +49,7 @@ function setup({reply,authenticated=true}={}){
  };
  const $=node;
  const context={document,$,console,
-  window:{},setTimeout:()=>0,setInterval:()=>0,
+  window:{addEventListener(){}},setTimeout:()=>0,setInterval:()=>0,
   localStorage:{getItem:()=>null,setItem(){},removeItem(){}},
   fetch:async(url,options={})=>{
    requests.push({url,method:options.method||'GET',body:options.body});
