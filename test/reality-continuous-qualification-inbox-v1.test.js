@@ -82,7 +82,8 @@ test('Reality Chat displays next source proof and does not silently approve or s
  assert.match(ui,/\/api\/reality\/personal-continuous-qualification/);
  assert.match(ui,/Discuss next qualification in Chat/);
  assert.match(ui,/A specific, current, independently qualified job/);
- assert.match(ui,/setInterval\(\(\)=>\{if\(isReady\(\)\)void load\(\);\},120000\)/);
+ assert.match(ui,/window.addEventListener\('reality:chat-work-opened',\(\)=>\{if\(isReady\(\)\)void load\(\)\}\)/);
+ assert.doesNotMatch(ui,/setInterval\(/);
  assert.doesNotMatch(ui,/reality_authorize_employee_shift_v1|AUTHORIZE_EXACT_EMPLOYEE_SHIFT|reality_owner_approve/);
 });
 
