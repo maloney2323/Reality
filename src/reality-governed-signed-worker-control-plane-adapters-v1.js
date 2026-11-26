@@ -49,7 +49,7 @@ function validEnv(env,db){
 // Bounded provider evidence, never provider body, raw exception, URL or headers.
 const httpCodes=new WeakMap();
 const operations=new Set(['VERCEL_ALIAS_READ','VERCEL_DEPLOYMENT_READ','VERCEL_ALIAS_ASSIGN',
- 'SUPABASE_BRANCH_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ',
+ 'SUPABASE_BRANCH_READ','GITHUB_PUBLIC_REPOSITORY_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ',
  'VERCEL_CANDIDATE_READ','VERCEL_ISOLATED_PEER_READ',
  'reality_read_governed_worker_release_schedule_v1','reality_read_current_shift_execution_graph_v1',
  'reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1',
