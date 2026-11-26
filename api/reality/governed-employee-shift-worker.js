@@ -39,8 +39,10 @@ import {classifySignedFinalLoopStagedPlanActions,
  from '../../src/reality-final-loop-staged-plan-action-router-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../../src/reality-final-loop-child-approval-request-v1.js';
-import {advanceOneFinalLoopChildReview}
+import {advanceOneFinalLoopChildReview,advanceCanonicalFinalLoopChildReview}
  from '../../src/reality-final-loop-child-review-worker-v1.js';
+import {connectExistingIsolatedChildTransport}
+ from '../../src/reality-final-loop-child-transport-v1.js';
 import {advanceOneFinalLoopParentIntegration}
  from '../../src/reality-final-loop-parent-integration-worker-v1.js';
 import {advanceOneFinalLoopParentDelivery}
@@ -2472,7 +2474,11 @@ export default async function handler(req,res){
        'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
        signedWorkerReleaseOperatingLane.status===
        'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY')?
-    ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[])
+    ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[]),
+   ...(canonicalEventRuntime&&process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED==='true'&&
+    process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE==='CANONICAL'&&
+    process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'?
+    ['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM']:[])
   ]);
   const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
    classification:continuityRecoveryHandoffClassification,
@@ -2951,10 +2957,9 @@ export default async function handler(req,res){
      continuity:currentReviewContinuity,shiftId:wakeReceipt.shift_id,
      claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes
     });
-    // A review claim route is not an executable claim. Do not consume the
-    // one-use claim until the existing isolated executor and canonical return
-    // connection are independently qualified. The canonical runtime remains
-    // read-only for child execution; the isolated lane is unchanged.
+    // Route only. The later canonical executor branch requires an observed
+    // approved release and a signed probe of the exact isolated deployment.
+    // The canonical runtime itself never performs child model inference.
    }catch{
     finalLoopCategorizedReviewTrigger={
      status:'FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED',
@@ -2975,6 +2980,27 @@ export default async function handler(req,res){
    status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',
    original_job_completed:false,production_changed:false
   };
+  // No live claim is consumed until the exact approved release is witnessed
+  // AND the isolated transport answers its signed, non-executing probe.
+  if(canonicalEventRuntime&&finalLoopCategorizedReviewTrigger.review_claim_route_ready===true&&
+    process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED==='true'&&
+    signedWorkerDurableReleaseWake.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
+    signedWorkerDurableReleaseWake.worker_run_id===actualWorkerRunId&&
+    process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
+    registeredRecoveryActionKeys.includes('VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM')){
+   try{
+    const transport=await connectExistingIsolatedChildTransport({db,
+     handoff:finalLoopCategorizedReviewTrigger.canonical_claim_handoff,env:process.env,fetchImpl:fetch});
+    finalLoopChildReview=transport.ready===true?
+     await advanceCanonicalFinalLoopChildReview({db,trigger:finalLoopCategorizedReviewTrigger,
+      workerRunId:actualWorkerRunId,env:process.env,readCurrentContinuity:requireFreshFinalLoopContinuity,
+      runIsolatedAdvisory:transport.runIsolatedAdvisory,fetchImpl:fetch}):
+     {status:transport.status,original_job_completed:false,production_changed:false};
+   }catch{
+    finalLoopChildReview={status:'FINAL_LOOP_CANONICAL_TRANSPORT_UNVERIFIED_NO_REPLAY',
+     original_job_completed:false,production_changed:false};
+   }
+  }
   let finalLoopParentIntegration={
    status:'FINAL_LOOP_PARENT_INTEGRATION_NOT_ENABLED',
    original_job_completed:false,production_changed:false
