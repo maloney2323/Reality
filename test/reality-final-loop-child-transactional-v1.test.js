@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview}
+import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview}
  from '../src/reality-final-loop-child-review-worker-v1.js';
 import {connectExistingIsolatedChildTransport,handleExistingChildTransport}
  from '../src/reality-final-loop-child-transport-v1.js';
@@ -51,6 +51,11 @@ const completeLargeFiles=()=>{
   patch:largePatch};
  return files;
 };
+const structuredReview=scope=>JSON.stringify({files:scope.files.map((f,index)=>({
+ index,finding:'Review proposed change to the pinned source.',test:'Test the changed behavior and regression.'
+}))});
+const assembledReview=scope=>'Source-backed review (proposed tests; not executed)\n'+scope.files.map(f=>
+ f.path+'\nFinding: Review proposed change to the pinned source.\nProposed test: Test the changed behavior and regression.\n').join('');
 const provider=(output,files=fullFiles(),checkRequest=()=>{})=>async(url,options)=>{
  if(url==='https://api.openai.com/v1/responses'){
   assert.equal(options.method,'POST');
@@ -165,8 +170,7 @@ test('exact approved child with oversized complete patch reaches governed model 
  const plan=await sourcePlan(files);
  assert.equal(plan.source_manifest_complete,true);
  const scope=plan.bounded_scopes[0];
- const text='Source reviewed: '+scope.files.map(f=>f.path).join(' ; ')+
-  '. The patch changes old to new; test each changed behavior and independent regression.';
+ const text=structuredReview(scope),artifact=assembledReview(scope);
  const modelId='resp_generated12345';
  let providerCalls=0,prepare=0;
  const mockProvider=provider({id:modelId,text},files,request=>{
@@ -202,10 +206,10 @@ test('exact approved child with oversized complete patch reaches governed model 
      model_response_id:null,model_authorized:true};
    if(name==='reality_prepare_final_loop_child_review_v1'){
     prepare++;
-    assert.equal(args.p_review_body,text);
+    assert.equal(args.p_review_body,artifact);
     assert.equal(args.p_model_response_id,modelId);
     return {status:'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED',
-     child_work_id:child,review_sha256:digest(text),
+     child_work_id:child,review_sha256:digest(artifact),
      original_job_completed:false};
    }
    throw Error('UNEXPECTED_RPC '+name);
@@ -344,8 +348,7 @@ test('canonical handoff overload delegates the same atomic claim and rejects sta
 
 test('already claimed isolated computation uses only fresh canonical readback and returns unverified advisory',async()=>{
  const files=completeLargeFiles(),plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
- const body='Source review of '+scope.files.map(f=>f.path).join(', ')+
-  '. Test each changed behavior and independent regression.';
+ const body=structuredReview(scope);
  const claim={
   status:'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',
   owner_id:owner,shift_id:shift,child_work_id:child,
@@ -397,7 +400,7 @@ test('already claimed isolated computation uses only fresh canonical readback an
 test('canonical claim, isolated computation and independent return preserve one Continuity scope',async()=>{
  const files=completeLargeFiles(),plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
  const paths=scope.files.map(f=>f.path);
- const body='Source review of '+paths.join(', ')+'. Test each changed behavior and independently verify regression.';
+ const body=assembledReview(scope),raw=structuredReview(scope);
  const packet='11111111-1111-4111-8111-111111111111',root='33333333-3333-4333-8333-333333333333';
  const claimId='44444444-4444-4444-8444-444444444444';
  const event='55555555-5555-4555-8555-555555555555';
@@ -495,7 +498,7 @@ test('canonical claim, isolated computation and independent return preserve one 
  const runIsolatedAdvisory=async({claim,mode,shiftId,workerRunId,readCurrentChild})=>
   computeClaimedFinalLoopChildAdvisory({claim,mode,shiftId,workerRunId,readCurrentChild,env,
    executionProject:db.project,fetchImpl:provider({id:mode==='VERIFY'?'resp_verifier1234':'resp_prepared1234',
-    text:mode==='VERIFY'?JSON.stringify({verdict:'PASS',supported_paths:paths}):body},files,()=>modelCalls++)});
+    text:mode==='VERIFY'?JSON.stringify({verdict:'PASS',supported_paths:paths}):raw},files,()=>modelCalls++)});
  const base={db:canonicalDb,trigger,workerRunId:run,env:canonicalEnv,readCurrentContinuity,runIsolatedAdvisory,call,fetchImpl};
  const missing=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:null});
  assert.equal(missing.status,'FINAL_LOOP_CANONICAL_ISOLATED_EXECUTOR_CONNECTION_REQUIRED');
@@ -565,7 +568,7 @@ test('canonical SQL reads and writes share the same continuity and signed releas
 
 test('actual signed transport connects the canonical claim to isolated model computation, fences replay and returns evidence',async()=>{
  const files=completeLargeFiles(),plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
- const body='Source review of '+scope.files.map(f=>f.path).join(', ')+'. Test each changed behavior and independently verify regression.';
+ const body=structuredReview(scope);
  const packet='11111111-1111-4111-8111-111111111111';
  const h={schema:'reality-canonical-approved-review-scope-v1',
   owner_id:owner,shift_id:shift,plan_id:packet,packet_id:packet,
@@ -736,4 +739,30 @@ test('child rejection stays on existing work and is not a new authorization',()=
  assert.match(sql,/FINAL_LOOP_CHILD_REJECTION_RECEIPT_CONFLICT_NO_REPLAY/);
  assert.match(sql,/advisory_rejection_receipts=advisory_rejection_receipts/);
  assert.doesNotMatch(sql,/CREATE TABLE/);
+});
+
+test('Reality owns exact indexed source coverage and the review output budget',async()=>{
+ const plan=await sourcePlan(completeLargeFiles()),scope=plan.bounded_scopes[0];
+ const b=qualifyBoundedChildReviewStrategy(scope);
+ assert.equal(b.max_provider_calls,1);
+ assert.equal(b.max_output_tokens,1800);
+ assert.equal(b.changed_files,0);
+ assert.equal(b.replay_authorized,false);
+ const raw=structuredReview(scope);
+ assert.equal(assembleBoundedChildReview(raw,scope),assembledReview(scope));
+ const base=JSON.parse(raw).files;
+ assert.equal(assembleBoundedChildReview(JSON.stringify({files:[...base].reverse()}),scope),assembledReview(scope));
+ for(const files of [base.slice(1),[base[0],...base.slice(1).map(x=>({...x,index:0}))],
+  [{...base[0],finding:'x'.repeat(b.field_max_chars+1)},...base.slice(1)],
+  [{...base[0],test:'\nUnsafe multiline content'},...base.slice(1)],
+  [{...base[0],path:'foreign.js'},...base.slice(1)]]){
+  assert.equal(assembleBoundedChildReview(JSON.stringify({files}),scope),null);
+ }
+ assert.equal(assembleBoundedChildReview(raw+' '.repeat(4000),scope),null);
+ assert.equal(assembleBoundedChildReview(JSON.stringify({files:base,approved:true}),scope),null);
+ const longScope={...scope,files:scope.files.map((f,i)=>({...f,path:'src/'+String(i)+'x'.repeat(340)+'.js'}))};
+ const lb=qualifyBoundedChildReviewStrategy(longScope);
+ assert.ok(lb.field_max_chars<160);
+ const maximal=JSON.stringify({files:longScope.files.map((f,index)=>({index,finding:'x'.repeat(lb.field_max_chars),test:'y'.repeat(lb.field_max_chars)}))});
+ assert.ok(assembleBoundedChildReview(maximal,longScope).length<=4000);
 });
