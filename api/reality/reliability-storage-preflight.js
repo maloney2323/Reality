@@ -5,6 +5,7 @@ import { shiftDatabase, shiftRpc } from '../../src/reality-governed-shift-bounda
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 const ALLOWED_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
 const FINAL_LOOP_BRANCH='feature/final-loop-governed-qualification-handoff-20261123';
+const ISOLATED_TRANSPORT_BRANCH='feature/final-loop-isolated-transport-20261125';
 const ISOLATED_PROJECT='txqgqqievsttobujcsli';
 const SHARED_PROJECT='hvkfreoagbrphwghjajw';
 
@@ -29,7 +30,13 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
   try{
     if(env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'){
       // Verify the actual deployed worker binding rather than overriding the target.
-      db=shiftDatabase(env);
+      // On the dedicated transport preview, verify the pinned credentials
+      // without enabling the runtime. This local env copy is read-only.
+      const isolatedProbe=env.VERCEL_GIT_COMMIT_REF===ISOLATED_TRANSPORT_BRANCH;
+      if(isolatedProbe&&(env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='false'||
+         env.REALITY_CONTINUOUS_RELIABILITY_ENABLED!=='false'))
+        return report('ISOLATED_PREFLIGHT_SCOPE_REJECTED');
+      db=shiftDatabase(isolatedProbe?{...env,REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true'}:env);
       if(db.project!==ISOLATED_PROJECT||env.REALITY_PERSONAL_CHAT_SUPABASE_URL!==db.url||
          env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED!=='false')
         return report('ISOLATED_WORKER_BINDING_REJECTED');
@@ -102,7 +109,7 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({ok:false,code:'METHOD_NOT_ALLOWED'});
-  if(process.env.VERCEL_ENV==='preview' && process.env.VERCEL_GIT_COMMIT_REF===FINAL_LOOP_BRANCH)
+  if(process.env.VERCEL_ENV==='preview' && [FINAL_LOOP_BRANCH,ISOLATED_TRANSPORT_BRANCH].includes(process.env.VERCEL_GIT_COMMIT_REF))
     return isolatedCredentialPreflight(req,res);
   if(process.env.VERCEL_ENV!=='preview' || process.env.VERCEL_GIT_COMMIT_REF!==ALLOWED_BRANCH)
     return res.status(404).json({ok:false,code:'NOT_AVAILABLE'});
