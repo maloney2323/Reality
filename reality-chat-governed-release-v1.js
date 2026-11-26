@@ -6,8 +6,8 @@
  'use strict';
  if(!/^\/chat\/?$/.test(location.pathname))return;
  const ready=document.getElementById('privateReady');
- const work=document.getElementById('realityChatPanelWork');
- if(!ready||!work||document.getElementById('realityChatGovernedRelease'))return;
+ const thread=document.getElementById('privateTranscript');
+ if(!ready||!thread||document.getElementById('realityChatGovernedRelease'))return;
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
  const SHA=/^[a-f0-9]{40}$/;
  const HASH=/^sha256:[a-f0-9]{64}$/;
@@ -36,8 +36,12 @@
  const message=node('p','reality-final-loop-child-message','');
  message.setAttribute('role','status');message.setAttribute('aria-live','polite');
  actions.append(check,approve);card.append(header,detail,evidence,limits,actions,message);
- work.prepend(card);
+ thread.append(card);
  let packet=null,busy=false,uncertain=false,dismissed=false,epoch=0;
+ // Keep the visible Chat decision through saved-history rerenders.
+ // Never force scroll, open a drawer, or perform a network read on render.
+ new MutationObserver(()=>{if(signed()&&!card.hidden&&!thread.contains(card))thread.append(card);})
+  .observe(thread,{childList:true});
  const clear=()=>{packet=null;approve.hidden=true;approve.disabled=true;evidence.textContent='';};
  const valid=p=>p?.status==='SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED'&&
   UUID.test(p.request_id||'')&&UUID.test(p.shift_id||'')&&SHA.test(p.release_sha||'')&&
@@ -109,6 +113,7 @@
  function sync(){
   if(!signed()){epoch++;clear();card.hidden=true;dismissed=false;return;}
   card.hidden=dismissed;
+  if(!dismissed&&!thread.contains(card))thread.append(card);
  }
  new MutationObserver(sync).observe(ready,{attributes:true,attributeFilter:['style']});
  sync();
