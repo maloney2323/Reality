@@ -2,6 +2,7 @@
 // records, enable reliability monitoring, run a model or expose any secrets.
 import { resolveReliabilityBenchmarkDb } from '../../src/reality-reliability-db-boundary-v0.1.js';
 import { shiftDatabase, shiftRpc } from '../../src/reality-governed-shift-boundary-v1.js';
+import {connectExistingIsolatedChildTransport} from '../../src/reality-final-loop-child-transport-v1.js';
 import { createUniversePostgresPersistence } from '../../src/reality-universe-postgres-persistence-v0.1.js';
 const ALLOWED_BRANCH='feature/reality-drift-live-continuity-v1-20261024';
 const FINAL_LOOP_BRANCH='feature/final-loop-governed-qualification-handoff-20261123';
@@ -109,15 +110,17 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
 // Same read-only service-role proof on the disabled canonical worker.
 // The configured project is never replaced with another project for this test.
 async function canonicalCredentialPreflight(req,res,env=process.env){
+  const probe=env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY==='true'&&
+    env.REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED==='false'&&env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED==='true';
   const report=(status,extra={})=>res.status(200).json({
     ok:true,status,canonical_project:SHARED_PROJECT,
-    credential_compatibility_verified:status==='CANONICAL_SERVICE_READ_VERIFIED',
+    credential_compatibility_verified:['CANONICAL_SERVICE_READ_VERIFIED','CANONICAL_SIGNED_TRANSPORT_PROBE_VERIFIED'].includes(status),
     execution_authorized:false,worker_started:false,model_calls:0,writes:0,...extra
   });
   if(Object.keys(req.query||{}).length||
     env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
     env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE!=='CANONICAL'||
-    env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='false'||
+    (!probe&&env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='false')||
     env.REALITY_CONTINUOUS_RELIABILITY_ENABLED!=='false'||
     env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='false'||
     env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='false'||
@@ -136,6 +139,15 @@ async function canonicalCredentialPreflight(req,res,env=process.env){
     });
     if(proof?.status!=='GOVERNED_START_SCOPE_UNVERIFIED')
       return report('CANONICAL_WORKER_RPC_READBACK_UNVERIFIED');
+    if(probe){
+      const result=await connectExistingIsolatedChildTransport({db,env});
+      return report(result.ready===true&&result.probe_only===true&&result.database_contract_verified===true?
+       'CANONICAL_SIGNED_TRANSPORT_PROBE_VERIFIED':'CANONICAL_SIGNED_TRANSPORT_PROBE_UNVERIFIED',{
+        worker_database_binding_verified:true,service_role_rpc_verified:true,
+        signed_transport_verified:result.ready===true&&result.probe_only===true&&result.database_contract_verified===true,
+        transport_status:result.status
+       });
+    }
     return report('CANONICAL_SERVICE_READ_VERIFIED',{
       worker_database_binding_verified:true,service_role_rpc_verified:true,unknown_warrant_rejected:true
     });
