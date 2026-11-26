@@ -397,6 +397,10 @@ export async function inspectFinalLoopOnExistingSignedWorker({
       const terminal=e.event_kind==='QUALIFIER_PROOF_CHANGED'&&
        current.length===1&&current[0].next_qualified_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
        current[0].unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED');
+      const acceptedReview=e.event_kind==='QUALIFIER_PROOF_CHANGED'&&
+       current.length===1&&current[0].next_qualified_action==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
+       !current[0].unresolved_proof_gates.includes('OWNER_GOAL_ACCEPTANCE_EVENT_MISSING')&&
+       !current[0].unresolved_proof_gates.includes('EXACT_ACCEPTANCE_APPROVAL_MISSING');
       ready.push(Object.freeze({
        event_id:e.event_id,source_ref:e.source_ref,
        original_work_id:e.original_work_id,event_kind:e.event_kind,
@@ -404,7 +408,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
        source_receipt_sha256:e.source_receipt_sha256,
        continuity_revision:e.continuity_revision,
        continuity_head_sha256:p.continuity_head_sha256,
-       next_qualified_action:terminal?current[0].next_qualified_action:subscriptions[0].next_qualified_action,
+       next_qualified_action:terminal||acceptedReview?current[0].next_qualified_action:subscriptions[0].next_qualified_action,
        would_resume_suspended_obligation:true,
        executor_invoked:false,execution_authorized:false
       }));
