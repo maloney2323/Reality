@@ -450,9 +450,21 @@ test('canonical claim, isolated computation and independent return preserve one 
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:canonicalDb.project,
   REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false',REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false'};
  let reads=0,claims=0,prepares=0,verifies=0,modelCalls=0,drift=false,verificationMode=false;
+ let returnDrift=false;
  const fetchImpl=()=>{throw Error('CANONICAL_WORKER_MUST_NOT_CALL_MODEL_DIRECTLY')};
  const call=async(_db,name,args)=>{
   if(name==='reality_read_final_loop_child_approval_preflight_v1')return preflight;
+  if(name==='reality_read_final_loop_child_recovery_v1')return {
+   status:'FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT',
+   independent_service_readback_verified:true,owner_id:owner,shift_id:shift,
+   parent_original_work_id:parent,parent_source_ref:pr,source_manifest_sha256:h.source_manifest_sha256,
+   source_head_sha:h.source_head_sha,acceptance_contract_sha256:acceptance,
+   original_job_completed:false,production_changed:false,
+   children:[{child_original_work_id:child,phase:'VERIFIED',parent_original_work_id:parent,
+    scope_sha256:scope.proposed_scope_sha256,independently_verified:true,verifier_independent:true,
+    independent_receipt_sha256:hash('9'),canonical_continuity_binding:{continuity_root_id:root,
+     continuity_head_sha256:returnDrift?hash('a'):h.continuity_head_sha256,revision:2,
+     owner_approval_receipt_sha256:h.owner_approval_receipt_sha256}}]};
   assert.deepEqual(args.p_canonical_handoff,h);
   if(name==='reality_read_final_loop_child_verify_v1')return verificationMode?verify:
    {status:'FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION'};
@@ -486,12 +498,18 @@ test('canonical claim, isolated computation and independent return preserve one 
  const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other});
  assert.equal(verified.status,'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN');
  assert.equal(verified.parent_obligation_remains_open,true);assert.equal(verified.canonical_continuity_head_sha256,h.continuity_head_sha256);
+ assert.equal(verified.canonical_verifier_receipt_readback_verified,true);
  assert.equal(claims,1);assert.equal(verifies,1);assert.equal(modelCalls,2);
+ returnDrift=true;
+ const unconfirmed=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other});
+ assert.equal(unconfirmed.status,'FINAL_LOOP_CANONICAL_VERIFIER_RECEIPT_READBACK_REQUIRED_NO_REPLAY');
+ assert.equal(unconfirmed.child_review_independently_verified,undefined);
+ assert.equal(verifies,2);assert.equal(modelCalls,3);returnDrift=false;
  const stale=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,runIsolatedAdvisory:async x=>{
   const r=await runIsolatedAdvisory(x);drift=true;return r;
  }});
  assert.equal(stale.status,'FINAL_LOOP_CHILD_CONTINUITY_DRIFT_NO_RECEIPT_REPLAY');
- assert.equal(verifies,1);assert.equal(modelCalls,3);
+ assert.equal(verifies,2);assert.equal(modelCalls,4);
 });
 
 test('canonical SQL reads and writes share the same continuity and signed release check',()=>{
