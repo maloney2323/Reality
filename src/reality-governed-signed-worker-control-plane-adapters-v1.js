@@ -59,6 +59,16 @@ const identityFields=new Set(['alias','project_id','deployment_id','repository',
  'ready_state','preview_target','schedule_contract','branch_ancestry','ci_identity','ci_result','peer_host']);
 const writeOps=new Set(['VERCEL_ALIAS_ASSIGN','reality_claim_governed_signed_worker_release_v1',
  'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
+// Vercel GET /v13/deployments documents readyState; state is the
+// legacy compatible shape. Never accept missing or contradictory evidence.
+export function verifiedVercelDeploymentReadiness(deployment){
+ if(!deployment||typeof deployment!=='object'||Array.isArray(deployment))return null;
+ const modern=Object.hasOwn(deployment,'readyState'),legacy=Object.hasOwn(deployment,'state');
+ if(!modern&&!legacy)return null;
+ if(modern&&legacy&&deployment.readyState!==deployment.state)return null;
+ const observed=modern?deployment.readyState:deployment.state;
+ return ['READY','BUILDING','ERROR','QUEUED','INITIALIZING','CANCELED'].includes(observed)?observed:null;
+}
 const numericHttp=n=>Number.isInteger(n)&&n>=100&&n<=599?n:null;
 export const observedReleaseHttpStatus=value=>value&&typeof value==='object'?httpCodes.get(value)??null:null;
 class ReleaseProviderError extends Error{
@@ -175,7 +185,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    ...(info.meta?.githubOrg!==expectedRepo[0]||info.meta?.githubRepo!==expectedRepo[1]?['repository']:[]),
    ...(!SHA.test(info.meta?.githubCommitSha||'')?['release_sha']:[]),
    ...(!BRANCH.test(info.meta?.githubCommitRef||'')?['release_ref']:[]),
-   ...(info.state!=='READY'?['ready_state']:[]),
+   ...(verifiedVercelDeploymentReadiness(info)!=='READY'?['ready_state']:[]),
    ...(info.target==='production'?['preview_target']:[])];
   if(mismatches.length)fail(releaseIdentityFailure('RELEASE_PROVIDER_PROJECT_OR_COMMIT_UNVERIFIED','VERCEL_DEPLOYMENT_READ',d,mismatches));
   return info;
