@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTrustedSignedWorkerReleaseControlPlaneAdapters as create}
+import {createTrustedSignedWorkerReleaseControlPlaneAdapters as create,releaseFailureReceipt,requestReleaseProviderJson}
  from '../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
 const sha='a'.repeat(40),oldSha='b'.repeat(40);
 const project='abcdefghijklmnopqrst';
@@ -133,7 +133,7 @@ test('ambiguous provider result is never automatically retried',async()=>{
   shift_id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
   capability_key:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET',
   claim_id:'cccccccc-cccc-4ccc-cccc-cccccccccccc'
- }),/ambiguous provider timeout/);
+ }),/RELEASE_CONTROL_PROVIDER_READ_OR_EFFECT_UNAVAILABLE/);
  assert.equal(f.calls.filter(x=>x.url.includes('/v2/deployments/')).length,1);
 });
 
@@ -245,4 +245,61 @@ test('read-only direction inspection works before target release or switch permi
  const drift=await observed.readDirection({ownerId:owner,shiftId:shift});
  assert.equal(drift.status,'GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED');
  assert.equal(drift.release_activated,false);
+});
+
+test('provider read errors retain actual status, operation and bounded next action without secrets',async()=>{
+ const cases=[[401,'AUTHENTICATION_REJECTED','VERIFY_BOUND_PROVIDER_CREDENTIAL'],
+ [403,'ACCESS_DENIED','VERIFY_PROVIDER_TOKEN_SCOPE_AND_RESOURCE_ACCESS'],
+ [404,'RESOURCE_NOT_FOUND_OR_HIDDEN','VERIFY_RESOURCE_ID_AND_PROVIDER_ACCESS'],
+ [429,'RATE_LIMITED','WAIT_FOR_PROVIDER_RATE_LIMIT_RESET'],
+ [503,'PROVIDER_SERVER_ERROR','RECHECK_PROVIDER_READ_CONNECTIVITY']];
+ for(const [status,classification,next] of cases){
+  let bodyRead=false;
+  const fetchImpl=async()=>({ok:false,status,json:async()=>{bodyRead=true;return {token:'SECRET_PROVIDER_BODY'}}});
+  const adapter=create({env,db,fetchImpl});
+  await assert.rejects(()=>adapter.observeAlias(alias),error=>{
+   const failure=releaseFailureReceipt(error);
+   assert.equal(failure.operation,'VERCEL_ALIAS_READ');
+   assert.equal(failure.http_status,status);
+   assert.equal(failure.classification,classification);
+   assert.equal(failure.next_governed_action,next);
+   assert.equal(failure.access_denied,status===403);
+   assert.equal(failure.credential_rejected,status===401);
+   assert.equal(failure.automatic_replay_permitted,false);
+   assert.equal(failure.credential_values_exposed,false);
+   assert.equal(adapter.readLastProviderFailure(),failure);
+   assert.equal(JSON.stringify(failure).includes('SECRET'),false);
+   return true;
+  });
+  assert.equal(bodyRead,false);
+ }
+});
+test('HTTP success is not a verified identity; only mismatched field names are returned',async()=>{
+ const adapter=create({env,db,fetchImpl:async()=>({ok:true,status:200,
+  json:async()=>({alias,projectId:'foreign-project',deploymentId:deploymentId,secret:'SECRET_PROVIDER_BODY'})})});
+ await assert.rejects(()=>adapter.observeAlias(alias),error=>{
+  const f=releaseFailureReceipt(error);
+  assert.equal(f.http_status,200);
+  assert.equal(f.identity_matches,false);
+  assert.deepEqual(f.mismatched_fields,['project_id']);
+  assert.equal(f.next_governed_action,'RECONCILE_EXPECTED_PROVIDER_IDENTITY');
+  assert.equal(JSON.stringify(f).includes('foreign-project'),false);
+  return true;
+ });
+});
+test('provider effect failure never authorizes replay and raw errors are not exposed',async()=>{
+ await assert.rejects(()=>requestReleaseProviderJson(async()=>{throw Error('SECRET_PROVIDER_EXCEPTION')},
+  'https://example.invalid',{method:'POST'},'VERCEL_ALIAS_ASSIGN'),error=>{
+   const f=releaseFailureReceipt(error);
+   assert.equal(f.http_status,null);
+   assert.equal(f.effect_reconciliation_required,true);
+   assert.equal(f.automatic_replay_permitted,false);
+   assert.equal(f.next_governed_action,'RECONCILE_EXACT_EFFECT_WITHOUT_REPLAY');
+   assert.equal(error.message.includes('SECRET'),false);
+   return true;
+  });
+ await assert.rejects(()=>requestReleaseProviderJson(async()=>{const e=new Error('SECRET');e.name='TimeoutError';throw e},
+  'https://example.invalid',{method:'GET'},'SUPABASE_BRANCH_READ'),error=>{
+   assert.equal(releaseFailureReceipt(error).classification,'TIMEOUT');return true;
+  });
 });
