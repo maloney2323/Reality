@@ -54,6 +54,15 @@ on:
       - 'index.html'
       - 'reality-chat-final-loop-child-approval-v1.js'
       - 'reality-chat-governed-release-v1.js'
+      - 'reality-chat-workspace-v1.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'reality-chat-repair-scope-approval-v1.js'
+      - 'reality-chat-handoff-health-v1.js'
+      - 'reality-chat-operational-incident-briefing-v1.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'reality-generalized-install-review-ui-v1.js'
+      - 'reality-native263-install-approval-ui-v1.js'
+      - 'reality-shift-conversation-v1.js'
       - 'test/reality-chat-final-loop-child-approval-v1.test.js'
       - 'src/reality-governed-openai-gateway-v1.js'
       - 'sql/reality-final-loop-pr-source-plans-v1.sql'
@@ -128,6 +137,15 @@ on:
       - 'index.html'
       - 'reality-chat-final-loop-child-approval-v1.js'
       - 'reality-chat-governed-release-v1.js'
+      - 'reality-chat-workspace-v1.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'reality-chat-repair-scope-approval-v1.js'
+      - 'reality-chat-handoff-health-v1.js'
+      - 'reality-chat-operational-incident-briefing-v1.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'reality-generalized-install-review-ui-v1.js'
+      - 'reality-native263-install-approval-ui-v1.js'
+      - 'reality-shift-conversation-v1.js'
       - 'test/reality-chat-final-loop-child-approval-v1.test.js'
       - 'src/reality-governed-openai-gateway-v1.js'
       - 'sql/reality-final-loop-pr-source-plans-v1.sql'
@@ -206,6 +224,15 @@ jobs:
           node --check test/reality-final-loop-parent-delivery-v1.test.js
           node --check reality-chat-final-loop-child-approval-v1.js
           node --check reality-chat-governed-release-v1.js
+          node --check reality-chat-workspace-v1.js
+          node --check reality-chat-maintenance-continuation-v1.js
+          node --check reality-chat-repair-scope-approval-v1.js
+          node --check reality-chat-handoff-health-v1.js
+          node --check reality-chat-operational-incident-briefing-v1.js
+          node --check reality-chat-continuous-qualification-v1.js
+          node --check reality-generalized-install-review-ui-v1.js
+          node --check reality-native263-install-approval-ui-v1.js
+          node --check reality-shift-conversation-v1.js
           node --check test/reality-chat-final-loop-child-approval-v1.test.js
           node --check test/reality-final-loop-pr-source-handoff-v1.test.js
           node --check src/reality-final-loop-signed-worker-bridge-v1.js
