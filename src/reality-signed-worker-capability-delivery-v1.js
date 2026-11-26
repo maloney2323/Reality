@@ -43,6 +43,8 @@ export function qualifiedWorkerRuntime(candidate,env){
   (s.capability_key!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||(
    /^dpl_[A-Za-z0-9_-]{8,75}$/.test(s.isolated_deployment_id||'')&&s.isolated_deployment_id!==s.target_deployment_id&&
    /^[-a-z0-9]+\.vercel\.app$/.test(s.isolated_transport_host||'')&&HASH.test(s.independent_transport_proof_sha256||'')&&
+   ['FUNCTIONS_DEPLOYED','MIGRATIONS_PASSED','MIGRATIONS_FAILED'].includes(s.provider_migration_status)&&
+   s.exact_runtime_database_contract_verified===true&&
    (!env||(s.isolated_deployment_id===env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID&&s.isolated_transport_host===env.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST))));
 }
 export function matchesWorkerReleaseAuthority(candidate,authority){
