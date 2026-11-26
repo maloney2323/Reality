@@ -627,6 +627,24 @@ test('actual signed transport connects the canonical claim to isolated model com
  assert.equal(modelCalls,1);
  const forged=await handleExistingChildTransport({db:isolatedDb,body:{...recordedCompute,signature:'0'.repeat(64)},env:isolatedEnv,call,fetchImpl,now});
  assert.equal(forged.http,403);assert.equal(modelCalls,1);
+ const probeFlags={REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY:'true',
+  REALITY_CONTINUOUS_RELIABILITY_ENABLED:'false',REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED:'false',
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false'};
+ const probeEnv={...canonicalEnv,...probeFlags};
+ const probeFetch=async(url,options)=>{
+  const req=JSON.parse(options.body);
+  const r=await handleExistingChildTransport({db:isolatedDb,body:req,
+   env:{...isolatedEnv,...probeFlags},call,now,fetchImpl:()=>{throw Error('PROBE_MUST_NOT_CALL_PROVIDER');}});
+  return {ok:r.http===200,status:r.http,json:async()=>r.body};
+ };
+ const readOnly=await connectExistingIsolatedChildTransport({...base,env:probeEnv,fetchImpl:probeFetch});
+ assert.equal(readOnly.ready,true);
+ assert.equal(readOnly.probe_only,true);
+ await assert.rejects(()=>readOnly.runIsolatedAdvisory(input),/PROBE_ONLY/);
+ assert.equal(modelCalls,1);
+ const computeAttempt=await handleExistingChildTransport({db:isolatedDb,body:recordedCompute,
+  env:{...isolatedEnv,...probeFlags},call,now,compute:()=>{throw Error('PROBE_MUST_NOT_COMPUTE');}});
+ assert.equal(computeAttempt.http,403);assert.equal(modelCalls,1);
  nonce=null;drift=true;
  const next=await connectExistingIsolatedChildTransport(base);
  await assert.rejects(()=>next.runIsolatedAdvisory(input),/ADVISORY_UNVERIFIED/);
