@@ -4,7 +4,7 @@
 // release switch. This endpoint cannot touch cron or mint owner authority.
 import crypto from 'node:crypto';
 import {shiftDatabase} from '../../src/reality-governed-shift-boundary-v1.js';
-import {createTrustedSignedWorkerReleaseControlPlaneAdapters}
+import {createTrustedSignedWorkerReleaseControlPlaneAdapters,releaseFailureReceipt}
  from '../../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
 import {qualifyCurrentIsolatedSignedWorkerRelease}
  from '../../src/reality-governed-release-independent-qualification-v1.js';
@@ -47,9 +47,10 @@ export default async function handler(req,res){
   Object.keys(req.body).join(',')!=='intent'||
   !['INSPECT','PREPARE_EXACT_RELEASE','SWITCH_EXACT_APPROVED_RELEASE'].includes(req.body.intent))
   return result(res,400,'GOVERNED_RELEASE_CONTROL_INTENT_INVALID');
+ let adapters=null;
  try{
   const db=shiftDatabase(env);
-  const adapters=createTrustedSignedWorkerReleaseControlPlaneAdapters({
+  adapters=createTrustedSignedWorkerReleaseControlPlaneAdapters({
    env,db,fetchImpl:fetch,inspectionOnly:req.body.intent==='INSPECT'
   });
   if(adapters.ready!==true)
@@ -96,6 +97,8 @@ export default async function handler(req,res){
     'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY'))
    return result(res,409,'GOVERNED_RELEASE_INDEPENDENT_QUALIFICATION_BLOCKED',{
     qualification_status:proof.status,
+    provider_failure:proof.provider_failure??null,
+    next_governed_action:proof.provider_failure?.next_governed_action??'RECONCILE_EXISTING_QUALIFICATION_REQUIREMENT',
     release_switch_attempted:false
    });
   if(!UUID.test(env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID||'')||
@@ -149,20 +152,23 @@ export default async function handler(req,res){
   if(action.status==='GOVERNED_RELEASE_SWITCH_DELIVERED_AWAITING_SIGNED_WORKER_WAKE'&&
    canonical&&env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'){
    try{governedTrigger=await adapters.recordObservedReviewDelivery();}
-   catch{governedTrigger={status:'REVIEW_RELEASE_ALIAS_OBSERVATION_UNVERIFIED_NO_REPLAY',wake_queued:false};}
+   catch(error){governedTrigger={status:'REVIEW_RELEASE_ALIAS_OBSERVATION_UNVERIFIED_NO_REPLAY',wake_queued:false,provider_failure:releaseFailureReceipt(error)??adapters.readLastProviderFailure()};}
   }
   return result(res,200,action.status,{
    governed_trigger_observation:governedTrigger,
    delivery_status:action.delivery_status??null,
+   provider_failure:adapters.readLastProviderFailure(),
    provider_write_attempted:action.provider_write_attempted===true,
    next_governed_action:action.next_governed_action??
     'READ_ACTUAL_SIGNED_WORKER_RELEASE_WAKE',
    signed_worker_new_release_observed:false
   });
- }catch{
-  // Provider timeout or missing privilege never becomes a guessed release.
+ }catch(error){
+  // Never return raw provider exceptions, request URLs, bodies or credentials.
+  const failure=releaseFailureReceipt(error)??adapters?.readLastProviderFailure()??null;
   return result(res,503,'GOVERNED_RELEASE_CONTROL_INDEPENDENT_READ_OR_CLAIM_FAILED',{
-   next_governed_action:'READ_PROVIDER_AND_DATABASE_STATE_WITHOUT_REPLAY'
+   provider_failure:failure,
+   next_governed_action:failure?.next_governed_action??'READ_PROVIDER_AND_DATABASE_STATE_WITHOUT_REPLAY'
   });
  }
 }
