@@ -109,9 +109,16 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  const exact=items.filter(b=>b?.project_ref===isolated&&
   b.parent_project_ref===parent&&
   b.is_default===false&&b.preview_project_status==='ACTIVE_HEALTHY'&&
-  ['FUNCTIONS_DEPLOYED','MIGRATIONS_PASSED'].includes(b.status));
+  (['FUNCTIONS_DEPLOYED','MIGRATIONS_PASSED'].includes(b.status)||
+   // A historical migration workflow is not the exact runtime contract.
+   // Only the existing read-only review capability may proceed to live
+   // independent qualification; the provider's failure remains recorded.
+   (canonical&&reviewTransport&&b.status==='MIGRATIONS_FAILED')));
  if(exact.length!==1)
   return safe('ISOLATED_SUPABASE_DEVELOPMENT_BRANCH_NOT_VERIFIED');
+ const migrationStatus=exact[0].status;
+ if(reviewTransport&&env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY==='true')
+  return safe('REVIEW_TRANSPORT_DIAGNOSTIC_ONLY_NOT_RELEASE_CAPACITY');
  const [org,name]=repo.split('/');
  let ci;
  try{
@@ -175,10 +182,12 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
    return safe('ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
   const probe=await connectExistingIsolatedChildTransport({db,env,fetchImpl});
   if(probe.ready!==true||probe.isolated_deployment_id!==peerId||probe.isolated_host!==peerHost||
-   probe.canonical_deployment_id!==vercelId||probe.isolated_project_ref!==isolated)
+   probe.canonical_deployment_id!==vercelId||probe.isolated_project_ref!==isolated||
+   probe.database_contract_verified!==true||probe.probe_only!==false)
    return safe('INDEPENDENT_REVIEW_TRANSPORT_PROBE_UNVERIFIED');
   transport={isolated_deployment_id:peerId,isolated_transport_host:peerHost,
-   independent_transport_proof_sha256:digest([vercelId,peerId,peerHost,sha,dbProject,isolated])};
+   provider_migration_status:migrationStatus,exact_runtime_database_contract_verified:true,
+   independent_transport_proof_sha256:digest([vercelId,peerId,peerHost,sha,dbProject,isolated,migrationStatus,'LIVE_SERVICE_ROLE_NEGATIVE_CONTROLS'])};
  }
  const providerProof=digest([repo,sha,branch,ci.id,ci.path,ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,d.state,d.target??null,
   ...(transport?[transport.isolated_deployment_id,transport.independent_transport_proof_sha256]:[]),
@@ -213,6 +222,8 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  return safe(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY',{
   candidate,ci:ciProof,
   branch_project_ref:isolated,
+  provider_migration_status:migrationStatus,
+  provider_migration_workflow_passed:['FUNCTIONS_DEPLOYED','MIGRATIONS_PASSED'].includes(migrationStatus),
   provider_deployment_id:vercelId,
   // Hash only the stable, independently read provider identity fields. No
   // time-varying timestamp or secret can change the existing packet identity.
