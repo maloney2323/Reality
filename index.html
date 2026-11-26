@@ -2095,10 +2095,7 @@ function realityOpenChatDock(focusPrompt=false){
   return;
  }
  // The conversation occupies a standalone page. Focus without launching a modal.
- if($('privateReady')?.style.display==='block'){
-  void homeOwnerRefresh();
-  void realityChatRefreshEvents();
- }
+ // Opening Chat focuses the conversation; detailed work is loaded on demand.
  const focus=focusPrompt&&$('privateReady')?.style.display==='block'?
   $('privatePrompt'):$('privateLogin')?.style.display==='block'?
   $('privateEmail'):$('realityChatTitle');
@@ -4416,14 +4413,22 @@ $('wcEasyRepairMain').onclick=async()=>{
  }finally{wcEasyRepairBusy=false;button.disabled=false;}
 };
 const wcEasyOriginalDiscover=$('wcQuickFindRepair').onclick;
-setTimeout(()=>{void wcEasyRefresh();void homeOwnerRefresh();},500);
-setInterval(()=>{if($('privateReady')?.style.display==='block'&&
-  !wcEasyRepairBusy)void wcEasyRefresh();},30000);
-setInterval(()=>{if(homeOwnerSignedIn())void homeOwnerRefresh();},30000);
-setInterval(()=>{if(homeOwnerSignedIn())void realityChatRefreshEvents();},12000);
-setInterval(()=>{if(homeOwnerSignedIn())void realityBusinessRefresh();},30000);
-setInterval(()=>{if(homeOwnerSignedIn())void wcLoadGapFeed();},60000);
-setTimeout(()=>void realityBusinessRefresh(),600);
+// Hidden dashboard readers must not compete with authenticated Chat.
+// Preserve explicit refresh/action handlers and server-side continuation.
+const visibleRoute=()=>!document.hidden&&homeOwnerSignedIn()&&document.body.dataset.realityRoute;
+const onRoute=(...routes)=>routes.includes(visibleRoute());
+setInterval(()=>{if(onRoute('work','shifts')&&!wcEasyRepairBusy)void wcEasyRefresh();},60000);
+setInterval(()=>{if(onRoute('home','work','shifts'))void homeOwnerRefresh();},60000);
+setInterval(()=>{if(onRoute('home','value'))void realityBusinessRefresh();},60000);
+setInterval(()=>{if(onRoute('work'))void wcLoadGapFeed();},120000);
+let lastChatWorkRead=0,chatWorkReading=false;
+window.addEventListener('reality:chat-work-opened',async()=>{
+ if(!onRoute('chat')||chatWorkReading||Date.now()-lastChatWorkRead<30000)return;
+ chatWorkReading=true;lastChatWorkRead=Date.now();
+ try{
+  await Promise.allSettled([homeOwnerRefresh(),realityChatRefreshEvents()]);
+ }finally{chatWorkReading=false;}
+});
 
 $('wcQuickFindRepair').onclick=()=>{
  if($('privateReady')?.style.display!=='block'){
@@ -6701,17 +6706,16 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   paintGuidedSetup();
   if(yes&&!previouslySignedIn){
    const route=realityCurrentRoute();
-   if(['chat','work'].includes(route))void refreshRealitySelfImprovement();
-   if(['chat','work','shifts','home'].includes(route))void homeOwnerRefresh();
-   if(route==='chat')void realityChatRefreshEvents();
+   if(route==='work')void refreshRealitySelfImprovement();
+   if(['work','shifts','home'].includes(route))void homeOwnerRefresh();
    if(['home','value'].includes(route))void realityBusinessRefresh();
-   if(['chat','work','shifts'].includes(route)&&
+   if(['work','shifts'].includes(route)&&
       typeof window.realityRefreshRileyWork==='function')void window.realityRefreshRileyWork();
-   if(route==='work'){void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
+   if(route==='work'){void wcEasyRefresh();void wcInvestigateMarket({restore:true});void wcLoadGapFeed();}
   }
   if(!yes){
    if(['home','value'].includes(realityCurrentRoute()))void realityBusinessRefresh();
-   if(['chat','work','shifts'].includes(realityCurrentRoute()))void homeOwnerRefresh();
+   if(['work','shifts'].includes(realityCurrentRoute()))void homeOwnerRefresh();
    realityOriginal143Eligible=false;
    el('privateContinueOriginal143').disabled=true;
    el('privateSelfImprovementStatus').textContent=
