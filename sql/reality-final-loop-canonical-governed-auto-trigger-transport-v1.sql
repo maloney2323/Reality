@@ -22,6 +22,11 @@ ALTER TABLE reality_internal.final_loop_resume_events_v1
  ADD COLUMN IF NOT EXISTS governed_wake_nonce uuid,
  ADD COLUMN IF NOT EXISTS governed_wake_worker_run_id uuid;
 
+-- Persist only the provider readback of the already consumed exact release.
+-- This is not a new authorization, job or worker receipt.
+ALTER TABLE reality_internal.governed_worker_release_approvals_v1
+ ADD COLUMN IF NOT EXISTS provider_alias_observed_at timestamptz,
+ ADD COLUMN IF NOT EXISTS provider_alias_observed_deployment_id text;
 CREATE OR REPLACE FUNCTION reality_internal.notify_final_loop_governed_trigger_v1(p_shift_id uuid DEFAULT NULL)
  RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 DECLARE w record; l record; e record; target text; token text; bypass text;
@@ -39,9 +44,7 @@ BEGIN
  INTO target,token,bypass,approved_sha FROM vault.decrypted_secrets
  WHERE name IN ('reality_final_loop_canonical_worker_url_v1','reality_riley_preview_worker_token_20261107',
  'reality_riley_preview_vercel_bypass_20261107','reality_final_loop_canonical_worker_release_sha_v1');
- IF target IS DISTINCT FROM 'https://reality-signed-worker-maloney2323-5310s-projects.vercel.app/api/reality/governed-employee-shift-worker'
- OR approved_sha IS NULL OR approved_sha !~ '^[a-f0-9]{40}$'
- OR token IS NULL OR token !~ '^[a-f0-9]{64}$'
+ IF token IS NULL OR token !~ '^[a-f0-9]{64}$'
  OR bypass IS NULL OR length(bypass)<10 THEN RETURN NULL; END IF;
  -- Never preempt the actual running worker. The release trigger drains a new
  -- event after its lease is released, not after an arbitrary cooldown.
@@ -70,7 +73,32 @@ BEGIN
   AND x.plan_fingerprint ~ '^sha256:[a-f0-9]{64}$'
  FOR UPDATE OF x SKIP LOCKED;
  IF NOT FOUND THEN RETURN NULL; END IF;
- -- Require the exact consumed release authority and completed runtime proof.
+ -- A verified one-use review release supplies its own pinned alias/commit.
+ -- The provider GET readback is recorded only by the trusted release
+ -- controller after delivery. The receiver still must attest before work.
+ SELECT a.claim_id,a.release_sha INTO release_claim,approved_sha
+ FROM reality_internal.governed_worker_release_approvals_v1 a
+ WHERE a.owner_id=w.owner_id AND a.shift_id=w.shift_id
+ AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND a.state='CLAIMED_ONCE' AND a.claim_id IS NOT NULL
+ AND a.scheduled_alias='reality-signed-worker-maloney2323-5310s-projects.vercel.app'
+ AND a.provider_alias_observed_at>=a.claimed_at
+ AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
+ AND a.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+ AND a.runtime_scope->>'runtime_database_project_ref'='hvkfreoagbrphwghjajw'
+ AND a.runtime_scope->>'child_execution_enabled'='false'
+ AND a.runtime_scope->>'parent_delivery_enabled'='false'
+ ORDER BY a.provider_alias_observed_at DESC LIMIT 1;
+ IF FOUND THEN
+  target:='https://'||'reality-signed-worker-maloney2323-5310s-projects.vercel.app'||'/api/reality/governed-employee-shift-worker';
+ ELSE
+ -- Legacy releases still require their existing Vault pin and completed witness.
+ SELECT max(decrypted_secret) FILTER(WHERE name='reality_final_loop_canonical_worker_url_v1'),
+        max(decrypted_secret) FILTER(WHERE name='reality_final_loop_canonical_worker_release_sha_v1')
+ INTO target,approved_sha FROM vault.decrypted_secrets
+ WHERE name IN('reality_final_loop_canonical_worker_url_v1','reality_final_loop_canonical_worker_release_sha_v1');
+ IF target IS DISTINCT FROM 'https://reality-signed-worker-maloney2323-5310s-projects.vercel.app/api/reality/governed-employee-shift-worker'
+ OR approved_sha IS NULL OR approved_sha !~ '^[a-f0-9]{40}$' THEN RETURN NULL; END IF;
  SELECT a.claim_id INTO release_claim FROM reality_internal.governed_worker_release_approvals_v1 a
  WHERE a.owner_id=w.owner_id AND a.shift_id=w.shift_id AND a.release_sha=approved_sha
  AND a.state='CLAIMED_ONCE' AND a.scheduled_alias='reality-signed-worker-maloney2323-5310s-projects.vercel.app'
@@ -84,6 +112,7 @@ BEGIN
    AND run.worker_stage='WORKER_RESPONSE_PUBLICATION' AND run.finished_at IS NOT NULL)
  ORDER BY a.claimed_at DESC LIMIT 1;
  IF NOT FOUND THEN RETURN NULL;END IF;
+ END IF;
  is_start:=w.governed_start_requested_at IS NOT NULL AND w.governed_start_request_id IS NULL
   AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shift_worker_pulses_v1 p
    WHERE p.shift_id=w.shift_id AND p.owner_id=w.owner_id
@@ -159,6 +188,9 @@ BEGIN
           AND a.runtime_scope->>'plan_fingerprint'=w.plan_fingerprint
           AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
           AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+          AND a.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+          AND a.provider_alias_observed_at>=a.claimed_at
+          AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
           AND a.runtime_scope->>'child_execution_enabled'='false'
           AND a.runtime_scope->>'parent_delivery_enabled'='false'
           AND a.runtime_scope->>'production_changed'='false'
@@ -236,6 +268,50 @@ CREATE TRIGGER final_loop_governed_resume_v1 AFTER INSERT ON reality_internal.fi
 DROP TRIGGER IF EXISTS final_loop_governed_release_v1 ON reality_internal.governed_preview_shift_worker_leases_v1;
 CREATE TRIGGER final_loop_governed_release_v1 AFTER UPDATE OF released_at ON reality_internal.governed_preview_shift_worker_leases_v1
  FOR EACH ROW EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
+
+-- Service-only observation, after the existing controller independently
+-- GETs the delivered alias. Existing event/lease triggers perform delivery.
+CREATE OR REPLACE FUNCTION public.reality_record_review_release_alias_observation_v1(
+ p_owner_id uuid,p_shift_id uuid,p_release_sha text,p_release_ref text,
+ p_scheduled_alias text,p_deployment_id text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE a record; n int;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'REVIEW_RELEASE_OBSERVATION_SERVICE_ONLY';END IF;
+ IF p_scheduled_alias IS DISTINCT FROM 'reality-signed-worker-maloney2323-5310s-projects.vercel.app'
+ OR coalesce(p_release_sha,'') !~ '^[a-f0-9]{40}$'
+ OR coalesce(p_deployment_id,'') !~ '^dpl_[A-Za-z0-9_-]{8,75}$'
+ THEN RETURN jsonb_build_object('status','REVIEW_RELEASE_ALIAS_SCOPE_UNVERIFIED');END IF;
+ SELECT * INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
+ WHERE r.owner_id=p_owner_id AND r.shift_id=p_shift_id AND r.release_sha=p_release_sha
+ AND r.release_ref=p_release_ref AND r.scheduled_alias=p_scheduled_alias
+ AND r.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL AND r.approval_receipt_sha256 IS NOT NULL
+ AND r.runtime_scope->>'target_deployment_id'=p_deployment_id
+ AND r.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+ AND r.runtime_scope->>'independent_transport_proof_sha256' ~ '^sha256:[a-f0-9]{64}$'
+ FOR UPDATE;
+ IF NOT FOUND THEN RETURN jsonb_build_object('status','REVIEW_RELEASE_ALIAS_CLAIM_UNVERIFIED');END IF;
+ IF a.provider_alias_observed_at IS NOT NULL THEN
+  RETURN jsonb_build_object('status','REVIEW_RELEASE_ALIAS_ALREADY_OBSERVED_NO_REPLAY','original_job_completed',false);
+ END IF;
+ IF NOT coalesce(reality_internal.canonical_worker_release_scope_current_v1(p_owner_id,p_shift_id,p_scheduled_alias,a.runtime_scope),false)
+ THEN RETURN jsonb_build_object('status','REVIEW_RELEASE_ALIAS_CONTINUITY_DRIFT');END IF;
+ UPDATE reality_internal.governed_worker_release_approvals_v1
+ SET provider_alias_observed_at=pg_catalog.clock_timestamp(),provider_alias_observed_deployment_id=p_deployment_id
+ WHERE request_id=a.request_id AND provider_alias_observed_at IS NULL;
+ GET DIAGNOSTICS n=ROW_COUNT;
+ RETURN jsonb_build_object('status',CASE WHEN n=1 THEN 'REVIEW_RELEASE_ALIAS_OBSERVED_GOVERNED_TRIGGER_NOTIFIED' ELSE 'REVIEW_RELEASE_ALIAS_OBSERVATION_UNVERIFIED' END,
+  'shift_id',p_shift_id,'release_sha',p_release_sha,'deployment_id',p_deployment_id,
+  'owner_approval_granted',false,'execution_authorized',false,'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_record_review_release_alias_observation_v1(uuid,uuid,text,text,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_record_review_release_alias_observation_v1(uuid,uuid,text,text,text,text) TO service_role;
+DROP TRIGGER IF EXISTS final_loop_governed_release_alias_observed_v1 ON reality_internal.governed_worker_release_approvals_v1;
+CREATE TRIGGER final_loop_governed_release_alias_observed_v1
+ AFTER UPDATE OF provider_alias_observed_at ON reality_internal.governed_worker_release_approvals_v1
+ FOR EACH ROW WHEN (OLD.provider_alias_observed_at IS NULL AND NEW.provider_alias_observed_at IS NOT NULL)
+ EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
 
 CREATE OR REPLACE FUNCTION public.reality_read_final_loop_governed_start_v1(p_owner_id uuid,p_shift_id uuid,p_plan_fingerprint text)
  RETURNS jsonb LANGUAGE plpgsql SET search_path TO '' AS $$
