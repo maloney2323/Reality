@@ -409,11 +409,15 @@ begin
 end;
 $function$;
 
+-- Keep the existing notifier definition identical across upgrade files.
+ALTER TABLE reality_internal.governed_worker_release_approvals_v1
+ ADD COLUMN IF NOT EXISTS provider_alias_observed_at timestamptz,
+ ADD COLUMN IF NOT EXISTS provider_alias_observed_deployment_id text;
 CREATE OR REPLACE FUNCTION reality_internal.notify_final_loop_governed_trigger_v1(p_shift_id uuid DEFAULT NULL)
  RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 DECLARE w record; l record; e record; target text; token text; bypass text;
         req bigint; now_at timestamptz:=pg_catalog.clock_timestamp(); is_start boolean;
-        approved_sha text; nonce uuid; wake_event_id uuid; release_claim uuid;
+        approved_sha text; nonce uuid; wake_event_id uuid; release_claim uuid; review_release boolean:=false;
 BEGIN
  -- Reuse the existing Vault credentials; never expose or copy their values.
  -- Transport is deliberately inert until an independently qualified canonical
@@ -426,9 +430,7 @@ BEGIN
  INTO target,token,bypass,approved_sha FROM vault.decrypted_secrets
  WHERE name IN ('reality_final_loop_canonical_worker_url_v1','reality_riley_preview_worker_token_20261107',
  'reality_riley_preview_vercel_bypass_20261107','reality_final_loop_canonical_worker_release_sha_v1');
- IF target IS DISTINCT FROM 'https://reality-signed-worker-maloney2323-5310s-projects.vercel.app/api/reality/governed-employee-shift-worker'
- OR approved_sha IS NULL OR approved_sha !~ '^[a-f0-9]{40}$'
- OR token IS NULL OR token !~ '^[a-f0-9]{64}$'
+ IF token IS NULL OR token !~ '^[a-f0-9]{64}$'
  OR bypass IS NULL OR length(bypass)<10 THEN RETURN NULL; END IF;
  -- Never preempt the actual running worker. The release trigger drains a new
  -- event after its lease is released, not after an arbitrary cooldown.
@@ -457,7 +459,33 @@ BEGIN
   AND x.plan_fingerprint ~ '^sha256:[a-f0-9]{64}$'
  FOR UPDATE OF x SKIP LOCKED;
  IF NOT FOUND THEN RETURN NULL; END IF;
- -- Require the exact consumed release authority and completed runtime proof.
+ -- A verified one-use review release supplies its own pinned alias/commit.
+ -- The provider GET readback is recorded only by the trusted release
+ -- controller after delivery. The receiver still must attest before work.
+ SELECT a.claim_id,a.release_sha INTO release_claim,approved_sha
+ FROM reality_internal.governed_worker_release_approvals_v1 a
+ WHERE a.owner_id=w.owner_id AND a.shift_id=w.shift_id
+ AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND a.state='CLAIMED_ONCE' AND a.claim_id IS NOT NULL
+ AND a.scheduled_alias='reality-signed-worker-maloney2323-5310s-projects.vercel.app'
+ AND a.provider_alias_observed_at>=a.claimed_at
+ AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
+ AND a.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+ AND a.runtime_scope->>'runtime_database_project_ref'='hvkfreoagbrphwghjajw'
+ AND a.runtime_scope->>'child_execution_enabled'='false'
+ AND a.runtime_scope->>'parent_delivery_enabled'='false'
+ ORDER BY a.provider_alias_observed_at DESC LIMIT 1;
+ IF FOUND THEN
+  review_release:=true;
+  target:='https://'||'reality-signed-worker-maloney2323-5310s-projects.vercel.app'||'/api/reality/governed-employee-shift-worker';
+ ELSE
+ -- Legacy releases still require their existing Vault pin and completed witness.
+ SELECT max(decrypted_secret) FILTER(WHERE name='reality_final_loop_canonical_worker_url_v1'),
+        max(decrypted_secret) FILTER(WHERE name='reality_final_loop_canonical_worker_release_sha_v1')
+ INTO target,approved_sha FROM vault.decrypted_secrets
+ WHERE name IN('reality_final_loop_canonical_worker_url_v1','reality_final_loop_canonical_worker_release_sha_v1');
+ IF target IS DISTINCT FROM 'https://reality-signed-worker-maloney2323-5310s-projects.vercel.app/api/reality/governed-employee-shift-worker'
+ OR approved_sha IS NULL OR approved_sha !~ '^[a-f0-9]{40}$' THEN RETURN NULL; END IF;
  SELECT a.claim_id INTO release_claim FROM reality_internal.governed_worker_release_approvals_v1 a
  WHERE a.owner_id=w.owner_id AND a.shift_id=w.shift_id AND a.release_sha=approved_sha
  AND a.state='CLAIMED_ONCE' AND a.scheduled_alias='reality-signed-worker-maloney2323-5310s-projects.vercel.app'
@@ -471,7 +499,8 @@ BEGIN
    AND run.worker_stage='WORKER_RESPONSE_PUBLICATION' AND run.finished_at IS NOT NULL)
  ORDER BY a.claimed_at DESC LIMIT 1;
  IF NOT FOUND THEN RETURN NULL;END IF;
- is_start:=w.governed_start_requested_at IS NOT NULL AND w.governed_start_request_id IS NULL
+ END IF;
+ is_start:=NOT review_release AND w.governed_start_requested_at IS NOT NULL AND w.governed_start_request_id IS NULL
   AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shift_worker_pulses_v1 p
    WHERE p.shift_id=w.shift_id AND p.owner_id=w.owner_id
     AND p.last_worker_seen_at>=w.governed_start_requested_at);
@@ -488,6 +517,11 @@ BEGIN
   WHERE ev.shift_id=w.shift_id AND ev.owner_id=w.owner_id AND ev.state='SHADOW_PENDING'
    AND ev.governed_wake_requested_at IS NOT NULL AND ev.governed_wake_request_id IS NULL
    AND ev.source_receipt_sha256<>ev.previous_receipt_sha256
+   AND (NOT review_release OR (ev.signal_kind='QUALIFIER_PROOF_CHANGED'
+    AND ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
+     WHERE a.claim_id=release_claim AND a.runtime_scope->>'original_work_id'=ev.original_work_id
+     AND a.runtime_scope->>'source_ref'=ev.source_ref)))
    -- A distinct current qualifier receipt at a terminal boundary can request
    -- evidence-only investigation. The worker MUST preserve the hard budget;
    -- the existing verifier route cannot dispatch old CI for this action.
@@ -546,6 +580,9 @@ BEGIN
           AND a.runtime_scope->>'plan_fingerprint'=w.plan_fingerprint
           AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
           AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+          AND a.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+          AND a.provider_alias_observed_at>=a.claimed_at
+          AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
           AND a.runtime_scope->>'child_execution_enabled'='false'
           AND a.runtime_scope->>'parent_delivery_enabled'='false'
           AND a.runtime_scope->>'production_changed'='false'
