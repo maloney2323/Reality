@@ -252,7 +252,5 @@
  document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&signedIn())void load();
  });
- window.setInterval(()=>{
-  if(document.visibilityState==='visible'&&signedIn())void load();
- },30000);
+ window.addEventListener('reality:chat-work-opened',()=>{if(signedIn())void load()});
 })();
