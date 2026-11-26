@@ -149,6 +149,60 @@ test('Final Loop auto trigger rejects ambiguous, stale or unauthorized proof eve
   {...terminal,event_resume_shadow:{...terminal.event_resume_shadow,ready_event_refs:[{...e,next_qualified_action:terminalAction,source_receipt_sha256:head}]}},
   {...c,shared_continuity_guard:terminal.shared_continuity_guard}
  ]){const blocked=route(invalid);assert.equal(blocked.dispatch_permitted,false);assert.notEqual(blocked.evidence_readback_permitted,true);}
+ // Independent review qualification may coexist with a terminal repair.
+ // The claimed event selects the exact scope, not the first event in a shift.
+ const reviewAction='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
+ const reviewEvent=randomUUID(),planId=randomUUID(),packetId=randomUUID();
+ const reviewEvidence={...e,event_id:reviewEvent,next_qualified_action:reviewAction};
+ const reviewGuard={...h,next_qualified_action:reviewAction,
+  unresolved_proof_gates:[...h.unresolved_proof_gates,terminalGate]};
+ const reviewContinuity={...c,
+  shared_continuity_guard:{...c.shared_continuity_guard,handoffs:[reviewGuard]},
+  governed_qualification_handoffs:[{...identity,qualifier_receipt_sha256:digest,next_qualified_action:reviewAction}],
+  event_resume_shadow:{...c.event_resume_shadow,shadow_ready_event_count:2,
+   ready_event_refs:[e,reviewEvidence]}};
+ const scope={schema:'reality-canonical-approved-review-scope-v1',
+  status:'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED',
+  owner_id:owner,shift_id:shiftId,parent_original_work_id:original,source_ref:source,
+  plan_id:planId,packet_id:packetId,owner_approval_receipt_sha256:digest,plan_fingerprint:digest,
+  source_head_sha:'a'.repeat(40),source_manifest_sha256:digest,acceptance_contract_sha256:digest,
+  continuity_root_id:root,continuity_head_sha256:head,revision:2,
+  effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',canonical_claim_required:true,
+  next_governed_action:'CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER',
+  read_only:true,execution_authorized:false,original_job_completed:false,production_changed:false};
+ const reviewRoute={source_ref:source,parent_original_work_id:original,plan_id:planId,
+  source_head_sha:scope.source_head_sha,source_manifest_sha256:digest,acceptance_contract_sha256:digest,
+  operation_category:'EXECUTION',authority_scope:'EXACT_ACCEPTED_READ_ONLY_REVIEW',
+  next_governed_action:reviewAction,next_registered_handler:reviewAction,
+  existing_owner_goal_acceptance_verified:true,owner_action_required:false,
+  child_execution_authorized:false,handler_dispatched:false,original_job_completed:false,
+  parent_source_phase:'BLOCKED',canonical_execution_handoff:scope};
+ const stagedActions={status:'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED',
+  read_only:true,action_dispatched:false,model_execution_authorized:false,
+  original_job_completed:false,routes:[reviewRoute]};
+ const input={continuity:reviewContinuity,shiftId,claimedEventId:reviewEvent,stagedActions};
+ const review=routeVerifiedFinalLoopResumeTrigger(input);
+ assert.equal(review.status,'FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY');
+ assert.equal(review.review_claim_route_ready,true);
+ assert.equal(review.canonical_claim_handoff,scope);
+ assert.equal(review.dispatch_permitted,false);
+ assert.equal(review.resume_event,null);
+ assert.equal(review.new_attempt_authorized,false);
+ assert.equal(review.repeat_prior_ci_dispatch_permitted,false);
+ assert.equal(review.execution_authorized_by_trigger,false);
+ for(const changes of [
+  {claimedEventId:null},{claimedEventId:randomUUID()},{claimedEventId:eventId},{stagedActions:null},
+  {stagedActions:{...stagedActions,routes:[reviewRoute,reviewRoute]}},
+  ...[{authority_scope:'SIGNED_MAINTENANCE_WARRANT'},{operation_category:'RECOVERY'},
+    {canonical_execution_handoff:{...scope,revision:3}},
+    {canonical_execution_handoff:{...scope,execution_authorized:true}},
+    {canonical_execution_handoff:{...scope,parent_original_work_id:'work:'+'a'.repeat(32)}}]
+   .map(d=>({stagedActions:{...stagedActions,routes:[{...reviewRoute,...d}]}}))
+ ]){
+  const blocked=routeVerifiedFinalLoopResumeTrigger({...input,...changes});
+  assert.notEqual(blocked.review_claim_route_ready,true);
+  assert.equal(blocked.dispatch_permitted,false);
+ }
  const completed=change({event_kind:'INDEPENDENT_FROZEN_CI_RECEIPT'});
  completed.shared_continuity_guard={...c.shared_continuity_guard,handoffs:[{...h,independent_internal_ci_verified:true}]};
  assert.equal(route(completed).status,'FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE');
