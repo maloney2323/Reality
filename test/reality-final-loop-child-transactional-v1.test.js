@@ -512,6 +512,33 @@ test('canonical claim, isolated computation and independent return preserve one 
  }});
  assert.equal(stale.status,'FINAL_LOOP_CHILD_CONTINUITY_DRIFT_NO_RECEIPT_REPLAY');
  assert.equal(verifies,2);assert.equal(modelCalls,4);
+ // A valid provider envelope and signed original can still carry an
+ // oversized advisory. Rejection must identify content, not imply
+ // authority drift or silently truncate, and must never write a receipt.
+ drift=false;verificationMode=false;
+ const originalAdvisory=await runIsolatedAdvisory({claim,mode:'PREPARE',shiftId:shift,
+  workerRunId:run,readCurrentChild:async()=>current});
+ const beforeWrites=prepares;
+ for(const size of [4001,8001]){
+  const oversized=body+' '.repeat(size-body.length-1)+'x';
+  const result=await advanceCanonicalFinalLoopChildReview({...base,
+   runIsolatedAdvisory:async()=>({...originalAdvisory,candidate:oversized})});
+  assert.equal(result.status,'FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE');
+  assert.equal(result.advisory_reconciliation_evidence.reason,'ADVISORY_CONTENT_OVER_CHARACTER_BUDGET');
+  assert.equal(result.advisory_reconciliation_evidence.candidate_chars,size);
+  assert.equal(result.advisory_reconciliation_evidence.candidate_sha256,digest(oversized));
+  assert.equal(result.advisory_reconciliation_evidence.child_work_id,child);
+  assert.equal(result.advisory_reconciliation_evidence.parent_original_work_id,parent);
+  assert.equal(result.advisory_reconciliation_evidence.accepted_artifact,false);
+  assert.equal(result.provider_effect_replay_authorized,false);
+  assert.equal(result.candidate,undefined);
+ }
+ const badAuthority=await advanceCanonicalFinalLoopChildReview({...base,
+  runIsolatedAdvisory:async()=>({...originalAdvisory,external_effect_performed:true})});
+ assert.equal(badAuthority.status,'FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT');
+ assert.equal(badAuthority.advisory_reconciliation_evidence.reason,'ADVISORY_AUTHORITY_FLAGS_INVALID');
+ assert.equal(badAuthority.provider_effect_replay_authorized,false);
+ assert.equal(prepares,beforeWrites);
 });
 
 test('canonical SQL reads and writes share the same continuity and signed release check',()=>{

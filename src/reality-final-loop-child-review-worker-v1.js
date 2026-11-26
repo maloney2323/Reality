@@ -374,16 +374,47 @@ async function recordClaimedFinalLoopChildAdvisory({
 }){
  if(advisory?.status!=='FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED')
   return advisory||no('FINAL_LOOP_CHILD_ADVISORY_UNAVAILABLE');
+ // Classify only trusted boundary observations. Neither a returned model
+ // string nor an absent receipt authorizes another provider invocation.
+ const rejected=(status,reason)=>no(status,{
+  child_work_id:c.child_work_id,parent_original_work_id:c.parent_original_work_id,
+  advisory_reconciliation_evidence:Object.freeze({
+   schema:'reality-final-loop-advisory-rejection-evidence-v1',
+   child_work_id:c.child_work_id,parent_original_work_id:c.parent_original_work_id,
+   worker_run_id:workerRunId,mode,scope_sha256:c.scope_sha256,
+   source_head_sha:c.source_head_sha,source_manifest_sha256:c.source_manifest_sha256,
+   reason,
+   // Do not publish model content or an untrusted identity. A bounded digest
+   // and length are observations, not an independently verified artifact.
+   candidate_chars:typeof advisory.candidate==='string'?advisory.candidate.length:null,
+   candidate_sha256:typeof advisory.candidate==='string'&&advisory.candidate.length<=100000?
+    digest(advisory.candidate):null,
+   response_id_sha256:typeof advisory.model_response_id==='string'&&
+    /^resp_[a-zA-Z0-9_-]{4,160}$/.test(advisory.model_response_id)?digest(advisory.model_response_id):null,
+   provider_evidence_sha256:HASH.test(advisory.provider_evidence_sha256||'')?advisory.provider_evidence_sha256:null,
+   accepted_artifact:false,independent_verification_committed:false,
+   provider_effect_replay_authorized:false
+  }),
+  next_governed_action:'RECONCILE_EXISTING_CHILD_ADVISORY_REJECTION_NO_REPLAY',
+  provider_effect_replay_authorized:false
+ });
  if(advisory.child_work_id!==c.child_work_id||
-    advisory.parent_original_work_id!==c.parent_original_work_id||
-    !/^resp_[a-zA-Z0-9_-]{4,160}$/.test(advisory.model_response_id||'')||
-    !HASH.test(advisory.provider_evidence_sha256||'')||
-    typeof advisory.candidate!=='string'||advisory.candidate.length>8000||
-    advisory.independent_verification_committed!==false||
+    advisory.parent_original_work_id!==c.parent_original_work_id)
+  return rejected('FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT','ORIGINAL_OR_CHILD_IDENTITY_MISMATCH');
+ if(!/^resp_[a-zA-Z0-9_-]{4,160}$/.test(advisory.model_response_id||''))
+  return rejected('FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT','PROVIDER_RESPONSE_ID_INVALID');
+ if(!HASH.test(advisory.provider_evidence_sha256||''))
+  return rejected('FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT','PROVIDER_EVIDENCE_DIGEST_INVALID');
+ if(advisory.independent_verification_committed!==false||
     advisory.original_job_completed!==false||advisory.production_changed!==false||
-    advisory.external_effect_performed!==false||
-    (mode==='VERIFY'&&advisory.model_response_id===c.model_response_id))
-  return no('FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT');
+    advisory.external_effect_performed!==false)
+  return rejected('FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT','ADVISORY_AUTHORITY_FLAGS_INVALID');
+ if(mode==='VERIFY'&&advisory.model_response_id===c.model_response_id)
+  return rejected('FINAL_LOOP_CHILD_ADVISORY_IDENTITY_OR_AUTHORITY_DRIFT','VERIFIER_REUSED_GENERATION_RESPONSE');
+ if(typeof advisory.candidate!=='string')
+  return rejected('FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE','ADVISORY_CONTENT_NOT_TEXT');
+ if(advisory.candidate.length>(mode==='PREPARE'?4000:8000))
+  return rejected('FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE','ADVISORY_CONTENT_OVER_CHARACTER_BUDGET');
  if(recheckAlignment!==null){
   try{if(!await recheckAlignment())deny('CONTINUITY_RETURN_DRIFT');}
   catch{return no('FINAL_LOOP_CHILD_CONTINUITY_DRIFT_NO_RECEIPT_REPLAY',{
@@ -393,12 +424,12 @@ async function recordClaimedFinalLoopChildAdvisory({
  const candidate=advisory.candidate;
  const paths=c.scope.files.map(f=>f.path);
  if(mode==='PREPARE'){
-  if(candidate.length<100||candidate.length>4000||
-    !paths.every(p=>candidate.includes(p))||
-    !/test|verification|check/i.test(candidate))
-   return no('FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE',{
-    child_work_id:c.child_work_id
-   });
+  if(candidate.length<100)
+   return rejected('FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE','ADVISORY_CONTENT_TOO_SHORT');
+  if(!paths.every(p=>candidate.includes(p)))
+   return rejected('FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE','REQUIRED_SOURCE_PATH_MISSING');
+  if(!/test|verification|check/i.test(candidate))
+   return rejected('FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE','REQUIRED_TEST_RECOMMENDATION_MISSING');
   try{
    const receipt=await call(db,'reality_prepare_final_loop_child_review_v1',{
     p_child_work_id:c.child_work_id,p_claim_id:c.claim_id,
@@ -429,13 +460,11 @@ async function recordClaimedFinalLoopChildAdvisory({
  let v;
  try{v=JSON.parse(candidate.replace(/^\x60\x60\x60(?:json)?\s*/,'')
   .replace(/\s*\x60\x60\x60$/,''));}
- catch{return no('FINAL_LOOP_CHILD_INDEPENDENT_VERIFIER_VERDICT_INVALID');}
+ catch{return rejected('FINAL_LOOP_CHILD_INDEPENDENT_VERIFIER_VERDICT_INVALID','VERIFIER_VERDICT_NOT_JSON');}
  if(v?.verdict!=='PASS'||!samePaths(v.supported_paths,paths)||
   !paths.every(p=>c.review_body.includes(p))||
   !/test|verification|check/i.test(c.review_body))
-  return no('FINAL_LOOP_CHILD_INDEPENDENT_VERIFIER_DID_NOT_PASS',{
-   child_work_id:c.child_work_id
-  });
+  return rejected('FINAL_LOOP_CHILD_INDEPENDENT_VERIFIER_DID_NOT_PASS','VERIFIER_VERDICT_OR_SOURCE_COVERAGE_NOT_PASSED');
  const evidence={
   schema:'reality-final-loop-independent-patch-review-v1',
   child_work_id:c.child_work_id,
