@@ -299,12 +299,13 @@ export default async function handler(req,res){
     {id:'verified_work',read:()=>readVerifiedOwnerCompletedWorkForChat({session,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'self_visibility',read:()=>readRealitySelfVisibilityForChat({session,message:text,priorTurns:recent,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'active_shift',read:()=>readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+    {id:'worker_observation',read:()=>readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'mission',read:()=>readFreshPersonalAccountMissionState({session}),
      validate:v=>v?.principal_id===session.user_id&&v.source==='OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY'&&v.execution_authorized===false&&v.state?.assistant_can_mutate_goals===false,fallback:null}
    ],{timeoutMs:1800}):{values:{},unavailable:wantsContext?['owner_context']:[],status:wantsContext?'OPTIONAL_EVIDENCE_PARTIALLY_UNAVAILABLE':'CONVERSATION_ONLY_CONTEXT'};
    const t=ctx.values.time_horizon;
    const shift=ctx.values.active_shift?.find(x=>x?.source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'&&x.owner_shift_authorization_recorded===true)||null;
-   const observations=[...(ctx.values.verified_work||[]),...(ctx.values.self_visibility||[]),...(ctx.values.active_shift||[])].slice(0,90);
+   const observations=[...(ctx.values.verified_work||[]),...(ctx.values.self_visibility||[]),...(ctx.values.active_shift||[]),...(ctx.values.worker_observation||[])].slice(0,90);
    const mission=ctx.values.mission?.state?.active_goal;
    const ownerUniverse=makeOwnerUniverseReadModel({observations});
    stage='READ_ONLY_MODEL_COGNITION';
