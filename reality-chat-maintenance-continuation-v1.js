@@ -1038,9 +1038,7 @@
  document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&signedIn()&&!authorizing)void refresh();
  });
- window.setInterval(()=>{
-  if(document.visibilityState==='visible'&&signedIn()&&!authorizing)void refresh();
- },120000);
+ window.addEventListener('reality:chat-work-opened',()=>{if(signedIn()&&!authorizing)void refresh()});
  // While the owner is watching, poll independently verified readback only.
  // No additional execution POST, new shift, model work or permission is minted.
  window.setInterval(()=>{
