@@ -569,7 +569,7 @@ test('actual signed transport connects the canonical claim to isolated model com
   VERCEL_DEPLOYMENT_ID:'dpl_isolatedtest1234',
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:isolatedDb.project};
  const now=()=>1234567890000;
- let nonce=null,begins=0,checks=0,modelCalls=0,recordedCompute,drift=false,dbProof=true,foreignGraph=false;
+ let nonce=null,begins=0,checks=0,modelCalls=0,recordedCompute,drift=false,dbProof=true,foreignGraph=false,rateLimited=false;
  const call=async(_db,name,args)=>{
   if(name==='reality_read_final_loop_governed_start_v1')return {status:dbProof?'GOVERNED_START_SCOPE_UNVERIFIED':'NOT_AUTHORIZED'};
   if(name==='reality_read_current_shift_execution_graph_v1'){
@@ -586,6 +586,9 @@ test('actual signed transport connects the canonical claim to isolated model com
  };
  const mockProvider=provider({id:'resp_transport1234',text:body},files,()=>modelCalls++);
  const fetchImpl=async(url,options)=>{
+  if(rateLimited&&url.startsWith('https://api.openai.com/')){
+   modelCalls++;return {ok:false,status:429};
+  }
   if(url.startsWith('https://api.github.com/')||url.startsWith('https://api.openai.com/'))return mockProvider(url,options);
   assert.equal(options.method,'POST');assert.equal(options.redirect,'error');
   assert.equal(options.headers.authorization,undefined);
@@ -647,8 +650,22 @@ test('actual signed transport connects the canonical claim to isolated model com
  assert.equal(computeAttempt.http,403);assert.equal(modelCalls,1);
  nonce=null;drift=true;
  const next=await connectExistingIsolatedChildTransport(base);
- await assert.rejects(()=>next.runIsolatedAdvisory(input),/ADVISORY_UNVERIFIED/);
+ await assert.rejects(()=>next.runIsolatedAdvisory(input),error=>{
+  assert.match(error.message,/ADVISORY_UNVERIFIED/);
+  assert.equal(error.child_failure_reason,'FINAL_LOOP_CHILD_GATEWAY_CURRENT_AUTHORITY_OR_SOURCE_REJECTED');
+  assert.equal(error.child_authority_read_attempts,2);return true;
+ });
  assert.equal(modelCalls,2); // inference may happen, but drift prevents any return/receipt
+ nonce=null;drift=false;rateLimited=true;
+ const limited=await connectExistingIsolatedChildTransport(base);
+ await assert.rejects(()=>limited.runIsolatedAdvisory(input),error=>{
+  assert.match(error.message,/ADVISORY_UNVERIFIED/);
+  assert.equal(error.child_failure_reason,'OPENAI_RATE_OR_QUOTA_LIMIT');
+  assert.equal(error.child_authority_read_attempts,1);return true;
+ });
+ assert.equal(modelCalls,3);
+ await assert.rejects(()=>limited.runIsolatedAdvisory(input),/NO_REPLAY/);
+ assert.equal(modelCalls,3);
 });
 
 test('transport is attached to existing signed worker and canonical service-only fence',()=>{

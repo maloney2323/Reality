@@ -21,6 +21,25 @@ const no=(status,more={})=>Object.freeze({
  external_effect_performed:false,parent_obligation_remains_open:true,
  parent_original_completed:false,production_changed:false,...more
 });
+// A provider diagnostic is evidence only, never permission to retry.
+const CHILD_FAILURE_REASONS=new Set([
+ 'FINAL_LOOP_CHILD_GOVERNED_EXECUTOR_DISABLED_OR_ISOLATED_DB_MISSING',
+ 'FINAL_LOOP_CHILD_SIGNED_CLAIM_SCOPE_UNVERIFIED',
+ 'FINAL_LOOP_CHILD_PROVIDER_SCOPE_OR_PATCH_UNVERIFIED_NO_EFFECT_RETRY',
+ 'FINAL_LOOP_CHILD_MODEL_KEY_UNAVAILABLE',
+ 'FINAL_LOOP_CHILD_COMPLETE_SOURCE_EXCEEDS_GOVERNED_REQUEST_BUDGET',
+ 'FINAL_LOOP_CHILD_GATEWAY_CURRENT_AUTHORITY_OR_SOURCE_REJECTED',
+ 'FINAL_LOOP_CHILD_MODEL_ADVISORY_NOT_PREPARED',
+ 'FINAL_LOOP_CHILD_MODEL_PROVIDER_REQUEST_UNVERIFIED',
+ 'FINAL_LOOP_CHILD_MODEL_PROVIDER_RESPONSE_INVALID',
+ 'FINAL_LOOP_CHILD_MODEL_RESPONSE_OR_INDEPENDENCE_INVALID',
+ 'OPENAI_REQUEST_OPTIONS_REJECTED','OPENAI_CREDENTIAL_OR_MODEL_ACCESS_REJECTED',
+ 'OPENAI_MODEL_OR_ENDPOINT_NOT_FOUND','OPENAI_RATE_OR_QUOTA_LIMIT',
+ 'OPENAI_PROVIDER_SERVER_FAILURE','OPENAI_RESPONSE_UNAVAILABLE',
+ 'FINAL_LOOP_CHILD_TRANSPORT_RESPONSE_UNAVAILABLE'
+]);
+export const boundedFinalLoopChildFailure=reason=>CHILD_FAILURE_REASONS.has(reason)?
+ reason:'FINAL_LOOP_CHILD_TRANSPORT_RESPONSE_UNAVAILABLE';
 const deny=s=>{throw Error('FINAL_LOOP_CHILD_WORKER_'+s)};
 const validScope=s=>s&&
  Number.isInteger(s.index)&&s.index>=0&&s.index<=62&&
@@ -271,7 +290,8 @@ export async function computeClaimedFinalLoopChildAdvisory({
  }
  if(modelResult.status!=='CURRENT_FINAL_LOOP_CHILD_ADVISORY_UNTRUSTED')
   return no('FINAL_LOOP_CHILD_MODEL_ADVISORY_NOT_PREPARED',{
-   child_work_id:c.child_work_id
+   child_work_id:c.child_work_id,
+   provider_failure_reason:boundedFinalLoopChildFailure(modelResult.reason)
   });
  return no('FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED',{
   child_work_id:c.child_work_id,parent_original_work_id:c.parent_original_work_id,
@@ -580,8 +600,12 @@ export async function advanceCanonicalFinalLoopChildReview({
   // canonical service; never accept a cached or model-generated readback.
   advisory=await runIsolatedAdvisory({claim:c,mode,shiftId:h.shift_id,workerRunId,
    readCurrentChild});
- }catch{return no('FINAL_LOOP_CANONICAL_ISOLATED_PROVIDER_UNCERTAIN_NO_REPLAY',{
-  child_work_id:c.child_work_id,parent_original_work_id:h.parent_original_work_id
+ }catch(error){return no('FINAL_LOOP_CANONICAL_ISOLATED_PROVIDER_UNCERTAIN_NO_REPLAY',{
+  child_work_id:c.child_work_id,parent_original_work_id:h.parent_original_work_id,
+  provider_failure_reason:boundedFinalLoopChildFailure(error?.child_failure_reason),
+  isolated_authority_read_attempts:[0,1,2].includes(error?.child_authority_read_attempts)?
+   error.child_authority_read_attempts:null,
+  provider_effect_replay_authorized:false
  });}
  // An adapter failure is never an outcome or a new authority decision.
  if(advisory?.status!=='FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED')

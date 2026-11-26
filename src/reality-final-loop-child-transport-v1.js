@@ -4,7 +4,8 @@
 // existing canonical claim, original and run. Only canonical DB can fence it.
 import {createHmac,timingSafeEqual,randomUUID} from 'node:crypto';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
-import {computeClaimedFinalLoopChildAdvisory} from './reality-final-loop-child-review-worker-v1.js';
+import {computeClaimedFinalLoopChildAdvisory,boundedFinalLoopChildFailure}
+ from './reality-final-loop-child-review-worker-v1.js';
 const PATH='/api/reality/governed-final-loop-child-transport';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{40}$/;
@@ -166,6 +167,17 @@ export async function connectExistingIsolatedChildTransport({db,handoff,env=proc
    const p=request(c,'COMPUTE',now,{claim,mode,shift_id:shiftId,worker_run_id:workerRunId,handoff});
    if(!isBound(p))throw Error('REVIEW_TRANSPORT_CLAIM_SCOPE');
    const x=await exchange(c,'isolated',p,fetchImpl,48000);
+   // Signed negative evidence never clears the invocation fence.
+   if(x.status==='FINAL_LOOP_ISOLATED_CHILD_ADVISORY_UNVERIFIED_NO_REPLAY'&&
+      x.project===c.isolatedProject&&x.child_work_id===claim.child_work_id&&
+      x.parent_original_work_id===claim.parent_original_work_id&&
+      x.provider_effect_replay_authorized===false){
+    const error=Error('REVIEW_TRANSPORT_ADVISORY_UNVERIFIED');
+    error.child_failure_reason=boundedFinalLoopChildFailure(x.provider_failure_reason);
+    error.child_authority_read_attempts=[0,1,2].includes(x.isolated_authority_read_attempts)?
+     x.isolated_authority_read_attempts:null;
+    throw error;
+   }
    if(x.status!=='FINAL_LOOP_ISOLATED_CHILD_ADVISORY_RETURNED'||
       x.project!==c.isolatedProject||x.advisory?.child_work_id!==claim.child_work_id||
       x.advisory?.parent_original_work_id!==claim.parent_original_work_id||
@@ -221,7 +233,13 @@ export async function handleExistingChildTransport({db,body,env=process.env,
    }
   });
   if(reads!==2||advisory?.status!=='FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED')
-   return reply('FINAL_LOOP_ISOLATED_CHILD_ADVISORY_UNVERIFIED_NO_REPLAY',{project:db.project});
+   return reply('FINAL_LOOP_ISOLATED_CHILD_ADVISORY_UNVERIFIED_NO_REPLAY',{
+    project:db.project,child_work_id:p.claim.child_work_id,
+    parent_original_work_id:p.claim.parent_original_work_id,
+    provider_failure_reason:boundedFinalLoopChildFailure(advisory?.provider_failure_reason??advisory?.status),
+    isolated_authority_read_attempts:[0,1,2].includes(reads)?reads:null,
+    provider_effect_replay_authorized:false
+   });
   return reply('FINAL_LOOP_ISOLATED_CHILD_ADVISORY_RETURNED',{project:db.project,advisory});
  }catch{return {http:403,body:safe('FINAL_LOOP_CHILD_TRANSPORT_SCOPE_OR_EFFECT_UNVERIFIED_NO_REPLAY')};}
 }
