@@ -2936,6 +2936,8 @@ export default async function handler(req,res){
   };
   if(canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&
      strictContinuityCycle&&hasReview&&
+     finalLoopGovernedResumeTrigger?.status==='FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED'&&
+     finalLoopGovernedResumeTrigger.reason==='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'&&
      wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
    try{
