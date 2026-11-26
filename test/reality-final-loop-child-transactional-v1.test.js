@@ -551,18 +551,22 @@ test('actual signed transport connects the canonical claim to isolated model com
  const isolatedDb={strictSecrets:true,project:'isolatedtestprojectx'};
  const common={...env,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'true',
   REALITY_FINAL_LOOP_REVIEW_CANONICAL_HOST:'canonical-test-deploy.vercel.app',
+  REALITY_SIGNED_WORKER_STABLE_ALIAS:'canonical-test-deploy.vercel.app',
+  REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID:'dpl_isolatedtest1234',
   REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST:'isolated-test-deploy.vercel.app',
   REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:canonicalDb.project,
   REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:isolatedDb.project,
   REALITY_FINAL_LOOP_REVIEW_TRANSPORT_KEY:'b'.repeat(64),
   REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false',VERCEL_GIT_COMMIT_SHA:'f'.repeat(40)};
  const canonicalEnv={...common,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'CANONICAL',
-  VERCEL_URL:common.REALITY_FINAL_LOOP_REVIEW_CANONICAL_HOST,
+  VERCEL_URL:'canonical-immutable-build.vercel.app',
+  VERCEL_DEPLOYMENT_ID:'dpl_canonicaltest1234',
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:canonicalDb.project,
   REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
   REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false'};
  const isolatedEnv={...common,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'ISOLATED',
   VERCEL_URL:common.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST,
+  VERCEL_DEPLOYMENT_ID:'dpl_isolatedtest1234',
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:isolatedDb.project};
  const now=()=>1234567890000;
  let nonce=null,begins=0,checks=0,modelCalls=0,recordedCompute,drift=false;
@@ -581,7 +585,7 @@ test('actual signed transport connects the canonical claim to isolated model com
   assert.equal(options.headers.authorization,undefined);
   assert.equal(options.headers.apikey,undefined);
   const req=JSON.parse(options.body);const p=JSON.parse(req.payload);
-  const canonical=url==='https://'+canonicalEnv.VERCEL_URL+'/api/reality/governed-final-loop-child-transport';
+  const canonical=url==='https://'+canonicalEnv.REALITY_SIGNED_WORKER_STABLE_ALIAS+'/api/reality/governed-final-loop-child-transport';
   assert.ok(canonical||url==='https://'+isolatedEnv.VERCEL_URL+'/api/reality/governed-final-loop-child-transport');
   if(p.action==='COMPUTE')recordedCompute=req;
   const r=await handleExistingChildTransport({db:canonical?canonicalDb:isolatedDb,body:req,
@@ -591,8 +595,13 @@ test('actual signed transport connects the canonical claim to isolated model com
  const base={db:canonicalDb,handoff:h,env:canonicalEnv,fetchImpl,now};
  const missing=await connectExistingIsolatedChildTransport({...base,env:{...canonicalEnv,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'false'}});
  assert.equal(missing.ready,undefined);assert.equal(begins,0);
+ const wrongPeer=await connectExistingIsolatedChildTransport({...base,env:{...canonicalEnv,
+  REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID:'dpl_foreignpeer1234'}});
+ assert.equal(wrongPeer.ready,undefined);assert.equal(begins,0);
  const connected=await connectExistingIsolatedChildTransport(base);
- assert.equal(connected.ready,true);assert.equal(begins,0);assert.equal(modelCalls,0);
+ assert.equal(connected.ready,true);
+ assert.equal(connected.isolated_deployment_id,isolatedEnv.VERCEL_DEPLOYMENT_ID);
+ assert.equal(connected.canonical_deployment_id,canonicalEnv.VERCEL_DEPLOYMENT_ID);assert.equal(begins,0);assert.equal(modelCalls,0);
  const input={claim,mode:'PREPARE',shiftId:shift,workerRunId:run};
  const result=await connected.runIsolatedAdvisory(input);
  assert.equal(result.status,'FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED');
