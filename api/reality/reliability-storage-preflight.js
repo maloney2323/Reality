@@ -106,9 +106,54 @@ async function isolatedCredentialPreflight(req,res,env=process.env,request=fetch
   }catch{return report('ISOLATED_SERVICE_READ_UNAVAILABLE');}
 }
 
+// Same read-only service-role proof on the disabled canonical worker.
+// The configured project is never replaced with another project for this test.
+async function canonicalCredentialPreflight(req,res,env=process.env){
+  const report=(status,extra={})=>res.status(200).json({
+    ok:true,status,canonical_project:SHARED_PROJECT,
+    credential_compatibility_verified:status==='CANONICAL_SERVICE_READ_VERIFIED',
+    execution_authorized:false,worker_started:false,model_calls:0,writes:0,...extra
+  });
+  if(Object.keys(req.query||{}).length||
+    env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+    env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE!=='CANONICAL'||
+    env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='false'||
+    env.REALITY_CONTINUOUS_RELIABILITY_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='false'||
+    env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF!==SHARED_PROJECT||
+    env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF!==ISOLATED_PROJECT||
+    env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='false')
+    return report('CANONICAL_PREFLIGHT_SCOPE_REJECTED');
+  try{
+    const db=shiftDatabase({...env,REALITY_CONTINUOUS_RELIABILITY_ENABLED:'true'});
+    if(db.project!==SHARED_PROJECT||env.REALITY_PERSONAL_CHAT_SUPABASE_URL!==db.url||
+       env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF!==db.project)
+      return report('CANONICAL_WORKER_BINDING_REJECTED');
+    const missing='00000000-0000-0000-0000-000000000000';
+    const proof=await shiftRpc(db,'reality_read_final_loop_governed_start_v1',{
+      p_owner_id:missing,p_shift_id:missing,p_plan_fingerprint:'sha256:'+'0'.repeat(64)
+    });
+    if(proof?.status!=='GOVERNED_START_SCOPE_UNVERIFIED')
+      return report('CANONICAL_WORKER_RPC_READBACK_UNVERIFIED');
+    return report('CANONICAL_SERVICE_READ_VERIFIED',{
+      worker_database_binding_verified:true,service_role_rpc_verified:true,unknown_warrant_rejected:true
+    });
+  }catch(e){
+    const m=String(e?.message||'');
+    return report('CANONICAL_SERVICE_READ_UNVERIFIED',{
+      reason:/401|403/.test(m)?'CREDENTIAL_NOT_AUTHORIZED':
+        /CREDENTIAL|BOUNDARY|PROJECT/.test(m)?'CREDENTIAL_OR_SCOPE_UNAVAILABLE':'SERVICE_READ_FAILED'
+    });
+  }
+}
+
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({ok:false,code:'METHOD_NOT_ALLOWED'});
+  if(process.env.VERCEL_ENV==='preview'&&process.env.VERCEL_GIT_COMMIT_REF===FINAL_LOOP_BRANCH&&
+     process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE==='CANONICAL')
+    return canonicalCredentialPreflight(req,res);
   if(process.env.VERCEL_ENV==='preview' && [FINAL_LOOP_BRANCH,ISOLATED_TRANSPORT_BRANCH].includes(process.env.VERCEL_GIT_COMMIT_REF))
     return isolatedCredentialPreflight(req,res);
   if(process.env.VERCEL_ENV!=='preview' || process.env.VERCEL_GIT_COMMIT_REF!==ALLOWED_BRANCH)
