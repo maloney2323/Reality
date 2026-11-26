@@ -32,7 +32,11 @@ export default async function handler(req,res){
  if(req.method!=='POST')
   return res.status(405).setHeader('Allow','POST').json({
    status:'GOVERNED_RELEASE_CONTROL_POST_ONLY'});
- const env=process.env;
+ // The target SHA/branch remain explicitly pinned. For a transport release
+ // only, the current provider deployment ID is authoritative; a deploy
+ // cannot contain its own as-yet-unassigned ID at build time.
+ const env=process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'?
+  {...process.env,REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID:process.env.VERCEL_DEPLOYMENT_ID}:process.env;
  if(env.VERCEL_ENV!=='preview'||
    !authorizedReleaseOperator(req.headers?.authorization,
     env.REALITY_RELEASE_CONTROL_OPERATOR_TOKEN))
