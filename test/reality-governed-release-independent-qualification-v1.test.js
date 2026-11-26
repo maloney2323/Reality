@@ -125,6 +125,7 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
   plan_fingerprint:'sha256:'+'1'.repeat(64),continuity_head_sha256:'sha256:'+'2'.repeat(64),qualifier_receipt_sha256:'sha256:'+'3'.repeat(64),
   original_work_id:'work:'+'4'.repeat(32),source_ref:'https://github.com/maloney2323/Reality/pull/307'};
  const calls=[];let gatewayPass=true;let branchStatus='FUNCTIONS_DEPLOYED';
+ let peerReadiness=null;
  const transportCap='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
  const fetchImpl=async url=>{
   calls.push(String(url));
@@ -134,6 +135,9 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
    path:'.github/workflows/reality-final-loop-engine-v1-ci.yml',status:'completed',conclusion:'success',event:'push'};
   else if(String(url).endsWith('/2005'))data={id:2005,head_sha:sha,head_branch:branch,name:'Reality — Isolated governed OpenAI gateway proof',
    path:gatewayPath,status:'completed',conclusion:gatewayPass?'success':'failure',event:'push'};
+  else if(String(url).includes('dpl_peer12345678')&&peerReadiness!==null)
+   data={id:'dpl_peer12345678',url:'isolated-pinned-test.vercel.app',project:{id:env.REALITY_VERIFIED_VERCEL_PROJECT_ID},target:null,
+    meta:{githubCommitSha:sha,githubCommitRef:'feature/isolated-peer',githubOrg:'org',githubRepo:'repo'},...peerReadiness};
   else data={id:env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID,project:{id:env.REALITY_VERIFIED_VERCEL_PROJECT_ID},state:'READY',target:null,
    meta:{githubCommitSha:sha,githubCommitRef:branch,githubOrg:'org',githubRepo:'repo'}};
   return {ok:true,json:async()=>data};
@@ -160,6 +164,16 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  const peerEnv={...transportEnv,REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID:'dpl_peer12345678',
   REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST:'isolated-pinned-test.vercel.app'};
  assert.equal((await transportRun({env:peerEnv})).status,'ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
+ for(const readiness of [{},{readyState:'BUILDING'},{readyState:'READY',state:'ERROR'}]){
+  peerReadiness=readiness;
+  const blocked=await transportRun({env:peerEnv});
+  assert.equal(blocked.status,'ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
+  assert.deepEqual(blocked.provider_failure.mismatched_fields,['ready_state']);
+ }
+ // A ready exact peer advances only to the still-required signed transport proof.
+ peerReadiness={readyState:'READY'};
+ assert.equal((await transportRun({env:peerEnv})).status,'INDEPENDENT_REVIEW_TRANSPORT_PROBE_UNVERIFIED');
+ peerReadiness=null;
  branchStatus='MIGRATIONS_FAILED';
  assert.equal((await run()).status,'ISOLATED_SUPABASE_DEVELOPMENT_BRANCH_NOT_VERIFIED');
  assert.equal((await transportRun()).status,'ISOLATED_REVIEW_DEPLOYMENT_NOT_PINNED');
@@ -182,4 +196,25 @@ test('qualification reports rejected provider access without treating it as proo
  assert.equal(r.owner_approval_granted,false);
  assert.equal(r.release_activated,false);
  assert.equal(JSON.stringify(r).includes('SECRET'),false);
+});
+
+test('candidate readiness is fail closed and modern/legacy proofs are identical',async()=>{
+ const deploy={id:'dpl_verified1234',project:{id:'prj_verified1234'},target:null,
+  meta:{githubCommitSha:sha,githubCommitRef:branch,githubOrg:'org',githubRepo:'repo'}};
+ const good=await fixture({deploy:{...deploy,readyState:'READY'}}).result;
+ assert.equal(good.status,'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY');
+ for(const readiness of [{state:'READY'},{state:'READY',readyState:'READY'}]){
+  const same=await fixture({deploy:{...deploy,...readiness}}).result;
+  assert.equal(same.provider_release_proof_sha256,good.provider_release_proof_sha256);
+ }
+ for(const readiness of [{},{readyState:'BUILDING'},{readyState:'ERROR'},{readyState:'READY',state:'ERROR'}]){
+  const blocked=await fixture({deploy:{...deploy,...readiness}}).result;
+  assert.equal(blocked.status,'VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH');
+  assert.deepEqual(blocked.provider_failure.mismatched_fields,['ready_state']);
+  assert.equal(blocked.release_activated,false);
+ }
+ const production=await fixture({deploy:{...deploy,readyState:'READY',target:'production'}}).result;
+ assert.deepEqual(production.provider_failure.mismatched_fields,['preview_target']);
+ const foreign=await fixture({deploy:{...deploy,readyState:'READY',project:{id:'prj_other'}}}).result;
+ assert.deepEqual(foreign.provider_failure.mismatched_fields,['project_id']);
 });
