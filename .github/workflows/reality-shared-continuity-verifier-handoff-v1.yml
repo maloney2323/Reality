@@ -111,7 +111,13 @@ jobs:
       - name: Execute genuine historical RED and corrected GREEN for source-bound technical blocker
         env:
           GITHUB_ACTIONS: "true"
+          REALITY_FROZEN_PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+            test "$(git rev-parse HEAD^2)" = "$REALITY_FROZEN_PR_HEAD"
+            git checkout --detach "$REALITY_FROZEN_PR_HEAD"
+          fi
           node --check scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs
           node scripts/reality-final-loop-technical-frozen-case-ci-v1.mjs reality-final-loop-recovery-case-specs/pr307-uncertain-provider-technical-recovery-v1.json
       - name: Preserve case-specific RED and GREEN proof as CI artifact only
