@@ -188,8 +188,9 @@ if(typeof setTimeout==='function')setTimeout(()=>{
 // Page visibility and route scope bound the read-only polling load; this
 // does not stop a server-side authorized shift or independent workers.
 if(typeof setInterval==='function')setInterval(()=>{
- if(shiftVisibleRoute()&&onlineVisible())void refresh();
+ if(window.location.pathname!=='/chat'&&shiftVisibleRoute()&&onlineVisible())void refresh();
 },60000);
+window.addEventListener('reality:chat-work-opened',()=>{if(onlineVisible())void refresh()});
 if(typeof MutationObserver==='function')
  new MutationObserver(()=>{
   if(ready.style.display==='block'&&shiftVisibleRoute()&&onlineVisible())
