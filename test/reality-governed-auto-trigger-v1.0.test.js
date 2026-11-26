@@ -196,11 +196,11 @@ test('Final Loop auto trigger rejects ambiguous, stale or unauthorized proof eve
   ...[{authority_scope:'SIGNED_MAINTENANCE_WARRANT'},{operation_category:'RECOVERY'},
     {canonical_execution_handoff:{...scope,revision:3}},
     {canonical_execution_handoff:{...scope,execution_authorized:true}},
-    {canonical_execution_handoff:{...scope,parent_original_work_id:'work:'+'a'.repeat(32)}}]
+    {canonical_execution_handoff:{...scope,parent_original_work_id:'work:'+'f'.repeat(32)}}]
    .map(d=>({stagedActions:{...stagedActions,routes:[{...reviewRoute,...d}]}}))
  ]){
   const blocked=routeVerifiedFinalLoopResumeTrigger({...input,...changes});
-  assert.notEqual(blocked.review_claim_route_ready,true);
+  assert.notEqual(blocked.review_claim_route_ready,true,JSON.stringify(changes));
   assert.equal(blocked.dispatch_permitted,false);
  }
  const completed=change({event_kind:'INDEPENDENT_FROZEN_CI_RECEIPT'});
