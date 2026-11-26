@@ -519,7 +519,37 @@ BEGIN
         AND q.reconciliation_snapshot->'recovery_terminal_history'->>'replay_permitted'='false'
         AND q.reconciliation_snapshot->'recovery_terminal_history'->>'new_attempt_authorized'='false'
         AND q.reconciliation_snapshot->'recovery_terminal_history'->>'last_attempt_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$'
-        AND q.reconciliation_snapshot->'recovery_terminal_history'->>'last_decision_receipt_sha256' ~ '^sha256:[a-f0-9]{64}
+        AND q.reconciliation_snapshot->'recovery_terminal_history'->>'last_decision_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$')
+       -- A different, independently accepted review effect may qualify
+       -- even when its maintenance strategy is terminal. Do not transport
+       -- it through an unqualified maintenance/packet-only release.
+       OR (ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+        AND q.reconciliation_snapshot->>'review_scope_qualified'='true'
+        AND q.reconciliation_snapshot->>'review_authority_scope'='EXACT_ACCEPTED_READ_ONLY_REVIEW'
+        AND q.reconciliation_snapshot->>'exact_goal_event_verified'='true'
+        AND q.reconciliation_snapshot->>'exact_acceptance_approval_verified'='true'
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'effect_type'='READ_ONLY_INTERNAL_PR_REVIEW'
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'owner_id'=ev.owner_id::text
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'shift_id'=ev.shift_id::text
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'parent_original_work_id'=ev.original_work_id
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'source_ref'=ev.source_ref
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'plan_fingerprint'=w.plan_fingerprint
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'execution_authorized'='false'
+        AND q.reconciliation_snapshot->'accepted_review_scope'->>'owner_approval_receipt_sha256' ~ '^sha256:[a-f0-9]{64}$'
+        AND pg_catalog.to_regprocedure('public.reality_claim_final_loop_child_review_v1(uuid,uuid,jsonb)') IS NOT NULL
+        AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
+         WHERE a.claim_id=release_claim AND a.owner_id=ev.owner_id AND a.shift_id=ev.shift_id
+          AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+          AND a.runtime_scope->>'target_environment'='CANONICAL_BENCHMARK_PREVIEW'
+          AND a.runtime_scope->>'original_work_id'=ev.original_work_id
+          AND a.runtime_scope->>'source_ref'=ev.source_ref
+          AND a.runtime_scope->>'plan_fingerprint'=w.plan_fingerprint
+          AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
+          AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+          AND a.runtime_scope->>'child_execution_enabled'='false'
+          AND a.runtime_scope->>'parent_delivery_enabled'='false'
+          AND a.runtime_scope->>'production_changed'='false'
+          AND a.independent_isolation_proof_sha256 ~ '^sha256:[a-f0-9]{64}$')))
       AND q.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(
         pg_catalog.convert_to(q.reconciliation_snapshot::text,'UTF8')),'hex')
     )) OR (ev.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' AND EXISTS(
