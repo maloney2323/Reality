@@ -338,4 +338,4 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()}
 document.addEventListener('click',e=>{
  if(e.target?.closest?.('#realityChatTabProof,#realityChatPanelProof,#chatNavLink'))refresh();
 });
-setInterval(()=>{if(!document.hidden)refresh()},30000);
+window.addEventListener('reality:chat-work-opened',()=>{if(!document.hidden)refresh()});
