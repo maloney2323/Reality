@@ -10,7 +10,8 @@ DECLARE s record; p jsonb; g jsonb; o jsonb; e jsonb; tail record;
  provenance jsonb; stamp timestamptz; iso text; content_hash text; lineage text;
  checkpoint jsonb; checkpoint_hash text; observation_hash text;
  sub_count integer; rebound integer; old_events jsonb; old_count integer;
- observed_count integer; after_p jsonb; after_g jsonb;
+ observed_count integer; stale_count integer; after_p jsonb; after_g jsonb;
+ current_event_id uuid; qualifier jsonb; qualifier_digest text;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_SPINE_RETURN_SERVICE_ONLY';END IF;
  IF p_shift_id IS NULL OR p_worker_run_id IS NULL
@@ -73,16 +74,50 @@ BEGIN
   AND u.payload->>'observation_sha256'=observation_hash
   AND u.payload->>'original_work_id'=p_original_work_id)
  THEN RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_OBSERVATIONS_ALREADY_RETURNED_NO_REPLAY');END IF;
- -- Do not strand unrelated obligations, queued/unclaimed workers, or
- -- unresolved older signal kinds. Those require their own reconciliation.
- -- No events are deleted or rearmed by this evidence-only return.
+ -- The current signed event may carry an evidence-only return BEFORE
+ -- consuming a child claim. It cannot also authorize a model invocation.
+ SELECT v.event_id INTO current_event_id FROM reality_internal.final_loop_resume_events_v1 v
+ WHERE v.shift_id=p_shift_id AND v.owner_id=s.owner_id AND v.original_work_id=p_original_work_id
+  AND v.governed_wake_worker_run_id=p_worker_run_id AND v.state='SHADOW_PENDING'
+  AND v.continuity_head_sha256=p_expected_head_sha256 AND v.continuity_revision=p_expected_revision
+  AND v.signal_kind='QUALIFIER_PROOF_CHANGED'
+  AND v.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND v.source_receipt_sha256=o->>'qualifier_receipt_sha256'
+  AND v.governed_wake_queued_at IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 c
+    WHERE c.claimant_worker_run_id=p_worker_run_id OR c.canonical_verify_invocation_run_id=p_worker_run_id)
+ ORDER BY v.created_at DESC LIMIT 1;
+ IF NOT FOUND THEN RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_RETURN_PRECLAIM_EVENT_REQUIRED');END IF;
+ qualifier_digest:=o->>'qualifier_receipt_sha256';
+ SELECT q.reconciliation_snapshot INTO qualifier
+ FROM reality_internal.owner_continuity_qualification_routes_v1 q
+ WHERE q.owner_id=s.owner_id AND q.intake_family='SIGNED_SHIFT_SOURCE'
+  AND q.source_ref=o->>'source_ref' AND q.reconciliation_receipt_sha256=qualifier_digest
+  AND q.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(q.reconciliation_snapshot::text,'UTF8')),'hex')
+  AND q.reconciliation_snapshot->>'shift_id'=p_shift_id::text
+  AND q.reconciliation_snapshot->>'original_candidate_work_id'=p_original_work_id
+  AND q.reconciliation_checked_at>=pg_catalog.clock_timestamp()-interval '10 minutes'
+ ORDER BY q.reconciliation_checked_at DESC LIMIT 1;
+ IF NOT FOUND THEN RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_RETURN_FRESH_QUALIFIER_REQUIRED');END IF;
+ -- An old unissued signal may be marked stale ONLY if its obligations
+ -- survive explicitly in the newer verified qualifier. Never erase it,
+ -- treat it as completed, or discard a dispatched/unconfirmed request.
  IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 v
   WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING'
-   AND (v.original_work_id<>p_original_work_id
-    OR v.governed_wake_worker_run_id IS NULL
-    OR v.governed_wake_worker_run_id=p_worker_run_id
-    OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x
-      WHERE x.value->>'event_id'=v.event_id::text)))
+   AND (v.owner_id<>s.owner_id OR v.original_work_id<>p_original_work_id
+    OR v.source_ref IS DISTINCT FROM o->>'source_ref'
+    OR v.continuity_head_sha256<>p_expected_head_sha256 OR v.continuity_revision<>p_expected_revision
+    OR NOT (v.event_id=current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x
+      WHERE x.value->>'event_id'=v.event_id::text)
+      OR (v.signal_kind='QUALIFIER_PROOF_CHANGED' AND v.governed_wake_worker_run_id IS NULL
+       AND v.governed_wake_request_id IS NULL AND v.governed_wake_queued_at IS NULL
+       AND v.source_receipt_sha256<>qualifier_digest
+       AND ((v.signal_next_action='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC'
+        AND qualifier->'unsatisfied_gates' ? 'CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')
+        OR (v.signal_next_action='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'
+        AND qualifier->'unsatisfied_gates' ? 'TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED'
+        AND qualifier->'recovery_terminal_history'->>'remaining_attempts'='0'
+        AND qualifier->'recovery_terminal_history'->>'replay_permitted'='false'))))))
  THEN RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_RETURN_PENDING_EVENTS_REQUIRE_CAUSAL_RECONCILIATION',
   'canonical_return_committed',false,'replay_authorized',false);END IF;
  SELECT u.event_id,u.worldline_id,u.lineage_hash INTO tail FROM public.universe_events u
@@ -98,7 +133,16 @@ BEGIN
     OR sub.continuity_revision<>p_expected_revision))
  THEN RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_RETURN_SUBSCRIPTION_RECONCILIATION_REQUIRED');END IF;
  SELECT count(*) INTO sub_count FROM reality_internal.final_loop_resume_conditions_v1 WHERE shift_id=p_shift_id;
- SELECT count(*),coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(v) ORDER BY v.event_id),'[]'::jsonb)
+ SELECT count(*),coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'event_id',v.event_id,'signal_kind',v.signal_kind,'signal_next_action',v.signal_next_action,
+  'source_receipt_sha256',v.source_receipt_sha256,'previous_receipt_sha256',v.previous_receipt_sha256,
+  'event_causality_sha256',v.event_causality_sha256,'continuity_head_sha256',v.continuity_head_sha256,
+  'continuity_revision',v.continuity_revision,'state',v.state,
+  'worker_run_id',v.governed_wake_worker_run_id,
+  'disposition',CASE WHEN v.event_id=current_event_id THEN 'EVIDENCE_ONLY_RETURN'
+   WHEN v.governed_wake_worker_run_id IS NULL THEN 'STALE_SIGNAL_OBLIGATION_PRESERVED'
+   ELSE 'HISTORICAL_INVOCATION_OBSERVED' END
+ ) ORDER BY v.event_id),'[]'::jsonb)
  INTO old_count,old_events FROM reality_internal.final_loop_resume_events_v1 v
  WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING';
  stamp:=pg_catalog.clock_timestamp();iso:=pg_catalog.to_char(stamp AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
@@ -106,7 +150,9 @@ BEGIN
  payload:=pg_catalog.jsonb_build_object('schema','reality-final-loop-invocation-observation-return-v1',
   'owner_id',s.owner_id,'shift_id',p_shift_id,'original_work_id',p_original_work_id,
   'source_ref',o->>'source_ref','observation_sha256',observation_hash,'invocation_observations',e->'observations',
-  'prior_resume_events',old_events,'provider_outcome_verified',false,'original_job_completed',false,
+  'prior_resume_events',old_events,'unresolved_proof_gates',qualifier->'unsatisfied_gates',
+  'terminal_recovery_history',qualifier->'recovery_terminal_history',
+  'provider_outcome_verified',false,'original_job_completed',false,
   'execution_authorized',false,'replay_authorized',false,'production_changed',false);
  refs:=pg_catalog.jsonb_build_array(observation_hash,o->>'qualifier_receipt_sha256');
  provenance:=pg_catalog.jsonb_build_object('source','SIGNED_CANONICAL_INVOCATION_READBACK',
@@ -141,11 +187,21 @@ BEGIN
   stamp,stamp,'OBSERVED',payload,refs,provenance,content_hash,lineage);
  UPDATE reality_internal.final_loop_resume_events_v1 v SET state='SHADOW_OBSERVED'
  WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING'
-  AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x WHERE x.value->>'event_id'=v.event_id::text);
+  AND (v.event_id=current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x WHERE x.value->>'event_id'=v.event_id::text));
  GET DIAGNOSTICS observed_count=ROW_COUNT;
- IF observed_count<>old_count THEN RAISE EXCEPTION 'FINAL_LOOP_SPINE_RETURN_EVENT_CAS_FAILED';END IF;
+ UPDATE reality_internal.final_loop_resume_events_v1 v SET state='SHADOW_STALE'
+ WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING'
+  AND v.governed_wake_worker_run_id IS NULL AND v.governed_wake_request_id IS NULL
+  AND v.governed_wake_queued_at IS NULL
+  AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(old_events) x
+   WHERE x.value->>'event_id'=v.event_id::text AND x.value->>'disposition'='STALE_SIGNAL_OBLIGATION_PRESERVED');
+ GET DIAGNOSTICS stale_count=ROW_COUNT;
+ IF observed_count+stale_count<>old_count THEN RAISE EXCEPTION 'FINAL_LOOP_SPINE_RETURN_EVENT_CAS_FAILED';END IF;
  UPDATE reality_internal.final_loop_resume_conditions_v1 SET continuity_head_sha256='sha256:'||lineage,
-  continuity_revision=p_expected_revision+1,state='SUSPENDED',updated_at=stamp
+  continuity_revision=p_expected_revision+1,state='SUSPENDED',updated_at=stamp,
+  subscribed_receipt_sha256=CASE WHEN condition_kind='QUALIFIER_PROOF_CHANGED' THEN qualifier_digest ELSE subscribed_receipt_sha256 END,
+  next_qualified_action=CASE WHEN condition_kind='QUALIFIER_PROOF_CHANGED' THEN qualifier->>'next_action' ELSE next_qualified_action END,
+  unresolved_proof_gates=qualifier->'unsatisfied_gates'
  WHERE shift_id=p_shift_id AND owner_id=s.owner_id AND continuity_head_sha256=p_expected_head_sha256
   AND continuity_revision=p_expected_revision;
  GET DIAGNOSTICS rebound=ROW_COUNT;
@@ -160,7 +216,7 @@ BEGIN
  RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',
   'canonical_return_committed',true,'event_id',event,'checkpoint_receipt_id',receipt,
   'observation_sha256',observation_hash,'continuity_head_sha256','sha256:'||lineage,
-  'revision',p_expected_revision+1,'rebound_subscriptions',rebound,'observed_events',observed_count,
+  'revision',p_expected_revision+1,'rebound_subscriptions',rebound,'observed_events',observed_count,'stale_signals_preserved',stale_count,
   'execution_authorized',false,'replay_authorized',false,'original_job_completed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint) FROM PUBLIC,anon,authenticated;

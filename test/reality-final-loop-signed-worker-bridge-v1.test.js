@@ -754,3 +754,16 @@ test('effect-capable Final Loop cannot bypass shared Continuity or reuse stale i
   assert.match(worker.slice(at-100,at),/await requireFreshFinalLoopContinuity\(\);\s*try\{\s*$/);
  }
 });
+
+test('canonical observation return preserves event lineage and never replays stale work',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-execution-spine-return-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/FINAL_LOOP_SPINE_RETURN_PRECLAIM_EVENT_REQUIRED/);
+ assert.match(sql,/v\.event_id=current_event_id/);
+ assert.match(sql,/STALE_SIGNAL_OBLIGATION_PRESERVED/);
+ assert.match(sql,/v\.governed_wake_request_id IS NULL AND v\.governed_wake_queued_at IS NULL/);
+ assert.match(sql,/TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED/);
+ assert.match(sql,/CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED/);
+ assert.match(sql,/SHADOW_STALE/);
+ assert.match(sql,/FINAL_LOOP_SPINE_RETURN_EVENT_CAS_FAILED/);
+ assert.doesNotMatch(sql,/pg_catalog\.to_jsonb\(v\)|governed_wake_nonce|DELETE FROM|net\.http_post/);
+});
