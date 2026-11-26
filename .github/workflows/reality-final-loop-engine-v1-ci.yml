@@ -54,6 +54,11 @@ on:
       - 'index.html'
       - 'reality-chat-final-loop-child-approval-v1.js'
       - 'reality-chat-governed-release-v1.js'
+      - 'test/reality-home-owner-authorizations-v1.test.js'
+      - 'test/reality-unified-shell-v1.test.js'
+      - 'test/reality-verified-repair-progress-projection-v1.test.js'
+      - 'test/reality-continuous-qualification-inbox-v1.test.js'
+      - 'test/reality-work-center-owner-approval-ui-v1.test.js'
       - 'reality-chat-workspace-v1.js'
       - 'reality-chat-maintenance-continuation-v1.js'
       - 'reality-chat-repair-scope-approval-v1.js'
@@ -137,6 +142,11 @@ on:
       - 'index.html'
       - 'reality-chat-final-loop-child-approval-v1.js'
       - 'reality-chat-governed-release-v1.js'
+      - 'test/reality-home-owner-authorizations-v1.test.js'
+      - 'test/reality-unified-shell-v1.test.js'
+      - 'test/reality-verified-repair-progress-projection-v1.test.js'
+      - 'test/reality-continuous-qualification-inbox-v1.test.js'
+      - 'test/reality-work-center-owner-approval-ui-v1.test.js'
       - 'reality-chat-workspace-v1.js'
       - 'reality-chat-maintenance-continuation-v1.js'
       - 'reality-chat-repair-scope-approval-v1.js'
@@ -270,6 +280,7 @@ jobs:
           node --test test/reality-signed-worker-scheduled-release-verifier-v1.test.js
           node --test test/reality-governed-release-independent-qualification-v1.test.js
           node --test test/reality-governed-worker-release-control-plane-v1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js test/reality-unified-shell-v1.test.js test/reality-verified-repair-progress-projection-v1.test.js test/reality-continuous-qualification-inbox-v1.test.js test/reality-work-center-owner-approval-ui-v1.test.js
           node --test test/reality-final-loop-child-transactional-v1.test.js
           node --test test/reality-final-loop-parent-integration-v1.test.js
           node --test test/reality-final-loop-parent-delivery-v1.test.js
