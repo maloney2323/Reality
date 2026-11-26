@@ -86,7 +86,7 @@ export default async function handler(req,res){
   const direction=canonical?await adapters.readDirection({ownerId:env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID,
     shiftId:env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID}):null;
   const proof=await qualifyCurrentIsolatedSignedWorkerRelease({
-   env,dbProject:db.project,fetchImpl:fetch,direction
+   env,dbProject:db.project,db,fetchImpl:fetch,direction
   });
   if(proof.status!==(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':
     'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY'))
