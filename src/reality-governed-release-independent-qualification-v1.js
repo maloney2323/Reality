@@ -23,9 +23,16 @@ const base=Object.freeze({
 const safe=(status,more={})=>Object.freeze({...base,status,...more});
 const digest=fields=>'sha256:'+createHash('sha256').update(JSON.stringify(fields)).digest('hex');
 async function getJson(fetchImpl,url,token,operation){
- return requestReleaseProviderJson(fetchImpl,url,
-  {method:'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'}},operation);
+ const headers={Accept:'application/json'};
+ if(token!==null)headers.Authorization='Bearer '+token;
+ return requestReleaseProviderJson(fetchImpl,url,{method:'GET',headers},operation);
 }
+// Explicit public-only policy, never an automatic fallback after denied access.
+// An anonymous read cannot grant private access, write authority, or approval.
+const publicRepoMatches=(r,repo)=>r?.full_name===repo&&r.private===false&&
+ r.visibility==='public'&&Number.isSafeInteger(r.id)&&r.id>0;
+const publicRunMatches=(run,repo,identity)=>run?.repository?.full_name===repo&&
+ run.repository.private===false&&run.repository.id===identity.id;
 const providerFailure=error=>({provider_failure:releaseFailureReceipt(error)});
 const identityFailure=(operation,value,fields)=>providerFailure(
  releaseIdentityFailure('RELEASE_QUALIFICATION_IDENTITY_MISMATCH',operation,value,fields));
@@ -42,7 +49,9 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  const cap=env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY;
  const reviewTransport=cap==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
  const repo=env.REALITY_VERIFIED_GITHUB_REPOSITORY;
- if(typeof fetchImpl!=='function'||!SHA.test(sha||'')||
+ const ciReadMode=env.REALITY_RELEASE_GITHUB_CI_READ_MODE??'AUTHENTICATED';
+ const publicCI=ciReadMode==='PUBLIC_ONLY';
+ if(!['AUTHENTICATED','PUBLIC_ONLY'].includes(ciReadMode)||typeof fetchImpl!=='function'||!SHA.test(sha||'')||
   !REF.test(branch||'')||!PROJECT.test(dbProject||'')||
   !PROJECT.test(isolated||'')||!PROJECT.test(parent||'')||
   isolated===parent||(canonical?parent!==dbProject:isolated!==dbProject)||
@@ -53,8 +62,8 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo||'')||
   typeof env.REALITY_RELEASE_CONTROL_SUPABASE_MANAGEMENT_TOKEN!=='string'||
   env.REALITY_RELEASE_CONTROL_SUPABASE_MANAGEMENT_TOKEN.length<20||
-  typeof env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN!=='string'||
-  env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN.length<20||
+  (!publicCI&&(typeof env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN!=='string'||
+  env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN.length<20))||
   typeof env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN!=='string'||
   env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN.length<20)
   return safe('PINNED_RELEASE_OR_PROVIDER_PROOF_CONFIG_MISSING');
@@ -118,15 +127,24 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  if(reviewTransport&&env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY==='true')
   return safe('REVIEW_TRANSPORT_DIAGNOSTIC_ONLY_NOT_RELEASE_CAPACITY');
  const [org,name]=repo.split('/');
+ const githubBase='https://api.github.com/repos/'+encodeURIComponent(org)+'/'+encodeURIComponent(name);
+ const githubToken=publicCI?null:env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN;
+ let publicIdentity=null;
+ if(publicCI){
+  try{publicIdentity=await getJson(fetchImpl,githubBase,null,'GITHUB_PUBLIC_REPOSITORY_READ')}
+  catch(error){return safe('INDEPENDENT_PUBLIC_REPOSITORY_READ_UNAVAILABLE',providerFailure(error))}
+  if(!publicRepoMatches(publicIdentity,repo))return safe('INDEPENDENT_PUBLIC_REPOSITORY_IDENTITY_NOT_VERIFIED',
+   identityFailure('GITHUB_PUBLIC_REPOSITORY_READ',publicIdentity,['repository']));
+ }
  let ci;
  try{
   ci=await getJson(fetchImpl,
-   'https://api.github.com/repos/'+encodeURIComponent(org)+'/'+
-    encodeURIComponent(name)+'/actions/runs/'+ciId,
-   env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN,'GITHUB_LIFECYCLE_CI_READ');
+   githubBase+'/actions/runs/'+ciId,githubToken,'GITHUB_LIFECYCLE_CI_READ');
  }catch(error){
   return safe('INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE',providerFailure(error));
  }
+ if(publicCI&&!publicRunMatches(ci,repo,publicIdentity))return safe('INDEPENDENT_PUBLIC_LIFECYCLE_REPOSITORY_IDENTITY_NOT_VERIFIED',
+  identityFailure('GITHUB_LIFECYCLE_CI_READ',ci,['repository']));
  if(ci?.id!==ciId||ci.head_sha!==sha||
   ci.head_branch!==branch||
   ci.name!=='Reality Final Loop Engine lifecycle acceptance'||
@@ -136,9 +154,10 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   return safe('INDEPENDENT_EXACT_RELEASE_CI_NOT_PASSED',identityFailure('GITHUB_LIFECYCLE_CI_READ',ci,[...(ci?.head_sha!==sha?['release_sha']:[]),...(ci?.head_branch!==branch?['release_ref']:[]),...(ci?.id!==ciId||ci?.name!=='Reality Final Loop Engine lifecycle acceptance'||ci?.path!=='.github/workflows/reality-final-loop-engine-v1-ci.yml'?['ci_identity']:[]),...(ci?.status!=='completed'||ci?.conclusion!=='success'||!['push','pull_request'].includes(ci?.event)?['ci_result']:[])]));
  let gateway=null;
  if(canonical){
-  try{gateway=await getJson(fetchImpl,'https://api.github.com/repos/'+encodeURIComponent(org)+'/'+
-    encodeURIComponent(name)+'/actions/runs/'+gatewayId,env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN,'GITHUB_GATEWAY_CI_READ')}
+  try{gateway=await getJson(fetchImpl,githubBase+'/actions/runs/'+gatewayId,githubToken,'GITHUB_GATEWAY_CI_READ')}
   catch(error){return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE',providerFailure(error))}
+  if(publicCI&&!publicRunMatches(gateway,repo,publicIdentity))return safe('INDEPENDENT_PUBLIC_GATEWAY_REPOSITORY_IDENTITY_NOT_VERIFIED',
+   identityFailure('GITHUB_GATEWAY_CI_READ',gateway,['repository']));
   if(gateway?.id!==gatewayId||gateway.head_sha!==sha||gateway.head_branch!==branch||
    gateway.name!=='Reality — Isolated governed OpenAI gateway proof'||gateway.path!==gatewayPath||
    gateway.status!=='completed'||gateway.conclusion!=='success'||!['push','pull_request'].includes(gateway.event))
@@ -189,7 +208,8 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  }
  const providerProof=digest([repo,sha,branch,ci.id,ci.path,ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,verifiedVercelDeploymentReadiness(d),d.target??null,
   ...(transport?[transport.isolated_deployment_id,transport.independent_transport_proof_sha256]:[]),
-  ...(canonical?[gateway.id,gateway.path,gateway.status,gateway.conclusion]:[])]);
+  ...(canonical?[gateway.id,gateway.path,gateway.status,gateway.conclusion]:[]),
+  ...(publicCI?['PUBLIC_ONLY',publicIdentity.id]:[])]);
  const isolationProof=digest([exact[0].project_ref,exact[0].parent_project_ref,exact[0].is_default,exact[0].status,
   exact[0].preview_project_status,dbProject]);
  const runtimeScope=canonical?Object.freeze({target_environment:'CANONICAL_BENCHMARK_PREVIEW',owner_id:direction.owner_id,
@@ -219,6 +239,8 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  });
  return safe(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY',{
   candidate,ci:ciProof,
+  github_ci_read_mode:ciReadMode,
+  public_repository_independently_verified:publicCI,
   branch_project_ref:isolated,
   provider_migration_status:migrationStatus,
   provider_migration_workflow_passed:['FUNCTIONS_DEPLOYED','MIGRATIONS_PASSED'].includes(migrationStatus),
