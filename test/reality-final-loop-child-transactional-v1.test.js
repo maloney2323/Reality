@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory}
+import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview}
  from '../src/reality-final-loop-child-review-worker-v1.js';
 import {requestFinalLoopChildApprovalFromAcceptedOriginal}
  from '../src/reality-final-loop-child-approval-request-v1.js';
@@ -390,4 +390,118 @@ test('already claimed isolated computation uses only fresh canonical readback an
  assert.equal(stale.status,'FINAL_LOOP_CHILD_GATEWAY_CURRENT_AUTHORITY_OR_SOURCE_REJECTED');
  assert.equal(stale.candidate,undefined);
  assert.equal(modelCalls,2);
+});
+
+test('canonical claim, isolated computation and independent return preserve one Continuity scope',async()=>{
+ const files=completeLargeFiles(),plan=await sourcePlan(files),scope=plan.bounded_scopes[0];
+ const paths=scope.files.map(f=>f.path);
+ const body='Source review of '+paths.join(', ')+'. Test each changed behavior and independently verify regression.';
+ const packet='11111111-1111-4111-8111-111111111111',root='33333333-3333-4333-8333-333333333333';
+ const claimId='44444444-4444-4444-8444-444444444444';
+ const event='55555555-5555-4555-8555-555555555555';
+ const h={schema:'reality-canonical-approved-review-scope-v1',
+  status:'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED',
+  owner_id:owner,shift_id:shift,plan_id:packet,packet_id:packet,
+  plan_fingerprint:hash('c'),parent_original_work_id:parent,source_ref:pr,
+  source_head_sha:plan.live_head_sha,source_proof_sha256:sourceHash,
+  source_manifest_sha256:plan.source_manifest_sha256,acceptance_contract_sha256:acceptance,
+  owner_approval_receipt_sha256:hash('d'),scope_count:plan.bounded_scopes.length,
+  scope_fingerprints:plan.bounded_scopes.map(x=>({index:x.index,scope_sha256:x.proposed_scope_sha256})),
+  continuity_root_id:root,continuity_head_sha256:hash('e'),revision:2,
+  effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',canonical_claim_required:true,
+  next_governed_action:'CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER',
+  read_only:true,execution_authorized:false,original_job_completed:false,production_changed:false};
+ const trigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY',
+  review_claim_route_ready:true,dispatch_permitted:false,execution_authorized_by_trigger:false,
+  owner_id:owner,shift_id:shift,event_id:event,original_work_id:parent,source_ref:pr,
+  continuity_head_sha256:h.continuity_head_sha256,continuity_revision:h.revision,
+  qualifier_receipt_sha256:hash('f'),canonical_claim_handoff:h};
+ const continuity={status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',owner_id:owner,shift_id:shift,
+  original_job_completed:false,execution_authorized:false,
+  shared_continuity_guard:{status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+   owner_id:owner,shift_id:shift,continuity_root_id:root,continuity_head_sha256:h.continuity_head_sha256,
+   revision:2,execution_authorized:false,handoffs:[{source_ref:pr,original_work_id:parent,
+    continuity_identity_verified:true,qualifier_digest_verified:true,
+    qualifier_receipt_sha256:trigger.qualifier_receipt_sha256,
+    next_qualified_action:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',
+    independent_original_outcome_verified:false,original_job_completed:false}]}};
+ const {status,continuity_root_id,continuity_head_sha256,revision,next_governed_action,read_only,...accepted}=h;
+ const preflight={status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_READ_ONLY',
+  owner_id:owner,shift_id:shift,plan_fingerprint:h.plan_fingerprint,
+  execution_authorized:false,original_job_completed:false,
+  plans:[{plan_id:packet,independent_goal_acceptance_verified:true,owner_approval_claim_window_current:true,
+   canonical_review_handoff:accepted}]};
+ const claim={status:'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',
+  owner_id:owner,shift_id:shift,child_work_id:child,parent_original_work_id:parent,source_ref:pr,
+  claim_id:claimId,claimant_worker_run_id:run,phase:'CLAIMED',child_claimed:true,
+  source_head_sha:h.source_head_sha,source_proof_sha256:sourceHash,source_manifest_sha256:h.source_manifest_sha256,
+  acceptance_contract_sha256:acceptance,scope_index:scope.index,scope_sha256:scope.proposed_scope_sha256,scope,
+  original_job_completed:false,production_changed:false,canonical_scope_bound:true,
+  packet_id:packet,plan_id:packet,continuity_head_sha256:h.continuity_head_sha256,revision:2};
+ const current={...claim,status:'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK',
+  worker_run_id:run,model_authorized:true,model_response_id:null};
+ const verify={...claim,status:'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE',
+  original_generation_worker_run_id:run,independent_verifier_run_id:other,
+  review_body:body,review_sha256:digest(body),model_response_id:'resp_prepared1234',read_only:true};
+ delete verify.claim_id;delete verify.claimant_worker_run_id;
+ const canonicalDb={strictSecrets:true,project:'testcanonical'};
+ const canonicalEnv={...env,REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:canonicalDb.project,
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:canonicalDb.project,
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false',REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false'};
+ let reads=0,claims=0,prepares=0,verifies=0,modelCalls=0,drift=false,verificationMode=false;
+ const fetchImpl=()=>{throw Error('CANONICAL_WORKER_MUST_NOT_CALL_MODEL_DIRECTLY')};
+ const call=async(_db,name,args)=>{
+  if(name==='reality_read_final_loop_child_approval_preflight_v1')return preflight;
+  assert.deepEqual(args.p_canonical_handoff,h);
+  if(name==='reality_read_final_loop_child_verify_v1')return verificationMode?verify:
+   {status:'FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION'};
+  if(name==='reality_claim_final_loop_child_review_v1'){claims++;return claim;}
+  if(name==='reality_read_final_loop_child_model_scope_v1')return current;
+  if(name==='reality_prepare_final_loop_child_review_v1'){prepares++;
+   return {status:'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED',
+    child_work_id:child,parent_original_work_id:parent,review_sha256:digest(body),original_job_completed:false};}
+  if(name==='reality_record_final_loop_child_verified_v1'){verifies++;
+   assert.equal(args.p_evidence.independent_verifier_run_id,other);
+   assert.deepEqual(args.p_evidence.verified_paths,paths);
+   return {status:'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN',
+    child_work_id:child,parent_original_work_id:parent,independent_receipt_sha256:hash('9'),original_job_completed:false};}
+  throw Error('UNEXPECTED '+name);
+ };
+ const readCurrentContinuity=async()=>{reads++;return drift?
+  {...continuity,shared_continuity_guard:{...continuity.shared_continuity_guard,revision:3}}:continuity;};
+ const runIsolatedAdvisory=async({claim,mode,shiftId,workerRunId,readCurrentChild})=>
+  computeClaimedFinalLoopChildAdvisory({claim,mode,shiftId,workerRunId,readCurrentChild,env,
+   executionProject:db.project,fetchImpl:provider({id:mode==='VERIFY'?'resp_verifier1234':'resp_prepared1234',
+    text:mode==='VERIFY'?JSON.stringify({verdict:'PASS',supported_paths:paths}):body},files,()=>modelCalls++)});
+ const base={db:canonicalDb,trigger,workerRunId:run,env:canonicalEnv,readCurrentContinuity,runIsolatedAdvisory,call,fetchImpl};
+ const missing=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:null});
+ assert.equal(missing.status,'FINAL_LOOP_CANONICAL_ISOLATED_EXECUTOR_CONNECTION_REQUIRED');
+ assert.equal(claims,0);
+ const prepared=await advanceCanonicalFinalLoopChildReview(base);
+ assert.equal(prepared.status,'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED');
+ assert.equal(prepared.canonical_continuity_head_sha256,h.continuity_head_sha256);
+ assert.equal(claims,1);assert.equal(prepares,1);assert.equal(modelCalls,1);assert.ok(reads>=4);
+ verificationMode=true;
+ const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other});
+ assert.equal(verified.status,'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN');
+ assert.equal(verified.parent_obligation_remains_open,true);assert.equal(verified.canonical_continuity_head_sha256,h.continuity_head_sha256);
+ assert.equal(claims,1);assert.equal(verifies,1);assert.equal(modelCalls,2);
+ const stale=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,runIsolatedAdvisory:async x=>{
+  const r=await runIsolatedAdvisory(x);drift=true;return r;
+ }});
+ assert.equal(stale.status,'FINAL_LOOP_CHILD_CONTINUITY_DRIFT_NO_RECEIPT_REPLAY');
+ assert.equal(verifies,1);assert.equal(modelCalls,3);
+});
+
+test('canonical SQL reads and writes share the same continuity and signed release check',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-child-transactional-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/check_final_loop_canonical_child_scope_v1\(p_shift_id,p_worker_run_id,h\)/);
+ assert.match(sql,/check_final_loop_canonical_child_scope_v1\(p_shift_id,p_verifier_run_id,p_canonical_handoff\)/);
+ assert.match(sql,/e\.continuity_head_sha256=h->>'continuity_head_sha256'/);
+ assert.match(sql,/o->>'qualifier_receipt_sha256'=e.source_receipt_sha256/);
+ assert.match(sql,/FOR UPDATE OF s,w/);
+ assert.match(sql,/'canonical_continuity_head_sha256',p_canonical_handoff->'continuity_head_sha256'/);
+ assert.match(sql,/'canonical_continuity_head_sha256',p_evidence->'canonical_continuity_head_sha256'/);
+ assert.match(sql,/FINAL_LOOP_CANONICAL_VERIFIER_CONTINUITY_DRIFT_NO_REPLAY/);
 });
