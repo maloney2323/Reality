@@ -738,7 +738,7 @@ export default async function handler(req,res){
      execution_authorized:false,installation_authorized:false,
      original_job_completed:false,production_changed:false};
   workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION';
-  const shiftContinuityInvestigation=
+  let shiftContinuityInvestigation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'?
     await investigateOneSignedShiftContinuityIncident({
      db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
@@ -3001,6 +3001,29 @@ export default async function handler(req,res){
      original_job_completed:false,production_changed:false};
    }
   }
+  // Record an exact failed transition before worker completion.
+  let finalLoopBlockerIncident={status:'NO_FINAL_LOOP_TRANSITION_BLOCKER_OBSERVED'};
+  if(canonicalEventRuntime&&[
+   'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED',
+   'FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED'
+  ].includes(finalLoopChildReview.continuity_blocker_code)){
+   try{
+    finalLoopBlockerIncident=await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
+     p_safe_result:finalLoopChildReview.continuity_blocker_code});
+    if(finalLoopBlockerIncident?.status==='SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED'&&
+       shiftContinuityInvestigation?.status==='NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'){
+     shiftContinuityInvestigation=await investigateOneSignedShiftContinuityIncident({
+      db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+     }).catch(error=>({status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
+       failure_code:classifySignedContinuityClaimTransportError(error),execution_authorized:false,
+       installation_authorized:false,production_changed:false}));
+    }
+   }catch{
+    finalLoopBlockerIncident={status:'FINAL_LOOP_BLOCKER_INCIDENT_HANDOFF_UNVERIFIED',
+     original_job_completed:false,production_changed:false};
+   }
+  }
   let finalLoopParentIntegration={
    status:'FINAL_LOOP_PARENT_INTEGRATION_NOT_ENABLED',
    original_job_completed:false,production_changed:false
@@ -3796,12 +3819,15 @@ export default async function handler(req,res){
        integratedWorkIntake.next_worker_pulse_code:
        automaticWorkSupervisor.next_worker_pulse_code:
       result?.status;
-   const safeOutcome=/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
-    outcomeCode:'RESULT_READBACK_UNVERIFIED';
+   const safeOutcome=finalLoopChildReview.continuity_blocker_code||
+    (/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
+    outcomeCode:'RESULT_READBACK_UNVERIFIED');
    // A signed wake is not shift progress when the same original-work
    // blocker repeats. Route the bounded, receipt-backed signal into the
    // EXISTING incident investigator. No approval, executor or new job here.
-   if(/(_REQUIRED|_BLOCKED|_UNVERIFIED|_NOT_READY)$/.test(safeOutcome)){
+   if(finalLoopBlockerIncident?.status!=='SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED'&&
+      !finalLoopChildReview.continuity_blocker_code&&
+      /(_REQUIRED|_BLOCKED|_UNVERIFIED|_NOT_READY)$/.test(safeOutcome)){
     await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
      p_shift_id:wakeReceipt.shift_id,
      p_worker_run_id:actualWorkerRunId,p_safe_result:safeOutcome
@@ -4345,6 +4371,7 @@ export default async function handler(req,res){
     final_loop_blocker_liveness:finalLoopBlockerLiveness,
     final_loop_child_approval_request:finalLoopChildApprovalRequest,
     final_loop_child_review:finalLoopChildReview,
+   final_loop_blocker_incident:finalLoopBlockerIncident,
     final_loop_parent_integration:finalLoopParentIntegration,
     final_loop_parent_delivery:finalLoopParentDelivery,
     final_loop_verified_canonical_return:finalLoopVerifiedCanonicalReturn,

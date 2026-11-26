@@ -242,7 +242,19 @@ export async function investigateOneSignedShiftContinuityIncident({
     'EMPLOYEE_QUALIFICATION_HANDOFF_STALLED',
     'SIGNED_SHIFT_REPEATED_NO_PROGRESS','SIGNED_CHAT_RECOVERY_REVIEW_STALLED','SIGNED_CHAT_RECOVERY_SYNTAX_STALLED',
     'SIGNED_CHAT_RECOVERY_MODEL_REJECTED','SIGNED_GOVERNED_TRANSITION_STALLED',
-    'SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED'].includes(claim.kind)||
+    'SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED','SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'].includes(claim.kind)||
+  (claim.kind==='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'&&(
+   claim.source_evidence?.schema!=='reality-signed-final-loop-blocker-v1'||
+   claim.source_evidence.owner_id!==claim.owner_id||claim.source_evidence.shift_id!==shiftId||
+   !/^work:[a-f0-9]{32}$/.test(claim.source_evidence.original_work_id||'')||
+   !UUID.test(claim.source_evidence.event_id||'')||!UUID.test(claim.source_evidence.worker_run_id||'')||
+   !UUID.test(claim.source_evidence.continuity_root_id||'')||
+   !HASH.test(claim.source_evidence.continuity_head_sha256||'')||
+   !HASH.test(claim.source_evidence.release_receipt_sha256||'')||
+   !/^[a-f0-9]{40}$/.test(claim.source_evidence.release_sha||'')||
+   claim.source_evidence.investigation_only!==true||claim.source_evidence.replay_authorized!==false||
+   claim.source_evidence.original_job_completed!==false||claim.source_evidence.installation_authorized!==false||
+   claim.source_evidence.production_changed!==false))||
   (claim.kind==='SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED'&&(
    claim.source_evidence?.schema!=='reality-signed-infrastructure-incident-v1'||
    claim.source_evidence.owner_id!==claim.owner_id||claim.source_evidence.shift_id!==shiftId||
@@ -373,7 +385,7 @@ export async function investigateOneSignedShiftContinuityIncident({
   // source reference. Do not misleadingly tell the investigator there is NO
   // source simply because this is not a GitHub issue or pull request.
   const sourceRef=String(claim.failed_source_ref||
-   (claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED'?
+   (['SIGNED_GOVERNED_TRANSITION_STALLED','SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'].includes(claim.kind)?
     claim.source_evidence?.source_ref:'')||'');
   let sourceReadback={status:'NO_SOURCE_REF_FOR_CURRENT_INCIDENT'};
   if(claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED'&&
@@ -403,7 +415,8 @@ export async function investigateOneSignedShiftContinuityIncident({
   const fencedTransitionIncident=claim.kind==='SIGNED_GOVERNED_TRANSITION_STALLED';
   const chatReviewIncident=claim.kind==='SIGNED_CHAT_RECOVERY_REVIEW_STALLED'||syntaxIncident||modelRejectionIncident||fencedTransitionIncident;
   const infrastructureIncident=claim.kind==='SIGNED_INFRASTRUCTURE_PROVISIONING_FAILED';
-  const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident;
+  const finalLoopIncident=claim.kind==='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED';
+  const guidedRecovery=claim.kind==='SIGNED_SHIFT_REPEATED_NO_PROGRESS'||chatReviewIncident||finalLoopIncident;
   // Real repeated wake receipts prove no progress, not a root cause.
   // The existing owner-scoped original preflight provides current admission
   // gates and exact Continuity routes to the LLM without granting authority.
@@ -544,7 +557,7 @@ export async function investigateOneSignedShiftContinuityIncident({
     {role:'user',content:[{type:'input_text',text:JSON.stringify({
      owner_shift_id:claim.shift_id,incident_id:claim.incident_id,
      kind:claim.kind,evidence_sha256:claim.evidence_sha256,
-     source_evidence:chatReviewIncident?claim.source_evidence:null,
+     source_evidence:chatReviewIncident||finalLoopIncident?claim.source_evidence:null,
      infrastructure_source_evidence:infrastructureIncident?claim.source_evidence:null,
      error_summary:claim.error_summary,
      claim_id:claim.source_claim_id||null,

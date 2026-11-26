@@ -510,6 +510,14 @@ test('canonical claim, isolated computation and independent return preserve one 
  const withObservation=(e,head=h.continuity_head_sha256,revision=2)=>({...continuity,
   shared_continuity_guard:{...continuity.shared_continuity_guard,continuity_head_sha256:head,revision,
    handoffs:[{...continuity.shared_continuity_guard.handoffs[0],execution_spine_readback:e}]}});
+ const failedGateway=await advanceCanonicalFinalLoopChildReview({...base,
+  readCurrentContinuity:async()=>withObservation(pendingObservation),
+  call:async(db,name,args)=>{
+   if(name==='reality_return_final_loop_invocation_observations_v1')throw Error('SHIFT_RPC_NOT_ALLOWLISTED');
+   return call(db,name,args);
+  }});
+ assert.equal(failedGateway.continuity_blocker_code,'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED');
+ assert.equal(claims,0);assert.equal(modelCalls,0);
  const missingEvidence=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(null)});
  assert.equal(missingEvidence.status,'FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
  let returned=false;
@@ -823,4 +831,16 @@ test('canonical continuity RPCs use the existing exact gateway allowlist',async(
  await assert.rejects(shiftRpc(db,'reality_return_final_loop_invocation_observations_v2',{}, {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
  await assert.rejects(shiftRpc(db,'reality_unregistered_effect_v1',{}, {fetchImpl}),/SHIFT_RPC_NOT_ALLOWLISTED/);
  assert.deepEqual(called,['reality_return_final_loop_invocation_observations_v1','reality_record_final_loop_child_rejection_v1']);
+});
+
+test('signed child failure reaches the existing incident observer before wake completion',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const sql=readFileSync(new URL('../sql/reality-final-loop-blocker-incident-handoff-v1.sql',import.meta.url),'utf8');
+ assert.match(worker,/p_safe_result:finalLoopChildReview.continuity_blocker_code/);
+ assert.match(worker,/final_loop_blocker_incident:finalLoopBlockerIncident/);
+ assert.match(sql,/SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED/);
+ assert.match(sql,/e.governed_wake_worker_run_id=p_worker_run_id/);
+ assert.match(sql,/e.original_work_id=a.runtime_scope->>'original_work_id'/);
+ assert.match(sql,/'replay_authorized',false/);
+ assert.doesNotMatch(sql,/net\.http_post|DELETE FROM/);
 });

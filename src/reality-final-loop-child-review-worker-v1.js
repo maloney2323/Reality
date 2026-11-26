@@ -644,13 +644,17 @@ export async function advanceCanonicalFinalLoopChildReview({
    try{written=await call(db,'reality_return_final_loop_invocation_observations_v1',{
     p_shift_id:h.shift_id,p_original_work_id:h.parent_original_work_id,p_worker_run_id:workerRunId,
     p_expected_head_sha256:h.continuity_head_sha256,p_expected_revision:h.revision},{fetchImpl});}
-   catch{return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_OUTCOME_UNCERTAIN_NO_CLAIM');}
+   catch(error){return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_OUTCOME_UNCERTAIN_NO_CLAIM',{
+    continuity_blocker_code:error?.message==='SHIFT_RPC_NOT_ALLOWLISTED'?
+     'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED':'FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED'
+   });}
    if(written?.status!=='FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'||
      written.canonical_return_committed!==true||written.execution_authorized!==false||
      written.replay_authorized!==false||written.original_job_completed!==false||
      !UUID.test(written.event_id||'')||!HASH.test(written.observation_sha256||'')||
      !HASH.test(written.continuity_head_sha256||'')||written.revision!==h.revision+1)
     return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_NOT_CONFIRMED_NO_CLAIM',{
+     continuity_blocker_code:'FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED',
      return_status:typeof written?.status==='string'&&/^[A-Z_]{1,120}$/.test(written.status)?written.status:null});
    const after=await readCurrentContinuity(),g=after?.shared_continuity_guard;
    const matches=g?.handoffs?.filter(x=>x.original_work_id===h.parent_original_work_id&&x.source_ref===h.source_ref);
@@ -663,7 +667,8 @@ export async function advanceCanonicalFinalLoopChildReview({
     observed.canonical_return_committed!==true||observed.canonical_return_event_id!==written.event_id||
     observed.canonical_return_head_sha256!==written.continuity_head_sha256||
     observed.observation_sha256!==written.observation_sha256)
-    return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENT_READBACK_REQUIRED_NO_CLAIM');
+    return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENT_READBACK_REQUIRED_NO_CLAIM',{
+     continuity_blocker_code:'FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED'});
    return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN',{
     canonical_return_event_id:written.event_id,continuity_head_sha256:written.continuity_head_sha256,
     revision:written.revision,child_claimed:false,model_invoked:false,
