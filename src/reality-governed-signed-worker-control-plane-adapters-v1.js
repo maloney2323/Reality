@@ -194,7 +194,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    h.independent_original_outcome_verified===false&&h.original_job_completed===false);
   const exact=unfinished.length===1?unfinished[0]:null;
   const current={original_work_id:exact?.original_work_id??null,source_ref:exact?.source_ref??null,
-   qualifier_receipt_sha256:exact?.qualifier_receipt_sha256??null,owner_id:ownerId,shift_id:shiftId,authoritative_database:db.project,
+   qualifier_receipt_sha256:exact?.qualifier_receipt_sha256??null,next_qualified_action:exact?.next_qualified_action??null,owner_id:ownerId,shift_id:shiftId,authoritative_database:db.project,
    plan_fingerprint:graph.plan_fingerprint,continuity_root_id:guard.continuity_root_id,
    continuity_head_sha256:guard.continuity_head_sha256,continuity_revision:guard.revision,
    scheduled_host:schedule.host,cron_job_id:schedule.job_id,
