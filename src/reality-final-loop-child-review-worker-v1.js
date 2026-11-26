@@ -647,6 +647,38 @@ export async function advanceCanonicalFinalLoopChildReview({
     'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE')&&
     current.child_work_id===c.child_work_id&&current.parent_original_work_id===h.parent_original_work_id;
   },canonicalHandoff:h});
+ if(returned.advisory_reconciliation_evidence){
+  // Preserve observations on the existing canonical child record. Read it
+  // back through the same recovery projection as verified child receipts.
+  // A rejected advisory never becomes an accepted review or retry warrant.
+  try{
+   const e=returned.advisory_reconciliation_evidence;
+   const written=await call(db,'reality_record_final_loop_child_rejection_v1',{
+    p_child_work_id:c.child_work_id,p_worker_run_id:workerRunId,p_mode:mode,
+    p_evidence:e,p_canonical_handoff:h},{fetchImpl});
+   const ledger=await call(db,'reality_read_final_loop_child_recovery_v1',{
+    p_shift_id:h.shift_id,p_plan_id:h.plan_id},{fetchImpl});
+   const matches=ledger?.children?.filter(x=>x.child_original_work_id===c.child_work_id);
+   const receipt=matches?.[0]?.advisory_rejection_receipts?.[mode];
+   if(written?.status!=='FINAL_LOOP_CHILD_REJECTION_OBSERVATION_RECORDED'||
+      written.child_work_id!==c.child_work_id||!UUID.test(written.invocation_id||'')||
+      !HASH.test(written.observation_receipt_sha256||'')||
+      ledger?.status!=='FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT'||
+      ledger.independent_service_readback_verified!==true||ledger.owner_id!==h.owner_id||
+      ledger.shift_id!==h.shift_id||ledger.parent_original_work_id!==h.parent_original_work_id||
+      matches?.length!==1||receipt?.observation_receipt_sha256!==written.observation_receipt_sha256||
+      receipt.invocation_id!==written.invocation_id||receipt.worker_run_id!==workerRunId||
+      receipt.reason!==e.reason||receipt.scope_sha256!==c.scope_sha256||
+      receipt.continuity_head_sha256!==h.continuity_head_sha256||
+      receipt.owner_approval_receipt_sha256!==h.owner_approval_receipt_sha256||
+      receipt.observation_only!==true||receipt.independent_recovery_verified!==false||
+      receipt.provider_effect_replay_authorized!==false)
+    return Object.freeze({...returned,advisory_rejection_readback_verified:false});
+   return Object.freeze({...returned,advisory_rejection_readback_verified:true,
+    advisory_rejection_receipt_sha256:written.observation_receipt_sha256,
+    advisory_rejection_invocation_id:written.invocation_id});
+  }catch{return Object.freeze({...returned,advisory_rejection_readback_verified:false});}
+ }
  if(returned.status!=='FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN')return returned;
  // Independently read the canonical ledger's existing recovery proof after
  // the verifier write. Never advance from only the writer's response.

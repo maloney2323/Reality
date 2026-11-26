@@ -361,6 +361,28 @@ export function inspectFinalLoopRecoveryContinuation({
  // Acceptance is an already-observed fact, not a fresh grant. The
  // existing isolated child worker and atomic claim still control execution.
  if(candidate?.status==='FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL'&&
+    candidate.existing_owner_goal_acceptance_verified===true&&childReview?.advisory_reconciliation_evidence){
+  const e=childReview.advisory_reconciliation_evidence;
+  const retained=childReview.advisory_rejection_readback_verified===true&&
+   HASH.test(childReview.advisory_rejection_receipt_sha256||'')&&
+   UUID.test(childReview.advisory_rejection_invocation_id||'')&&
+   e.parent_original_work_id===candidate.original_work_id&&
+   e.provider_effect_replay_authorized===false&&e.accepted_artifact===false;
+  return result(retained?'FINAL_LOOP_EXISTING_CHILD_REJECTION_REQUIRES_RECONCILIATION':
+   'FINAL_LOOP_EXISTING_CHILD_REJECTION_EVIDENCE_READBACK_REQUIRED',{
+   incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
+   source_ref:candidate.source_ref,plan_id:candidate.plan_id,
+   existing_owner_goal_acceptance_verified:true,owner_action_required:false,
+   original_obligation_remains_open:true,child_execution_authorized:false,
+   handler_dispatched:false,advisory_rejection_readback_verified:retained,
+   ...(retained?{advisory_rejection_receipt_sha256:childReview.advisory_rejection_receipt_sha256,
+    advisory_rejection_reason:e.reason}:{}),
+   provider_effect_replay_authorized:false,
+   next_governed_action:retained?'RECONCILE_EXISTING_CHILD_ADVISORY_REJECTION_NO_REPLAY':
+    'READ_CANONICAL_CHILD_REJECTION_OBSERVATION_NO_REPLAY'
+  });
+ }
+ if(candidate?.status==='FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL'&&
     candidate.existing_owner_goal_acceptance_verified===true)
   return result('FINAL_LOOP_EXISTING_ACCEPTED_GOAL_REQUIRES_VERIFIED_CHILD_CLAIM',{
    incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,

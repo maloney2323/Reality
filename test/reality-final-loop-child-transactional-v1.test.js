@@ -452,7 +452,7 @@ test('canonical claim, isolated computation and independent return preserve one 
   REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:canonicalDb.project,
   REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false',REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false'};
  let reads=0,claims=0,prepares=0,verifies=0,modelCalls=0,drift=false,verificationMode=false;
- let returnDrift=false;
+ let returnDrift=false,rejectionObservation=null;
  const fetchImpl=()=>{throw Error('CANONICAL_WORKER_MUST_NOT_CALL_MODEL_DIRECTLY')};
  const call=async(_db,name,args)=>{
   if(name==='reality_read_final_loop_child_approval_preflight_v1')return preflight;
@@ -463,11 +463,19 @@ test('canonical claim, isolated computation and independent return preserve one 
    source_head_sha:h.source_head_sha,acceptance_contract_sha256:acceptance,
    original_job_completed:false,production_changed:false,
    children:[{child_original_work_id:child,phase:'VERIFIED',parent_original_work_id:parent,
+    advisory_rejection_receipts:rejectionObservation?{PREPARE:rejectionObservation}:{},
     scope_sha256:scope.proposed_scope_sha256,independently_verified:true,verifier_independent:true,
     independent_receipt_sha256:hash('9'),canonical_continuity_binding:{continuity_root_id:root,
      continuity_head_sha256:returnDrift?hash('a'):h.continuity_head_sha256,revision:2,
      owner_approval_receipt_sha256:h.owner_approval_receipt_sha256}}]};
   assert.deepEqual(args.p_canonical_handoff,h);
+  if(name==='reality_record_final_loop_child_rejection_v1'){
+   rejectionObservation={...args.p_evidence,invocation_id:event,
+    observation_receipt_sha256:hash('8'),observation_only:true,independent_recovery_verified:false,
+    continuity_head_sha256:h.continuity_head_sha256,owner_approval_receipt_sha256:h.owner_approval_receipt_sha256};
+   return {status:'FINAL_LOOP_CHILD_REJECTION_OBSERVATION_RECORDED',child_work_id:child,
+    observation_receipt_sha256:hash('8'),invocation_id:event};
+  }
   if(name==='reality_read_final_loop_child_verify_v1')return verificationMode?verify:
    {status:'FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION'};
   if(name==='reality_claim_final_loop_child_review_v1'){claims++;return claim;}
@@ -526,6 +534,8 @@ test('canonical claim, isolated computation and independent return preserve one 
   assert.equal(result.status,'FINAL_LOOP_CHILD_MODEL_REVIEW_NOT_SOURCE_COMPLETE');
   assert.equal(result.advisory_reconciliation_evidence.reason,'ADVISORY_CONTENT_OVER_CHARACTER_BUDGET');
   assert.equal(result.advisory_reconciliation_evidence.candidate_chars,size);
+  assert.equal(result.advisory_rejection_readback_verified,true);
+  assert.equal(result.advisory_rejection_receipt_sha256,hash('8'));
   assert.equal(result.advisory_reconciliation_evidence.candidate_sha256,digest(oversized));
   assert.equal(result.advisory_reconciliation_evidence.child_work_id,child);
   assert.equal(result.advisory_reconciliation_evidence.parent_original_work_id,parent);
@@ -716,4 +726,14 @@ test('release continuation retains qualifier evidence and one-use historical inv
  assert.match(sql,/a\.claim_id=e\.release_continuation_claim_id AND a\.release_sha=p_release_sha/);
  assert.match(sql,/e\.governed_wake_queued_at>=a\.claimed_at/);
  assert.doesNotMatch(sql,/UPDATE reality_internal\.final_loop_child_review_work_v1/);
+});
+
+test('child rejection stays on existing work and is not a new authorization',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-child-rejection-continuity-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/ALTER TABLE reality_internal\.final_loop_child_review_work_v1/);
+ assert.match(sql,/check_final_loop_canonical_child_scope_v1/);
+ assert.match(sql,/canonical_prepare_invocation_id/);
+ assert.match(sql,/FINAL_LOOP_CHILD_REJECTION_RECEIPT_CONFLICT_NO_REPLAY/);
+ assert.match(sql,/advisory_rejection_receipts=advisory_rejection_receipts/);
+ assert.doesNotMatch(sql,/CREATE TABLE/);
 });
