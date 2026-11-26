@@ -1293,7 +1293,8 @@ export default async function handler(req,res){
      strictContinuityCycle){
    try{
     finalLoopGovernedResumeTrigger=routeVerifiedFinalLoopResumeTrigger({
-     continuity:await requireFreshFinalLoopContinuity(),shiftId:wakeReceipt.shift_id});
+     continuity:await requireFreshFinalLoopContinuity(),shiftId:wakeReceipt.shift_id,
+     claimedEventId:canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'?governedWakeScope.event_id:null});
     if(finalLoopGovernedResumeTrigger.dispatch_permitted===true)
      signedCaseCiResumeEvent=finalLoopGovernedResumeTrigger.resume_event;
    }catch{
@@ -2925,6 +2926,41 @@ export default async function handler(req,res){
     };
    }
   }
+  // The canonical event was durably claimed at ingress. Reconcile its
+  // exact current category and independently accepted review scope here,
+  // after staging; never use a maintenance-only event as a review claim.
+  let finalLoopCategorizedReviewTrigger={
+   status:'FINAL_LOOP_CATEGORIZED_REVIEW_EVENT_NOT_OBSERVED',
+   review_claim_route_ready:false,dispatch_permitted:false,
+   execution_authorized_by_trigger:false,original_job_completed:false
+  };
+  if(canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&
+     strictContinuityCycle&&hasReview&&
+     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+   try{
+    const currentReviewContinuity=await requireFreshFinalLoopContinuity();
+    const currentReviewGraph=assertRealityUnifiedShiftGraph(
+     await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
+      expectedShiftId:wakeReceipt.shift_id
+     });
+    finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(currentReviewContinuity,currentReviewGraph);
+    finalLoopCategorizedReviewTrigger=routeVerifiedFinalLoopResumeTrigger({
+     continuity:currentReviewContinuity,shiftId:wakeReceipt.shift_id,
+     claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes
+    });
+    // A review claim route is not an executable claim. Do not consume the
+    // one-use claim until the existing isolated executor and canonical return
+    // connection are independently qualified. The canonical runtime remains
+    // read-only for child execution; the isolated lane is unchanged.
+   }catch{
+    finalLoopCategorizedReviewTrigger={
+     status:'FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED',
+     review_claim_route_ready:false,dispatch_permitted:false,
+     execution_authorized_by_trigger:false,original_job_completed:false
+    };
+   }
+  }
   // The existing signed worker advances the SAME Final Loop child
   // lifecycle: exact parent goal acceptance -> itemized owner approval ->
   // one-use child claim -> governed model -> separate-run verifier.
@@ -4264,6 +4300,7 @@ export default async function handler(req,res){
     riley_pr_source_readiness:rileyPrSourceReadiness,
     final_loop_pr_source_plan_handoff:finalLoopPrSourcePlanHandoff,
     final_loop_staged_action_routes:finalLoopStagedActionRoutes,
+    final_loop_categorized_review_trigger:finalLoopCategorizedReviewTrigger,
     final_loop_recovery_source_candidate:finalLoopRecoveryCandidate,
     final_loop_recovery_continuation:finalLoopRecoveryContinuation,
     final_loop_recovery_continuity_readback:finalLoopRecoveryContinuityReadback,
