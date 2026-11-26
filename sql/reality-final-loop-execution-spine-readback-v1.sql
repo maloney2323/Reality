@@ -313,63 +313,7 @@ BEGIN
     AND ca.parent_original_work_id=c.parent_original_work_id
     AND ca.acceptance_contract_sha256=c.acceptance_contract_sha256
     AND ca.authority_effect='READ_ONLY_INTERNAL_PR_REVIEW'
-    AND ca.owner_approval_receipt_sha256~'^sha256:[a-f0-9]{64}
-   THEN v_mismatches:=v_mismatches+1;END IF;
-   v_items:=v_items||pg_catalog.jsonb_build_array(
-    pg_catalog.jsonb_build_object(
-     'original_work_id',v_work,'source_ref',v_source,
-     'status',CASE WHEN NOT qualifier_ok THEN 'QUALIFIER_CHAIN_UNVERIFIED'
-      WHEN j->>'independent_source_proof_verified'<>'true' THEN 'SOURCE_UNVERIFIED'
-      WHEN NOT v_work_event THEN 'FIRST_LAYER_ORIGINAL_CONTINUITY_NOT_PROVEN'
-      WHEN has_final AND has_universe THEN 'INDEPENDENTLY_SETTLED_WITH_UNIVERSE'
-      ELSE 'CONTINUITY_OPEN_PENDING_PROOFS' END,
-     'source_proof_verified',j->>'independent_source_proof_verified'='true',
-     'original_work_universe_event_verified',v_work_event,
-     'continuity_identity_verified',true,
-     'qualifier_digest_verified',qualifier_ok,
-     'qualifier_receipt_sha256',v_qualifier_receipt,
-     'next_qualified_action',v_action,
-     'unresolved_proof_gates',v_gates,
-     'internal_maintenance_independent_frozen_ci_verified',has_ci,
-     'internal_maintenance_verifier_receipt_sha256',v_verifier_receipt,
-     'original_claim_admitted',has_original,
-     'independent_original_outcome_verified',has_final,
-     'universe_return_verified',has_universe,
-     'same_head_evidence_checkpoint_observed',has_checkpoint,
-     'matching_event_in_shadow',has_pending_event,
-     'executor_authorized_by_observation',false,
-     'execution_permitted_by_handoff',false,
-     'independent_verification_does_not_grant_owner_authority',true
-    ));
- END LOOP;
- v_observation:=pg_catalog.jsonb_build_object(
-   'schema','reality-shared-cross-layer-continuity-handoff-v1',
-   'shift_id',p_shift_id,'owner_id',v_owner,
-   'continuity_root_id',v_root,'continuity_head_sha256',v_head,
-   'frozen_shift_scope_sha256',v_scope,'revision',v_revision,
-   'obligations',v_items,'unverified_handoffs',v_mismatches,
-   'first_signal_anchor_verified',true,
-   'verified_evidence_event_count',v_verification_count,
-   'shift_scope_authority_event_present',true,
-   'worldline_parent_links_verified',true);
- v_fingerprint:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-   pg_catalog.convert_to(v_observation::text,'UTF8')),'hex');
- RETURN v_observation||pg_catalog.jsonb_build_object(
-  'status',CASE WHEN v_mismatches>0 THEN
-    'FINAL_LOOP_SHARED_CONTINUITY_HANDOFF_PROOF_GAP'
-    ELSE 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED' END,
-  'handoff_observation_sha256',v_fingerprint,
-  'same_state_same_digest_until_receipt_changes',true,
-  'digest_is_not_independent_factual_proof',true,
-  'read_only',true,'no_new_executable_authority',true,
-  'transition_committed',false,'executor_invoked',false,
-  'execution_authorized',false,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false);
-END $function$;
-
-REVOKE ALL ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) TO service_role;
-
+    AND ca.owner_approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=c.claimant_worker_run_id
     AND r.status='COMPLETED' AND r.finished_at IS NOT NULL AND r.started_at IS NOT NULL
    JOIN reality_internal.final_loop_resume_events_v1 e ON e.governed_wake_worker_run_id=r.run_id
@@ -379,122 +323,10 @@ GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_shared_continuity_guard
    JOIN reality_internal.governed_signed_worker_release_wakes_v1 w ON w.worker_run_id=r.run_id
     AND w.owner_id=c.owner_id AND w.shift_id=c.shift_id
     AND w.operating_lane='NORMAL_SIGNED_SHIFT'
-    AND w.release_receipt_sha256~'^sha256:[a-f0-9]{64}
-   THEN v_mismatches:=v_mismatches+1;END IF;
-   v_items:=v_items||pg_catalog.jsonb_build_array(
-    pg_catalog.jsonb_build_object(
-     'original_work_id',v_work,'source_ref',v_source,
-     'status',CASE WHEN NOT qualifier_ok THEN 'QUALIFIER_CHAIN_UNVERIFIED'
-      WHEN j->>'independent_source_proof_verified'<>'true' THEN 'SOURCE_UNVERIFIED'
-      WHEN NOT v_work_event THEN 'FIRST_LAYER_ORIGINAL_CONTINUITY_NOT_PROVEN'
-      WHEN has_final AND has_universe THEN 'INDEPENDENTLY_SETTLED_WITH_UNIVERSE'
-      ELSE 'CONTINUITY_OPEN_PENDING_PROOFS' END,
-     'source_proof_verified',j->>'independent_source_proof_verified'='true',
-     'original_work_universe_event_verified',v_work_event,
-     'continuity_identity_verified',true,
-     'qualifier_digest_verified',qualifier_ok,
-     'qualifier_receipt_sha256',v_qualifier_receipt,
-     'next_qualified_action',v_action,
-     'unresolved_proof_gates',v_gates,
-     'internal_maintenance_independent_frozen_ci_verified',has_ci,
-     'internal_maintenance_verifier_receipt_sha256',v_verifier_receipt,
-     'original_claim_admitted',has_original,
-     'independent_original_outcome_verified',has_final,
-     'universe_return_verified',has_universe,
-     'same_head_evidence_checkpoint_observed',has_checkpoint,
-     'matching_event_in_shadow',has_pending_event,
-     'executor_authorized_by_observation',false,
-     'execution_permitted_by_handoff',false,
-     'independent_verification_does_not_grant_owner_authority',true
-    ));
- END LOOP;
- v_observation:=pg_catalog.jsonb_build_object(
-   'schema','reality-shared-cross-layer-continuity-handoff-v1',
-   'shift_id',p_shift_id,'owner_id',v_owner,
-   'continuity_root_id',v_root,'continuity_head_sha256',v_head,
-   'frozen_shift_scope_sha256',v_scope,'revision',v_revision,
-   'obligations',v_items,'unverified_handoffs',v_mismatches,
-   'first_signal_anchor_verified',true,
-   'verified_evidence_event_count',v_verification_count,
-   'shift_scope_authority_event_present',true,
-   'worldline_parent_links_verified',true);
- v_fingerprint:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-   pg_catalog.convert_to(v_observation::text,'UTF8')),'hex');
- RETURN v_observation||pg_catalog.jsonb_build_object(
-  'status',CASE WHEN v_mismatches>0 THEN
-    'FINAL_LOOP_SHARED_CONTINUITY_HANDOFF_PROOF_GAP'
-    ELSE 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED' END,
-  'handoff_observation_sha256',v_fingerprint,
-  'same_state_same_digest_until_receipt_changes',true,
-  'digest_is_not_independent_factual_proof',true,
-  'read_only',true,'no_new_executable_authority',true,
-  'transition_committed',false,'executor_invoked',false,
-  'execution_authorized',false,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false);
-END $function$;
-
-REVOKE ALL ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) TO service_role;
-
+    AND w.release_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
     AND a.owner_id=c.owner_id AND a.shift_id=c.shift_id AND a.release_sha=w.running_release_sha
-    AND a.approval_receipt_sha256~'^sha256:[a-f0-9]{64}
-   THEN v_mismatches:=v_mismatches+1;END IF;
-   v_items:=v_items||pg_catalog.jsonb_build_array(
-    pg_catalog.jsonb_build_object(
-     'original_work_id',v_work,'source_ref',v_source,
-     'status',CASE WHEN NOT qualifier_ok THEN 'QUALIFIER_CHAIN_UNVERIFIED'
-      WHEN j->>'independent_source_proof_verified'<>'true' THEN 'SOURCE_UNVERIFIED'
-      WHEN NOT v_work_event THEN 'FIRST_LAYER_ORIGINAL_CONTINUITY_NOT_PROVEN'
-      WHEN has_final AND has_universe THEN 'INDEPENDENTLY_SETTLED_WITH_UNIVERSE'
-      ELSE 'CONTINUITY_OPEN_PENDING_PROOFS' END,
-     'source_proof_verified',j->>'independent_source_proof_verified'='true',
-     'original_work_universe_event_verified',v_work_event,
-     'continuity_identity_verified',true,
-     'qualifier_digest_verified',qualifier_ok,
-     'qualifier_receipt_sha256',v_qualifier_receipt,
-     'next_qualified_action',v_action,
-     'unresolved_proof_gates',v_gates,
-     'internal_maintenance_independent_frozen_ci_verified',has_ci,
-     'internal_maintenance_verifier_receipt_sha256',v_verifier_receipt,
-     'original_claim_admitted',has_original,
-     'independent_original_outcome_verified',has_final,
-     'universe_return_verified',has_universe,
-     'same_head_evidence_checkpoint_observed',has_checkpoint,
-     'matching_event_in_shadow',has_pending_event,
-     'executor_authorized_by_observation',false,
-     'execution_permitted_by_handoff',false,
-     'independent_verification_does_not_grant_owner_authority',true
-    ));
- END LOOP;
- v_observation:=pg_catalog.jsonb_build_object(
-   'schema','reality-shared-cross-layer-continuity-handoff-v1',
-   'shift_id',p_shift_id,'owner_id',v_owner,
-   'continuity_root_id',v_root,'continuity_head_sha256',v_head,
-   'frozen_shift_scope_sha256',v_scope,'revision',v_revision,
-   'obligations',v_items,'unverified_handoffs',v_mismatches,
-   'first_signal_anchor_verified',true,
-   'verified_evidence_event_count',v_verification_count,
-   'shift_scope_authority_event_present',true,
-   'worldline_parent_links_verified',true);
- v_fingerprint:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
-   pg_catalog.convert_to(v_observation::text,'UTF8')),'hex');
- RETURN v_observation||pg_catalog.jsonb_build_object(
-  'status',CASE WHEN v_mismatches>0 THEN
-    'FINAL_LOOP_SHARED_CONTINUITY_HANDOFF_PROOF_GAP'
-    ELSE 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED' END,
-  'handoff_observation_sha256',v_fingerprint,
-  'same_state_same_digest_until_receipt_changes',true,
-  'digest_is_not_independent_factual_proof',true,
-  'read_only',true,'no_new_executable_authority',true,
-  'transition_committed',false,'executor_invoked',false,
-  'execution_authorized',false,'installation_authorized',false,
-  'original_job_completed',false,'production_changed',false);
-END $function$;
-
-REVOKE ALL ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) TO service_role;
-
+    AND a.approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    WHERE c.owner_id=v_owner AND c.shift_id=p_shift_id
     AND c.parent_original_work_id=v_work AND c.canonical_prepare_invocation_id IS NOT NULL;
    IF NOT qualifier_ok OR NOT v_work_event OR j->>'independent_source_proof_verified'<>'true'
