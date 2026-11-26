@@ -239,7 +239,5 @@
  });
  // The signed worker wakes every five minutes. Read-only owner progress
  // refresh keeps the Chat explanation current without scheduling new work.
- window.setInterval(()=>{
-  if(document.visibilityState==='visible'&&signedIn())void refresh();
- },20000);
+ window.addEventListener('reality:chat-work-opened',()=>{if(signedIn())void refresh()});
 })();
