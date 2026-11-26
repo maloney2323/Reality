@@ -441,6 +441,7 @@
     closePanel();
     if(!next)return;
     document.body.dataset.realityChatPanel=next;
+    if(next==='work')window.dispatchEvent(new CustomEvent('reality:chat-work-opened'));
     historyToggle.setAttribute('aria-expanded',String(next==='history'));
     inspectorToggle.setAttribute('aria-expanded',String(next==='work'));
     if(inlineScreen()){
