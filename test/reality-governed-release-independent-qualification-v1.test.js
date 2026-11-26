@@ -121,12 +121,12 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
   scheduled_host:env.REALITY_SIGNED_WORKER_STABLE_ALIAS,cron_job_id:7,continuity_root_id:shift,continuity_revision:3,
   plan_fingerprint:'sha256:'+'1'.repeat(64),continuity_head_sha256:'sha256:'+'2'.repeat(64),qualifier_receipt_sha256:'sha256:'+'3'.repeat(64),
   original_work_id:'work:'+'4'.repeat(32),source_ref:'https://github.com/maloney2323/Reality/pull/307'};
- const calls=[];let gatewayPass=true;
+ const calls=[];let gatewayPass=true;let branchStatus='FUNCTIONS_DEPLOYED';
  const transportCap='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
  const fetchImpl=async url=>{
   calls.push(String(url));
   let data;
-  if(String(url).includes('api.supabase.com'))data=[{project_ref:project,parent_project_ref:parent,is_default:false,preview_project_status:'ACTIVE_HEALTHY',status:'FUNCTIONS_DEPLOYED'}];
+  if(String(url).includes('api.supabase.com'))data=[{project_ref:project,parent_project_ref:parent,is_default:false,preview_project_status:'ACTIVE_HEALTHY',status:branchStatus}];
   else if(String(url).endsWith('/2004'))data={id:2004,head_sha:sha,head_branch:branch,name:'Reality Final Loop Engine lifecycle acceptance',
    path:'.github/workflows/reality-final-loop-engine-v1-ci.yml',status:'completed',conclusion:'success',event:'push'};
   else if(String(url).endsWith('/2005'))data={id:2005,head_sha:sha,head_branch:branch,name:'Reality — Isolated governed OpenAI gateway proof',
@@ -156,5 +156,11 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  assert.equal((await transportRun()).status,'ISOLATED_REVIEW_DEPLOYMENT_NOT_PINNED');
  const peerEnv={...transportEnv,REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID:'dpl_peer12345678',
   REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST:'isolated-pinned-test.vercel.app'};
+ assert.equal((await transportRun({env:peerEnv})).status,'ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
+ branchStatus='MIGRATIONS_FAILED';
+ assert.equal((await run()).status,'ISOLATED_SUPABASE_DEVELOPMENT_BRANCH_NOT_VERIFIED');
+ assert.equal((await transportRun()).status,'ISOLATED_REVIEW_DEPLOYMENT_NOT_PINNED');
+ assert.equal((await transportRun({env:{...peerEnv,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY:'true'}})).status,
+  'REVIEW_TRANSPORT_DIAGNOSTIC_ONLY_NOT_RELEASE_CAPACITY');
  assert.equal((await transportRun({env:peerEnv})).status,'ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
 });
