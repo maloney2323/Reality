@@ -393,9 +393,7 @@
  document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')void update();
  });
- window.setInterval(()=>{
-  if(document.visibilityState==='visible')void update();
- },30000);
+ window.addEventListener('reality:chat-work-opened',()=>{if(document.visibilityState==='visible')void update()});
  void update();
  // Auth may finish after the view script loads; read the same owner ledger on
  // the next visible signed-in refresh rather than pretending the user logged in.
