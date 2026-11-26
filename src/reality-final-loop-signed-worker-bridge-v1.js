@@ -165,7 +165,8 @@ export function verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId}={}){
     if(executionReadback!==null){
      const e=executionReadback;
      if(!['NO_FENCED_CHILD_INVOCATION_OBSERVED','SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED',
-       'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'].includes(e.status)||
+       'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN',
+       'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'].includes(e.status)||
       !Number.isSafeInteger(e.fenced_count)||e.fenced_count<0||e.fenced_count>63||
       !Number.isSafeInteger(e.signed_observation_count)||e.signed_observation_count<0||
       !Array.isArray(e.observations)||e.observations.length!==e.signed_observation_count||
@@ -177,7 +178,11 @@ export function verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId}={}){
        !/^[a-f0-9]{40}$/.test(x.release_sha||'')||x.worker_completed!==true||
        x.provider_outcome_verified!==false||x.replay_authorized!==false||
        typeof x.model_artifact_recorded!=='boolean')||
-      e.canonical_return_committed!==false||e.execution_authorized!==false||
+      e.canonical_return_committed!==(e.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN')||
+      (e.canonical_return_committed&&(!UUID.test(e.canonical_return_event_id||'')||
+       !HASH.test(e.canonical_return_head_sha256||'')||!HASH.test(e.observation_sha256||'')||
+       e.fenced_count===0||e.fenced_count!==e.signed_observation_count))||
+      e.execution_authorized!==false||
       e.provider_outcome_verified!==false||e.original_job_completed!==false||e.replay_authorized!==false||
       (e.status==='NO_FENCED_CHILD_INVOCATION_OBSERVED'&&(e.fenced_count!==0||e.signed_observation_count!==0))||
       (e.status==='SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'&&

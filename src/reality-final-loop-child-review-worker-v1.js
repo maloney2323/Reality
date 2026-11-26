@@ -590,6 +590,7 @@ export async function advanceCanonicalFinalLoopChildReview({
     !Number.isSafeInteger(h.revision)||h.revision<1||
     !Array.isArray(h.scope_fingerprints)||h.scope_fingerprints.length!==h.scope_count)
   return no('FINAL_LOOP_CANONICAL_REVIEW_TRIGGER_OR_LINEAGE_UNVERIFIED');
+ let alignedExecutionReadback=null;
  const aligned=async()=>{
   const c=await readCurrentContinuity();
   const g=c?.shared_continuity_guard;
@@ -608,6 +609,7 @@ export async function advanceCanonicalFinalLoopChildReview({
      matches[0].next_qualified_action!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
      matches[0].independent_original_outcome_verified!==false||
      matches[0].original_job_completed!==false)return false;
+  alignedExecutionReadback=matches[0].execution_spine_readback??null;
   const pre=await call(db,'reality_read_final_loop_child_approval_preflight_v1',{
    p_shift_id:h.shift_id},{fetchImpl});
   const exact=pre?.plans?.filter(x=>x.plan_id===h.plan_id);
@@ -631,6 +633,48 @@ export async function advanceCanonicalFinalLoopChildReview({
  let c,mode;
  try{
   if(!await aligned())return no('FINAL_LOOP_CANONICAL_CONTINUITY_REQUALIFICATION_REQUIRED');
+  // Consume the current signed event for evidence-only canonical return
+  // BEFORE claiming another child. Missing or uncertain readback is not
+  // permission to use an untouched scope. No retry/reset in this branch.
+  const evidence=alignedExecutionReadback;
+  if(!evidence||evidence.status==='SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED')
+   return no('FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
+  if(evidence.status==='SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'){
+   let written;
+   try{written=await call(db,'reality_return_final_loop_invocation_observations_v1',{
+    p_shift_id:h.shift_id,p_original_work_id:h.parent_original_work_id,p_worker_run_id:workerRunId,
+    p_expected_head_sha256:h.continuity_head_sha256,p_expected_revision:h.revision},{fetchImpl});}
+   catch{return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_OUTCOME_UNCERTAIN_NO_CLAIM');}
+   if(written?.status!=='FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'||
+     written.canonical_return_committed!==true||written.execution_authorized!==false||
+     written.replay_authorized!==false||written.original_job_completed!==false||
+     !UUID.test(written.event_id||'')||!HASH.test(written.observation_sha256||'')||
+     !HASH.test(written.continuity_head_sha256||'')||written.revision!==h.revision+1)
+    return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_NOT_CONFIRMED_NO_CLAIM',{
+     return_status:typeof written?.status==='string'&&/^[A-Z_]{1,120}$/.test(written.status)?written.status:null});
+   const after=await readCurrentContinuity(),g=after?.shared_continuity_guard;
+   const matches=g?.handoffs?.filter(x=>x.original_work_id===h.parent_original_work_id&&x.source_ref===h.source_ref);
+   const observed=matches?.[0]?.execution_spine_readback;
+   if(g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+    g.owner_id!==h.owner_id||g.shift_id!==h.shift_id||g.continuity_root_id!==h.continuity_root_id||
+    g.continuity_head_sha256!==written.continuity_head_sha256||g.revision!==written.revision||
+    g.execution_authorized!==false||matches?.length!==1||
+    observed?.status!=='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'||
+    observed.canonical_return_committed!==true||observed.canonical_return_event_id!==written.event_id||
+    observed.canonical_return_head_sha256!==written.continuity_head_sha256||
+    observed.observation_sha256!==written.observation_sha256)
+    return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENT_READBACK_REQUIRED_NO_CLAIM');
+   return no('FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN',{
+    canonical_return_event_id:written.event_id,continuity_head_sha256:written.continuity_head_sha256,
+    revision:written.revision,child_claimed:false,model_invoked:false,
+    next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+  }
+  if(evidence.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'&&
+     evidence.observations.some(x=>x.model_artifact_recorded!==true))
+   return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
+    next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+  if(!['NO_FENCED_CHILD_INVOCATION_OBSERVED','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'].includes(evidence.status))
+   return no('FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
   // Verification and generation use the same canonical database and distinct
   // signed runs. The overload also verifies the release lease + exact wake.
   const review=await call(db,'reality_read_final_loop_child_verify_v1',{

@@ -429,7 +429,9 @@ test('canonical claim, isolated computation and independent return preserve one 
     continuity_identity_verified:true,qualifier_digest_verified:true,
     qualifier_receipt_sha256:trigger.qualifier_receipt_sha256,
     next_qualified_action:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',
-    independent_original_outcome_verified:false,original_job_completed:false}]}};
+    independent_original_outcome_verified:false,original_job_completed:false,
+    execution_spine_readback:{status:'NO_FENCED_CHILD_INVOCATION_OBSERVED',fenced_count:0,
+     signed_observation_count:0,observations:[],canonical_return_committed:false}}]}};
  const {status,continuity_root_id,continuity_head_sha256,revision,next_governed_action,read_only,...accepted}=h;
  const preflight={status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_READ_ONLY',
   owner_id:owner,shift_id:shift,plan_fingerprint:h.plan_fingerprint,
@@ -500,6 +502,39 @@ test('canonical claim, isolated computation and independent return preserve one 
    executionProject:db.project,fetchImpl:provider({id:mode==='VERIFY'?'resp_verifier1234':'resp_prepared1234',
     text:mode==='VERIFY'?JSON.stringify({verdict:'PASS',supported_paths:paths}):raw},files,()=>modelCalls++)});
  const base={db:canonicalDb,trigger,workerRunId:run,env:canonicalEnv,readCurrentContinuity,runIsolatedAdvisory,call,fetchImpl};
+ const observedHead=hash('7'),returnedEvent='77777777-7777-4777-8777-777777777777';
+ const pendingObservation={status:'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN',
+  fenced_count:1,signed_observation_count:1,observations:[{model_artifact_recorded:false}],
+  canonical_return_committed:false};
+ const withObservation=(e,head=h.continuity_head_sha256,revision=2)=>({...continuity,
+  shared_continuity_guard:{...continuity.shared_continuity_guard,continuity_head_sha256:head,revision,
+   handoffs:[{...continuity.shared_continuity_guard.handoffs[0],execution_spine_readback:e}]}});
+ const missingEvidence=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(null)});
+ assert.equal(missingEvidence.status,'FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
+ let returned=false;
+ const returnedEvidence={...pendingObservation,status:'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',
+  canonical_return_committed:true,canonical_return_event_id:returnedEvent,canonical_return_head_sha256:observedHead,
+  observation_sha256:hash('6')};
+ const returnCall=async(db,name,args)=>{
+  if(name!=='reality_return_final_loop_invocation_observations_v1')return call(db,name,args);
+  assert.equal(args.p_original_work_id,parent);assert.equal(args.p_expected_revision,2);
+  returned=true;
+  return {status:'FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',canonical_return_committed:true,
+   execution_authorized:false,replay_authorized:false,original_job_completed:false,event_id:returnedEvent,
+   observation_sha256:hash('6'),continuity_head_sha256:observedHead,revision:3};
+ };
+ const observationReturn=await advanceCanonicalFinalLoopChildReview({...base,call:returnCall,
+  readCurrentContinuity:async()=>returned?withObservation(returnedEvidence,observedHead,3):withObservation(pendingObservation)});
+ assert.equal(observationReturn.status,'FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN');
+ assert.equal(observationReturn.child_claimed,false);assert.equal(observationReturn.model_invoked,false);
+ assert.equal(claims,0);assert.equal(modelCalls,0);
+ const unresolved=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(returnedEvidence)});
+ assert.equal(unresolved.status,'FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM');
+ returned=false;
+ const unconfirmedReturn=await advanceCanonicalFinalLoopChildReview({...base,call:returnCall,
+  readCurrentContinuity:async()=>withObservation(pendingObservation)});
+ assert.equal(unconfirmedReturn.status,'FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENT_READBACK_REQUIRED_NO_CLAIM');
+ assert.equal(claims,0);assert.equal(modelCalls,0);
  const missing=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:null});
  assert.equal(missing.status,'FINAL_LOOP_CANONICAL_ISOLATED_EXECUTOR_CONNECTION_REQUIRED');
  assert.equal(claims,0);

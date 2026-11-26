@@ -22,6 +22,7 @@ DECLARE
  v_broken_links integer;v_worldline_count integer;v_work_event boolean;
  v_work text;v_source text;v_qual_next text;
  v_fenced_count integer;v_observations jsonb;v_observation_count integer;
+ v_invocation_observation_hash text;v_return_event uuid;v_return_head text;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_SHARED_CONTINUITY_SERVICE_ONLY';END IF;
  IF p_shift_id IS NULL THEN RETURN pg_catalog.jsonb_build_object(
@@ -329,6 +330,35 @@ BEGIN
     AND a.approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    WHERE c.owner_id=v_owner AND c.shift_id=p_shift_id
     AND c.parent_original_work_id=v_work AND c.canonical_prepare_invocation_id IS NOT NULL;
+
+   -- The writer's response is never its own proof. Independently locate
+   -- the identical observation set on the same canonical parent chain.
+   v_invocation_observation_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+    pg_catalog.convert_to(v_observations::text,'UTF8')),'hex');
+   v_return_event:=NULL;v_return_head:=NULL;
+   SELECT u.event_id,'sha256:'||u.lineage_hash INTO v_return_event,v_return_head
+   FROM public.universe_events u
+   JOIN public.universe_events prior ON prior.event_id=u.parent_event_id
+    AND prior.continuity_root_id=u.continuity_root_id AND prior.worldline_id=u.worldline_id
+   JOIN reality_internal.final_loop_transition_receipts_v1 tr
+    ON tr.shift_id=p_shift_id AND tr.owner_id=v_owner AND tr.original_work_id=v_work
+    AND tr.continuity_root_id=v_root AND tr.continuity_head_sha256='sha256:'||prior.lineage_hash
+    AND tr.decision='SUSPEND' AND tr.reason_code='PROVIDER_EFFECT_UNCERTAIN'
+    AND tr.worker_run_id::text=u.provenance->>'worker_run_id'
+   WHERE u.continuity_root_id=v_root AND u.event_kind='OBSERVATION'
+    AND u.entity_type='reality_final_loop_invocation_observation_v1' AND u.epistemic_status='OBSERVED'
+    AND u.payload->>'owner_id'=v_owner::text AND u.payload->>'shift_id'=p_shift_id::text
+    AND u.payload->>'original_work_id'=v_work AND u.payload->>'source_ref'=v_source
+    AND u.payload->>'observation_sha256'=v_invocation_observation_hash
+    AND u.payload->'invocation_observations'=v_observations
+    AND u.payload->>'provider_outcome_verified'='false' AND u.payload->>'original_job_completed'='false'
+    AND u.payload->>'execution_authorized'='false' AND u.payload->>'replay_authorized'='false'
+    AND u.content_hash=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+     public.reality_continuity_canonical_json_v1(u.payload),'UTF8')),'hex')
+    AND u.lineage_hash~'^[a-f0-9]{64}$'
+    AND u.provenance->'continuity_spine'->>'prior_lineage_hash'=prior.lineage_hash
+    AND u.provenance->'continuity_spine'->>'source_event_id'=prior.event_id::text
+   ORDER BY u.assertion_time DESC,u.event_id DESC LIMIT 1;
    IF NOT qualifier_ok OR NOT v_work_event OR j->>'independent_source_proof_verified'<>'true'
    THEN v_mismatches:=v_mismatches+1;END IF;
    v_items:=v_items||pg_catalog.jsonb_build_array(
@@ -354,9 +384,12 @@ BEGIN
      'execution_spine_readback',pg_catalog.jsonb_build_object(
        'status',CASE WHEN v_fenced_count=0 THEN 'NO_FENCED_CHILD_INVOCATION_OBSERVED'
         WHEN v_fenced_count<>v_observation_count THEN 'SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED'
+        WHEN v_return_event IS NOT NULL THEN 'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'
         ELSE 'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN' END,
        'fenced_count',v_fenced_count,'signed_observation_count',v_observation_count,
-       'observations',v_observations,'canonical_return_committed',false,
+       'observations',v_observations,'canonical_return_committed',v_return_event IS NOT NULL,
+       'observation_sha256',v_invocation_observation_hash,'canonical_return_event_id',v_return_event,
+       'canonical_return_head_sha256',v_return_head,
        'execution_authorized',false,'provider_outcome_verified',false,
        'original_job_completed',false,'replay_authorized',false),
      'same_head_evidence_checkpoint_observed',has_checkpoint,
