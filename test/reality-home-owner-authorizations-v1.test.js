@@ -63,9 +63,11 @@ test('no auto-approval on page load, session refresh or queue readback',()=>{
  assert.doesNotMatch(refresh,/personal-qualified-capability-approve/);
  assert.doesNotMatch(refresh,/OWNER_APPROVE_EXACT_VERIFIED_ISOLATED_CAPABILITY/);
  assert.match(inlineScript,/if\(yes&&!previouslySignedIn\)\{/);
- assert.match(inlineScript,/if\(\['chat','work','shifts','home'\]\.includes\(route\)\)void homeOwnerRefresh\(\)/);
+ assert.match(inlineScript,/if\(\['work','shifts','home'\]\.includes\(route\)\)void homeOwnerRefresh\(\)/);
  assert.match(inlineScript,/if\(previouslySignedIn!==yes\)el\('privateReady'\)\.style\.display=/);
- assert.match(inlineScript,/if\(homeOwnerSignedIn\(\)\)void homeOwnerRefresh\(\)/);
+ assert.match(inlineScript,/if\(onRoute\('home','work','shifts'\)\)void homeOwnerRefresh\(\)/);
+ assert.match(inlineScript,/window.addEventListener\('reality:chat-work-opened',async/);
+ assert.doesNotMatch(inlineScript,/if\(homeOwnerSignedIn\(\)\)void homeOwnerRefresh\(\)/);
 });
 test('homepage mobile layout and fail-closed sign-in behavior',()=>{
  assert.match(html,/@media\(max-width:640px\)\{\.home-owner-center/);
