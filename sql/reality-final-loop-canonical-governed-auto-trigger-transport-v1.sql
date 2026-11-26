@@ -31,7 +31,7 @@ CREATE OR REPLACE FUNCTION reality_internal.notify_final_loop_governed_trigger_v
  RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 DECLARE w record; l record; e record; target text; token text; bypass text;
         req bigint; now_at timestamptz:=pg_catalog.clock_timestamp(); is_start boolean;
-        approved_sha text; nonce uuid; wake_event_id uuid; release_claim uuid;
+        approved_sha text; nonce uuid; wake_event_id uuid; release_claim uuid; review_release boolean:=false;
 BEGIN
  -- Reuse the existing Vault credentials; never expose or copy their values.
  -- Transport is deliberately inert until an independently qualified canonical
@@ -90,6 +90,7 @@ BEGIN
  AND a.runtime_scope->>'parent_delivery_enabled'='false'
  ORDER BY a.provider_alias_observed_at DESC LIMIT 1;
  IF FOUND THEN
+  review_release:=true;
   target:='https://'||'reality-signed-worker-maloney2323-5310s-projects.vercel.app'||'/api/reality/governed-employee-shift-worker';
  ELSE
  -- Legacy releases still require their existing Vault pin and completed witness.
@@ -113,7 +114,7 @@ BEGIN
  ORDER BY a.claimed_at DESC LIMIT 1;
  IF NOT FOUND THEN RETURN NULL;END IF;
  END IF;
- is_start:=w.governed_start_requested_at IS NOT NULL AND w.governed_start_request_id IS NULL
+ is_start:=NOT review_release AND w.governed_start_requested_at IS NOT NULL AND w.governed_start_request_id IS NULL
   AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shift_worker_pulses_v1 p
    WHERE p.shift_id=w.shift_id AND p.owner_id=w.owner_id
     AND p.last_worker_seen_at>=w.governed_start_requested_at);
@@ -130,6 +131,11 @@ BEGIN
   WHERE ev.shift_id=w.shift_id AND ev.owner_id=w.owner_id AND ev.state='SHADOW_PENDING'
    AND ev.governed_wake_requested_at IS NOT NULL AND ev.governed_wake_request_id IS NULL
    AND ev.source_receipt_sha256<>ev.previous_receipt_sha256
+   AND (NOT review_release OR (ev.signal_kind='QUALIFIER_PROOF_CHANGED'
+    AND ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
+     WHERE a.claim_id=release_claim AND a.runtime_scope->>'original_work_id'=ev.original_work_id
+     AND a.runtime_scope->>'source_ref'=ev.source_ref)))
    -- A distinct current qualifier receipt at a terminal boundary can request
    -- evidence-only investigation. The worker MUST preserve the hard budget;
    -- the existing verifier route cannot dispatch old CI for this action.
@@ -303,6 +309,12 @@ BEGIN
  GET DIAGNOSTICS n=ROW_COUNT;
  RETURN jsonb_build_object('status',CASE WHEN n=1 THEN 'REVIEW_RELEASE_ALIAS_OBSERVED_GOVERNED_TRIGGER_NOTIFIED' ELSE 'REVIEW_RELEASE_ALIAS_OBSERVATION_UNVERIFIED' END,
   'shift_id',p_shift_id,'release_sha',p_release_sha,'deployment_id',p_deployment_id,
+  'wake_queued',EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+    WHERE e.shift_id=p_shift_id AND e.owner_id=p_owner_id
+    AND e.original_work_id=a.runtime_scope->>'original_work_id'
+    AND e.source_ref=a.runtime_scope->>'source_ref' AND e.state='SHADOW_PENDING'
+    AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND e.governed_wake_request_id IS NOT NULL),
   'owner_approval_granted',false,'execution_authorized',false,'original_job_completed',false,'production_changed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_record_review_release_alias_observation_v1(uuid,uuid,text,text,text,text) FROM PUBLIC,anon,authenticated;
