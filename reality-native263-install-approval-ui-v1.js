@@ -432,6 +432,6 @@ export function mountNative263ExactInstallApproval(){
  if(visible())void refreshExactNative263InstallApproval();
  window.addEventListener('focus',()=>{void refreshExactNative263InstallApproval()});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshExactNative263InstallApproval()});
- setInterval(()=>{if(!document.hidden)void refreshExactNative263InstallApproval()},30000);
+ window.addEventListener('reality:chat-work-opened',()=>{if(!document.hidden)void refreshExactNative263InstallApproval()});
 }
 if(typeof document!=='undefined')mountNative263ExactInstallApproval();
