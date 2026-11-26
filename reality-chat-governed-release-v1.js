@@ -85,7 +85,7 @@
   return [status,reason,next].filter(Boolean).join(' · ').replaceAll('_',' ');
  }
  async function prepareRelease(){
-  if(!signed()||busy||uncertain)return;
+  if(!signed()||busy)return;
   autoPreparedEpoch=epoch;
   busy=true;const started=epoch;check.disabled=true;clear();
   message.textContent='Reading independent release and continuity evidence…';
