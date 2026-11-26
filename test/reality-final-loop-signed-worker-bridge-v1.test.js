@@ -531,6 +531,16 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
  assert.equal(contract.contract_candidate.obligation_id,work);
  assert.equal(contract.execution_authorized,false);
  assert.equal(contract.contract_candidate.ledger_freeze_verified,false);
+ const evidence={status:'NO_FENCED_CHILD_INVOCATION_OBSERVED',fenced_count:0,
+  signed_observation_count:0,observations:[],canonical_return_committed:false,
+  execution_authorized:false,provider_outcome_verified:false,original_job_completed:false,replay_authorized:false};
+ const observe=async(e)=>caller(async(db,name)=>name==='reality_read_final_loop_shared_continuity_guard_v1'?
+  {...guard,obligations:[{...guard.obligations[0],execution_spine_readback:e}]}:load(db,name),{env:state});
+ assert.deepEqual((await observe(evidence)).shared_continuity_guard.handoffs[0].execution_spine_readback,evidence);
+ assert.equal((await observe({...evidence,replay_authorized:true})).status,
+  'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
+ assert.equal((await observe({...evidence,signed_observation_count:1})).status,
+  'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
  assert.equal(good.shared_continuity_guard.handoffs[0].universe_return_verified,false);
  assert.equal(good.executor_invoked,false);
  for(const [mutation,expected] of [

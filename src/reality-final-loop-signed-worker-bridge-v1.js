@@ -160,6 +160,30 @@ export function verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId}={}){
        (o.internal_maintenance_independent_frozen_ci_verified&&
         !HASH.test(o.internal_maintenance_verifier_receipt_sha256||'')))
       return safe('FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_PROOF_NOT_VERIFIED');
+
+    const executionReadback=o.execution_spine_readback??null;
+    if(executionReadback!==null){
+     const e=executionReadback;
+     if(!['NO_FENCED_CHILD_INVOCATION_OBSERVED','SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED',
+       'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'].includes(e.status)||
+      !Number.isSafeInteger(e.fenced_count)||e.fenced_count<0||e.fenced_count>63||
+      !Number.isSafeInteger(e.signed_observation_count)||e.signed_observation_count<0||
+      !Array.isArray(e.observations)||e.observations.length!==e.signed_observation_count||
+      new Set(e.observations.map(x=>x?.invocation_id)).size!==e.observations.length||
+      e.observations.some(x=>!/^work:[a-f0-9]{32}$/.test(x?.child_work_id||'')||
+       !UUID.test(x.invocation_id||'')||!UUID.test(x.worker_run_id||'')||!UUID.test(x.event_id||'')||
+       !HASH.test(x.scope_sha256||'')||!HASH.test(x.event_head_sha256||'')||
+       !HASH.test(x.release_receipt_sha256||'')||!Number.isSafeInteger(x.event_revision)||x.event_revision<1||
+       !/^[a-f0-9]{40}$/.test(x.release_sha||'')||x.worker_completed!==true||
+       x.provider_outcome_verified!==false||x.replay_authorized!==false||
+       typeof x.model_artifact_recorded!=='boolean')||
+      e.canonical_return_committed!==false||e.execution_authorized!==false||
+      e.provider_outcome_verified!==false||e.original_job_completed!==false||e.replay_authorized!==false||
+      (e.status==='NO_FENCED_CHILD_INVOCATION_OBSERVED'&&(e.fenced_count!==0||e.signed_observation_count!==0))||
+      (e.status==='SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'&&
+       (e.fenced_count===0||e.fenced_count!==e.signed_observation_count)))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
+    }
     verifiedHandoffs.push(Object.freeze({
      source_ref:j.source_ref,original_work_id:j.original_work_id,
      status:o.status,continuity_identity_verified:true,
@@ -175,6 +199,7 @@ export function verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId}={}){
      internal_maintenance_verifier_receipt_sha256:
       o.internal_maintenance_independent_frozen_ci_verified===true?
        o.internal_maintenance_verifier_receipt_sha256:null,
+     execution_spine_readback:executionReadback,
      original_claim_admitted:o.original_claim_admitted===true,
      independent_original_outcome_verified:
       o.independent_original_outcome_verified===true,
