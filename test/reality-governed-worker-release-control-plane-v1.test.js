@@ -65,7 +65,7 @@ test('qualified missing approval routes through existing durable preparation bef
  const qualification=s.indexOf('await qualifyCurrentIsolatedSignedWorkerRelease(');
  const switchIndex=s.indexOf('await triggerOneGovernedSignedWorkerReleaseSwitch(');
  assert.ok(qualification>0&&prepare>qualification&&switchIndex>prepare);
- assert.match(s,/if\(req.body.intent==='PREPARE_EXACT_RELEASE'\|\|req.body.intent==='OWNER_PREPARE_EXACT_RELEASE'\)/);
+ assert.match(s,/if\(signedPrepare\|\|req.body.intent==='PREPARE_EXACT_RELEASE'\|\|req.body.intent==='OWNER_PREPARE_EXACT_RELEASE'\)/);
  assert.match(s,/PRESENT_EXACT_OWNER_RELEASE_PACKET/);
 });
 
