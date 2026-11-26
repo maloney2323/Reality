@@ -86,7 +86,12 @@ BEGIN
   OR p_scope->>'parent_delivery_enabled' IS DISTINCT FROM 'false'
   OR p_scope->>'production_changed' IS DISTINCT FROM 'false'
   OR coalesce(p_scope->>'capability_key','') NOT IN
-   ('REQUALIFY_EXISTING_CONTINUITY_SOURCE','PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')
+   ('REQUALIFY_EXISTING_CONTINUITY_SOURCE','PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET','VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM')
+  OR (p_scope->>'capability_key'='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM' AND (
+   coalesce(p_scope->>'isolated_deployment_id','') !~ '^dpl_[A-Za-z0-9_-]{8,75}$'
+   OR p_scope->>'isolated_deployment_id'=p_scope->>'target_deployment_id'
+   OR coalesce(p_scope->>'isolated_transport_host','') !~ '^[-a-z0-9]+[.]vercel[.]app$'
+   OR coalesce(p_scope->>'independent_transport_proof_sha256','') !~ '^sha256:[a-f0-9]{64}$'))
  THEN RETURN false; END IF;
  IF NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shifts_v1 sh
   JOIN reality_internal.governed_employee_completion_warrants_v1 w
@@ -132,7 +137,9 @@ BEGIN
   AND o->>'continuity_identity_verified'='true'
   AND o->>'source_proof_verified'='true'
   AND o->>'execution_permitted_by_handoff'='false'
-  AND o->>'independent_original_outcome_verified'='false';
+  AND o->>'independent_original_outcome_verified'='false'
+  AND (p_scope->>'capability_key'<>'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM' OR
+       o->>'next_qualified_action'='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
  IF n<>1 THEN RETURN false;END IF;
  s:=public.reality_read_governed_worker_release_schedule_v1((p_scope->>'cron_job_id')::bigint);
  RETURN s->>'status'='GOVERNED_RELEASE_CRON_SCHEDULE_READ_ONLY'
