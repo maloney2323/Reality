@@ -482,7 +482,7 @@ export async function advanceCanonicalFinalLoopChildReview({
     !UUID.test(workerRunId||'')||typeof readCurrentContinuity!=='function'||
     typeof runIsolatedAdvisory!=='function')
   return no('FINAL_LOOP_CANONICAL_ISOLATED_EXECUTOR_CONNECTION_REQUIRED');
- if(trigger.status!=='FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY'||
+ if(trigger?.status!=='FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY'||
     trigger.review_claim_route_ready!==true||trigger.dispatch_permitted!==false||
     trigger.execution_authorized_by_trigger!==false||
     h?.status!=='CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED'||
@@ -583,10 +583,48 @@ export async function advanceCanonicalFinalLoopChildReview({
  }catch{return no('FINAL_LOOP_CANONICAL_ISOLATED_PROVIDER_UNCERTAIN_NO_REPLAY',{
   child_work_id:c.child_work_id,parent_original_work_id:h.parent_original_work_id
  });}
- return recordClaimedFinalLoopChildAdvisory({db,claim:c,mode,workerRunId,advisory,
+ // An adapter failure is never an outcome or a new authority decision.
+ if(advisory?.status!=='FINAL_LOOP_CHILD_CLAIMED_ADVISORY_UNTRUSTED')
+  return no('FINAL_LOOP_CANONICAL_ISOLATED_ADVISORY_NOT_VERIFIED_NO_REPLAY',{
+   child_work_id:c.child_work_id,parent_original_work_id:h.parent_original_work_id
+  });
+ const returned=await recordClaimedFinalLoopChildAdvisory({db,claim:c,mode,workerRunId,advisory,
   call,fetchImpl,recheckAlignment:async()=>{const current=await readCurrentChild();
    return current.status===(mode==='PREPARE'?'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK':
     'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE')&&
     current.child_work_id===c.child_work_id&&current.parent_original_work_id===h.parent_original_work_id;
   },canonicalHandoff:h});
+ if(returned.status!=='FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN')return returned;
+ // Independently read the canonical ledger's existing recovery proof after
+ // the verifier write. Never advance from only the writer's response.
+ try{
+  const ledger=await call(db,'reality_read_final_loop_child_recovery_v1',{
+   p_shift_id:h.shift_id,p_plan_id:h.plan_id},{fetchImpl});
+  const matching=ledger?.children?.filter(x=>x.child_original_work_id===c.child_work_id);
+  const receipt=matching?.[0],binding=receipt?.canonical_continuity_binding;
+  if(ledger?.status!=='FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT'||
+     ledger.independent_service_readback_verified!==true||
+     ledger.owner_id!==h.owner_id||ledger.shift_id!==h.shift_id||
+     ledger.parent_original_work_id!==h.parent_original_work_id||
+     ledger.parent_source_ref!==h.source_ref||
+     ledger.source_manifest_sha256!==h.source_manifest_sha256||
+     ledger.source_head_sha!==h.source_head_sha||
+     ledger.acceptance_contract_sha256!==h.acceptance_contract_sha256||
+     ledger.original_job_completed!==false||ledger.production_changed!==false||
+     matching?.length!==1||receipt.phase!=='VERIFIED'||
+     receipt.parent_original_work_id!==h.parent_original_work_id||
+     receipt.scope_sha256!==c.scope_sha256||
+     receipt.independently_verified!==true||receipt.verifier_independent!==true||
+     receipt.independent_receipt_sha256!==returned.independent_receipt_sha256||
+     binding?.continuity_root_id!==h.continuity_root_id||
+     binding.continuity_head_sha256!==h.continuity_head_sha256||
+     binding.revision!==h.revision||
+     binding.owner_approval_receipt_sha256!==h.owner_approval_receipt_sha256)
+    return no('FINAL_LOOP_CANONICAL_VERIFIER_RECEIPT_READBACK_REQUIRED_NO_REPLAY',{
+     child_work_id:c.child_work_id,parent_original_work_id:h.parent_original_work_id
+    });
+  return Object.freeze({...returned,canonical_verifier_receipt_readback_verified:true});
+ }catch{return no('FINAL_LOOP_CANONICAL_VERIFIER_RECEIPT_READBACK_REQUIRED_NO_REPLAY',{
+  child_work_id:c.child_work_id,parent_original_work_id:h.parent_original_work_id
+ });}
 }
