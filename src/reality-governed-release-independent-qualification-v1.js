@@ -6,6 +6,8 @@ import {createHash} from 'node:crypto';
 import {inspectFinalLoopSignedWorkerOperatingLane}
  from './reality-signed-worker-operating-lane-v1.js';
 import {connectExistingIsolatedChildTransport} from './reality-final-loop-child-transport-v1.js';
+import {requestReleaseProviderJson,releaseFailureReceipt,releaseIdentityFailure}
+ from './reality-governed-signed-worker-control-plane-adapters-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const REF=/^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$/;
 const PROJECT=/^[a-z0-9]{16,32}$/;
@@ -20,17 +22,13 @@ const base=Object.freeze({
 });
 const safe=(status,more={})=>Object.freeze({...base,status,...more});
 const digest=fields=>'sha256:'+createHash('sha256').update(JSON.stringify(fields)).digest('hex');
-async function getJson(fetchImpl,url,token,timeoutMs=7000){
- const controller=new AbortController();
- const timer=setTimeout(()=>controller.abort(),timeoutMs);
- try{
-  const r=await fetchImpl(url,{method:'GET',
-   headers:{Authorization:'Bearer '+token,Accept:'application/json'},
-   cache:'no-store',redirect:'error',signal:controller.signal});
-  if(!r?.ok)throw Error('INDEPENDENT_RELEASE_PROVIDER_READ_FAILED');
-  return await r.json();
- }finally{clearTimeout(timer)}
+async function getJson(fetchImpl,url,token,operation){
+ return requestReleaseProviderJson(fetchImpl,url,
+  {method:'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'}},operation);
 }
+const providerFailure=error=>({provider_failure:releaseFailureReceipt(error)});
+const identityFailure=(operation,value,fields)=>providerFailure(
+ releaseIdentityFailure('RELEASE_QUALIFICATION_IDENTITY_MISMATCH',operation,value,fields));
 export async function qualifyCurrentIsolatedSignedWorkerRelease({
  env=process.env,dbProject,db=null,fetchImpl=fetch,direction=null
 }={}){
@@ -100,9 +98,9 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  try{
   branches=await getJson(fetchImpl,
    'https://api.supabase.com/v1/projects/'+encodeURIComponent(parent)+'/branches',
-   env.REALITY_RELEASE_CONTROL_SUPABASE_MANAGEMENT_TOKEN);
- }catch{
-  return safe('INDEPENDENT_SUPABASE_BRANCH_ANCESTRY_READ_UNAVAILABLE');
+   env.REALITY_RELEASE_CONTROL_SUPABASE_MANAGEMENT_TOKEN,'SUPABASE_BRANCH_READ');
+ }catch(error){
+  return safe('INDEPENDENT_SUPABASE_BRANCH_ANCESTRY_READ_UNAVAILABLE',providerFailure(error));
  }
  const items=Array.isArray(branches)?branches:
   Array.isArray(branches?.branches)?branches.branches:[];
@@ -115,7 +113,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
    // independent qualification; the provider's failure remains recorded.
    (canonical&&reviewTransport&&b.status==='MIGRATIONS_FAILED')));
  if(exact.length!==1)
-  return safe('ISOLATED_SUPABASE_DEVELOPMENT_BRANCH_NOT_VERIFIED');
+  return safe('ISOLATED_SUPABASE_DEVELOPMENT_BRANCH_NOT_VERIFIED',identityFailure('SUPABASE_BRANCH_READ',branches,['branch_ancestry']));
  const migrationStatus=exact[0].status;
  if(reviewTransport&&env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY==='true')
   return safe('REVIEW_TRANSPORT_DIAGNOSTIC_ONLY_NOT_RELEASE_CAPACITY');
@@ -125,9 +123,9 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   ci=await getJson(fetchImpl,
    'https://api.github.com/repos/'+encodeURIComponent(org)+'/'+
     encodeURIComponent(name)+'/actions/runs/'+ciId,
-   env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN);
- }catch{
-  return safe('INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE');
+   env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN,'GITHUB_LIFECYCLE_CI_READ');
+ }catch(error){
+  return safe('INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE',providerFailure(error));
  }
  if(ci?.id!==ciId||ci.head_sha!==sha||
   ci.head_branch!==branch||
@@ -135,26 +133,26 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   ci.path!=='.github/workflows/reality-final-loop-engine-v1-ci.yml'||
   ci.status!=='completed'||ci.conclusion!=='success'||
   !['push','pull_request'].includes(ci.event))
-  return safe('INDEPENDENT_EXACT_RELEASE_CI_NOT_PASSED');
+  return safe('INDEPENDENT_EXACT_RELEASE_CI_NOT_PASSED',identityFailure('GITHUB_LIFECYCLE_CI_READ',ci,[...(ci?.head_sha!==sha?['release_sha']:[]),...(ci?.head_branch!==branch?['release_ref']:[]),...(ci?.id!==ciId||ci?.name!=='Reality Final Loop Engine lifecycle acceptance'||ci?.path!=='.github/workflows/reality-final-loop-engine-v1-ci.yml'?['ci_identity']:[]),...(ci?.status!=='completed'||ci?.conclusion!=='success'||!['push','pull_request'].includes(ci?.event)?['ci_result']:[])]));
  let gateway=null;
  if(canonical){
   try{gateway=await getJson(fetchImpl,'https://api.github.com/repos/'+encodeURIComponent(org)+'/'+
-    encodeURIComponent(name)+'/actions/runs/'+gatewayId,env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN)}
-  catch{return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE')}
+    encodeURIComponent(name)+'/actions/runs/'+gatewayId,env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN,'GITHUB_GATEWAY_CI_READ')}
+  catch(error){return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE',providerFailure(error))}
   if(gateway?.id!==gatewayId||gateway.head_sha!==sha||gateway.head_branch!==branch||
    gateway.name!=='Reality — Isolated governed OpenAI gateway proof'||gateway.path!==gatewayPath||
    gateway.status!=='completed'||gateway.conclusion!=='success'||!['push','pull_request'].includes(gateway.event))
-   return safe('INDEPENDENT_GATEWAY_CI_NOT_PASSED');
+   return safe('INDEPENDENT_GATEWAY_CI_NOT_PASSED',identityFailure('GITHUB_GATEWAY_CI_READ',gateway,[...(gateway?.head_sha!==sha?['release_sha']:[]),...(gateway?.head_branch!==branch?['release_ref']:[]),...(gateway?.id!==gatewayId||gateway?.name!=='Reality — Isolated governed OpenAI gateway proof'||gateway?.path!==gatewayPath?['ci_identity']:[]),...(gateway?.status!=='completed'||gateway?.conclusion!=='success'||!['push','pull_request'].includes(gateway?.event)?['ci_result']:[])]));
  }
  let d;
  try{
   const data=await getJson(fetchImpl,
    'https://api.vercel.com/v13/deployments/'+encodeURIComponent(vercelId)+
    '?teamId='+encodeURIComponent(env.REALITY_VERIFIED_VERCEL_TEAM_ID),
-   env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN);
+   env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN,'VERCEL_CANDIDATE_READ');
   d=data?.deployment??data;
- }catch{
-  return safe('INDEPENDENT_EXACT_VERCEL_DEPLOYMENT_READ_UNAVAILABLE');
+ }catch(error){
+  return safe('INDEPENDENT_EXACT_VERCEL_DEPLOYMENT_READ_UNAVAILABLE',providerFailure(error));
  }
  if(d?.id!==vercelId||
   (d.project?.id??d.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
@@ -162,7 +160,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   d.meta?.githubCommitSha!==sha||
   d.meta?.githubCommitRef!==branch||
   d.meta?.githubOrg!==org||d.meta?.githubRepo!==name)
-  return safe('VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH');
+  return safe('VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH',identityFailure('VERCEL_CANDIDATE_READ',d,[...(d?.id!==vercelId?['deployment_id']:[]),...((d?.project?.id??d?.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),...(d?.state!=='READY'?['ready_state']:[]),...(d?.target==='production'?['preview_target']:[]),...(d?.meta?.githubCommitSha!==sha?['release_sha']:[]),...(d?.meta?.githubCommitRef!==branch?['release_ref']:[]),...(d?.meta?.githubOrg!==org||d?.meta?.githubRepo!==name?['repository']:[])]));
  let transport=null;
  if(reviewTransport){
   if(!canonical)return safe('CANONICAL_REVIEW_TRANSPORT_REQUIRED');
@@ -173,13 +171,13 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   let peer;
   try{
    const data=await getJson(fetchImpl,'https://api.vercel.com/v13/deployments/'+encodeURIComponent(peerId)+
-    '?teamId='+encodeURIComponent(env.REALITY_VERIFIED_VERCEL_TEAM_ID),env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN);
+    '?teamId='+encodeURIComponent(env.REALITY_VERIFIED_VERCEL_TEAM_ID),env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN,'VERCEL_ISOLATED_PEER_READ');
    peer=data?.deployment??data;
-  }catch{return safe('ISOLATED_REVIEW_DEPLOYMENT_READ_UNAVAILABLE')}
+  }catch(error){return safe('ISOLATED_REVIEW_DEPLOYMENT_READ_UNAVAILABLE',providerFailure(error))}
   if(peer?.id!==peerId||peer.url!==peerHost||peer.state!=='READY'||peer.target==='production'||
    (peer.project?.id??peer.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
    peer.meta?.githubCommitSha!==sha||peer.meta?.githubOrg!==org||peer.meta?.githubRepo!==name)
-   return safe('ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
+   return safe('ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH',identityFailure('VERCEL_ISOLATED_PEER_READ',peer,[...(peer?.id!==peerId?['deployment_id']:[]),...(peer?.url!==peerHost?['peer_host']:[]),...((peer?.project?.id??peer?.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),...(peer?.state!=='READY'?['ready_state']:[]),...(peer?.target==='production'?['preview_target']:[]),...(peer?.meta?.githubCommitSha!==sha?['release_sha']:[]),...(peer?.meta?.githubOrg!==org||peer?.meta?.githubRepo!==name?['repository']:[])]));
   const probe=await connectExistingIsolatedChildTransport({db,env,fetchImpl});
   if(probe.ready!==true||probe.isolated_deployment_id!==peerId||probe.isolated_host!==peerHost||
    probe.canonical_deployment_id!==vercelId||probe.isolated_project_ref!==isolated||
