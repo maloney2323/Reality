@@ -767,3 +767,15 @@ test('canonical observation return preserves event lineage and never replays sta
  assert.match(sql,/FINAL_LOOP_SPINE_RETURN_EVENT_CAS_FAILED/);
  assert.doesNotMatch(sql,/pg_catalog\.to_jsonb\(v\)|governed_wake_nonce|DELETE FROM|net\.http_post/);
 });
+
+test('completed prior preclaim events remain observations rather than fabricated provider outcomes',()=>{
+ const sql=readFileSync(new URL('../sql/reality-final-loop-execution-spine-return-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/SIGNED_WORKER_FINISHED_NO_CANONICAL_CHILD_CLAIM_OBSERVED/);
+ assert.match(sql,/r\.status='COMPLETED' AND r\.finished_at IS NOT NULL AND r\.worker_stage='WORKER_RESPONSE_PUBLICATION'/);
+ assert.match(sql,/a\.claim_id=v\.release_continuation_claim_id/);
+ assert.match(sql,/a\.runtime_scope->>'continuity_revision'=v\.continuity_revision::text/);
+ assert.match(sql,/a\.runtime_scope->>'qualifier_receipt_sha256'=v\.source_receipt_sha256/);
+ assert.match(sql,/c\.claimant_worker_run_id=r\.run_id OR c\.canonical_verify_invocation_run_id=r\.run_id/);
+ assert.match(sql,/'canonical_child_claim_observed',false,'provider_outcome_verified',false/);
+ assert.match(sql,/'prior_preclaim_worker_observations',prior_preclaim_events/);
+});

@@ -12,6 +12,7 @@ DECLARE s record; p jsonb; g jsonb; o jsonb; e jsonb; tail record;
  sub_count integer; rebound integer; old_events jsonb; old_count integer;
  observed_count integer; stale_count integer; after_p jsonb; after_g jsonb;
  current_event_id uuid; qualifier jsonb; qualifier_digest text;
+ prior_preclaim_events jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_SPINE_RETURN_SERVICE_ONLY';END IF;
  IF p_shift_id IS NULL OR p_worker_run_id IS NULL
@@ -99,6 +100,42 @@ BEGIN
   AND q.reconciliation_checked_at>=pg_catalog.clock_timestamp()-interval '10 minutes'
  ORDER BY q.reconciliation_checked_at DESC LIMIT 1;
  IF NOT FOUND THEN RETURN jsonb_build_object('status','FINAL_LOOP_SPINE_RETURN_FRESH_QUALIFIER_REQUIRED');END IF;
+ -- A prior signed release can finish before a child claim exists (for
+ -- example, when the RPC gateway rejects a newly installed capability).
+ -- Retain that completed event as an observation of the worker boundary.
+ -- Absence of a canonical child claim is NOT a provider outcome.
+ SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'event_id',v.event_id,'worker_run_id',r.run_id,
+  'release_sha',w.running_release_sha,'release_receipt_sha256',w.release_receipt_sha256,
+  'canonical_child_claim_observed',false,'provider_outcome_verified',false,
+  'replay_authorized',false) ORDER BY v.event_id),'[]'::jsonb)
+ INTO prior_preclaim_events
+ FROM reality_internal.final_loop_resume_events_v1 v
+ JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=v.governed_wake_worker_run_id
+ JOIN reality_internal.governed_signed_worker_release_wakes_v1 w ON w.worker_run_id=r.run_id
+  AND w.owner_id=v.owner_id AND w.shift_id=v.shift_id AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+ JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
+  AND a.claim_id=v.release_continuation_claim_id AND a.owner_id=v.owner_id AND a.shift_id=v.shift_id
+  AND a.release_sha=w.running_release_sha AND a.state='CLAIMED_ONCE'
+  AND a.provider_alias_observed_at IS NOT NULL
+  AND a.approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+  AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND a.runtime_scope->>'original_work_id'=v.original_work_id
+  AND a.runtime_scope->>'source_ref'=v.source_ref
+  AND a.runtime_scope->>'continuity_head_sha256'=v.continuity_head_sha256
+  AND a.runtime_scope->>'continuity_revision'=v.continuity_revision::text
+  AND a.runtime_scope->>'qualifier_receipt_sha256'=v.source_receipt_sha256
+ WHERE v.shift_id=p_shift_id AND v.owner_id=s.owner_id AND v.original_work_id=p_original_work_id
+  AND v.source_ref=o->>'source_ref' AND v.state='SHADOW_PENDING'
+  AND v.continuity_head_sha256=p_expected_head_sha256 AND v.continuity_revision=p_expected_revision
+  AND v.signal_kind='QUALIFIER_PROOF_CHANGED'
+  AND v.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND v.source_receipt_sha256=qualifier_digest AND v.governed_wake_queued_at IS NOT NULL
+  AND v.governed_wake_request_id IS NOT NULL AND r.run_id<>p_worker_run_id
+  AND r.status='COMPLETED' AND r.finished_at IS NOT NULL AND r.worker_stage='WORKER_RESPONSE_PUBLICATION'
+  AND w.release_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 c
+    WHERE c.claimant_worker_run_id=r.run_id OR c.canonical_verify_invocation_run_id=r.run_id);
  -- An old unissued signal may be marked stale ONLY if its obligations
  -- survive explicitly in the newer verified qualifier. Never erase it,
  -- treat it as completed, or discard a dispatched/unconfirmed request.
@@ -109,6 +146,8 @@ BEGIN
     OR v.continuity_head_sha256<>p_expected_head_sha256 OR v.continuity_revision<>p_expected_revision
     OR NOT (v.event_id=current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x
       WHERE x.value->>'event_id'=v.event_id::text)
+      OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(prior_preclaim_events) x
+        WHERE x.value->>'event_id'=v.event_id::text)
       OR (v.signal_kind='QUALIFIER_PROOF_CHANGED' AND v.governed_wake_worker_run_id IS NULL
        AND v.governed_wake_request_id IS NULL AND v.governed_wake_queued_at IS NULL
        AND v.source_receipt_sha256<>qualifier_digest
@@ -140,6 +179,8 @@ BEGIN
   'continuity_revision',v.continuity_revision,'state',v.state,
   'worker_run_id',v.governed_wake_worker_run_id,
   'disposition',CASE WHEN v.event_id=current_event_id THEN 'EVIDENCE_ONLY_RETURN'
+   WHEN EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(prior_preclaim_events) x
+     WHERE x.value->>'event_id'=v.event_id::text) THEN 'SIGNED_WORKER_FINISHED_NO_CANONICAL_CHILD_CLAIM_OBSERVED'
    WHEN v.governed_wake_worker_run_id IS NULL THEN 'STALE_SIGNAL_OBLIGATION_PRESERVED'
    ELSE 'HISTORICAL_INVOCATION_OBSERVED' END
  ) ORDER BY v.event_id),'[]'::jsonb)
@@ -150,7 +191,8 @@ BEGIN
  payload:=pg_catalog.jsonb_build_object('schema','reality-final-loop-invocation-observation-return-v1',
   'owner_id',s.owner_id,'shift_id',p_shift_id,'original_work_id',p_original_work_id,
   'source_ref',o->>'source_ref','observation_sha256',observation_hash,'invocation_observations',e->'observations',
-  'prior_resume_events',old_events,'unresolved_proof_gates',qualifier->'unsatisfied_gates',
+  'prior_resume_events',old_events,'prior_preclaim_worker_observations',prior_preclaim_events,
+  'unresolved_proof_gates',qualifier->'unsatisfied_gates',
   'terminal_recovery_history',qualifier->'recovery_terminal_history',
   'provider_outcome_verified',false,'original_job_completed',false,
   'execution_authorized',false,'replay_authorized',false,'production_changed',false);
@@ -185,11 +227,12 @@ BEGIN
   effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash)
  VALUES(event,'OBSERVATION','reality_final_loop_invocation_observation_v1',event,root,tail.worldline_id,tail.event_id,
   stamp,stamp,'OBSERVED',payload,refs,provenance,content_hash,lineage);
- UPDATE reality_internal.final_loop_resume_events_v1 v SET state='SHADOW_OBSERVED'
+ UPDATE reality_internal.final_loop_resume_events_v1 v SET state='SHADOW_OBSERVED',observed_at=stamp
  WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING'
-  AND (v.event_id=current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x WHERE x.value->>'event_id'=v.event_id::text));
+  AND (v.event_id=current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(e->'observations') x WHERE x.value->>'event_id'=v.event_id::text)
+   OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(prior_preclaim_events) x WHERE x.value->>'event_id'=v.event_id::text));
  GET DIAGNOSTICS observed_count=ROW_COUNT;
- UPDATE reality_internal.final_loop_resume_events_v1 v SET state='SHADOW_STALE'
+ UPDATE reality_internal.final_loop_resume_events_v1 v SET state='SHADOW_STALE',observed_at=stamp
  WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING'
   AND v.governed_wake_worker_run_id IS NULL AND v.governed_wake_request_id IS NULL
   AND v.governed_wake_queued_at IS NULL
@@ -217,6 +260,7 @@ BEGIN
   'canonical_return_committed',true,'event_id',event,'checkpoint_receipt_id',receipt,
   'observation_sha256',observation_hash,'continuity_head_sha256','sha256:'||lineage,
   'revision',p_expected_revision+1,'rebound_subscriptions',rebound,'observed_events',observed_count,'stale_signals_preserved',stale_count,
+  'prior_preclaim_workers_observed',pg_catalog.jsonb_array_length(prior_preclaim_events),
   'execution_authorized',false,'replay_authorized',false,'original_job_completed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint) FROM PUBLIC,anon,authenticated;
