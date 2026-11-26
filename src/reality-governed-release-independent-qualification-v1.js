@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {inspectFinalLoopSignedWorkerOperatingLane}
  from './reality-signed-worker-operating-lane-v1.js';
 import {connectExistingIsolatedChildTransport} from './reality-final-loop-child-transport-v1.js';
-import {requestReleaseProviderJson,releaseFailureReceipt,releaseIdentityFailure}
+import {requestReleaseProviderJson,releaseFailureReceipt,releaseIdentityFailure,verifiedVercelDeploymentReadiness}
  from './reality-governed-signed-worker-control-plane-adapters-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
 const REF=/^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$/;
@@ -156,11 +156,11 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  }
  if(d?.id!==vercelId||
   (d.project?.id??d.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
-  d.state!=='READY'||d.target==='production'||
+  verifiedVercelDeploymentReadiness(d)!=='READY'||d.target==='production'||
   d.meta?.githubCommitSha!==sha||
   d.meta?.githubCommitRef!==branch||
   d.meta?.githubOrg!==org||d.meta?.githubRepo!==name)
-  return safe('VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH',identityFailure('VERCEL_CANDIDATE_READ',d,[...(d?.id!==vercelId?['deployment_id']:[]),...((d?.project?.id??d?.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),...(d?.state!=='READY'?['ready_state']:[]),...(d?.target==='production'?['preview_target']:[]),...(d?.meta?.githubCommitSha!==sha?['release_sha']:[]),...(d?.meta?.githubCommitRef!==branch?['release_ref']:[]),...(d?.meta?.githubOrg!==org||d?.meta?.githubRepo!==name?['repository']:[])]));
+  return safe('VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH',identityFailure('VERCEL_CANDIDATE_READ',d,[...(d?.id!==vercelId?['deployment_id']:[]),...((d?.project?.id??d?.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),...(verifiedVercelDeploymentReadiness(d)!=='READY'?['ready_state']:[]),...(d?.target==='production'?['preview_target']:[]),...(d?.meta?.githubCommitSha!==sha?['release_sha']:[]),...(d?.meta?.githubCommitRef!==branch?['release_ref']:[]),...(d?.meta?.githubOrg!==org||d?.meta?.githubRepo!==name?['repository']:[])]));
  let transport=null;
  if(reviewTransport){
   if(!canonical)return safe('CANONICAL_REVIEW_TRANSPORT_REQUIRED');
@@ -174,10 +174,10 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
     '?teamId='+encodeURIComponent(env.REALITY_VERIFIED_VERCEL_TEAM_ID),env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN,'VERCEL_ISOLATED_PEER_READ');
    peer=data?.deployment??data;
   }catch(error){return safe('ISOLATED_REVIEW_DEPLOYMENT_READ_UNAVAILABLE',providerFailure(error))}
-  if(peer?.id!==peerId||peer.url!==peerHost||peer.state!=='READY'||peer.target==='production'||
+  if(peer?.id!==peerId||peer.url!==peerHost||verifiedVercelDeploymentReadiness(peer)!=='READY'||peer.target==='production'||
    (peer.project?.id??peer.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
    peer.meta?.githubCommitSha!==sha||peer.meta?.githubOrg!==org||peer.meta?.githubRepo!==name)
-   return safe('ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH',identityFailure('VERCEL_ISOLATED_PEER_READ',peer,[...(peer?.id!==peerId?['deployment_id']:[]),...(peer?.url!==peerHost?['peer_host']:[]),...((peer?.project?.id??peer?.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),...(peer?.state!=='READY'?['ready_state']:[]),...(peer?.target==='production'?['preview_target']:[]),...(peer?.meta?.githubCommitSha!==sha?['release_sha']:[]),...(peer?.meta?.githubOrg!==org||peer?.meta?.githubRepo!==name?['repository']:[])]));
+   return safe('ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH',identityFailure('VERCEL_ISOLATED_PEER_READ',peer,[...(peer?.id!==peerId?['deployment_id']:[]),...(peer?.url!==peerHost?['peer_host']:[]),...((peer?.project?.id??peer?.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),...(verifiedVercelDeploymentReadiness(peer)!=='READY'?['ready_state']:[]),...(peer?.target==='production'?['preview_target']:[]),...(peer?.meta?.githubCommitSha!==sha?['release_sha']:[]),...(peer?.meta?.githubOrg!==org||peer?.meta?.githubRepo!==name?['repository']:[])]));
   const probe=await connectExistingIsolatedChildTransport({db,env,fetchImpl});
   if(probe.ready!==true||probe.isolated_deployment_id!==peerId||probe.isolated_host!==peerHost||
    probe.canonical_deployment_id!==vercelId||probe.isolated_project_ref!==isolated||
@@ -187,7 +187,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
    provider_migration_status:migrationStatus,exact_runtime_database_contract_verified:true,
    independent_transport_proof_sha256:digest([vercelId,peerId,peerHost,sha,dbProject,isolated,migrationStatus,'LIVE_SERVICE_ROLE_NEGATIVE_CONTROLS'])};
  }
- const providerProof=digest([repo,sha,branch,ci.id,ci.path,ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,d.state,d.target??null,
+ const providerProof=digest([repo,sha,branch,ci.id,ci.path,ci.status,ci.conclusion,d.id,d.project?.id??d.projectId,verifiedVercelDeploymentReadiness(d),d.target??null,
   ...(transport?[transport.isolated_deployment_id,transport.independent_transport_proof_sha256]:[]),
   ...(canonical?[gateway.id,gateway.path,gateway.status,gateway.conclusion]:[])]);
  const isolationProof=digest([exact[0].project_ref,exact[0].parent_project_ref,exact[0].is_default,exact[0].status,
