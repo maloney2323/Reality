@@ -218,3 +218,76 @@ test('candidate readiness is fail closed and modern/legacy proofs are identical'
  const foreign=await fixture({deploy:{...deploy,readyState:'READY',project:{id:'prj_other'}}}).result;
  assert.deepEqual(foreign.provider_failure.mismatched_fields,['project_id']);
 });
+
+test('public CI is explicit, credential-free, exact and never falls back after rejection',async()=>{
+ const repository={id:91423,full_name:'org/repo',private:false,visibility:'public'};
+ const publicEnv={...env,REALITY_RELEASE_GITHUB_CI_READ_MODE:'PUBLIC_ONLY',
+  REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:undefined};
+ const ci={id:2004,head_sha:sha,head_branch:branch,
+  name:'Reality Final Loop Engine lifecycle acceptance',
+  path:'.github/workflows/reality-final-loop-engine-v1-ci.yml',
+  status:'completed',conclusion:'success',event:'push',repository};
+ const dep={id:'dpl_verified1234',project:{id:'prj_verified1234'},readyState:'READY',target:null,
+  meta:{githubCommitSha:sha,githubCommitRef:branch,githubOrg:'org',githubRepo:'repo'}};
+ const run=async({e=publicEnv,repo=repository,workflow=ci,repoStatus=200,ciStatus=200}={})=>{
+  const calls=[];
+  const result=await qualify({env:e,dbProject:project,fetchImpl:async(url,init)=>{
+   const u=String(url);calls.push(u);
+   assert.equal(init.method,'GET');assert.equal(init.redirect,'error');
+   if(u.includes('api.github.com')){
+    if(e.REALITY_RELEASE_GITHUB_CI_READ_MODE==='PUBLIC_ONLY')
+     assert.equal(Object.hasOwn(init.headers,'Authorization'),false);
+    else assert.equal(init.headers.Authorization,'Bearer '+e.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN);
+    const meta=u.endsWith('/org/repo');
+    const status=meta?repoStatus:ciStatus;
+    return {ok:status===200,status,json:async()=>meta?repo:workflow};
+   }
+   return {ok:true,status:200,json:async()=>u.includes('api.supabase.com')?
+    [{project_ref:project,parent_project_ref:parent,is_default:false,
+      preview_project_status:'ACTIVE_HEALTHY',status:'FUNCTIONS_DEPLOYED'}]:dep};
+  }});
+  return {result,calls};
+ };
+ const good=await run();
+ assert.equal(good.result.status,'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY');
+ assert.equal(good.result.github_ci_read_mode,'PUBLIC_ONLY');
+ assert.equal(good.result.public_repository_independently_verified,true);
+ assert.equal(good.result.owner_approval_granted,false);
+ assert.equal(good.result.release_activated,false);
+ assert.equal(good.calls.length,4);
+ const ignoredSecret=await run({e:{...publicEnv,REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:'unused-private-token'}});
+ assert.equal(ignoredSecret.result.provider_release_proof_sha256,good.result.provider_release_proof_sha256);
+ for(const badRepo of [{...repository,private:true},{...repository,visibility:'internal'},
+  {...repository,full_name:'other/repo'},{...repository,id:undefined},{...repository,visibility:undefined}]){
+  const blocked=await run({repo:badRepo});
+  assert.equal(blocked.result.status,'INDEPENDENT_PUBLIC_REPOSITORY_IDENTITY_NOT_VERIFIED');
+  assert.equal(blocked.calls.length,2);
+ }
+ for(const badRun of [{...ci,repository:{...repository,id:91424}},
+  {...ci,repository:{...repository,private:true}},{...ci,repository:undefined}]){
+  const blocked=await run({workflow:badRun});
+  assert.equal(blocked.result.status,'INDEPENDENT_PUBLIC_LIFECYCLE_REPOSITORY_IDENTITY_NOT_VERIFIED');
+  assert.equal(blocked.calls.length,3);
+ }
+ for(const badRun of [{...ci,head_sha:'b'.repeat(40)},{...ci,head_branch:'wrong'},
+  {...ci,conclusion:'failure'},{...ci,path:'.github/workflows/wrong.yml'}]){
+  assert.equal((await run({workflow:badRun})).result.status,'INDEPENDENT_EXACT_RELEASE_CI_NOT_PASSED');
+ }
+ for(const status of [401,403,404,429,503]){
+  const blocked=await run({repoStatus:status});
+  assert.equal(blocked.result.status,'INDEPENDENT_PUBLIC_REPOSITORY_READ_UNAVAILABLE');
+  assert.equal(blocked.result.provider_failure.http_status,status);
+  assert.equal(blocked.calls.length,2);
+  const ciBlocked=await run({ciStatus:status});
+  assert.equal(ciBlocked.result.status,'INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE');
+  assert.equal(ciBlocked.calls.length,3);
+ }
+ const authRejected=await run({e:env,ciStatus:401});
+ assert.equal(authRejected.result.status,'INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE');
+ assert.equal(authRejected.result.provider_failure.credential_rejected,true);
+ assert.equal(authRejected.calls.length,2);
+ assert.equal((await run({e:{...publicEnv,REALITY_RELEASE_GITHUB_CI_READ_MODE:'AUTO'}})).result.status,
+  'PINNED_RELEASE_OR_PROVIDER_PROOF_CONFIG_MISSING');
+ assert.equal((await run({e:{...env,REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:undefined}})).result.status,
+  'PINNED_RELEASE_OR_PROVIDER_PROOF_CONFIG_MISSING');
+});
