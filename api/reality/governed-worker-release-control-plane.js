@@ -4,7 +4,8 @@
 // release switch. This endpoint cannot touch cron or mint owner authority.
 import crypto from 'node:crypto';
 import {authenticatedChatSession,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
-import {shiftDatabase} from '../../src/reality-governed-shift-boundary-v1.js';
+import {shiftDatabase,shiftRpc} from '../../src/reality-governed-shift-boundary-v1.js';
+import {authenticateSignedReleasePreparation} from '../../src/reality-governed-release-preparation-handoff-v1.js';
 import {createTrustedSignedWorkerReleaseControlPlaneAdapters,releaseFailureReceipt}
  from '../../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
 import {qualifyCurrentIsolatedSignedWorkerRelease}
@@ -78,12 +79,15 @@ export default async function handler(req,res){
   {...process.env,REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID:process.env.VERCEL_DEPLOYMENT_ID}:process.env;
  const ownerChannel=['OWNER_PREPARE_EXACT_RELEASE','OWNER_APPROVE_EXACT_RELEASE'].includes(req.body?.intent);
  const ownerApprove=ownerChannel&&req.body.intent==='OWNER_APPROVE_EXACT_RELEASE';
- if(env.VERCEL_ENV!=='preview'||(!ownerChannel&&
+ const signedPrepare=req.body?.intent==='SIGNED_WAKE_PREPARE_EXACT_RELEASE';
+ if(env.VERCEL_ENV!=='preview'||(!ownerChannel&&!signedPrepare&&
    !authorizedReleaseOperator(req.headers?.authorization,env.REALITY_RELEASE_CONTROL_OPERATOR_TOKEN)))
   return result(res,403,'GOVERNED_RELEASE_CONTROL_OPERATOR_AUTH_REQUIRED');
  if(ownerChannel&&!validOwnerReleaseIntent(req))
   return result(res,403,'GOVERNED_RELEASE_CHAT_EXACT_OWNER_ACTION_REQUIRED');
- if(!ownerChannel&&(Object.keys(req.query||{}).length||
+ if(signedPrepare&&(Object.keys(req.query||{}).length||!/^application\/json(?:;|$)/i.test(req.headers?.['content-type']||'')))
+  return result(res,403,'SIGNED_RELEASE_PREPARATION_REQUEST_INVALID');
+ if(!ownerChannel&&!signedPrepare&&(Object.keys(req.query||{}).length||
   !req.body||typeof req.body!=='object'||
   Array.isArray(req.body)||Object.getPrototypeOf(req.body)!==Object.prototype||
   Object.keys(req.body).join(',')!=='intent'||
@@ -99,6 +103,20 @@ export default async function handler(req,res){
    if(!session)return result(res,401,'GOVERNED_RELEASE_CHAT_SIGN_IN_REQUIRED');
   }
   const db=shiftDatabase(env);
+  const event=signedPrepare?authenticateSignedReleasePreparation({body:req.body,env,db}):null;
+  if(signedPrepare&&!event)return result(res,403,'SIGNED_RELEASE_PREPARATION_AUTH_REQUIRED');
+  let verifiedEvent=null;
+  if(event){
+   const e=await shiftRpc(db,'reality_read_signed_release_preparation_event_v1',{
+    p_owner_id:event.owner_id,p_shift_id:event.shift_id,p_plan_fingerprint:event.plan,p_event_id:event.event_id,
+    p_worker_run_id:event.worker_run_id,p_lease_id:event.lease_id,p_running_release:event.running_release,
+    p_head:event.head,p_revision:event.revision});
+   if(e?.status!=='SIGNED_RELEASE_PREPARATION_EVENT_VERIFIED'||e.event_id!==event.event_id||
+      e.worker_run_id!==event.worker_run_id||e.shift_id!==event.shift_id||e.read_only!==true||
+      e.execution_authorized!==false||e.owner_approval_granted!==false||e.production_changed!==false||e.original_job_completed!==false)
+    return result(res,409,'SIGNED_RELEASE_PREPARATION_EVENT_UNVERIFIED',{release_switch_attempted:false});
+   verifiedEvent=e;
+  }
   if(ownerChannel&&!ownerReleaseScopeMatches(session,db,env))
    return result(res,403,'GOVERNED_RELEASE_CHAT_OWNER_SCOPE_DENIED');
   adapters=createTrustedSignedWorkerReleaseControlPlaneAdapters({
@@ -141,6 +159,13 @@ export default async function handler(req,res){
   const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
   const direction=canonical?await adapters.readDirection({ownerId:env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID,
     shiftId:env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID}):null;
+  if(event&&(direction?.status!=='GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED'||direction.owner_id!==event.owner_id||
+     direction.shift_id!==event.shift_id||direction.plan_fingerprint!==event.plan||
+     direction.continuity_head_sha256!==event.head||direction.continuity_revision!==event.revision||
+     direction.original_work_id!==verifiedEvent.original_work_id||direction.source_ref!==verifiedEvent.source_ref||
+     direction.qualifier_receipt_sha256!==verifiedEvent.qualifier_receipt_sha256||
+     direction.observed_alias_release_sha!==event.running_release||direction.configured_target_release_sha!==event.target_release))
+   return result(res,409,'SIGNED_RELEASE_PREPARATION_DIRECTION_CHANGED',{release_switch_attempted:false});
   const proof=await qualifyCurrentIsolatedSignedWorkerRelease({
    env,dbProject:db.project,db,fetchImpl:fetch,direction
   });
@@ -201,7 +226,7 @@ export default async function handler(req,res){
    return result(res,409,'GOVERNED_RELEASE_EXACT_OWNER_APPROVAL_PENDING',{
     release_switch_attempted:false
    });
-  if(req.body.intent==='PREPARE_EXACT_RELEASE'||req.body.intent==='OWNER_PREPARE_EXACT_RELEASE')
+  if(signedPrepare||req.body.intent==='PREPARE_EXACT_RELEASE'||req.body.intent==='OWNER_PREPARE_EXACT_RELEASE')
    return result(res,200,'GOVERNED_RELEASE_EXISTING_EXACT_APPROVAL_READ',{
     release_switch_attempted:false,
     next_governed_action:'SWITCH_EXACT_APPROVED_RELEASE_UNDER_EXISTING_ONE_USE_CLAIM'

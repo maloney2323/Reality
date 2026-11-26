@@ -53,16 +53,28 @@ check(process.env.GITHUB_ACTIONS==='true'&&
  process.env.GITHUB_HEAD_REF!=='forked-untrusted',
  'GITHUB_SIGNED_REPOSITORY_RUN_REQUIRED');
 const commit=git(['rev-parse','HEAD']);
-check(SHA.test(commit)&&commit===process.env.GITHUB_SHA,
- 'CURRENT_GITHUB_COMMIT_IDENTITY_MISMATCH');
-if(process.env.GITHUB_EVENT_NAME==='push')
- check(process.env.GITHUB_REF===
-  'refs/heads/feature/final-loop-governed-qualification-handoff-20261123',
-  'PREVIEW_BRANCH_ONLY');
-if(process.env.GITHUB_EVENT_NAME==='pull_request')
- check(process.env.GITHUB_HEAD_REF===
-  'feature/final-loop-governed-qualification-handoff-20261123',
+const trustedBranch='feature/final-loop-governed-qualification-handoff-20261123';
+check(SHA.test(commit),'CURRENT_GITHUB_COMMIT_IDENTITY_MISMATCH');
+if(process.env.GITHUB_EVENT_NAME==='push'){
+ check(commit===process.env.GITHUB_SHA,'CURRENT_GITHUB_COMMIT_IDENTITY_MISMATCH');
+ check(process.env.GITHUB_REF==='refs/heads/'+trustedBranch,'PREVIEW_BRANCH_ONLY');
+}else{
+ // The cross-layer suite runs on the merge result. The frozen artifact
+ // separately tests the exact immutable PR head, never relabels a merge.
+ const event=JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+ const pr=event.pull_request;
+ check(pr?.head?.repo?.full_name===process.env.GITHUB_REPOSITORY&&
+  pr?.base?.repo?.full_name===process.env.GITHUB_REPOSITORY&&
+  pr.head.repo.id===event.repository?.id&&pr.base.repo.id===event.repository?.id&&
+  SHA.test(pr.head.sha||'')&&SHA.test(pr.base.sha||'')&&
+  pr.head.ref===process.env.GITHUB_HEAD_REF&&pr.base.ref===process.env.GITHUB_BASE_REF&&
+  (pr.head.ref===trustedBranch||pr.base.ref===trustedBranch),
   'PR_HEAD_ONLY');
+ check(commit===pr.head.sha&&
+  git(['rev-parse',process.env.GITHUB_SHA+'^1'])===pr.base.sha&&
+  git(['rev-parse',process.env.GITHUB_SHA+'^2'])===pr.head.sha,
+  'CURRENT_GITHUB_COMMIT_IDENTITY_MISMATCH');
+}
 const raw=readFileSync(file,'utf8'),spec=JSON.parse(raw);
 check(spec&&typeof spec==='object'&&!Array.isArray(spec)&&
  spec.schema==='reality-final-loop-sourcebound-frozen-recovery-v1'&&

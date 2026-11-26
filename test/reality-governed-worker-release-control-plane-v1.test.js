@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {authorizedReleaseOperator,validOwnerReleaseIntent,ownerReleaseScopeMatches,default as handler}
  from '../api/reality/governed-worker-release-control-plane.js';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 
 function res(){
  const out={statusCode:200,headers:{},body:null};
@@ -64,7 +65,7 @@ test('qualified missing approval routes through existing durable preparation bef
  const qualification=s.indexOf('await qualifyCurrentIsolatedSignedWorkerRelease(');
  const switchIndex=s.indexOf('await triggerOneGovernedSignedWorkerReleaseSwitch(');
  assert.ok(qualification>0&&prepare>qualification&&switchIndex>prepare);
- assert.match(s,/if\(req.body.intent==='PREPARE_EXACT_RELEASE'\|\|req.body.intent==='OWNER_PREPARE_EXACT_RELEASE'\)/);
+ assert.match(s,/if\(signedPrepare\|\|req.body.intent==='PREPARE_EXACT_RELEASE'\|\|req.body.intent==='OWNER_PREPARE_EXACT_RELEASE'\)/);
  assert.match(s,/PRESENT_EXACT_OWNER_RELEASE_PACKET/);
 });
 
@@ -181,4 +182,112 @@ test('release explanation separates verified delivery from completion and preser
  const chat=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
  assert.match(chat,/id:'worker_observation',read:\(\)=>readVerifiedIndependentWorkerForChat/);
  assert.match(chat,/ctx.values.worker_observation\|\|\[\]/);
+});
+
+
+test('authenticated Chat automatically prepares once per signed epoch without approving or polling',async()=>{
+ const source=readFileSync(new URL('../reality-chat-governed-release-v1.js',import.meta.url),'utf8');
+ const elements=[];
+ const make=(tag)=>{
+  const el={tag,children:[],style:{},hidden:false,disabled:false,listeners:{},
+   append(...children){this.children.push(...children)},
+   contains(child){return this.children.includes(child)},
+   setAttribute(){},addEventListener(type,fn){this.listeners[type]=fn}};
+  elements.push(el);return el;
+ };
+ const ready=make('ready'),thread=make('thread');
+ ready.style.display='none';
+ let sync;
+ class Observer{constructor(fn){this.fn=fn}observe(el){if(el===ready)sync=this.fn}}
+ const calls=[];
+ let release;
+ const fetch=async(url,init)=>{
+  calls.push({url,body:JSON.parse(init.body)});
+  await new Promise(resolve=>{release=resolve});
+  return {status:409,json:async()=>({status:'GOVERNED_RELEASE_INDEPENDENT_QUALIFICATION_BLOCKED',
+   production_changed:false,original_job_completed:false})};
+ };
+ const flush=()=>new Promise(resolve=>setImmediate(resolve));
+ runInNewContext(source,{location:{pathname:'/chat'},document:{
+  getElementById:id=>id==='privateReady'?ready:id==='privateTranscript'?thread:null,
+  createElement:make},MutationObserver:Observer,fetch,AbortSignal});
+ assert.equal(calls.length,0);
+ ready.style.display='block';sync();sync();
+ assert.equal(calls.length,1);
+ assert.deepEqual(calls[0].body,{intent:'OWNER_PREPARE_EXACT_RELEASE'});
+ release();await flush();sync();
+ assert.equal(calls.length,1);
+ const approve=elements.find(el=>el.textContent==='Approve exact Preview release');
+ assert.equal(approve.disabled,true);
+ const dismiss=elements.find(el=>el.textContent==='×');
+ dismiss.listeners.click();sync();
+ assert.equal(calls.length,1);
+ ready.style.display='none';sync();
+ ready.style.display='block';sync();
+ assert.equal(calls.length,2);
+ assert.deepEqual(calls[1].body,{intent:'OWNER_PREPARE_EXACT_RELEASE'});
+ release();await flush();
+ assert.ok(calls.every(c=>c.url==='/api/reality/governed-worker-release-control-plane'));
+});
+
+
+test('signed wake handoff is candidate-bound, preparation-only, and rejects stale or tampered scope',async()=>{
+ const {handoffSignedReleasePreparation,authenticateSignedReleasePreparation}=await import('../src/reality-governed-release-preparation-handoff-v1.js');
+ const u=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+ const owner=u(1),shift=u(2),run=u(3),lease=u(4),event=u(5),request=u(6);
+ const old='a'.repeat(40),target='b'.repeat(40),head='sha256:'+'c'.repeat(64),plan='sha256:'+'d'.repeat(64);
+ const host='candidate-test.vercel.app',id='dpl_candidateTest123',project='benchmark-test';
+ const env={VERCEL_ENV:'preview',REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
+  REALITY_RELEASE_EVENT_PREPARATION_ENABLED:'true',REALITY_RELEASE_CONTROL_DB_PROJECT_REF:project,
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:project,REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
+  REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:'isolated-test',REALITY_EMPLOYEE_SHIFT_WORKER_TOKEN:'f'.repeat(64),
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID:owner,REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:shift,
+  REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA:target,VERCEL_GIT_COMMIT_SHA:old,VERCEL_DEPLOYMENT_ID:'dpl_oldRuntime123',
+  REALITY_RELEASE_PREPARATION_CANDIDATE_HOST:host,REALITY_RELEASE_PREPARATION_CANDIDATE_DEPLOYMENT_ID:id,
+  REALITY_VERIFIED_VERCEL_PROJECT_ID:'prj_test',REALITY_VERIFIED_VERCEL_TEAM_ID:'team_test',
+  REALITY_VERIFIED_GITHUB_REPOSITORY:'example/repo'};
+ const db={strictSecrets:true,project};
+ const d={status:'GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED',read_only:true,release_activated:false,
+  production_changed:false,owner_approval_granted:false,authoritative_database:project,owner_id:owner,shift_id:shift,
+  plan_fingerprint:plan,continuity_head_sha256:head,continuity_revision:2,observed_alias_release_sha:old,
+  configured_target_release_sha:target,configured_target_release_ref:'feature/test'};
+ const wake={kind:'RESUME',owner_id:owner,shift_id:shift,plan_fingerprint:plan,release_sha:old,event_id:event};
+ const candidate={...env,VERCEL_GIT_COMMIT_SHA:target,VERCEL_DEPLOYMENT_ID:id};
+ const calls=[];let signedBody;
+ const fetchImpl=async(url,opts)=>{
+  calls.push({url,method:opts.method});
+  if(opts.method==='GET')return {ok:true,json:async()=>({id,url:host,projectId:'prj_test',target:null,state:'READY',
+   meta:{githubCommitSha:target,githubCommitRef:'feature/test',githubOrg:'example',githubRepo:'repo'}})};
+  signedBody=JSON.parse(opts.body);
+  assert.equal(opts.headers.Authorization,undefined);
+  assert.equal(authenticateSignedReleasePreparation({body:signedBody,env:candidate,db,now:1000}).event_id,event);
+  return {ok:false,json:async()=>({status:'SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED',production_changed:false,
+   original_job_completed:false,release_switch_attempted:false,release_preparation:{status:'SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED',
+    shift_id:shift,release_sha:target,owner_id:owner,request_id:request,proposal_fingerprint:head,
+    runtime_scope:{continuity_head_sha256:head,continuity_revision:2},owner_approval_granted:false,release_changed:false}})};
+ };
+ const args={env,db,direction:d,wake,workerRunId:run,leaseId:lease,fetchImpl,now:()=>1000};
+ const out=await handoffSignedReleasePreparation(args);
+ assert.equal(out.status,'SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED');
+ assert.equal(out.owner_approval_granted,false);
+ assert.equal(out.release_activated,false);
+ assert.equal(calls.length,2);
+ assert.equal(authenticateSignedReleasePreparation({body:{...signedBody,payload:signedBody.payload+' '},env:candidate,db,now:1000}),null);
+ assert.equal(authenticateSignedReleasePreparation({body:signedBody,env:candidate,db,now:100000}),null);
+ assert.equal(authenticateSignedReleasePreparation({body:signedBody,env:{...candidate,VERCEL_ENV:'production'},db,now:1000}),null);
+ assert.equal(authenticateSignedReleasePreparation({body:signedBody,env:{...candidate,VERCEL_DEPLOYMENT_ID:'dpl_wrongCandidate'},db,now:1000}),null);
+ assert.equal((await handoffSignedReleasePreparation({...args,wake:{...wake,kind:'START'}})).status,'SIGNED_RELEASE_PREPARATION_NOT_DUE');
+ assert.equal(calls.length,2);
+});
+test('signed preparation channel cannot reach activation and uses current service-only event readback',()=>{
+ const s=readFileSync(new URL('../api/reality/governed-worker-release-control-plane.js',import.meta.url),'utf8');
+ assert.ok(s.indexOf('await shiftRpc(db,\'reality_read_signed_release_preparation_event_v1\'')<
+  s.indexOf('await qualifyCurrentIsolatedSignedWorkerRelease('));
+ assert.ok(s.indexOf("if(signedPrepare||req.body.intent==='PREPARE_EXACT_RELEASE'")<
+  s.indexOf('await triggerOneGovernedSignedWorkerReleaseSwitch('));
+ const sql=readFileSync(new URL('../sql/reality-final-loop-release-preparation-event-readback-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/r.run_id=p_worker_run_id/);
+ assert.match(sql,/e.continuity_revision=p_revision/);
+ assert.match(sql,/l.released_at IS NULL/);
+ assert.doesNotMatch(sql,/INSERT INTO|UPDATE reality_internal|DELETE FROM/);
 });

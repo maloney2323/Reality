@@ -199,6 +199,8 @@ import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
 import {createTrustedSignedWorkerReleaseControlPlaneAdapters}
  from '../../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
+import {handoffSignedReleasePreparation}
+ from '../../src/reality-governed-release-preparation-handoff-v1.js';
 import {inspectFinalLoopSignedWorkerOperatingLane}
  from '../../src/reality-signed-worker-operating-lane-v1.js';
 import {continueSignedMaintenanceCaseCiVerification,selectSignedCaseCiResumeEvent}
@@ -2467,6 +2469,15 @@ export default async function handler(req,res){
       runningReleaseSha:process.env.VERCEL_GIT_COMMIT_SHA}):
      {status:observer.status,release_activated:false};
    }catch{signedWorkerReleaseDirection={status:'GOVERNED_RELEASE_DIRECTION_INDEPENDENT_READ_UNAVAILABLE',release_activated:false};}
+  }
+  // Reuse the durably claimed event. The candidate controller independently
+  // qualifies and prepares; this worker never holds release-switch authority.
+  if(canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&governedWakeClaimId&&actualWorkerRunId&&
+    signedWorkerReleaseDirection.status==='GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED'){
+   const preparation=await handoffSignedReleasePreparation({env:process.env,db,
+    direction:signedWorkerReleaseDirection,wake:governedWakeScope,workerRunId:actualWorkerRunId,
+    leaseId:governedWakeClaimId,fetchImpl:fetch});
+   signedWorkerReleaseDirection=Object.freeze({...signedWorkerReleaseDirection,preparation_handoff:preparation});
   }
   const registeredRecoveryActionKeys=Object.freeze([
    'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
