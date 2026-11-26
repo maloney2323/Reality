@@ -47,7 +47,7 @@ function fixture({e={},branches=null,ci=null,deploy=null}={}){
    githubOrg:'org',githubRepo:'repo'}};
  const fetchImpl=async url=>{
   calls.push(String(url));
-  return {ok:true,json:async()=>{
+  return {ok:true,status:200,json:async()=>{
    if(String(url).includes('api.supabase.com'))return b;
    if(String(url).includes('api.github.com'))return c;
    if(String(url).includes('api.vercel.com'))return d;
@@ -104,6 +104,9 @@ test('Vercel READY on a different commit is not sufficient',async()=>{
    githubOrg:'org',githubRepo:'repo'}}});
  const r=await f.result;
  assert.equal(r.status,'VERCEL_RELEASE_COMMIT_OR_PROJECT_IDENTITY_MISMATCH');
+ assert.equal(r.provider_failure.http_status,200);
+ assert.deepEqual(r.provider_failure.mismatched_fields,['release_sha']);
+ assert.equal(r.provider_failure.identity_matches,false);
  assert.equal(f.calls.length,3);
 });
 
@@ -163,4 +166,20 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  assert.equal((await transportRun({env:{...peerEnv,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY:'true'}})).status,
   'REVIEW_TRANSPORT_DIAGNOSTIC_ONLY_NOT_RELEASE_CAPACITY');
  assert.equal((await transportRun({env:peerEnv})).status,'ISOLATED_REVIEW_DEPLOYMENT_IDENTITY_MISMATCH');
+});
+
+test('qualification reports rejected provider access without treating it as proof or leaking response bodies',async()=>{
+ let calls=0;
+ const r=await qualify({env,dbProject:project,fetchImpl:async()=>{
+  calls++;return {ok:false,status:403,json:async()=>{throw Error('SECRET_PROVIDER_BODY')}};
+ }});
+ assert.equal(calls,1);
+ assert.equal(r.status,'INDEPENDENT_SUPABASE_BRANCH_ANCESTRY_READ_UNAVAILABLE');
+ assert.equal(r.provider_failure.operation,'SUPABASE_BRANCH_READ');
+ assert.equal(r.provider_failure.http_status,403);
+ assert.equal(r.provider_failure.access_denied,true);
+ assert.equal(r.provider_failure.next_governed_action,'VERIFY_PROVIDER_TOKEN_SCOPE_AND_RESOURCE_ACCESS');
+ assert.equal(r.owner_approval_granted,false);
+ assert.equal(r.release_activated,false);
+ assert.equal(JSON.stringify(r).includes('SECRET'),false);
 });
