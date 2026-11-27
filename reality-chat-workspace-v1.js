@@ -196,7 +196,7 @@
   // not as a sibling above its header. No extra API calls or worker actions.
   const liveActivity=get('realityChatContinuityActivity');
   function mountLiveActivity(){
-    if(liveActivity&&!transcript.contains(liveActivity))transcript.prepend(liveActivity);
+    if(liveActivity&&!transcript.contains(liveActivity))transcript.append(liveActivity);
   }
   mountLiveActivity();
 
