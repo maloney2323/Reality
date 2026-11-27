@@ -31,6 +31,9 @@ on:
       - 'supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql'
       - 'test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql'
       - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'src/reality-shift-continuity-independent-review-v1.js'
+      - 'src/reality-dynamic-employee-inquiry-worker-v1.js'
+      - 'test/reality-shift-continuity-independent-review-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
@@ -64,6 +67,9 @@ on:
       - 'supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql'
       - 'test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql'
       - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'src/reality-shift-continuity-independent-review-v1.js'
+      - 'src/reality-dynamic-employee-inquiry-worker-v1.js'
+      - 'test/reality-shift-continuity-independent-review-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
@@ -98,6 +104,7 @@ jobs:
           node --test test/reality-governed-auto-trigger-v1.0.test.js
           node --test test/reality-final-loop-governed-start-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
+          node --test test/reality-shift-continuity-independent-review-v1.test.js
           node --test test/reality-final-loop-shared-owner-packet-v1.test.js
           node --test test/reality-final-loop-whole-cycle-acceptance-v1.test.js
           node --test test/reality-final-loop-proof-carrying-recovery-v1.test.js
