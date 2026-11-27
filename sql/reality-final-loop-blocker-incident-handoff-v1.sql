@@ -619,3 +619,199 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_read_owner_current_continuity_self_visibility_v1(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_read_owner_current_continuity_self_visibility_v1(uuid) TO service_role;
+
+-- The existing technical CI verifier consumes this exact signed context.
+-- The proof is about the exhausted strategy's technical handoff only.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_terminal_technical_context_v1(
+ p_shift_id uuid,p_event_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE e record; evidence jsonb;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'TERMINAL_TECHNICAL_CONTEXT_SERVICE_ONLY';END IF;
+ SELECT ev.* INTO e FROM reality_internal.final_loop_resume_events_v1 ev
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=p_worker_run_id
+  AND run.status='STARTED' AND run.finished_at IS NULL AND run.started_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+ JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
+  AND wake.owner_id=ev.owner_id AND wake.shift_id=ev.shift_id AND wake.release_claim_id=ev.release_continuation_claim_id
+  AND wake.operating_lane='NORMAL_SIGNED_SHIFT'
+ JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=wake.release_claim_id
+  AND a.owner_id=ev.owner_id AND a.shift_id=ev.shift_id AND a.release_sha=wake.running_release_sha
+  AND a.state='CLAIMED_ONCE' AND a.provider_alias_observed_at>=a.claimed_at
+  AND a.runtime_scope->>'continuity_head_sha256'=ev.continuity_head_sha256
+  AND a.runtime_scope->>'continuity_revision'=ev.continuity_revision::text
+ JOIN reality_internal.governed_employee_shift_worker_pulses_v1 pulse ON pulse.owner_id=ev.owner_id
+  AND pulse.shift_id=ev.shift_id AND pulse.last_worker_status='WAKE_RECEIVED'
+  AND pulse.last_worker_seen_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+ WHERE ev.event_id=p_event_id AND ev.shift_id=p_shift_id AND ev.governed_wake_worker_run_id=p_worker_run_id
+  AND ev.state='SHADOW_PENDING' AND ev.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
+  AND ev.signal_next_action='READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'
+  AND ev.governed_wake_queued_at>pg_catalog.clock_timestamp()-interval '5 minutes';
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_CONTEXT_UNVERIFIED',
+  'execution_authorized',false,'original_job_completed',false);END IF;
+ evidence:=reality_internal.read_final_loop_verified_terminal_review_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,
+  e.continuity_head_sha256,e.continuity_revision);
+ IF evidence IS NULL OR evidence->>'review_receipt_sha256' IS DISTINCT FROM e.source_receipt_sha256
+  OR evidence->>'investigation_receipt_sha256' IS DISTINCT FROM e.previous_receipt_sha256
+  OR evidence->>'review_worker_run_id'=p_worker_run_id::text OR evidence->>'investigation_worker_run_id'=p_worker_run_id::text
+ THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_CONTEXT_UNVERIFIED',
+  'execution_authorized',false,'original_job_completed',false);END IF;
+ RETURN evidence||pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY',
+  'event_id',e.event_id,'owner_id',e.owner_id,'shift_id',e.shift_id,'original_work_id',e.original_work_id,
+  'source_ref',e.source_ref,'continuity_head_sha256',e.continuity_head_sha256,'continuity_revision',e.continuity_revision,
+  'read_only',true,'execution_authorized',false,'original_job_completed',false,'installation_authorized',false,
+  'replay_authorized',false,'production_changed',false,'new_attempt_authorized',false,'previous_attempt_budget_preserved',true);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_read_final_loop_terminal_technical_context_v1(uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_terminal_technical_context_v1(uuid,uuid,uuid) TO service_role;
+
+-- Overload of the existing technical evidence writer. For an exhausted
+-- strategy, the canonical original/root and independent review replace the
+-- new-contract prerequisite. Preserve all unresolved business proof gates.
+CREATE OR REPLACE FUNCTION public.reality_record_final_loop_technical_ci_observation_v1(
+ p_shift_id uuid,p_event_id uuid,p_worker_run_id uuid,p_proof jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE ctx jsonb; p jsonb; g jsonb; sh record; ev record; tail record;
+ root uuid; event_id_new uuid; receipt_id_new uuid; payload jsonb; refs jsonb; provenance jsonb;
+ basis jsonb; checkpoint jsonb; receipt_hash text; observation_hash text; content_hash_new text; lineage text;
+ stamp timestamptz; iso text; n int; sub_count int; after_p jsonb; after_g jsonb;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'TERMINAL_TECHNICAL_RETURN_SERVICE_ONLY';END IF;
+ SELECT s.owner_id,s.plan_fingerprint INTO sh FROM reality_internal.governed_employee_shifts_v1 s
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w ON w.shift_id=s.shift_id AND w.owner_id=s.owner_id
+  AND w.plan_fingerprint=s.plan_fingerprint AND w.state='ACTIVE'
+ WHERE s.shift_id=p_shift_id AND s.authorized_at IS NOT NULL AND s.closed_at IS NULL
+  AND s.planned_start_at<=pg_catalog.clock_timestamp() AND s.planned_end_at>pg_catalog.clock_timestamp()
+ FOR UPDATE OF s;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_SHIFT_UNVERIFIED');END IF;
+ SELECT * INTO ev FROM reality_internal.final_loop_resume_events_v1 e
+ WHERE e.event_id=p_event_id AND e.owner_id=sh.owner_id AND e.shift_id=p_shift_id FOR UPDATE;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_EVENT_UNVERIFIED');END IF;
+ ctx:=public.reality_read_final_loop_terminal_technical_context_v1(p_shift_id,p_event_id,p_worker_run_id);
+ IF ctx->>'status' IS DISTINCT FROM 'TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY'
+ OR p_proof->>'status' IS DISTINCT FROM 'RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED'
+ OR p_proof->'contract_id' IS DISTINCT FROM 'null'::jsonb
+ OR p_proof->>'owner_id' IS DISTINCT FROM ctx->>'owner_id'
+ OR p_proof->>'shift_id' IS DISTINCT FROM ctx->>'shift_id'
+ OR p_proof->>'obligation_id' IS DISTINCT FROM ctx->>'original_work_id'
+ OR p_proof->>'source_ref' IS DISTINCT FROM ctx->>'source_ref'
+ OR p_proof->>'source_revision' IS DISTINCT FROM ctx->>'frozen_source_head_sha'
+ OR p_proof->>'qualifier_receipt_sha256' IS DISTINCT FROM ctx->>'qualifier_receipt_sha256'
+ OR p_proof->>'maintenance_id' IS DISTINCT FROM ctx->'terminal_history'->>'maintenance_id'
+ OR p_proof->>'existing_diagnostic_receipt_sha256' IS DISTINCT FROM ctx->'terminal_history'->>'independent_diagnostic_receipt_sha256'
+ OR p_proof->>'independent_technical_ci_verified' IS DISTINCT FROM 'true'
+ OR p_proof->>'frozen_technical_red_verified' IS DISTINCT FROM 'true'
+ OR p_proof->>'independent_ci_provider_observation' IS DISTINCT FROM 'true'
+ OR p_proof->>'original_business_case_red_verified' IS DISTINCT FROM 'false'
+ OR p_proof->>'business_original_warrant_verified' IS DISTINCT FROM 'false'
+ OR p_proof->>'original_job_completed' IS DISTINCT FROM 'false'
+ OR p_proof->>'previous_attempt_budget_preserved' IS DISTINCT FROM 'true'
+ OR p_proof->>'new_attempt_authorized' IS DISTINCT FROM 'false'
+ OR p_proof->>'repeat_prior_ci_dispatch_permitted' IS DISTINCT FROM 'false'
+ OR p_proof->>'execution_authorized' IS DISTINCT FROM 'false'
+ OR p_proof->>'production_changed' IS DISTINCT FROM 'false'
+ OR coalesce(p_proof->>'github_artifact_digest','')!~'^sha256:[a-f0-9]{64}$'
+ OR coalesce(p_proof->>'signed_case_spec_git_blob_sha','')!~'^[a-f0-9]{40}$'
+ OR coalesce(p_proof->>'github_run_id','')!~'^[1-9][0-9]{0,15}$'
+ OR coalesce(p_proof->>'github_job_id','')!~'^[1-9][0-9]{0,15}$'
+ OR coalesce(p_proof->>'github_artifact_id','')!~'^[1-9][0-9]{0,15}$'
+ OR NOT EXISTS(SELECT 1 FROM reality_internal.governed_signed_worker_release_wakes_v1 w
+  WHERE w.worker_run_id=p_worker_run_id AND w.owner_id=sh.owner_id AND w.shift_id=p_shift_id
+   AND w.running_release_sha=p_proof->>'github_release_sha')
+ THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_PROVIDER_PROOF_UNVERIFIED',
+  'execution_authorized',false,'original_job_completed',false);END IF;
+ root:=(ctx->>'continuity_root_id')::uuid;
+ PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('reality:canonical-continuity-return:'||root::text,0));
+ p:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+ g:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+ IF p->>'status' IS DISTINCT FROM 'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'
+ OR p->>'owner_id' IS DISTINCT FROM sh.owner_id::text OR p->>'continuity_root_id' IS DISTINCT FROM root::text
+ OR p->>'continuity_head_sha256' IS DISTINCT FROM ev.continuity_head_sha256
+ OR p->>'revision' IS DISTINCT FROM ev.continuity_revision::text
+ OR g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+ OR g->>'continuity_head_sha256' IS DISTINCT FROM ev.continuity_head_sha256
+ OR g->>'revision' IS DISTINCT FROM ev.continuity_revision::text
+ OR g->>'execution_authorized' IS DISTINCT FROM 'false'
+ OR coalesce(p->>'frozen_shift_scope_sha256','')!~'^sha256:[a-f0-9]{64}$'
+ OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 v
+  WHERE v.shift_id=p_shift_id AND v.state='SHADOW_PENDING' AND v.event_id<>p_event_id)
+ OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 c WHERE c.shift_id=p_shift_id
+  AND (c.owner_id<>sh.owner_id OR c.original_work_id<>ev.original_work_id OR c.continuity_head_sha256<>ev.continuity_head_sha256
+   OR c.continuity_revision<>ev.continuity_revision))
+ THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_CONTINUITY_DRIFT_NO_REPLAY');END IF;
+ SELECT u.event_id,u.worldline_id,u.lineage_hash INTO tail FROM public.universe_events u
+ WHERE u.continuity_root_id=root AND u.payload->>'owner_id'=sh.owner_id::text AND u.payload->>'shift_id'=p_shift_id::text
+ ORDER BY u.assertion_time DESC,u.event_id DESC LIMIT 1 FOR UPDATE;
+ IF NOT FOUND OR 'sha256:'||tail.lineage_hash IS DISTINCT FROM ev.continuity_head_sha256
+ THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_HEAD_DRIFT_NO_REPLAY');END IF;
+ -- A prior technical provider artifact is evidence only. Deduplicate the
+ -- exact provider run/artifact against the original, irrespective of release.
+ IF EXISTS(SELECT 1 FROM public.universe_events u WHERE u.continuity_root_id=root
+  AND u.entity_type='reality_final_loop_terminal_technical_observation_v1'
+  AND u.payload->>'original_work_id'=ev.original_work_id
+  AND (u.payload->>'review_receipt_sha256'=ev.source_receipt_sha256
+   OR (u.payload->'technical_provider_proof'->>'github_run_id'=p_proof->>'github_run_id'
+    AND u.payload->'technical_provider_proof'->>'github_artifact_digest'=p_proof->>'github_artifact_digest')))
+ THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_ALREADY_RETURNED_NO_REPLAY');END IF;
+ stamp:=pg_catalog.clock_timestamp();iso:=pg_catalog.to_char(stamp AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ event_id_new:=pg_catalog.gen_random_uuid();receipt_id_new:=pg_catalog.gen_random_uuid();
+ payload:=pg_catalog.jsonb_build_object('schema','reality-final-loop-terminal-technical-observation-v1',
+  'owner_id',sh.owner_id,'shift_id',p_shift_id,'original_work_id',ev.original_work_id,'source_ref',ev.source_ref,
+  'review_receipt_sha256',ev.source_receipt_sha256,'investigation_receipt_sha256',ev.previous_receipt_sha256,
+  'qualifier_receipt_sha256',ctx->>'qualifier_receipt_sha256','terminal_recovery_history',ctx->'terminal_history',
+  'unresolved_proof_gates',ctx->'unresolved_proof_gates','technical_provider_proof',p_proof,
+  'prior_revision',ev.continuity_revision,'prior_head_sha256',ev.continuity_head_sha256,
+  'technical_evidence_only',true,'previous_attempt_budget_preserved',true,'new_attempt_authorized',false,
+  'provider_outcome_verified',false,'original_business_red_verified',false,'original_job_completed',false,
+  'execution_authorized',false,'installation_authorized',false,'replay_authorized',false,'production_changed',false,
+  'next_action','INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED');
+ observation_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(payload::text,'UTF8')),'hex');
+ refs:=pg_catalog.jsonb_build_array(observation_hash,ev.source_receipt_sha256,ctx->>'qualifier_receipt_sha256');
+ provenance:=pg_catalog.jsonb_build_object('source','SIGNED_TERMINAL_TECHNICAL_CI_READBACK','principal_id',sh.owner_id,
+  'worker_run_id',p_worker_run_id,'continuity_spine',pg_catalog.jsonb_build_object('version','reality-continuity-spine-v2.1',
+  'source_event_id',tail.event_id::text,'prior_lineage_hash',tail.lineage_hash,'transformation_receipt_id',NULL));
+ content_hash_new:=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(payload),'UTF8')),'hex');
+ basis:=pg_catalog.jsonb_build_object('spine_version','reality-continuity-spine-v2.1','continuity_root_id',root::text,
+  'worldline_id',tail.worldline_id::text,'parent_event_id',tail.event_id,'prior_lineage_hash',tail.lineage_hash,
+  'stage','OBSERVATION','entity_id',event_id_new::text,'evidence_refs',refs,'transformation_receipt_id',NULL,
+  'effective_time',iso,'assertion_time',iso,'epistemic_status','OBSERVED','payload',payload,'provenance',provenance);
+ lineage:=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(basis),'UTF8')),'hex');
+ checkpoint:=pg_catalog.jsonb_build_object('shift_id',p_shift_id,'owner_id',sh.owner_id,'original_work_id',ev.original_work_id,
+  'source_ref',ev.source_ref,'plan_fingerprint',sh.plan_fingerprint,'frozen_shift_scope_sha256',p->>'frozen_shift_scope_sha256',
+  'continuity_root_id',root,'continuity_head_sha256',ev.continuity_head_sha256,'expected_revision',ev.continuity_revision,
+  'worker_run_id',p_worker_run_id,'decision','REFRESH','reason_code','BLOCKER_ATTESTATION_PENDING');
+ receipt_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(checkpoint::text,'UTF8')),'hex');
+ INSERT INTO reality_internal.final_loop_transition_receipts_v1(receipt_id,shift_id,owner_id,original_work_id,source_ref,
+  plan_fingerprint,frozen_shift_scope_sha256,continuity_root_id,continuity_head_sha256,expected_revision,worker_run_id,decision,reason_code,receipt_sha256)
+ VALUES(receipt_id_new,p_shift_id,sh.owner_id,ev.original_work_id,ev.source_ref,sh.plan_fingerprint,p->>'frozen_shift_scope_sha256',
+  root,ev.continuity_head_sha256,ev.continuity_revision,p_worker_run_id,'REFRESH','BLOCKER_ATTESTATION_PENDING',receipt_hash);
+ INSERT INTO public.universe_events(event_id,event_kind,entity_type,entity_id,continuity_root_id,worldline_id,parent_event_id,
+  effective_time,assertion_time,epistemic_status,payload,evidence_refs,provenance,content_hash,lineage_hash)
+ VALUES(event_id_new,'OBSERVATION','reality_final_loop_terminal_technical_observation_v1',event_id_new,root,tail.worldline_id,tail.event_id,
+  stamp,stamp,'OBSERVED',payload,refs,provenance,content_hash_new,lineage);
+ UPDATE reality_internal.final_loop_resume_events_v1 SET state='SHADOW_OBSERVED',observed_at=stamp
+ WHERE event_id=p_event_id AND state='SHADOW_PENDING' AND governed_wake_worker_run_id=p_worker_run_id;
+ IF NOT FOUND THEN RAISE EXCEPTION 'TERMINAL_TECHNICAL_EVENT_CAS_FAILED';END IF;
+ SELECT count(*) INTO sub_count FROM reality_internal.final_loop_resume_conditions_v1 WHERE shift_id=p_shift_id;
+ UPDATE reality_internal.final_loop_resume_conditions_v1 SET continuity_head_sha256='sha256:'||lineage,
+  continuity_revision=ev.continuity_revision+1,state='SUSPENDED',updated_at=stamp
+ WHERE shift_id=p_shift_id AND owner_id=sh.owner_id AND continuity_head_sha256=ev.continuity_head_sha256
+  AND continuity_revision=ev.continuity_revision;
+ GET DIAGNOSTICS n=ROW_COUNT;
+ IF n<>sub_count THEN RAISE EXCEPTION 'TERMINAL_TECHNICAL_SUBSCRIPTION_CAS_FAILED';END IF;
+ after_p:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+ after_g:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+ IF after_p->>'continuity_head_sha256' IS DISTINCT FROM 'sha256:'||lineage
+ OR after_p->>'revision' IS DISTINCT FROM (ev.continuity_revision+1)::text
+ OR after_g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+ OR after_g->>'continuity_head_sha256' IS DISTINCT FROM 'sha256:'||lineage
+ OR after_g->>'revision' IS DISTINCT FROM (ev.continuity_revision+1)::text
+ THEN RAISE EXCEPTION 'TERMINAL_TECHNICAL_POSTWRITE_CONTINUITY_UNVERIFIED';END IF;
+ RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN',
+  'event_id',event_id_new,'checkpoint_receipt_id',receipt_id_new,'observation_receipt_sha256',observation_hash,
+  'continuity_head_sha256','sha256:'||lineage,'revision',ev.continuity_revision+1,'original_work_id',ev.original_work_id,
+  'technical_observation_recorded',true,'previous_attempt_budget_preserved',true,'new_attempt_authorized',false,
+  'original_business_red_verified',false,'original_job_completed',false,'execution_authorized',false,
+  'installation_authorized',false,'replay_authorized',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_record_final_loop_technical_ci_observation_v1(uuid,uuid,uuid,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_record_final_loop_technical_ci_observation_v1(uuid,uuid,uuid,jsonb) TO service_role;
