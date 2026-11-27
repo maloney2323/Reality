@@ -258,9 +258,12 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .reality-chat-progress strong{display:block;margin-bottom:4px;color:#eaf5fc}
 .reality-chat-progress small{color:#b5ccda;font-size:12px}
 #realityChatContinuityActivity[hidden]{display:none!important}
-#realityChatContinuityActivity{margin:10px 0 16px;overflow-wrap:anywhere}
-#realityChatContinuityHeadline{font-size:15px;line-height:1.5}
-#realityChatContinuitySteps article{border-top:1px solid #395b70;padding:12px 0}
+#realityChatContinuityActivity{margin:0;overflow-wrap:anywhere}
+#realityChatContinuityActivity [hidden]{display:none!important}
+#realityChatContinuityHeadline{font-size:13px;line-height:1.5;color:#b5ccda;margin:8px 0}
+#realityChatContinuitySteps .reality-operational-message{margin:10px 0}
+#realityChatContinuitySteps .reality-operational-message>p{font-size:inherit;line-height:1.6}
+#realityChatContinuitySteps article{padding:0}
 #realityChatContinuitySteps ol{list-style:none;padding:0;margin:10px 0}
 #realityChatContinuitySteps li{border-left:2px solid #395b70;padding:4px 0 14px 12px;margin-left:6px}
 #realityChatContinuitySteps li[data-state="verified"]{border-left-color:#7dd3a5}
@@ -1630,13 +1633,12 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p style="color:#afc2d5;font-size:11px">Open issues are observations, not executable job warrants. Reality must exclude previously settled jobs and independently qualify any new execution.</p>
   </section>
   <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
-  <section id="realityChatContinuityActivity" class="bubble reality-chat-progress" aria-label="Reality live operational conversation" hidden>
-   <div class="label">REALITY · LIVE WORK</div>
-   <div id="realityChatContinuityHeadline" role="status" aria-live="polite">Reading actual operational events…</div>
-   <small id="realityChatContinuityChecked"></small>
+  <div id="realityChatContinuityActivity" aria-label="Reality operational messages" hidden>
+   <div id="realityChatContinuityHeadline" role="status" aria-live="polite" hidden></div>
+   <small id="realityChatContinuityChecked" hidden></small>
    <div id="realityChatContinuitySteps"></div>
-   <button type="button" id="realityChatContinuityRefresh" class="simple-secondary">Refresh live evidence</button>
-  </section>
+   <button type="button" id="realityChatContinuityRefresh" class="simple-secondary" hidden>Retry live update</button>
+  </div>
   <div id="realityRileyShiftLaunch" style="border:1px solid #5886a4;border-radius:12px;background:#142c3c;padding:14px;margin:12px 0" aria-label="Authorize Riley's three-hour shift">
     <strong style="font-size:16px">Ready to start Riley?</strong>
     <p class="muted" style="margin:8px 0">No shift starts when you set a goal or send an ordinary message. Open the signed-in shift control, inspect the exact 3-hour scope, and authorize it once. Independent upgrade installation still requires separate approval.</p>
@@ -6723,15 +6725,16 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  function showLiveActivity(data){
   const host=el('realityChatContinuitySteps'),headline=el('realityChatContinuityHeadline');
   el('realityChatContinuityChecked').textContent='Checked '+new Date(data.observed_at).toLocaleTimeString()+' · live evidence';
+  headline.hidden=true;el('realityChatContinuityChecked').hidden=true;el('realityChatContinuityRefresh').hidden=true;
   const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations,data.final_receipts]);
   if(liveActivityFingerprint===key)return;
   const open=new Set([...host.querySelectorAll('details[open][data-disclosure]')].map(d=>d.dataset.disclosure));
   liveActivityFingerprint=key;host.replaceChildren();
-  headline.textContent=data.obligations.length?
-   'Tracking '+data.obligations.length+' original '+(data.obligations.length===1?'job':'jobs')+' in your existing shift.':
-   data.active_shift_count?'Your shift is open. Current job evidence is unavailable.':
-    'No current authorized shift returned by this check.';
-  if(data.partial)headline.textContent+=' Some evidence is still unavailable.';
+  headline.textContent='';
+  if(data.active_shift_count&&!data.obligations.length){
+   headline.textContent='I can see your open shift, but I cannot verify its current work yet.';
+   headline.hidden=false;
+  }
   const disclosure=(parent,label,id)=>{
    const d=document.createElement('details');d.dataset.disclosure=id;d.open=open.has(id);
    parent.append(d);liveNode('summary',label,d);return d;
@@ -6766,16 +6769,26 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    }
   };
   for(const job of data.obligations){
-   const article=document.createElement('article');host.append(article);
-   liveNode('strong',sourceLabel(job.source_ref),article);
+   const article=document.createElement('div');article.className='bubble reality-operational-message';host.append(article);
+   liveNode('div','REALITY',article).className='label';
    const verified=job.steps.filter(s=>s.state==='verified');
    const running=job.steps.find(s=>s.state==='running');
    const proposal=job.steps.find(s=>s.state==='proposal');
-   liveNode('p','Past · '+(verified.length?verified.at(-1).label+' verified.':'No current verified step returned.'),article);
-   liveNode('p','Present · '+(job.original_complete?'Outcome and Universe return verified.':running?running.label+' running.':job.gates.length?'Paused — required proofs remain unresolved. Your shift stays open.':'Original job remains open.'),article);
-   liveNode('p','Next · '+(job.original_complete?'Review final receipt.':friendlyNext(job.next_action)),article);
-   if(proposal)liveNode('p','Proposed resolution recorded. Independent review is required before it can be relied on.',article);
-   const d=disclosure(article,'View steps, blocker, proposal and receipts',job.original_work_id);
+   const failed=job.steps.find(s=>s.state==='blocked'&&s.label!=='Original obligation suspended');
+   const text=[];
+   if(job.original_complete)text.push('I have independently verified the outcome and its return to Continuity for '+sourceLabel(job.source_ref)+'.');
+   else{
+    if(verified.length)text.push('I’ve verified '+verified.at(-1).label.toLowerCase()+' for '+sourceLabel(job.source_ref)+'.');
+    else text.push('I’m tracking '+sourceLabel(job.source_ref)+' in your existing shift.');
+    if(running)text.push(running.label+' is running.');
+    else if(failed)text.push(failed.detail);
+    else if(job.gates.length)text.push('The original work is paused because required evidence is still missing. Your existing shift remains open.');
+    if(proposal)text.push((proposal.investigator?proposal.investigator+' has':'I have')+' recorded a proposed correction, which still requires independent review.');
+    text.push('My next step: '+friendlyNext(job.next_action));
+   }
+   liveNode('p',text.join(' '),article);
+   if(data.partial)liveNode('small','Some evidence is unavailable; no additional progress is inferred.',article);
+   const d=disclosure(article,'View activity and evidence',job.original_work_id);
    liveNode('p','Continuity revision '+job.revision+' · '+job.shift_status,d);
    if(job.active_release)liveNode('p','Last recorded activation: '+job.active_release.sha.slice(0,12),d);
    if(job.gates.length){
@@ -6828,8 +6841,10 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   }catch{
    if(epoch===liveActivityEpoch){
     liveActivityFingerprint='';
-    el('realityChatContinuityHeadline').textContent='Live update temporarily unavailable. Last recorded evidence is retained below.';
-    el('realityChatContinuityChecked').textContent='Rechecking automatically while Chat is visible.';
+    const notice=el('realityChatContinuityHeadline');
+    notice.textContent='I couldn’t refresh the current work status. Any previous work update is from the last successful check.';
+    notice.hidden=false;
+    el('realityChatContinuityRefresh').hidden=false;
    }
   }finally{
    clearTimeout(deadline);
