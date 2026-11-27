@@ -6,6 +6,8 @@ on:
     paths:
       - 'src/reality-final-loop-*.js'
       - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
+      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql'
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
@@ -48,6 +50,8 @@ on:
     paths:
       - 'src/reality-final-loop-*.js'
       - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
+      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql'
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
@@ -196,3 +200,5 @@ jobs:
           PGDATABASE=reality_suspension_smoke psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-suspension-investigation-smoke-v1.sql
           createdb reality_provider_checkpoint_smoke
           PGDATABASE=reality_provider_checkpoint_smoke psql -v ON_ERROR_STOP=1 -f test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql
+          createdb reality_worker_history_smoke
+          PGDATABASE=reality_worker_history_smoke psql -v ON_ERROR_STOP=1 -f test/reality-continuity-worker-history-readback-index-smoke-v1.sql
