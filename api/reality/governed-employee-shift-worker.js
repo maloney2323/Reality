@@ -88,7 +88,7 @@ import {classifyFinalLoopBlockerLiveness}
  from '../../src/reality-final-loop-blocker-liveness-v1.js';
 import {verifySourceBoundTechnicalRecoveryCi}
  from '../../src/reality-final-loop-technical-ci-evidence-verifier-v1.js';
-import {attachVerifiedTechnicalCiToContinuity}
+import {attachVerifiedTechnicalCiToContinuity,returnTerminalTechnicalEvidenceToContinuity}
  from '../../src/reality-final-loop-technical-ci-continuity-writer-v1.js';
 import {advanceOneSignedProofRecovery}
  from '../../src/reality-final-loop-signed-proof-recovery-worker-v1.js';
@@ -320,7 +320,7 @@ export default async function handler(req,res){
      realRun.installation_authorized!==false||
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
-  let suspensionInvestigationWake=false,independentInvestigationReviewWake=false;
+  let suspensionInvestigationWake=false,independentInvestigationReviewWake=false,terminalTechnicalEvidenceWake=false;
   if(governedWakeScope&&canonicalEventRuntime){
    const receipt=await shiftRpc(db,'reality_claim_canonical_governed_wake_v1',{
     p_owner_id:governedWakeScope.owner_id,p_shift_id:governedWakeScope.shift_id,p_plan_fingerprint:governedWakeScope.plan_fingerprint,
@@ -332,7 +332,8 @@ export default async function handler(req,res){
     throw Error('CANONICAL_GOVERNED_WAKE_NOT_DURABLY_CLAIMED');
    suspensionInvestigationWake=receipt.investigation_only===true;
    independentInvestigationReviewWake=receipt.independent_review_only===true;
-   if(suspensionInvestigationWake&&independentInvestigationReviewWake)throw Error('GOVERNED_WAKE_CONFLICTING_EVIDENCE_LANES');
+   terminalTechnicalEvidenceWake=receipt.terminal_technical_evidence_only===true;
+   if([suspensionInvestigationWake,independentInvestigationReviewWake,terminalTechnicalEvidenceWake].filter(Boolean).length>1)throw Error('GOVERNED_WAKE_CONFLICTING_EVIDENCE_LANES');
   }
   // Explicitly authenticated, preview-only source staging for the SAME
   // signed worker and its durable lease/run. This is NOT a second worker
@@ -484,6 +485,79 @@ export default async function handler(req,res){
    throw Error('GOVERNED_AUTO_TRIGGER_WAKE_SCOPE_CHANGED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // A completed independent review causes one distinct technical evidence
+  // run. Reuse the original diagnostic and provider verifier; no freeze,
+  // child claim, repair strategy, or replay is allowed in this lane.
+  if(terminalTechnicalEvidenceWake){
+   workerStage='TERMINAL_TECHNICAL_EVIDENCE_RELEASE_ATTESTATION';
+   if(!canonicalEventRuntime||governedWakeScope?.kind!=='RESUME'||
+      wakeReceipt.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+      process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED!=='true'||
+      process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+      process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+      process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true')
+    throw Error('TERMINAL_TECHNICAL_EVIDENCE_RUNTIME_FENCE_REJECTED');
+   const witness=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
+    p_worker_run_id:actualWorkerRunId,p_owner_id:governedWakeScope.owner_id,
+    p_shift_id:wakeReceipt.shift_id,p_release_sha:governedWakeScope.release_sha,
+    p_release_ref:process.env.VERCEL_GIT_COMMIT_REF,
+    p_registered_capabilities:['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'],
+    p_wake_claim_id:governedWakeClaimId,p_capability_key:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'});
+   if(witness?.status!=='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'||
+      witness.worker_run_id!==actualWorkerRunId||witness.shift_id!==wakeReceipt.shift_id||
+      witness.release_sha!==governedWakeScope.release_sha||witness.original_job_completed!==false||
+      witness.production_changed!==false)throw Error('TERMINAL_TECHNICAL_EVIDENCE_WITNESS_UNVERIFIED');
+   workerStage='TERMINAL_TECHNICAL_EXACT_CONTEXT';
+   const context=await shiftRpc(db,'reality_read_final_loop_terminal_technical_context_v1',{
+    p_shift_id:wakeReceipt.shift_id,p_event_id:governedWakeScope.event_id,p_worker_run_id:actualWorkerRunId});
+   if(context?.status!=='TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY'||
+    context.owner_id!==governedWakeScope.owner_id||context.shift_id!==wakeReceipt.shift_id||
+    context.event_id!==governedWakeScope.event_id||context.read_only!==true||
+    context.execution_authorized!==false||context.replay_authorized!==false||
+    context.previous_attempt_budget_preserved!==true||context.new_attempt_authorized!==false)
+    throw Error('TERMINAL_TECHNICAL_EVIDENCE_CONTEXT_UNVERIFIED');
+   const terminalScope={owner_id:context.owner_id,shift_id:context.shift_id,
+    obligation_id:context.original_work_id,source_ref:context.source_ref,source_revision:context.frozen_source_head_sha,
+    continuity_root_id:context.continuity_root_id,qualifier_receipt_sha256:context.qualifier_receipt_sha256,
+    next_qualified_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'};
+   const proposal={status:'RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED',
+    contract_candidate:null,terminal_requalification:terminalScope,read_only:true,
+    previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false};
+   const trigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE',
+    owner_id:context.owner_id,shift_id:context.shift_id,original_work_id:context.original_work_id,
+    source_ref:context.source_ref,continuity_root_id:context.continuity_root_id,
+    qualifier_receipt_sha256:context.qualifier_receipt_sha256,evidence_readback_permitted:true,
+    dispatch_permitted:false,execution_authorized_by_trigger:false,new_attempt_authorized:false,
+    previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false};
+   const ledger=await shiftRpc(db,'reality_read_owner_internal_maintenance_v1',{p_owner_id:context.owner_id});
+   const existingRoute=routeExistingSignedCaseCiForRecovery({contractProposal:proposal,maintenanceLedger:ledger,resumeTrigger:trigger});
+   workerStage='TERMINAL_TECHNICAL_PROVIDER_READBACK';
+   const proof=await verifySourceBoundTechnicalRecoveryCi({db,env:process.env,contractProposal:proposal,existingCiRoute:existingRoute,fetchImpl:fetch});
+   workerStage='TERMINAL_TECHNICAL_CONTINUITY_RETURN';
+   const returned=await returnTerminalTechnicalEvidenceToContinuity({db,env:process.env,wake:wakeReceipt,
+    workerRunId:actualWorkerRunId,eventId:governedWakeScope.event_id,context,technicalCiProviderProof:proof});
+   const verified=returned?.status==='TERMINAL_TECHNICAL_EVIDENCE_DURABLY_RECONCILED_ORIGINAL_OPEN'&&
+    returned.technical_observation_recorded===true&&returned.original_job_completed===false&&returned.replay_authorized===false;
+   const pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
+    p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
+    p_safe_result:verified?'TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN':'TERMINAL_TECHNICAL_EVIDENCE_UNVERIFIED'});
+   if(!isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))throw Error('TERMINAL_TECHNICAL_COMPLETION_PULSE_UNVERIFIED');
+   durableWorkerCompletion=pulse;
+   workerStage='TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION';
+   const attested=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
+    p_run_id:actualWorkerRunId,p_status:'COMPLETED',p_stage:workerStage});
+   workerCompletionAttestedBeforeResponse=attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+    attested.run_id===actualWorkerRunId&&attested.original_job_completed===false&&
+    attested.installation_authorized===false&&attested.production_changed===false;
+   if(!workerCompletionAttestedBeforeResponse)throw Error('TERMINAL_TECHNICAL_COMPLETION_ATTESTATION_UNVERIFIED');
+   const released=await shiftRpc(db,'reality_release_governed_shift_worker_run_v1',{p_claim_id:governedWakeClaimId});
+   wakeLeaseReleasedBeforeResponse=released?.status==='WAKE_RELEASED'&&released.original_job_completed===false&&released.installation_authorized===false;
+   if(!wakeLeaseReleasedBeforeResponse)throw Error('TERMINAL_TECHNICAL_LEASE_RELEASE_UNVERIFIED');
+   return res.status(200).json({status:verified?'TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN':'TERMINAL_TECHNICAL_EVIDENCE_UNVERIFIED',
+    terminal_technical_evidence_only:true,signed_worker_release_wake:witness,provider_proof_status:proof.status,
+    continuity_return:returned,original_job_completed:false,execution_authorized:false,
+    installation_authorized:false,replay_authorized:false,production_changed:false,new_shift_started:false});
+  }
   // A different signed run reviews the saved investigation, before any
   // ordinary executor or model. No new job or owner authority is minted.
   if(independentInvestigationReviewWake){
