@@ -34,6 +34,10 @@ on:
       - 'src/reality-shift-continuity-independent-review-v1.js'
       - 'src/reality-dynamic-employee-inquiry-worker-v1.js'
       - 'test/reality-shift-continuity-independent-review-v1.test.js'
+      - 'src/reality-chat-self-visibility-v1.js'
+      - 'src/reality-chat-optional-evidence-v1.js'
+      - 'test/reality-chat-self-visibility-v1.test.js'
+      - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
@@ -70,6 +74,10 @@ on:
       - 'src/reality-shift-continuity-independent-review-v1.js'
       - 'src/reality-dynamic-employee-inquiry-worker-v1.js'
       - 'test/reality-shift-continuity-independent-review-v1.test.js'
+      - 'src/reality-chat-self-visibility-v1.js'
+      - 'src/reality-chat-optional-evidence-v1.js'
+      - 'test/reality-chat-self-visibility-v1.test.js'
+      - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
@@ -105,6 +113,8 @@ jobs:
           node --test test/reality-final-loop-governed-start-v1.test.js
           node --test test/reality-final-loop-signed-worker-bridge-v1.test.js
           node --test test/reality-shift-continuity-independent-review-v1.test.js
+          node --test test/reality-chat-self-visibility-v1.test.js
+          node --test test/reality-chat-optional-evidence-v1.test.js
           node --test test/reality-final-loop-shared-owner-packet-v1.test.js
           node --test test/reality-final-loop-whole-cycle-acceptance-v1.test.js
           node --test test/reality-final-loop-proof-carrying-recovery-v1.test.js
