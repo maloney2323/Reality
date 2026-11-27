@@ -287,9 +287,15 @@ END $fn$;
 REVOKE ALL ON FUNCTION reality_internal.read_final_loop_verified_terminal_review_v1(uuid,uuid,text,text,text,bigint) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_terminal_review_v1(uuid,uuid,text,text,text,bigint) TO service_role;
 
+-- An expired evidence-only worker may lack its final write. Keep the original
+-- stage and immutable dispatch identifiers; record the independent transport
+-- failure and reconciliation time on the existing worker-history record.
+ALTER TABLE reality_internal.signed_worker_actual_runs_v1
+ ADD COLUMN IF NOT EXISTS interrupted_evidence_failure_v1 jsonb;
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_terminal_technical_evidence_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
 DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text; prior_event uuid;
+ prior_run uuid; prior_status text; interrupted_proof jsonb; lease_row record;
 BEGIN
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
@@ -308,6 +314,10 @@ BEGIN
   a.runtime_scope->>'original_work_id',a.runtime_scope->>'source_ref',
   a.runtime_scope->>'continuity_head_sha256',(a.runtime_scope->>'continuity_revision')::bigint);
  IF evidence IS NULL THEN RETURN NULL;END IF;
+ -- Serialize with the existing singleton lease; never reconcile a worker
+ -- if a new claim can race this transaction.
+ SELECT * INTO lease_row FROM reality_internal.governed_preview_shift_worker_leases_v1
+ WHERE worker_key='preview-governed-employee-shift-worker' FOR UPDATE SKIP LOCKED;
  SELECT * INTO sub FROM reality_internal.final_loop_resume_conditions_v1 c
  WHERE c.owner_id=a.owner_id AND c.shift_id=a.shift_id AND c.original_work_id=a.runtime_scope->>'original_work_id'
   AND c.source_ref=a.runtime_scope->>'source_ref' AND c.condition_kind='QUALIFIER_PROOF_CHANGED'
@@ -322,7 +332,22 @@ BEGIN
   WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id
    AND e.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
    AND e.source_receipt_sha256=evidence->>'review_receipt_sha256') THEN
-  SELECT e.event_id INTO prior_event
+  SELECT e.event_id,run.run_id,run.status,
+   CASE WHEN run.status='STARTED' THEN pg_catalog.jsonb_build_object(
+    'schema','reality-interrupted-evidence-failure-v1',
+    'owner_id',e.owner_id,'shift_id',e.shift_id,'original_work_id',e.original_work_id,
+    'source_ref',e.source_ref,'continuity_head_sha256',e.continuity_head_sha256,
+    'continuity_revision',e.continuity_revision,'event_id',e.event_id,'run_id',run.run_id,
+    'request_id',e.governed_wake_request_id,'release_claim_id',prev.claim_id,
+    'release_sha',wake.running_release_sha,'lease_claim_id',lease_row.claim_id,
+    'lease_expires_at',lease_row.lease_expires_at,'recorded_worker_stage',run.worker_stage,
+    'provider_response_status',http.status_code,'provider_response_recorded_at',http.created,
+    'provider_response_sha256','sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(http.content,'UTF8')),'hex'),
+    'reconciled_at',pg_catalog.clock_timestamp(),'technical_observation_recorded',false,
+    'original_job_completed',false,'replay_authorized',false,'new_attempt_authorized',false,
+    'previous_attempt_budget_preserved',true,'installation_authorized',false,'production_changed',false)
+   END
+  INTO prior_event,prior_run,prior_status,interrupted_proof
   FROM reality_internal.final_loop_resume_events_v1 e
   JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=e.governed_wake_worker_run_id
   JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
@@ -333,6 +358,7 @@ BEGIN
     AND prev.state='CLAIMED_ONCE' AND prev.capability_key=a.capability_key
     AND prev.provider_alias_observed_at>=prev.claimed_at
   JOIN reality_internal.governed_employee_shift_worker_pulses_v1 pulse ON pulse.owner_id=e.owner_id AND pulse.shift_id=e.shift_id
+  LEFT JOIN net._http_response http ON http.id=e.governed_wake_request_id
   WHERE e.shift_id=a.shift_id AND e.owner_id=a.owner_id AND e.original_work_id=sub.original_work_id
    AND e.source_ref=sub.source_ref AND e.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
    AND e.signal_next_action='READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'
@@ -340,12 +366,43 @@ BEGIN
    AND e.previous_receipt_sha256=evidence->>'investigation_receipt_sha256'
    AND e.continuity_head_sha256=sub.continuity_head_sha256 AND e.continuity_revision=sub.continuity_revision
    AND e.state='SHADOW_PENDING' AND e.observed_at IS NULL AND e.governed_wake_request_id IS NOT NULL
-   AND run.status='COMPLETED' AND run.worker_stage='TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION'
-   AND run.finished_at IS NOT NULL AND pulse.last_worker_status='WAKE_COMPLETED'
-   AND pulse.last_worker_safe_result='TERMINAL_TECHNICAL_EVIDENCE_UNVERIFIED'
-   AND pulse.last_worker_completed_at BETWEEN run.started_at AND run.finished_at
+   AND (
+    (run.status='COMPLETED' AND run.worker_stage='TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION'
+     AND run.finished_at IS NOT NULL AND pulse.last_worker_status='WAKE_COMPLETED'
+     AND pulse.last_worker_safe_result='TERMINAL_TECHNICAL_EVIDENCE_UNVERIFIED'
+     AND pulse.last_worker_completed_at BETWEEN run.started_at AND run.finished_at
+     AND a.provider_alias_observed_at>run.finished_at)
+    OR
+    (run.status='STARTED' AND run.finished_at IS NULL AND run.interrupted_evidence_failure_v1 IS NULL
+     AND e.governed_wake_nonce IS NOT NULL AND e.governed_wake_queued_at IS NOT NULL
+     AND lease_row.claim_id IS NOT NULL AND lease_row.released_at IS NULL
+     AND lease_row.claimed_at>=e.governed_wake_queued_at
+     AND run.started_at>=lease_row.claimed_at AND run.started_at<lease_row.lease_expires_at
+     AND lease_row.lease_expires_at<pg_catalog.clock_timestamp()
+     AND a.provider_alias_observed_at>lease_row.lease_expires_at
+     AND pulse.last_worker_status='WAKE_RECEIVED'
+     AND pulse.last_worker_seen_at BETWEEN run.started_at AND lease_row.lease_expires_at
+     AND (pulse.last_worker_completed_at IS NULL OR pulse.last_worker_completed_at<run.started_at)
+     AND http.status_code=503 AND http.timed_out IS FALSE
+     AND http.content_type ILIKE 'application/json%'
+     -- pg_net's created timestamp is not a worker completion timestamp.
+     -- Use the exact dispatch request ID and bound its record to this lease.
+     AND http.created>=e.governed_wake_queued_at AND http.created<=lease_row.lease_expires_at
+     AND (CASE WHEN http.content IS JSON OBJECT THEN http.content::jsonb ELSE '{}'::jsonb END)
+       @> '{"ok":false,"error":"SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED","work_completed":false,"installation_authorized":false,"production_changed":false}'::jsonb
+     AND (SELECT count(*) FROM net._http_response h WHERE h.id=e.governed_wake_request_id)=1
+     AND NOT EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 newer
+       WHERE newer.run_id<>run.run_id AND newer.started_at>=run.started_at)
+     AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_transition_receipts_v1 tr
+       WHERE tr.worker_run_id=run.run_id)
+     AND NOT EXISTS(SELECT 1 FROM public.universe_events u
+       WHERE u.entity_type='reality_final_loop_terminal_technical_observation_v1'
+        AND u.payload->>'owner_id'=e.owner_id::text AND u.payload->>'shift_id'=e.shift_id::text
+        AND u.payload->>'original_work_id'=e.original_work_id)
+     AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 f
+       WHERE f.owner_id=e.owner_id AND f.shift_id=e.shift_id AND f.original_work_id=e.original_work_id))
+   )
    AND a.claim_id<>prev.claim_id AND a.release_sha<>prev.release_sha
-   AND a.provider_alias_observed_at>run.finished_at
    AND a.runtime_scope->>'target_environment'='CANONICAL_BENCHMARK_PREVIEW'
    AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
    AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
@@ -362,7 +419,7 @@ BEGIN
      JOIN reality_internal.governed_worker_release_approvals_v1 xrel ON xrel.claim_id=x.release_continuation_claim_id
      WHERE x.shift_id=e.shift_id AND x.original_work_id=e.original_work_id AND x.signal_kind=e.signal_kind
       AND x.source_receipt_sha256=e.source_receipt_sha256 AND xrel.release_sha=a.release_sha)
-  FOR UPDATE OF e;
+  FOR UPDATE OF e,run;
   IF NOT FOUND THEN RETURN NULL;END IF;
  END IF;
  IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
@@ -386,6 +443,16 @@ BEGIN
  -- Supersede only after all source and subscription checks. Both operations
  -- are in this transaction; conflict must not strand the old event.
  IF prior_event IS NOT NULL THEN
+  IF prior_status='STARTED' THEN
+   IF interrupted_proof IS NULL THEN RAISE EXCEPTION 'INTERRUPTED_EVIDENCE_FAILURE_PROOF_MISSING';END IF;
+   UPDATE reality_internal.signed_worker_actual_runs_v1
+    SET status='FAILED',finished_at=(interrupted_proof->>'reconciled_at')::timestamptz,
+     interrupted_evidence_failure_v1=interrupted_proof||pg_catalog.jsonb_build_object(
+      'receipt_sha256','sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(interrupted_proof::text,'UTF8')),'hex'))
+    WHERE run_id=prior_run AND status='STARTED' AND finished_at IS NULL
+     AND interrupted_evidence_failure_v1 IS NULL;
+   IF NOT FOUND THEN RAISE EXCEPTION 'INTERRUPTED_EVIDENCE_FAILURE_RECONCILIATION_RACE';END IF;
+  END IF;
   UPDATE reality_internal.final_loop_resume_events_v1 SET state='SHADOW_STALE'
    WHERE event_id=prior_event AND state='SHADOW_PENDING' AND observed_at IS NULL;
   IF NOT FOUND THEN RETURN NULL;END IF;

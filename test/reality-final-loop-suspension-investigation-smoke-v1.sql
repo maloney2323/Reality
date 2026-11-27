@@ -6,6 +6,8 @@ CREATE SCHEMA net;
 GRANT USAGE ON SCHEMA reality_internal TO service_role;
 CREATE TABLE vault.decrypted_secrets(name text,decrypted_secret text);
 CREATE TABLE net.fake_requests(id bigint GENERATED ALWAYS AS IDENTITY,target text,headers jsonb);
+CREATE TABLE net._http_response(id bigint PRIMARY KEY,status_code int,content_type text,content text,timed_out boolean,created timestamptz);
+CREATE TABLE reality_internal.governed_original_independent_final_receipts_v1(owner_id uuid,shift_id uuid,original_work_id text);
 CREATE FUNCTION net.http_post(url text,body jsonb,headers jsonb,timeout_milliseconds integer)
  RETURNS bigint LANGUAGE sql AS 'INSERT INTO net.fake_requests(target,headers) VALUES(url,headers) RETURNING id';
 CREATE TABLE public.universe_events(event_id uuid PRIMARY KEY,continuity_root_id uuid,worldline_id uuid,parent_event_id uuid,
@@ -422,6 +424,118 @@ BEGIN
  worker_stage='TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION' WHERE run_id=run;
 END $$;
 RESET ROLE;
+-- Exercise an interrupted final write against the same fixture, then roll back
+-- the disposable scenario so the existing completed-unverified path still runs.
+DO $$
+DECLARE e record; a record; next_event uuid; next_req uuid:=gen_random_uuid(); next_claim uuid:=gen_random_uuid();
+ q text; t timestamptz:=clock_timestamp(); failed record; old_event record; proof jsonb; denial uuid;
+BEGIN
+ BEGIN
+ SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE';
+ SELECT * INTO a FROM reality_internal.governed_worker_release_approvals_v1 WHERE claim_id=e.release_continuation_claim_id;
+ SELECT reconciliation_receipt_sha256 INTO q FROM reality_internal.owner_continuity_qualification_routes_v1 WHERE owner_id=e.owner_id AND source_ref=e.source_ref;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_queued_at=t-interval '10 minutes' WHERE event_id=e.event_id;
+ -- Keep historical fixture runs earlier than this interrupted run, as they
+ -- are on the real timeline. The previous positive fixture runs in seconds.
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET started_at=least(started_at,t-interval '11 minutes')
+ WHERE run_id<>e.governed_wake_worker_run_id;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='STARTED',finished_at=NULL,started_at=t-interval '9 minutes',
+ worker_stage='SHIFT_DB_BOUNDARY' WHERE run_id=e.governed_wake_worker_run_id;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET claimed_at=t-interval '9 minutes 1 second',
+ lease_expires_at=t-interval '3 minutes',released_at=NULL;
+ UPDATE reality_internal.governed_employee_shift_worker_pulses_v1 SET last_worker_seen_at=t-interval '8 minutes',
+ last_worker_completed_at=t-interval '11 minutes',last_worker_status='WAKE_RECEIVED',last_worker_safe_result=NULL WHERE shift_id=e.shift_id;
+ INSERT INTO reality_internal.governed_worker_release_approvals_v1(request_id,owner_id,shift_id,claim_id,capability_key,state,
+ approval_receipt_sha256,claimed_at,provider_alias_observed_at,provider_alias_observed_deployment_id,runtime_scope,release_sha,release_ref,scheduled_alias,independent_isolation_proof_sha256)
+ VALUES(next_req,a.owner_id,a.shift_id,next_claim,a.capability_key,'CLAIMED_ONCE',a.approval_receipt_sha256,t,t,'dpl_fixture_interrupt',
+ a.runtime_scope||jsonb_build_object('target_deployment_id','dpl_fixture_interrupt','qualifier_receipt_sha256',q),
+ repeat('4',40),'fixture-interruption-correction',a.scheduled_alias,a.independent_isolation_proof_sha256);
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'INTERRUPTION_WITHOUT_PROVIDER_RESPONSE_ACCEPTED';END IF;
+ INSERT INTO net._http_response VALUES(e.governed_wake_request_id,503,'application/json; charset=utf-8',
+ '{"ok":false,"error":"SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED","work_completed":true,"installation_authorized":false,"production_changed":false}',false,t-interval '9 minutes 30 seconds');
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'INTERRUPTION_WITH_EFFECT_ACCEPTED';END IF;
+ UPDATE net._http_response SET content='{"ok":false,"error":"SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED","work_completed":false,"installation_authorized":false,"production_changed":false}' WHERE id=e.governed_wake_request_id;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET lease_expires_at=t+interval '1 minute';
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'ACTIVE_LEASE_INTERRUPTION_ACCEPTED';END IF;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET lease_expires_at=t-interval '3 minutes';
+ INSERT INTO reality_internal.governed_original_independent_final_receipts_v1 VALUES(e.owner_id,e.shift_id,e.original_work_id);
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'SETTLED_ORIGINAL_INTERRUPTION_ACCEPTED';END IF;
+ DELETE FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE original_work_id=e.original_work_id;
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,finished_at,worker_stage)
+ VALUES(next_claim,'STARTED',t-interval '2 minutes',NULL,'FIXTURE_NEWER_WORKER');
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'NEWER_WORKER_INTERRUPTION_ACCEPTED';END IF;
+ DELETE FROM reality_internal.signed_worker_actual_runs_v1 WHERE run_id=next_claim;
+ UPDATE net._http_response SET id=e.governed_wake_request_id+1000 WHERE id=e.governed_wake_request_id;
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'FOREIGN_REQUEST_INTERRUPTION_ACCEPTED';END IF;
+ UPDATE net._http_response SET id=e.governed_wake_request_id WHERE id=e.governed_wake_request_id+1000;
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(a.request_id) IS NOT NULL THEN RAISE EXCEPTION 'INTERRUPTION_SAME_RELEASE_REPLAYED';END IF;
+ next_event:=reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req);
+ SELECT * INTO failed FROM reality_internal.signed_worker_actual_runs_v1 WHERE run_id=e.governed_wake_worker_run_id;
+ SELECT * INTO old_event FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=e.event_id;
+ proof:=failed.interrupted_evidence_failure_v1;
+ IF next_event IS NULL OR next_event=e.event_id OR failed.status<>'FAILED' OR failed.finished_at IS NULL
+  OR failed.worker_stage<>'SHIFT_DB_BOUNDARY' OR proof->>'request_id' IS DISTINCT FROM e.governed_wake_request_id::text
+  OR proof->>'receipt_sha256' IS DISTINCT FROM 'sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((proof-'receipt_sha256')::text,'UTF8')),'hex')
+  OR proof->>'replay_authorized'<>'false' OR proof->>'previous_attempt_budget_preserved'<>'true'
+  OR old_event.state<>'SHADOW_STALE' OR old_event.governed_wake_nonce IS DISTINCT FROM e.governed_wake_nonce
+  OR old_event.governed_wake_worker_run_id IS DISTINCT FROM e.governed_wake_worker_run_id OR old_event.observed_at IS NOT NULL
+  OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 fresh WHERE fresh.event_id=next_event
+    AND fresh.original_work_id=e.original_work_id AND fresh.continuity_revision=e.continuity_revision
+    AND fresh.continuity_head_sha256=e.continuity_head_sha256 AND fresh.release_continuation_claim_id=next_claim
+    AND fresh.governed_wake_worker_run_id IS NULL AND fresh.state='SHADOW_PENDING')
+ THEN RAISE EXCEPTION 'INTERRUPTED_EVIDENCE_RECONCILIATION_FAILED';END IF;
+ IF reality_internal.stage_final_loop_terminal_technical_evidence_v1(next_req) IS NOT NULL THEN RAISE EXCEPTION 'INTERRUPTED_EVIDENCE_DUPLICATED';END IF;
+ -- Use the existing service-only claim, exact context reader and verifier
+ -- return writer on the DISTINCT recovered event. Fixture proof is explicitly
+ -- synthetic; the live revision must still use actual provider evidence.
+ SET LOCAL ROLE service_role;
+ DECLARE e record; run uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid(); plan text; ctx jsonb; r jsonb; proof jsonb;
+BEGIN
+ SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=next_event AND signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING';
+ SELECT plan_fingerprint INTO plan FROM reality_internal.governed_employee_shifts_v1 WHERE shift_id=e.shift_id;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET claim_id=lease,claimed_at=clock_timestamp()-interval '1 second',
+ released_at=NULL,lease_expires_at=clock_timestamp()+interval '2 minutes';
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1 VALUES(run,'STARTED',clock_timestamp(),NULL,'FIXTURE_TERMINAL_READBACK');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1 VALUES(run,e.owner_id,e.shift_id,e.release_continuation_claim_id,
+ repeat('4',40),'fixture-interruption-correction','NORMAL_SIGNED_SHIFT','sha256:'||repeat('2',64));
+ UPDATE reality_internal.governed_employee_shift_worker_pulses_v1 SET last_worker_seen_at=clock_timestamp(),last_worker_status='WAKE_RECEIVED'
+ WHERE shift_id=e.shift_id;
+ r:=public.reality_claim_canonical_governed_wake_v1(e.owner_id,e.shift_id,plan,e.event_id,e.governed_wake_nonce,'RESUME',repeat('4',40),run,lease);
+ IF r->>'status'<>'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' OR r->>'terminal_technical_evidence_only'<>'true' OR r->>'execution_authorized'<>'false'
+ THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_CLAIM_UNVERIFIED %',r;END IF;
+ ctx:=public.reality_read_final_loop_terminal_technical_context_v1(e.shift_id,e.event_id,run);
+ IF ctx->>'status'<>'TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY' OR ctx->>'original_work_id'<>e.original_work_id
+ OR ctx->>'worker_run_id' IS DISTINCT FROM run::text OR ctx->>'running_release_sha' IS DISTINCT FROM repeat('4',40)
+ OR ctx->>'running_release_ref' IS DISTINCT FROM 'fixture-interruption-correction' OR ctx->>'release_claim_id' IS DISTINCT FROM e.release_continuation_claim_id::text
+ THEN RAISE EXCEPTION 'TERMINAL_CONTEXT_UNVERIFIED %',ctx;END IF;
+ proof:=jsonb_build_object('status','RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED','contract_id',NULL,
+ 'owner_id',e.owner_id,'shift_id',e.shift_id,'obligation_id',e.original_work_id,'source_ref',e.source_ref,
+ 'source_revision',ctx->>'frozen_source_head_sha','qualifier_receipt_sha256',ctx->>'qualifier_receipt_sha256',
+ 'maintenance_id',ctx->'terminal_history'->>'maintenance_id','existing_diagnostic_receipt_sha256',ctx->'terminal_history'->>'independent_diagnostic_receipt_sha256',
+ 'independent_technical_ci_verified',true,'frozen_technical_red_verified',true,'independent_ci_provider_observation',true,
+ 'original_business_case_red_verified',false,'business_original_warrant_verified',false,'original_job_completed',false,
+ 'previous_attempt_budget_preserved',true,'new_attempt_authorized',false,'repeat_prior_ci_dispatch_permitted',false,
+ 'execution_authorized',false,'production_changed',false,'github_artifact_digest','sha256:'||repeat('9',64),
+ 'signed_case_spec_git_blob_sha',repeat('a',40),'github_run_id',123,'github_job_id',456,'github_artifact_id',789,'github_release_sha',repeat('4',40));
+ r:=public.reality_record_final_loop_technical_ci_observation_v1(e.shift_id,e.event_id,run,proof||jsonb_build_object('original_business_case_red_verified',true));
+ IF r->>'status'<>'TERMINAL_TECHNICAL_PROVIDER_PROOF_UNVERIFIED' THEN RAISE EXCEPTION 'TECHNICAL_PROOF_PROMOTED_TO_BUSINESS_RED';END IF;
+ r:=public.reality_record_final_loop_technical_ci_observation_v1(e.shift_id,e.event_id,run,proof);
+ IF r->>'status'<>'TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN' OR r->>'revision'<>'4'
+ OR r->>'original_job_completed'<>'false' OR r->>'new_attempt_authorized'<>'false'
+ THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_RETURN_UNVERIFIED %',r;END IF;
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 WHERE shift_id=e.shift_id AND (continuity_revision<>4 OR state<>'SUSPENDED'))
+ OR NOT EXISTS(SELECT 1 FROM public.universe_events WHERE entity_type='reality_final_loop_terminal_technical_observation_v1'
+ AND payload->>'original_work_id'=e.original_work_id AND payload->'terminal_recovery_history'->>'remaining_attempts'='0')
+ THEN RAISE EXCEPTION 'TERMINAL_RETURN_LOST_ORIGINAL_OR_BUDGET';END IF;
+ r:=public.reality_record_final_loop_technical_ci_observation_v1(e.shift_id,e.event_id,run,proof);
+ IF r->>'status'='TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN' THEN RAISE EXCEPTION 'TECHNICAL_RETURN_REPLAYED';END IF;
+
+ END;
+ RESET ROLE;
+ RAISE SQLSTATE 'P9999';
+ EXCEPTION WHEN SQLSTATE 'P9999' THEN NULL;
+ END;
+END $$;
 DO $$
 DECLARE e record; a record; next_event record; newreq uuid:=gen_random_uuid(); newclaim uuid:=gen_random_uuid(); q text;
 BEGIN
