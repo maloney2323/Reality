@@ -406,7 +406,12 @@ export async function inspectFinalLoopOnExistingSignedWorker({
         e.event_state)||
        !HASH.test(e.source_receipt_sha256||'')||
        !HASH.test(e.event_causality_sha256||'')||
-       e.continuity_revision!==p.revision||
+       !Number.isSafeInteger(e.continuity_revision)||e.continuity_revision<1||
+       e.continuity_revision>p.revision||
+       // Prior observed/stale events are immutable history, never active
+       // continuation authority. Only a current pending event can resume.
+       (e.continuity_revision!==p.revision&&
+        (e.event_state==='SHADOW_PENDING'||e.would_resume_suspended_obligation!==false))||
        typeof e.source_current!=='boolean'||
        typeof e.would_resume_suspended_obligation!=='boolean'||
        (e.would_resume_suspended_obligation&&
