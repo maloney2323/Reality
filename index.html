@@ -6722,53 +6722,78 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  }
  function showLiveActivity(data){
   const host=el('realityChatContinuitySteps'),headline=el('realityChatContinuityHeadline');
-  el('realityChatContinuityChecked').textContent='Evidence checked '+new Date(data.observed_at).toLocaleTimeString()+
-   ' · read-only updates';
+  el('realityChatContinuityChecked').textContent='Checked '+new Date(data.observed_at).toLocaleTimeString()+' · live evidence';
   const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations,data.final_receipts]);
   if(liveActivityFingerprint===key)return;
+  const open=new Set([...host.querySelectorAll('details[open][data-disclosure]')].map(d=>d.dataset.disclosure));
   liveActivityFingerprint=key;host.replaceChildren();
   headline.textContent=data.obligations.length?
-   'I’m tracking '+data.obligations.length+' original obligation(s) in your authorized shift.'+
-    (data.partial?' Some evidence is unavailable; missing proof is not completion.':''):
-   data.active_shift_count?'An authorized shift exists, but its current obligations are not independently visible yet.':
-    'No current authorized shift was returned by this read. Previously recorded work remains in the ledger.';
+   'Tracking '+data.obligations.length+' original '+(data.obligations.length===1?'job':'jobs')+' in your existing shift.':
+   data.active_shift_count?'Your shift is open. Current job evidence is unavailable.':
+    'No current authorized shift returned by this check.';
+  if(data.partial)headline.textContent+=' Some evidence is still unavailable.';
+  const disclosure=(parent,label,id)=>{
+   const d=document.createElement('details');d.dataset.disclosure=id;d.open=open.has(id);
+   parent.append(d);liveNode('summary',label,d);return d;
+  };
+  const sourceLabel=ref=>{
+   const m=/^https:\/\/github\.com\/[^/]+\/[^/]+\/(pull|issues)\/(\d+)\/?$/.exec(ref);
+   return m?(m[1]==='pull'?'Pull request #':'Issue #')+m[2]:ref;
+  };
+  const friendlyNext=action=>({
+   'independently review verified investigation no replay':'Independently review the recorded investigation.',
+   'read distinct terminal technical evidence no replay':'Read and verify distinct technical evidence.',
+   'verify existing approved child review claim':'Verify the existing authorized review claim.',
+   'qualify distinct recovery evidence and exact budget no replay':'Qualify distinct recovery evidence within the existing budget.',
+   'independently qualify new source epoch no replay':'Verify the changed source before continuing.'
+  }[action]||action||'Next action unavailable.');
+  const renderStep=(step,list)=>{
+   const li=document.createElement('li');li.dataset.state=step.state;list.append(li);
+   const state=liveNode('div',step.state==='proposal'?'Proposal · not approval':step.state,li);
+   state.className='live-step-state';state.dataset.state=step.state;
+   liveNode('strong',step.label,li);liveNode('p',step.detail,li);
+   if(step.investigator)liveNode('p','Investigator: '+step.investigator,li);
+   if(step.reviewer)liveNode('p','Independent reviewer: '+step.reviewer,li);
+   if(step.diagnosis)liveNode('p','Findings: '+step.diagnosis,li);
+   if(step.proposal)liveNode('p','Proposed correction: '+step.proposal,li);
+   if(step.test)liveNode('p','Required independent test: '+step.test,li);
+   if(step.limitations)liveNode('p','Limitations: '+step.limitations,li);
+   if(step.receipt||step.worker_run_id){
+    const d=disclosure(li,'Evidence and receipt',step.id);
+    if(step.at)liveNode('p',new Date(step.at).toLocaleString(),d);
+    if(step.receipt)liveNode('p','Receipt: '+step.receipt,d);
+    if(step.worker_run_id)liveNode('p','Signed worker: '+step.worker_run_id,d);
+   }
+  };
   for(const job of data.obligations){
    const article=document.createElement('article');host.append(article);
-   liveNode('strong','Original work · '+job.source_ref,article);
-   liveNode('p','Continuity revision '+job.revision+' · '+job.shift_status,article);
-   if(job.active_release)liveNode('p','Last recorded release activation: '+job.active_release.sha.slice(0,12),article);
-   const list=document.createElement('ol');article.append(list);
-   for(const step of job.steps){
-    const li=document.createElement('li');li.dataset.state=step.state;list.append(li);
-    const state=liveNode('div',step.state==='proposal'?'Proposal · not approval':step.state,li);
-    state.className='live-step-state';state.dataset.state=step.state;
-    liveNode('strong',step.label,li);liveNode('p',step.detail,li);
-    if(step.investigator)liveNode('p','Investigator: '+step.investigator,li);
-    if(step.reviewer)liveNode('p','Independent reviewer: '+step.reviewer,li);
-    if(step.diagnosis)liveNode('p','Findings: '+step.diagnosis,li);
-    if(step.proposal)liveNode('p','Proposed correction: '+step.proposal,li);
-    if(step.test)liveNode('p','Required independent test: '+step.test,li);
-    if(step.limitations)liveNode('p','Limitations: '+step.limitations,li);
-    if(step.receipt||step.worker_run_id){
-     const d=document.createElement('details');li.append(d);
-     liveNode('summary','Evidence and receipt',d);
-     if(step.at)liveNode('p',new Date(step.at).toLocaleString(),d);
-     if(step.receipt)liveNode('p','Receipt: '+step.receipt,d);
-     if(step.worker_run_id)liveNode('p','Signed worker: '+step.worker_run_id,d);
-    }
-   }
+   liveNode('strong',sourceLabel(job.source_ref),article);
+   const verified=job.steps.filter(s=>s.state==='verified');
+   const running=job.steps.find(s=>s.state==='running');
+   const proposal=job.steps.find(s=>s.state==='proposal');
+   liveNode('p','Past · '+(verified.length?verified.at(-1).label+' verified.':'No current verified step returned.'),article);
+   liveNode('p','Present · '+(job.original_complete?'Outcome and Universe return verified.':running?running.label+' running.':job.gates.length?'Paused — required proofs remain unresolved. Your shift stays open.':'Original job remains open.'),article);
+   liveNode('p','Next · '+(job.original_complete?'Review final receipt.':friendlyNext(job.next_action)),article);
+   if(proposal)liveNode('p','Proposed resolution recorded. Independent review is required before it can be relied on.',article);
+   const d=disclosure(article,'View steps, blocker, proposal and receipts',job.original_work_id);
+   liveNode('p','Continuity revision '+job.revision+' · '+job.shift_status,d);
+   if(job.active_release)liveNode('p','Last recorded activation: '+job.active_release.sha.slice(0,12),d);
    if(job.gates.length){
-    liveNode('strong','Why work cannot advance yet',article);
-    for(const gate of job.gates)liveNode('p','• '+gate,article);
+    liveNode('strong','Unresolved proof requirements',d);
+    for(const gate of job.gates)liveNode('p','• '+gate,d);
    }
-   liveNode('strong',job.original_complete?'Independent outcome and Universe return verified':'Next qualified action',article);
-   if(!job.original_complete)liveNode('p',job.next_action||'Current next action unavailable.',article);
-   liveNode('p',job.original_complete?'See the final receipt in completed work.':
-    'Original work remains open. No additional authorization is inferred from this display.',article);
+   const list=document.createElement('ol');d.append(list);
+   for(const step of job.steps.filter(s=>s.state!=='historical'))renderStep(step,list);
+   const past=job.steps.filter(s=>s.state==='historical');
+   if(past.length){
+    const history=disclosure(d,'Earlier recorded signals ('+past.length+')',job.original_work_id+':history');
+    const h=document.createElement('ol');history.append(h);
+    for(const step of past)renderStep(step,h);
+   }
+   liveNode('p','This read-only update does not grant new authority or confirm an installation.',d);
   }
   if(data.final_receipts.length){
-   const receipts=document.createElement('details');host.append(receipts);
-   liveNode('summary','Independently verified final receipts · '+data.final_receipts.length,receipts);
+   const receipts=disclosure(host,'Verified completed jobs ('+data.final_receipts.length+')','final-receipts');
    for(const r of data.final_receipts){
     if(!/^work:[a-f0-9]{32}$/.test(r.original_work_id||''))continue;
     const item=document.createElement('article');receipts.append(item);
@@ -6803,8 +6828,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   }catch{
    if(epoch===liveActivityEpoch){
     liveActivityFingerprint='';
-    el('realityChatContinuityHeadline').textContent='Live evidence read unavailable. Any previously displayed steps are historical, not a new status.';
-    el('realityChatContinuityChecked').textContent='Current check failed · no execution or completion inferred';
+    el('realityChatContinuityHeadline').textContent='Live update temporarily unavailable. Last recorded evidence is retained below.';
+    el('realityChatContinuityChecked').textContent='Rechecking automatically while Chat is visible.';
    }
   }finally{
    clearTimeout(deadline);
