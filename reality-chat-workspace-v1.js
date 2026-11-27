@@ -192,6 +192,13 @@
   quickNav.append(planShift);
   threadHeader.append(historyToggle, threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
+  // Preserve the same live evidence node inside the scrollable conversation,
+  // not as a sibling above its header. No extra API calls or worker actions.
+  const liveActivity=get('realityChatContinuityActivity');
+  function mountLiveActivity(){
+    if(liveActivity&&!transcript.contains(liveActivity))transcript.prepend(liveActivity);
+  }
+  mountLiveActivity();
 
   // Keep original goal-command selector functional, but move its explanatory
   // controls behind an optional disclosure so ordinary chat stays uncluttered.
@@ -469,7 +476,7 @@
 
   // Empty conversation is explicitly an invitation, never fabricated history.
   function renderEmpty() {
-    const hasMessage=[...transcript.children].some(el=>el.classList.contains('bubble'));
+    const hasMessage=[...transcript.children].some(el=>el!==liveActivity&&el.classList.contains('bubble'));
     let empty=transcript.querySelector('.reality-chat-empty');
     if(hasMessage){if(empty)empty.remove();return;}
     if(empty)return;
@@ -493,6 +500,7 @@
   // any owner-requested inline work card in their conversation, not a layer
   // above it. This is a projection, not a new persisted customer message.
   const inlineRerender=new MutationObserver(()=>{
+    mountLiveActivity();
     attachInlineStatus();
     if(inlineScreen()&&!inlinePanels.hidden&&!transcript.contains(inlinePanels))
       transcript.append(inlinePanels);
