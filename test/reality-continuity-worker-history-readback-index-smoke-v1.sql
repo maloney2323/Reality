@@ -37,24 +37,85 @@ BEGIN
 END $$;
 \ir ../sql/reality-continuity-worker-history-readback-index-v1.sql
 ANALYZE cron.job_run_details;
+-- Reproduce live readback statements with minimal service function fixtures.
+CREATE FUNCTION public.reality_read_owner_worker_recovery_status_v1(p_owner_id uuid)
+RETURNS timestamptz LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE success_at timestamptz;
+BEGIN
+ select max(d.start_time) into success_at
+ from cron.job_run_details d join cron.job j on j.jobid=d.jobid
+ where j.jobname='reality-riley-preview-original-execution-wake-v1'
+ and d.status='succeeded'
+ and d.start_time>clock_timestamp()-interval '48 hours';
+ RETURN success_at;
+END $fn$;
+CREATE FUNCTION public.reality_read_owner_signed_worker_actual_runs_v1(p_owner_id uuid)
+RETURNS timestamptz LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE last_dispatch timestamptz;
+BEGIN
+ select max(d.start_time) into last_dispatch
+ from cron.job_run_details d join cron.job j on j.jobid=d.jobid
+ where j.jobname='reality-riley-preview-original-execution-wake-v1'
+  and d.status='succeeded'
+  and d.return_message='1 row'
+ and d.start_time>clock_timestamp()-interval '48 hours';
+ RETURN last_dispatch;
+END $fn$;
+CREATE TEMP VIEW optimized_history_answers AS SELECT
+ public.reality_read_owner_worker_recovery_status_v1(NULL::uuid) AS recovery,
+ public.reality_read_owner_signed_worker_actual_runs_v1(NULL::uuid) AS dispatch;
+\ir ../sql/reality-continuity-worker-history-readback-query-v1.sql
 DO $$
 DECLARE p json;
 BEGIN
- IF EXISTS((SELECT * FROM baseline EXCEPT SELECT * FROM exact_history_answers)
- UNION ALL (SELECT * FROM exact_history_answers EXCEPT SELECT * FROM baseline))
+ IF EXISTS((SELECT * FROM baseline EXCEPT SELECT * FROM optimized_history_answers)
+ UNION ALL (SELECT * FROM optimized_history_answers EXCEPT SELECT * FROM baseline))
  THEN RAISE EXCEPTION 'READBACK_EVIDENCE_CHANGED'; END IF;
- IF NOT EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
- WHERE c.relname='reality_cron_success_start_readback_v1' AND i.indisvalid)
- THEN RAISE EXCEPTION 'INDEX_INVALID';END IF;
- -- Check the index is usable by the planner with both exact predicates.
- -- The natural planner chooses independently; no forced scan settings.
- EXECUTE 'EXPLAIN (FORMAT JSON) SELECT max(d.start_time) FROM cron.job_run_details d JOIN cron.job j ON j.jobid=d.jobid WHERE j.jobname=''reality-riley-preview-original-execution-wake-v1'' AND d.status=''succeeded'' AND d.start_time>clock_timestamp()-interval ''48 hours''' INTO p;
- RAISE NOTICE 'recovery natural plan: %',p;
- EXECUTE 'EXPLAIN (FORMAT JSON) SELECT max(d.start_time) FROM cron.job_run_details d JOIN cron.job j ON j.jobid=d.jobid WHERE j.jobname=''reality-riley-preview-original-execution-wake-v1'' AND d.status=''succeeded'' AND d.return_message=''1 row'' AND d.start_time>clock_timestamp()-interval ''48 hours''' INTO p;
- RAISE NOTICE 'dispatch natural plan: %',p;
+ EXECUTE $q$EXPLAIN (FORMAT JSON) select max(latest.start_time)
+ from cron.job j
+ cross join lateral (
+  select d.start_time from cron.job_run_details d
+  where d.jobid=j.jobid and d.status='succeeded'
+  and d.start_time>clock_timestamp()-interval '48 hours'
+  order by d.start_time desc limit 1
+ ) latest
+ where j.jobname='reality-riley-preview-original-execution-wake-v1';$q$ INTO p;
+ RAISE NOTICE 'optimized recovery natural plan: %',p;
+ IF p::text NOT LIKE '%reality_cron_success_start_readback_v1%' THEN
+  RAISE EXCEPTION 'RECOVERY_INDEX_NOT_USED'; END IF;
+ EXECUTE $q$EXPLAIN (FORMAT JSON) select max(latest.start_time)
+ from cron.job j
+ cross join lateral (
+  select d.start_time from cron.job_run_details d
+  where d.jobid=j.jobid and d.status='succeeded'
+  and d.return_message='1 row'
+  and d.start_time>clock_timestamp()-interval '48 hours'
+  order by d.start_time desc limit 1
+ ) latest
+ where j.jobname='reality-riley-preview-original-execution-wake-v1';$q$ INTO p;
+ RAISE NOTICE 'optimized dispatch natural plan: %',p;
+ IF p::text NOT LIKE '%reality_cron_dispatch_start_readback_v1%' THEN
+  RAISE EXCEPTION 'DISPATCH_INDEX_NOT_USED'; END IF;
 END $$;
-EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) SELECT * FROM exact_history_answers;
--- Additional no matching recent successes case, both must remain NULL.
+EXPLAIN (ANALYZE, BUFFERS) select max(latest.start_time)
+ from cron.job j
+ cross join lateral (
+  select d.start_time from cron.job_run_details d
+  where d.jobid=j.jobid and d.status='succeeded'
+  and d.start_time>clock_timestamp()-interval '48 hours'
+  order by d.start_time desc limit 1
+ ) latest
+ where j.jobname='reality-riley-preview-original-execution-wake-v1';
+EXPLAIN (ANALYZE, BUFFERS) select max(latest.start_time)
+ from cron.job j
+ cross join lateral (
+  select d.start_time from cron.job_run_details d
+  where d.jobid=j.jobid and d.status='succeeded'
+  and d.return_message='1 row'
+  and d.start_time>clock_timestamp()-interval '48 hours'
+  order by d.start_time desc limit 1
+ ) latest
+ where j.jobname='reality-riley-preview-original-execution-wake-v1';
 DELETE FROM cron.job_run_details WHERE jobid IN (1,3);
-DO $$ BEGIN IF EXISTS(SELECT 1 FROM exact_history_answers WHERE recovery IS NOT NULL OR dispatch IS NOT NULL)
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM optimized_history_answers WHERE recovery IS NOT NULL OR dispatch IS NOT NULL)
  THEN RAISE EXCEPTION 'EMPTY_HISTORY_FALSE_SUCCESS'; END IF; END $$;
