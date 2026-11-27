@@ -529,7 +529,7 @@ export default async function handler(req,res){
    if(!isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
     throw Error('SUSPENSION_INVESTIGATION_COMPLETION_PULSE_UNVERIFIED');
    durableWorkerCompletion=pulse;
-   workerStage='WORKER_RESPONSE_PUBLICATION';
+   workerStage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION';
    const attested=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
     p_run_id:actualWorkerRunId,p_status:'COMPLETED',p_stage:workerStage});
    workerCompletionAttestedBeforeResponse=attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
