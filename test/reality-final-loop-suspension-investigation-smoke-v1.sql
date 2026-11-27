@@ -124,7 +124,10 @@ BEGIN
  proof:=jsonb_build_object('status','FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING','owner_id',o,'shift_id',s,
  'continuity_head_sha256',head,'revision',3,'independent_owner_scope_verified',true,'governed_qualification_handoffs','[]'::jsonb);
  guard:=jsonb_build_object('status','FINAL_LOOP_SHARED_CONTINUITY_CHECKED','owner_id',o,'shift_id',s,'continuity_head_sha256',head,'revision',3,
+ 'read_only',true,'production_changed',false,'continuity_root_id',root,'handoff_observation_sha256',wake_hash,
  'execution_authorized',false,'original_job_completed',false,'obligations',jsonb_build_array(jsonb_build_object('original_work_id',work,'source_ref',src,
+ 'qualifier_receipt_sha256',q,'unresolved_proof_gates',gates,'next_qualified_action','VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',
+ 'original_claim_admitted',false,'universe_return_verified',false,
  'continuity_identity_verified',true,'qualifier_digest_verified',true,'source_proof_verified',true,'independent_original_outcome_verified',false,
  'execution_spine_readback',jsonb_build_object('status','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN','canonical_return_event_id',observed,'replay_authorized',false))));
  INSERT INTO public.suspension_fixture_proof VALUES(s,proof,guard);
@@ -236,11 +239,20 @@ END $$;
 SET ROLE service_role;
 DO $$
 DECLARE e record; oldrun uuid; newrun uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid();
- plan text; r jsonb; claim jsonb; i record; verdict record;
+ plan text; r jsonb; claim jsonb; i record; verdict record; visibility jsonb;
 BEGIN
  SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
  SELECT governed_wake_worker_run_id INTO oldrun FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
  SELECT plan_fingerprint INTO plan FROM reality_internal.governed_employee_shifts_v1 WHERE shift_id=e.shift_id;
+ visibility:=public.reality_read_owner_current_continuity_self_visibility_v1(e.owner_id);
+ IF visibility->>'status'<>'OWNER_CURRENT_CONTINUITY_SELF_VISIBILITY_READ_ONLY'
+ OR visibility->'obligations'->0->'verified_investigation'->>'investigation_worker_run_id' IS DISTINCT FROM oldrun::text
+ OR visibility->'obligations'->0->'verified_independent_review' IS DISTINCT FROM 'null'::jsonb
+ OR visibility->'obligations'->0->>'continuity_revision'<>'3'
+ OR visibility->>'execution_authorized'<>'false'
+ THEN RAISE EXCEPTION 'SELF_VISIBILITY_CURRENT_INVESTIGATION_NOT_RECONCILED: %',visibility;END IF;
+ IF public.reality_read_owner_current_continuity_self_visibility_v1(gen_random_uuid())->'obligations'<>'[]'::jsonb
+ THEN RAISE EXCEPTION 'SELF_VISIBILITY_FOREIGN_OWNER_LEAK';END IF;
  r:=public.reality_claim_shift_continuity_independent_review_v1(e.shift_id,oldrun,e.event_id);
  IF r->>'status'<>'NO_CONTINUITY_INDEPENDENT_REVIEW_READY' THEN RAISE EXCEPTION 'DIAGNOSING_RUN_CLAIMED_OWN_REVIEW';END IF;
  UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET claim_id=lease,claimed_at=clock_timestamp()-interval '1 second',
@@ -271,9 +283,22 @@ BEGIN
  OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=e.event_id AND state='SHADOW_OBSERVED')
  OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE canonical_prepare_invocation_id IS NOT NULL OR claimant_worker_run_id IS NOT NULL)
  THEN RAISE EXCEPTION 'REVIEW_HASH_OR_ORIGINAL_AUTHORITY_DRIFT';END IF;
+ visibility:=public.reality_read_owner_current_continuity_self_visibility_v1(e.owner_id);
+ IF visibility->'obligations'->0->'verified_independent_review' IS DISTINCT FROM 'null'::jsonb
+ THEN RAISE EXCEPTION 'SELF_VISIBILITY_PREMATURE_REVIEW_PROOF';END IF;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp(),
+ worker_stage='INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION' WHERE run_id=newrun;
+ visibility:=public.reality_read_owner_current_continuity_self_visibility_v1(e.owner_id);
+ IF visibility->'obligations'->0->'verified_independent_review'->>'receipt_sha256' IS DISTINCT FROM verdict.receipt_sha256
+ OR visibility->'obligations'->0->>'operational_next_action'<>'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'
+ OR visibility->'obligations'->0->'verified_independent_review'->>'original_job_completed'<>'false'
+ THEN RAISE EXCEPTION 'SELF_VISIBILITY_DISTINCT_REVIEW_NOT_RECONCILED: %',visibility;END IF;
 END $$;
 RESET ROLE;
 DO $$ BEGIN
+ IF has_function_privilege('authenticated','public.reality_read_owner_current_continuity_self_visibility_v1(uuid)','EXECUTE')
+ OR has_function_privilege('anon','public.reality_read_owner_current_continuity_self_visibility_v1(uuid)','EXECUTE')
+ THEN RAISE EXCEPTION 'SELF_VISIBILITY_RPC_EXPOSED';END IF;
  IF has_function_privilege('authenticated','public.reality_claim_shift_continuity_independent_review_v1(uuid,uuid,uuid)','EXECUTE')
  OR has_function_privilege('anon','public.reality_record_shift_continuity_independent_review_v1(uuid,uuid,uuid,text,text,timestamptz,uuid,text)','EXECUTE')
  THEN RAISE EXCEPTION 'DIRECT_ORIGINAL_REVIEW_RPC_EXPOSED';END IF;
