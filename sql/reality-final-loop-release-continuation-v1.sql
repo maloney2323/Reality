@@ -320,8 +320,10 @@ BEGIN
    AND ev.governed_wake_requested_at IS NOT NULL AND ev.governed_wake_request_id IS NULL
    AND (ev.release_continuation_claim_id IS NULL OR (review_release AND ev.release_continuation_claim_id=release_claim))
    AND ev.source_receipt_sha256<>ev.previous_receipt_sha256
-   AND (NOT review_release OR (ev.signal_kind='QUALIFIER_PROOF_CHANGED'
-    AND ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+   AND (NOT review_release OR (
+    ((ev.signal_kind='QUALIFIER_PROOF_CHANGED' AND ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM')
+     OR (ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+      AND ev.release_continuation_claim_id=release_claim))
     AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
      WHERE a.claim_id=release_claim AND a.runtime_scope->>'original_work_id'=ev.original_work_id
      AND a.runtime_scope->>'source_ref'=ev.source_ref)))
@@ -329,6 +331,9 @@ BEGIN
    -- evidence-only investigation. The worker MUST preserve the hard budget;
    -- the existing verifier route cannot dispatch old CI for this action.
    AND (ev.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' OR
+    (ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND review_release
+     AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+     AND ev.release_continuation_claim_id=release_claim) OR
     (ev.signal_kind='QUALIFIER_PROOF_CHANGED' AND ev.signal_next_action IN
      ('VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC',
       'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY',
@@ -398,7 +403,16 @@ BEGIN
       AND ci.case_specific_ci_receipt_sha256=ev.source_receipt_sha256
       AND ci.source_epoch_frozen_red_verified AND ci.code_correction_green_verified
       AND NOT ci.original_customer_job_completed AND NOT ci.artifact_installation_authorized
-      AND NOT ci.production_changed)))
+      AND NOT ci.production_changed))
+    OR (ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND review_release
+     AND ev.release_continuation_claim_id=release_claim
+     AND ev.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
+      ev.owner_id,ev.shift_id,ev.original_work_id,ev.source_ref,ev.continuity_head_sha256,ev.continuity_revision)->>'receipt_sha256')
+     AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
+       WHERE a.claim_id=release_claim AND a.runtime_scope->>'continuity_head_sha256'=ev.continuity_head_sha256
+        AND a.runtime_scope->>'continuity_revision'=ev.continuity_revision::text
+        AND a.runtime_scope->>'qualifier_receipt_sha256'=ev.previous_receipt_sha256)))
+   )
   ORDER BY ev.created_at,ev.event_id LIMIT 1 FOR UPDATE OF ev SKIP LOCKED;
   IF NOT FOUND THEN RETURN NULL;END IF;
  END IF;
@@ -495,7 +509,10 @@ BEGIN
     WHERE e.shift_id=p_shift_id AND e.owner_id=p_owner_id
     AND e.original_work_id=a.runtime_scope->>'original_work_id'
     AND e.source_ref=a.runtime_scope->>'source_ref' AND e.state='SHADOW_PENDING'
-    AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND (e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+      OR (e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION'
+       AND e.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+       AND e.release_continuation_claim_id=a.claim_id))
     AND e.governed_wake_request_id IS NOT NULL
     AND e.governed_wake_queued_at>=a.claimed_at
     AND (e.release_continuation_claim_id=a.claim_id OR e.release_continuation_claim_id IS NULL)),
@@ -508,7 +525,7 @@ CREATE OR REPLACE FUNCTION public.reality_claim_canonical_governed_wake_v1(
  p_owner_id uuid,p_shift_id uuid,p_plan_fingerprint text,p_event_id uuid,
  p_nonce uuid,p_kind text,p_release_sha text,p_worker_run_id uuid,p_lease_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE n int:=0;
+DECLARE n int:=0; claimed_event record; investigation_only boolean:=false;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'CANONICAL_WAKE_SERVICE_ONLY';END IF;
  IF p_nonce IS NULL OR p_event_id IS NULL OR p_kind IS NULL OR p_kind NOT IN('START','RESUME')
@@ -552,9 +569,23 @@ BEGIN
   AND c.condition_kind=e.signal_kind AND c.continuity_revision=e.continuity_revision
   AND c.continuity_head_sha256=e.continuity_head_sha256 AND c.subscribed_receipt_sha256=e.previous_receipt_sha256);
  GET DIAGNOSTICS n=ROW_COUNT;
+ IF n=1 THEN
+  SELECT * INTO claimed_event FROM reality_internal.final_loop_resume_events_v1 e
+   WHERE e.event_id=p_event_id AND e.governed_wake_worker_run_id=p_worker_run_id;
+  IF claimed_event.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' THEN
+   IF claimed_event.signal_next_action<>'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+    OR claimed_event.release_continuation_claim_id IS NULL
+    OR claimed_event.source_receipt_sha256 IS DISTINCT FROM (reality_internal.read_final_loop_verified_suspension_v1(
+      claimed_event.owner_id,claimed_event.shift_id,claimed_event.original_work_id,claimed_event.source_ref,
+      claimed_event.continuity_head_sha256,claimed_event.continuity_revision)->>'receipt_sha256')
+   THEN RAISE EXCEPTION 'SUSPENSION_INVESTIGATION_CLAIM_PROOF_UNVERIFIED';END IF;
+   investigation_only:=true;
+  END IF;
+ END IF;
  END IF;
  RETURN pg_catalog.jsonb_build_object('status',CASE WHEN n=1 THEN 'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' ELSE 'CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED' END,
  'event_id',p_event_id,'worker_run_id',p_worker_run_id,'shift_id',p_shift_id,
+ 'investigation_only',investigation_only,
  'execution_authorized',false,'original_job_completed',false,'production_changed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) FROM PUBLIC,anon,authenticated;
