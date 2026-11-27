@@ -9,15 +9,19 @@ ALTER TABLE reality_internal.final_loop_resume_events_v1
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_original_signal_once_v1
  ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,signal_kind,source_receipt_sha256)
  WHERE release_continuation_claim_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS final_loop_release_continuation_once_v1
+DROP INDEX IF EXISTS reality_internal.final_loop_release_continuation_once_v1;
+CREATE UNIQUE INDEX final_loop_release_continuation_once_v1
  ON reality_internal.final_loop_resume_events_v1(release_continuation_claim_id)
- WHERE release_continuation_claim_id IS NOT NULL;
+ WHERE release_continuation_claim_id IS NOT NULL AND signal_kind<>'VERIFIED_INVESTIGATION_REVIEW';
+CREATE UNIQUE INDEX IF NOT EXISTS final_loop_verified_investigation_review_once_v1
+ ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,source_receipt_sha256)
+ WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
 
 -- A verified suspension is a causal source distinct from a changed qualifier.
 ALTER TABLE reality_internal.final_loop_resume_conditions_v1 DROP CONSTRAINT final_loop_resume_conditions_v1_condition_kind_check;
-ALTER TABLE reality_internal.final_loop_resume_conditions_v1 ADD CONSTRAINT final_loop_resume_conditions_v1_condition_kind_check CHECK (condition_kind IN ('QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION'));
+ALTER TABLE reality_internal.final_loop_resume_conditions_v1 ADD CONSTRAINT final_loop_resume_conditions_v1_condition_kind_check CHECK (condition_kind IN ('QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW'));
 ALTER TABLE reality_internal.final_loop_resume_events_v1 DROP CONSTRAINT final_loop_resume_events_v1_signal_kind_check;
-ALTER TABLE reality_internal.final_loop_resume_events_v1 ADD CONSTRAINT final_loop_resume_events_v1_signal_kind_check CHECK (signal_kind IN ('QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION'));
+ALTER TABLE reality_internal.final_loop_resume_events_v1 ADD CONSTRAINT final_loop_resume_events_v1_signal_kind_check CHECK (signal_kind IN ('QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW'));
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_suspension_investigation_once_v1 ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,source_receipt_sha256) WHERE signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
 CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_verified_suspension_v1(
  p_owner_id uuid,p_shift_id uuid,p_original_work_id text,p_source_ref text,p_head text,p_revision bigint)
@@ -85,10 +89,132 @@ $fn$;
 REVOKE ALL ON FUNCTION reality_internal.read_final_loop_verified_suspension_v1(uuid,uuid,text,text,text,bigint) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_suspension_v1(uuid,uuid,text,text,text,bigint) TO service_role;
 
+-- A completed signed investigation and independently validated receipt are
+-- the causal source of the distinct reviewer event. No model verdict is proof.
+CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_verified_investigation_v1(
+ p_owner_id uuid,p_shift_id uuid,p_original_work_id text,p_source_ref text,p_head text,p_revision bigint)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
+ SELECT pg_catalog.jsonb_build_object('incident_id',i.incident_id,
+  'investigation_receipt_sha256',i.investigation_receipt_sha256,'investigation_worker_run_id',run.run_id,
+  'investigation_event_id',ev.event_id,'suspension_receipt_sha256',ev.source_receipt_sha256,
+  'frozen_source_head_sha',q.reconciliation_snapshot->>'source_head_sha',
+  'unresolved_proof_gates',q.reconciliation_snapshot->'unsatisfied_gates')
+ FROM reality_internal.owner_shift_continuity_incidents_v1 i
+ JOIN reality_internal.final_loop_resume_events_v1 ev ON ev.event_id::text=i.source_evidence->>'event_id'
+  AND ev.owner_id=i.owner_id AND ev.shift_id=i.shift_id AND ev.original_work_id=p_original_work_id
+  AND ev.source_ref=p_source_ref AND ev.continuity_head_sha256=p_head AND ev.continuity_revision=p_revision
+  AND ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+  AND ev.state='SHADOW_OBSERVED' AND ev.observed_at>=i.investigated_at
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=ev.governed_wake_worker_run_id
+  AND run.status='COMPLETED' AND run.finished_at>=ev.observed_at
+  AND run.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION'
+ JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
+  AND wake.release_claim_id=ev.release_continuation_claim_id AND wake.owner_id=i.owner_id AND wake.shift_id=i.shift_id
+  AND wake.operating_lane='NORMAL_SIGNED_SHIFT'
+ JOIN reality_internal.owner_continuity_qualification_routes_v1 q ON q.owner_id=i.owner_id AND q.source_ref=p_source_ref
+  AND q.reconciliation_snapshot->>'shift_id'=p_shift_id::text
+  AND q.reconciliation_snapshot->>'original_candidate_work_id'=p_original_work_id
+  AND q.reconciliation_snapshot->>'source_proof_bound'='true'
+  AND q.reconciliation_snapshot->>'review_scope_qualified'='true'
+  AND q.reconciliation_snapshot->>'exact_goal_event_verified'='true'
+  AND q.reconciliation_snapshot->>'exact_acceptance_approval_verified'='true'
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'source_head_sha'=q.reconciliation_snapshot->>'source_head_sha'
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'parent_original_work_id'=p_original_work_id
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'source_ref'=p_source_ref
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'execution_authorized'='false'
+  AND q.reconciliation_snapshot->'recovery_terminal_history'->>'remaining_attempts'='0'
+  AND q.reconciliation_snapshot->'recovery_terminal_history'->>'replay_permitted'='false'
+  AND q.reconciliation_snapshot->'recovery_terminal_history'->>'new_attempt_authorized'='false'
+  AND q.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+   pg_catalog.convert_to(q.reconciliation_snapshot::text,'UTF8')),'hex')
+ WHERE i.owner_id=p_owner_id AND i.shift_id=p_shift_id AND i.kind='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'
+  AND i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' AND i.qualified_job_id IS NULL
+  AND i.reviewer_function_id IS NOT NULL AND i.reviewer_function_id<>i.assigned_function_id
+  AND i.source_evidence->>'original_work_id'=p_original_work_id
+  AND i.source_evidence->>'source_ref'=p_source_ref AND i.source_evidence->>'continuity_head_sha256'=p_head
+  AND i.source_evidence->>'worker_run_id'=run.run_id::text
+  AND i.source_evidence->>'verified_suspension_receipt_sha256'=ev.source_receipt_sha256
+  AND i.source_evidence->>'previous_attempt_budget_preserved'='true'
+  AND i.source_evidence->>'replay_authorized'='false' AND i.source_evidence->>'new_attempt_authorized'='false'
+  AND i.evidence_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(i.source_evidence::text,'UTF8')),'hex')
+  AND i.investigation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+   pg_catalog.jsonb_build_object('owner_id',i.owner_id,'incident_id',i.incident_id,
+    'evidence_sha256',i.evidence_sha256,'model_response_id',i.model_response_id,
+    'assigned_employee',i.assigned_employee,'reviewer',i.independent_reviewer,
+    'diagnosis',i.diagnosis,'proposed_upgrade',i.proposed_upgrade,
+    'required_independent_test',i.independent_test_requirement,'limitations',i.limitations,
+    'new_original_jobs_created',0,'installation_authorized',false)::text,'UTF8')),'hex')
+  AND ev.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
+   p_owner_id,p_shift_id,p_original_work_id,p_source_ref,p_head,p_revision)->>'receipt_sha256')
+ ORDER BY q.reconciliation_checked_at DESC NULLS LAST,i.investigated_at DESC LIMIT 1;
+$fn$;
+REVOKE ALL ON FUNCTION reality_internal.read_final_loop_verified_investigation_v1(uuid,uuid,text,text,text,bigint) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_investigation_v1(uuid,uuid,text,text,text,bigint) TO service_role;
+
+CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_independent_investigation_review_v1(p_request_id uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text;
+BEGIN
+ SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
+ WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
+  AND r.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND r.provider_alias_observed_at>=r.claimed_at
+  AND r.provider_alias_observed_deployment_id=r.runtime_scope->>'target_deployment_id'
+  AND r.runtime_scope->>'runtime_database_project_ref'='hvkfreoagbrphwghjajw'
+  AND r.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+  AND r.runtime_scope->>'child_execution_enabled'='false' AND r.runtime_scope->>'parent_delivery_enabled'='false'
+  AND r.runtime_scope->>'production_changed'='false'
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 newer
+   WHERE newer.owner_id=r.owner_id AND newer.shift_id=r.shift_id AND newer.capability_key=r.capability_key
+    AND newer.state='CLAIMED_ONCE' AND newer.provider_alias_observed_at>r.provider_alias_observed_at);
+ IF NOT FOUND THEN RETURN NULL;END IF;
+ evidence:=reality_internal.read_final_loop_verified_investigation_v1(a.owner_id,a.shift_id,
+  a.runtime_scope->>'original_work_id',a.runtime_scope->>'source_ref',
+  a.runtime_scope->>'continuity_head_sha256',(a.runtime_scope->>'continuity_revision')::bigint);
+ IF evidence IS NULL THEN RETURN NULL;END IF;
+ SELECT * INTO sub FROM reality_internal.final_loop_resume_conditions_v1 c
+ WHERE c.owner_id=a.owner_id AND c.shift_id=a.shift_id AND c.original_work_id=a.runtime_scope->>'original_work_id'
+  AND c.source_ref=a.runtime_scope->>'source_ref' AND c.condition_kind='QUALIFIER_PROOF_CHANGED'
+  AND c.continuity_head_sha256=a.runtime_scope->>'continuity_head_sha256'
+  AND c.continuity_revision::text=a.runtime_scope->>'continuity_revision' AND c.state='SUSPENDED'
+ FOR UPDATE;
+ IF NOT FOUND OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+  WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id
+   AND (e.state='SHADOW_PENDING' OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
+    AND e.source_receipt_sha256=evidence->>'investigation_receipt_sha256'))) THEN RETURN NULL;END IF;
+ INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,
+  subscribed_receipt_sha256,continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
+ VALUES(a.shift_id,a.owner_id,sub.original_work_id,sub.source_ref,'VERIFIED_INVESTIGATION_REVIEW',
+  evidence->>'suspension_receipt_sha256',sub.continuity_head_sha256,sub.continuity_revision,
+  'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',evidence->'unresolved_proof_gates','RECOVER','SUSPENDED')
+ ON CONFLICT(shift_id,original_work_id,condition_kind) DO NOTHING;
+ IF NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 c
+  WHERE c.owner_id=a.owner_id AND c.shift_id=a.shift_id AND c.original_work_id=sub.original_work_id
+   AND c.source_ref=sub.source_ref AND c.condition_kind='VERIFIED_INVESTIGATION_REVIEW'
+   AND c.continuity_head_sha256=sub.continuity_head_sha256 AND c.continuity_revision=sub.continuity_revision
+   AND c.subscribed_receipt_sha256=evidence->>'suspension_receipt_sha256') THEN RETURN NULL;END IF;
+ causal:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+  a.shift_id::text||'|'||sub.original_work_id||'|'||sub.continuity_head_sha256||'|'||
+  sub.continuity_revision::text||'|'||(evidence->>'suspension_receipt_sha256')||'|'||
+  (evidence->>'investigation_receipt_sha256'),'UTF8')),'hex');
+ INSERT INTO reality_internal.final_loop_resume_events_v1(shift_id,owner_id,original_work_id,source_ref,signal_kind,
+  source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,
+  signal_next_action,release_continuation_claim_id)
+ VALUES(a.shift_id,a.owner_id,sub.original_work_id,sub.source_ref,'VERIFIED_INVESTIGATION_REVIEW',
+  evidence->>'investigation_receipt_sha256',evidence->>'suspension_receipt_sha256',causal,sub.continuity_head_sha256,
+  sub.continuity_revision,'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',a.claim_id)
+ ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+ RETURN fresh_id;
+END $fn$;
+REVOKE ALL ON FUNCTION reality_internal.stage_final_loop_independent_investigation_review_v1(uuid) FROM PUBLIC,anon,authenticated,service_role;
+
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_release_continuation_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
 DECLARE a record; old_event record; fresh_id uuid; suspension jsonb; qsub record; causal text;
 BEGIN
+ -- Prefer the next existing verified investigation over any old review attempt.
+ fresh_id:=reality_internal.stage_final_loop_independent_investigation_review_v1(p_request_id);
+ IF fresh_id IS NOT NULL THEN RETURN fresh_id;END IF;
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
  AND r.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
