@@ -16,8 +16,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS final_loop_release_continuation_once_v1
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_verified_investigation_review_once_v1
  ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,source_receipt_sha256)
  WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
-CREATE UNIQUE INDEX IF NOT EXISTS final_loop_verified_review_technical_evidence_once_v1
+-- At most one live/observed technical readback for each proof; a stale,
+-- consumed evidence-only delivery remains historical and cannot execute.
+DROP INDEX IF EXISTS reality_internal.final_loop_verified_review_technical_evidence_once_v1;
+CREATE UNIQUE INDEX final_loop_verified_review_technical_evidence_once_v1
  ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,source_receipt_sha256)
+ WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state IN ('SHADOW_PENDING','SHADOW_OBSERVED');
+CREATE UNIQUE INDEX IF NOT EXISTS final_loop_verified_review_technical_release_once_v1
+ ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,source_receipt_sha256,release_continuation_claim_id)
  WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE';
 
 -- A verified suspension is a causal source distinct from a changed qualifier.
@@ -156,7 +162,7 @@ GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_investigatio
 
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_independent_investigation_review_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text;
+DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text; prior_event uuid;
 BEGIN
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
@@ -308,10 +314,60 @@ BEGIN
   AND c.continuity_head_sha256=a.runtime_scope->>'continuity_head_sha256'
   AND c.continuity_revision::text=a.runtime_scope->>'continuity_revision' AND c.state='SUSPENDED'
  FOR UPDATE;
- IF NOT FOUND OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+ IF NOT FOUND THEN RETURN NULL;END IF;
+ -- An already-consumed read-only delivery may be superseded only by an
+ -- independently qualified, different, later activated release. The old
+ -- event, nonce, claim, signed run, and evidence hashes are never reset.
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
   WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id
-   AND (e.state='SHADOW_PENDING' OR (e.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
-    AND e.source_receipt_sha256=evidence->>'review_receipt_sha256'))) THEN RETURN NULL;END IF;
+   AND e.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
+   AND e.source_receipt_sha256=evidence->>'review_receipt_sha256') THEN
+  SELECT e.event_id INTO prior_event
+  FROM reality_internal.final_loop_resume_events_v1 e
+  JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=e.governed_wake_worker_run_id
+  JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
+    AND wake.owner_id=e.owner_id AND wake.shift_id=e.shift_id AND wake.release_claim_id=e.release_continuation_claim_id
+    AND wake.operating_lane='NORMAL_SIGNED_SHIFT'
+  JOIN reality_internal.governed_worker_release_approvals_v1 prev ON prev.claim_id=wake.release_claim_id
+    AND prev.owner_id=e.owner_id AND prev.shift_id=e.shift_id AND prev.release_sha=wake.running_release_sha
+    AND prev.state='CLAIMED_ONCE' AND prev.capability_key=a.capability_key
+    AND prev.provider_alias_observed_at>=prev.claimed_at
+  JOIN reality_internal.governed_employee_shift_worker_pulses_v1 pulse ON pulse.owner_id=e.owner_id AND pulse.shift_id=e.shift_id
+  WHERE e.shift_id=a.shift_id AND e.owner_id=a.owner_id AND e.original_work_id=sub.original_work_id
+   AND e.source_ref=sub.source_ref AND e.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
+   AND e.signal_next_action='READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'
+   AND e.source_receipt_sha256=evidence->>'review_receipt_sha256'
+   AND e.previous_receipt_sha256=evidence->>'investigation_receipt_sha256'
+   AND e.continuity_head_sha256=sub.continuity_head_sha256 AND e.continuity_revision=sub.continuity_revision
+   AND e.state='SHADOW_PENDING' AND e.observed_at IS NULL AND e.governed_wake_request_id IS NOT NULL
+   AND run.status='COMPLETED' AND run.worker_stage='TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION'
+   AND run.finished_at IS NOT NULL AND pulse.last_worker_status='WAKE_COMPLETED'
+   AND pulse.last_worker_safe_result='TERMINAL_TECHNICAL_EVIDENCE_UNVERIFIED'
+   AND pulse.last_worker_completed_at BETWEEN run.started_at AND run.finished_at
+   AND a.claim_id<>prev.claim_id AND a.release_sha<>prev.release_sha
+   AND a.provider_alias_observed_at>run.finished_at
+   AND a.runtime_scope->>'target_environment'='CANONICAL_BENCHMARK_PREVIEW'
+   AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+   AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
+   AND a.runtime_scope->>'independent_transport_proof_sha256' ~ '^sha256:[a-f0-9]{64}$'
+   AND a.approval_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
+   AND a.runtime_scope->>'qualifier_receipt_sha256'=evidence->>'qualifier_receipt_sha256'
+   AND prev.runtime_scope->>'child_execution_enabled'='false'
+   AND prev.runtime_scope->>'parent_delivery_enabled'='false'
+   AND prev.runtime_scope->>'production_changed'='false'
+   AND evidence->'terminal_history'->>'remaining_attempts'='0'
+   AND evidence->'terminal_history'->>'replay_permitted'='false'
+   AND evidence->'terminal_history'->>'new_attempt_authorized'='false'
+   AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 x
+     JOIN reality_internal.governed_worker_release_approvals_v1 xrel ON xrel.claim_id=x.release_continuation_claim_id
+     WHERE x.shift_id=e.shift_id AND x.original_work_id=e.original_work_id AND x.signal_kind=e.signal_kind
+      AND x.source_receipt_sha256=e.source_receipt_sha256 AND xrel.release_sha=a.release_sha)
+  FOR UPDATE OF e;
+  IF NOT FOUND THEN RETURN NULL;END IF;
+ END IF;
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+  WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id AND e.state='SHADOW_PENDING'
+   AND e.event_id IS DISTINCT FROM prior_event) THEN RETURN NULL;END IF;
  INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,
   subscribed_receipt_sha256,continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
  VALUES(a.shift_id,a.owner_id,sub.original_work_id,sub.source_ref,'VERIFIED_REVIEW_TECHNICAL_EVIDENCE',
@@ -327,6 +383,13 @@ BEGIN
   a.shift_id::text||'|'||sub.original_work_id||'|'||sub.continuity_head_sha256||'|'||
   sub.continuity_revision::text||'|'||(evidence->>'investigation_receipt_sha256')||'|'||
   (evidence->>'review_receipt_sha256'),'UTF8')),'hex');
+ -- Supersede only after all source and subscription checks. Both operations
+ -- are in this transaction; conflict must not strand the old event.
+ IF prior_event IS NOT NULL THEN
+  UPDATE reality_internal.final_loop_resume_events_v1 SET state='SHADOW_STALE'
+   WHERE event_id=prior_event AND state='SHADOW_PENDING' AND observed_at IS NULL;
+  IF NOT FOUND THEN RETURN NULL;END IF;
+ END IF;
  INSERT INTO reality_internal.final_loop_resume_events_v1(shift_id,owner_id,original_work_id,source_ref,signal_kind,
   source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,
   signal_next_action,release_continuation_claim_id)
@@ -334,6 +397,8 @@ BEGIN
   evidence->>'review_receipt_sha256',evidence->>'investigation_receipt_sha256',causal,sub.continuity_head_sha256,
   sub.continuity_revision,'READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY',a.claim_id)
  ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+ IF prior_event IS NOT NULL AND fresh_id IS NULL THEN
+  RAISE EXCEPTION 'TERMINAL_EVIDENCE_CONTINUATION_NOT_STAGED';END IF;
  RETURN fresh_id;
 END $fn$;
 REVOKE ALL ON FUNCTION reality_internal.stage_final_loop_terminal_technical_evidence_v1(uuid) FROM PUBLIC,anon,authenticated,service_role;
