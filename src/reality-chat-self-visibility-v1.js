@@ -132,10 +132,85 @@ async function ownerAudit({session,db,env,callRpc,fetchImpl}){
   installation_authorized:false,
  });
 }
+// Read the SAME current authority, original identity and independent receipts
+// that drive the governed worker. This is neither a capability catalog nor a
+// grant. Current exact receipts supersede older source-only descriptions.
+const HASH=/^sha256:[a-f0-9]{64}$/;
+const WORK=/^work:[a-f0-9]{32}$/;
+export function projectCurrentContinuitySelfVisibility(value,ownerId){
+ if(value?.status!=='OWNER_CURRENT_CONTINUITY_SELF_VISIBILITY_READ_ONLY'||
+  value.owner_id!==ownerId||value.owner_scope_verified!==true||value.read_only!==true||
+  value.execution_authorized!==false||value.installation_authorized!==false||value.production_changed!==false||
+  !Number.isFinite(Date.parse(value.observed_at||''))||
+  !Number.isSafeInteger(value.active_shift_count)||value.active_shift_count<0||
+  !Number.isSafeInteger(value.unverified_guard_count)||value.unverified_guard_count<0||
+  !Array.isArray(value.obligations)||value.obligations.length>144)return null;
+ const entries=[];
+ for(const ob of value.obligations){
+  if(!UUID.test(ob?.shift_id||'')||!WORK.test(ob.original_work_id||'')||
+   !UUID.test(ob.continuity_root_id||'')||!HASH.test(ob.continuity_head_sha256||'')||
+   !HASH.test(ob.guard_receipt_sha256||'')||!HASH.test(ob.qualifier_receipt_sha256||'')||
+   !Number.isSafeInteger(ob.continuity_revision)||ob.continuity_revision<1||
+   typeof ob.source_ref!=='string'||!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:pull|issues)\/[1-9][0-9]*$/.test(ob.source_ref)||
+   ob.existing_shift_authorized!==true||ob.read_only!==true||ob.execution_authorized!==false||
+   ob.installation_authorized!==false||ob.production_changed!==false||
+   !Array.isArray(ob.unresolved_proof_gates)||!Array.isArray(ob.current_events)||ob.current_events.length>8)return null;
+  const i=ob.verified_investigation;
+  const r=ob.verified_independent_review;
+  const a=ob.active_release_observation;
+  if(i!==null&&(!UUID.test(i?.incident_id||'')||!UUID.test(i?.investigation_worker_run_id||'')||
+   !HASH.test(i?.investigation_receipt_sha256||'')||!HASH.test(i?.suspension_receipt_sha256||'')))return null;
+  if(r!==null&&(!i||!HASH.test(r?.receipt_sha256||'')||
+   r.investigation_receipt_sha256!==i.investigation_receipt_sha256||
+   r.investigation_worker_run_id!==i.investigation_worker_run_id||
+   !UUID.test(r.review_worker_run_id||'')||r.review_worker_run_id===i.investigation_worker_run_id||
+   r.original_work_id!==ob.original_work_id||r.continuity_head_sha256!==ob.continuity_head_sha256||
+   r.continuity_revision!==ob.continuity_revision||r.execution_authorized!==false||
+   r.replay_authorized!==false||r.original_job_completed!==false||r.production_changed!==false))return null;
+  if(a!==null&&(!SHA.test(a?.release_sha||'')||!HASH.test(a?.approval_receipt_sha256||'')||
+   !Number.isFinite(Date.parse(a?.alias_observed_at||''))))return null;
+  const currentNext=String(ob.operational_next_action||'UNKNOWN');
+  const summary='Current verified Continuity: original '+ob.original_work_id+' ('+ob.source_ref+
+   '), revision '+ob.continuity_revision+', existing shift '+ob.shift_id+
+   ' is authorized under '+ob.warrant_mode+'. '+
+   (a?'Latest independently recorded release alias observation: '+a.release_sha+
+    ', approval '+a.approval_receipt_sha256+'. This is recorded activation evidence, not a fresh provider alias probe. ':'Release activation evidence unavailable. ')+
+   (i?'Autonomous investigation VERIFIED LIVE, signed run '+i.investigation_worker_run_id+
+    ', investigation receipt '+i.investigation_receipt_sha256+'. ':'No exact current investigation proof returned; do not infer absence. ')+
+   (r?'Distinct independent review VERIFIED LIVE, receipt '+r.receipt_sha256+
+    ', '+r.review_status+'. Not proof of repair. ':'No verified independent review returned for this current head. ')+
+   'Current governed next action: '+currentNext+'. Unresolved gates: '+ob.unresolved_proof_gates.join(', ')+
+   '. Evidence reads grant no new authority; do not request another shift start for covered work.';
+  entries.push(Object.freeze({
+   entry_id:'reality:current-continuity:'+ob.original_work_id+':'+ob.continuity_head_sha256,
+   event_kind:'reality_current_verified_operational_self_visibility',
+   source_kind:'OWNER_SCOPED_CANONICAL_CONTINUITY_AND_SIGNED_RECEIPT_READBACK',
+   source_ref:'reality:employee-shift:'+ob.shift_id,
+   assertion_time:value.observed_at,epistemic_status:'CURRENT_CANONICAL_OPERATIONAL_EVIDENCE',
+   summary,original_work_id:ob.original_work_id,active_owner_shift_id:ob.shift_id,
+   owner_shift_authorization_recorded:true,continuity_revision:ob.continuity_revision,
+   continuity_head_sha256:ob.continuity_head_sha256,
+   current_operational_facts:ob,
+   autonomous_investigation_verified_live:i!==null,independent_review_verified_live:r!==null,
+   next_governed_action:currentNext,execution_authorized:false,installation_authorized:false,production_changed:false
+  }));
+ }
+ return Object.freeze({observed_at:value.observed_at,active_shift_count:value.active_shift_count,
+  unverified_guard_count:value.unverified_guard_count,observations:entries});
+}
+export async function readCurrentContinuitySelfVisibility({session,db,env=process.env,callRpc=shiftRpc,fetchImpl=fetch}={}){
+ if(!UUID.test(session?.user_id||'')||!db?.strictSecrets||db.url!==session?.config?.url||
+  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||env.VERCEL_ENV!=='preview')return null;
+ try{
+  const v=await callRpc(db,'reality_read_owner_current_continuity_self_visibility_v1',
+   {p_owner_id:session.user_id},{fetchImpl,timeoutMs:4500});
+  return projectCurrentContinuitySelfVisibility(v,session.user_id);
+ }catch{return null}
+}
 export async function readRealitySelfVisibilityForChat({
  session,message,priorTurns=[],env=process.env,db=null,
  fetchImpl=fetch,callRpc=shiftRpc,
- readSource=sourceManifest,readAudit=ownerAudit
+ readSource=sourceManifest,readAudit=ownerAudit,readCurrent=readCurrentContinuitySelfVisibility
 }={}){
  if(!needsRealityCapabilityInspection(message,priorTurns)||
    env.VERCEL_ENV!=='preview'||!SHA.test(env.VERCEL_GIT_COMMIT_SHA||'')||
@@ -153,10 +228,11 @@ export async function readRealitySelfVisibilityForChat({
   setTimeout(()=>resolve(null),1750))]);
  // Independent budgets: a slow owner audit does not conceal an already
  // verified GitHub source tree, and vice versa.
- const [source,audit]=await Promise.all([
-  bounded(sourcePending),bounded(auditPending)
+ const [source,audit,current]=await Promise.all([
+  bounded(sourcePending),bounded(auditPending),
+  Promise.resolve().then(()=>readCurrent({session,db,env,callRpc,fetchImpl})).catch(()=>null)
  ]);
- const observations=[];
+ const observations=[...(current?.observations||[])];
  if(source?.sha===env.VERCEL_GIT_COMMIT_SHA&&
     SHA.test(source.tree_sha||'')&&Array.isArray(source.files)&&
     source.files.length<=12000){
@@ -197,6 +273,7 @@ export async function readRealitySelfVisibilityForChat({
     audit.capabilities.map(x=>x.id+'='+x.proof_level).join(' | ')+
     '. Current owner shift count '+audit.active_owner_shift_count+
     '. Source, connection, running work and independent settlement are distinct.'+
+    ' This legacy inventory is not the current operational verdict; exact current Continuity receipts take precedence over its coarse capability descriptions.'+
     ' This self-inspection does NOT authorize changes.',
    capabilities:audit.capabilities,
    owner_active_shift_count:audit.active_owner_shift_count,
