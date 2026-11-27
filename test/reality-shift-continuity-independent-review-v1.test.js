@@ -119,3 +119,37 @@ test('SQL review requires signed worker and prevents false original settlement',
  assert.match(sql,/reconcile_stale_continuity_reviews_v1/);
  assert.doesNotMatch(sql,/grant execute[^;]*to (anon|authenticated)/is);
 });
+
+test('direct original investigation is independently reviewed without an evidence-job identity or replay authority',async()=>{
+ const event='77777777-8888-4999-aaaa-bbbbbbbbbbbb';
+ const previousRun='88888888-9999-4aaa-bbbb-cccccccccccc';
+ const work='work:'+'1'.repeat(32),head=hash('2'),sourceHead='3'.repeat(40);
+ const directClaim={...claim,status:'SIGNED_CONTINUITY_ORIGINAL_REVIEW_CLAIMED',job_id:null,
+  event_id:event,investigation_worker_run_id:previousRun,original_work_id:work,continuity_head_sha256:head,
+  continuity_revision:3,frozen_source_head_sha:sourceHead,execution_authorized:false,replay_authorized:false};
+ const verdict={status:'SOURCE_MATCHED_NEEDS_FROZEN_TEST',incident_id:incident,job_id:null,reviewer:'Quinn',
+  original_work_id:work,continuity_head_sha256:head,review_event_id:event,review_worker_run_id:run,
+  investigation_worker_run_id:previousRun,investigation_receipt_sha256:hash('b'),frozen_source_head_sha:sourceHead,
+  observed_source_head_sha:sourceHead,provider_proof_sha256:hash('c'),recommendation_disposition:'ADVISORY_ONLY_NO_AUTHORITY_OR_REPLAY',
+  previous_attempt_budget_preserved:true,new_attempt_authorized:false,replay_authorized:false,execution_authorized:false,
+  root_cause_verified:false,independent_review_receipt_sha256:hash('d'),original_job_completed:false,
+  repair_executed:false,installation_authorized:false,production_changed:false,
+  next_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'};
+ const calls=[];let reads=0;
+ const invoke=async(options={})=>advanceOneShiftContinuityIndependentReview({
+  db,env,shiftId:shift,workerRunId:run,reviewEventId:event,rolesBuilder,
+  readSource:async(_ref,opts)=>{assert.equal(opts.requireFrozenPrHead,true);reads++;
+   return {...await readSource(),source_head_sha:sourceHead};},
+  fetchImpl:async()=>{throw Error('UNEXPECTED_FETCH')},
+  call:async(_db,method,args)=>{calls.push({method,args});
+   if(method==='reality_claim_shift_continuity_independent_review_v1')return options.claim||directClaim;
+   assert.equal(method,'reality_record_shift_continuity_independent_review_v1');
+   assert.equal(args.p_event_id,event);assert.equal(args.p_source_head_sha,sourceHead);return options.verdict||verdict;}
+ });
+ const r=await invoke();
+ assert.equal(reads,2);assert.equal(calls[0].args.p_event_id,event);
+ assert.equal(r.original_work_id,work);assert.equal(r.job_id,null);assert.equal(r.root_cause_verified,false);
+ assert.equal(r.replay_authorized,false);assert.equal(r.new_attempt_authorized,false);assert.equal(r.independent_repair_test_completed,false);
+ await assert.rejects(invoke({claim:{...directClaim,investigation_worker_run_id:run}}),/EXACT_REVIEW_CLAIM_UNVERIFIED/);
+ await assert.rejects(invoke({verdict:{...verdict,replay_authorized:true}}),/INDEPENDENT_REVIEW_RECEIPT_UNVERIFIED/);
+});
