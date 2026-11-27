@@ -590,3 +590,98 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) TO service_role;
+
+-- Read the typed suspension receipt without inventing a changed qualifier.
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_event_resume_shadow_v1(p_shift_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE v_proof jsonb;v_subs jsonb;v_events jsonb;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_EVENT_SHADOW_SERVICE_ONLY';END IF;
+ v_proof:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+ IF v_proof->>'shift_id'<>p_shift_id::text OR
+    v_proof->>'independent_owner_scope_verified'<>'true' THEN
+  RETURN jsonb_build_object('status','FINAL_LOOP_EVENT_SHADOW_SCOPE_UNVERIFIED',
+   'event_dispatch_enabled',false,'execution_authorized',false);END IF;
+ SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'original_work_id',s.original_work_id,'source_ref',s.source_ref,
+  'condition_kind',s.condition_kind,'subscribed_receipt_sha256',s.subscribed_receipt_sha256,
+  'unresolved_proof_gates',s.unresolved_proof_gates,
+  'next_qualified_action',s.next_qualified_action,
+  'state',s.state,'continuity_revision',s.continuity_revision
+ ) ORDER BY s.original_work_id),'[]'::jsonb) INTO v_subs
+ FROM reality_internal.final_loop_resume_conditions_v1 s
+ WHERE s.shift_id=p_shift_id AND s.owner_id=(v_proof->>'owner_id')::uuid;
+ SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+  'event_id',e.event_id,'original_work_id',e.original_work_id,
+  'source_ref',e.source_ref,'event_kind',e.signal_kind,
+  'source_receipt_sha256',e.source_receipt_sha256,
+  'event_causality_sha256',e.event_causality_sha256,
+  'event_state',e.state,
+  'continuity_revision',e.continuity_revision,
+  'signal_next_action',e.signal_next_action,
+
+  'source_current',case
+   when e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' then coalesce(
+    e.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
+      e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)->>'receipt_sha256'),false)
+   when e.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' then exists(
+    select 1 from reality_internal.owner_maintenance_independent_case_ci_v1 ci
+    where ci.shift_id=e.shift_id and ci.owner_id=e.owner_id
+      and ci.source_ref=e.source_ref
+      and ci.case_specific_ci_receipt_sha256=e.source_receipt_sha256
+      and ci.source_epoch_frozen_red_verified=true
+      and ci.code_correction_green_verified=true
+      and ci.original_customer_job_completed=false
+      and ci.artifact_installation_authorized=false
+      and ci.production_changed=false)
+   else exists(
+    select 1 from pg_catalog.jsonb_array_elements(
+      coalesce(v_proof->'governed_qualification_handoffs','[]'::jsonb)) h
+    where h->>'source_ref'=e.source_ref
+      and h->>'original_work_id'=e.original_work_id
+      and h->>'qualifier_receipt_sha256'=e.source_receipt_sha256)
+   end,
+
+  'would_resume_suspended_obligation',e.state='SHADOW_PENDING' AND
+   e.continuity_revision=(v_proof->>'revision')::bigint AND
+   e.continuity_head_sha256=v_proof->>'continuity_head_sha256' AND
+  case when e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' then coalesce(
+    e.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
+      e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)->>'receipt_sha256'),false)
+   when e.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' then exists(
+    select 1 from reality_internal.owner_maintenance_independent_case_ci_v1 ci
+    where ci.shift_id=e.shift_id and ci.owner_id=e.owner_id
+      and ci.source_ref=e.source_ref
+      and ci.case_specific_ci_receipt_sha256=e.source_receipt_sha256
+      and ci.source_epoch_frozen_red_verified=true
+      and ci.code_correction_green_verified=true
+      and ci.original_customer_job_completed=false
+      and ci.artifact_installation_authorized=false
+      and ci.production_changed=false)
+  else exists(
+    select 1 from pg_catalog.jsonb_array_elements(
+     coalesce(v_proof->'governed_qualification_handoffs','[]'::jsonb)) h
+    where h->>'source_ref'=e.source_ref
+     and h->>'original_work_id'=e.original_work_id
+     and h->>'qualifier_receipt_sha256'=e.source_receipt_sha256)
+  end
+ ) ORDER BY e.created_at),'[]'::jsonb) INTO v_events
+ FROM reality_internal.final_loop_resume_events_v1 e
+ WHERE e.shift_id=p_shift_id AND e.owner_id=(v_proof->>'owner_id')::uuid;
+ RETURN jsonb_build_object(
+  'schema','reality-final-loop-event-resume-shadow-v1',
+  'status','FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY',
+  'shift_id',p_shift_id,'subscriptions',v_subs,'events',v_events,
+  'event_dispatch_enabled',false,'execution_authorized',false,
+  'installation_authorized',false,'original_job_completed',false,
+  'production_changed',false);
+END $function$;
+
+REVOKE ALL ON FUNCTION public.reality_read_final_loop_event_resume_shadow_v1(uuid) FROM PUBLIC,anon,authenticated;
+
+GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_event_resume_shadow_v1(uuid) TO service_role;
+
