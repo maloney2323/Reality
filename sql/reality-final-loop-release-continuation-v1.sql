@@ -87,7 +87,7 @@ GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_suspension_v
 
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_release_continuation_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE a record; old_event record; fresh_id uuid;
+DECLARE a record; old_event record; fresh_id uuid; suspension jsonb; qsub record; causal text;
 BEGIN
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
@@ -125,6 +125,47 @@ BEGIN
    AND ((c.phase='ADMITTED' AND c.canonical_prepare_invocation_id IS NULL AND c.model_response_id IS NULL)
      OR (c.phase='PREPARED' AND c.canonical_verify_invocation_id IS NULL AND c.independent_review_receipt_sha256 IS NULL)));
  IF NOT FOUND THEN RETURN NULL; END IF;
+ -- Catch up from the independently observed current successor only after
+ -- exact release approval and provider readback; never fake a qualifier delta.
+ suspension:=reality_internal.read_final_loop_verified_suspension_v1(a.owner_id,a.shift_id,
+  a.runtime_scope->>'original_work_id',a.runtime_scope->>'source_ref',
+  a.runtime_scope->>'continuity_head_sha256',(a.runtime_scope->>'continuity_revision')::bigint);
+ IF suspension IS NOT NULL AND suspension->>'prior_release_sha'<>a.release_sha THEN
+  SELECT * INTO qsub FROM reality_internal.final_loop_resume_conditions_v1 sub
+   WHERE sub.owner_id=a.owner_id AND sub.shift_id=a.shift_id AND sub.original_work_id=a.runtime_scope->>'original_work_id'
+    AND sub.source_ref=a.runtime_scope->>'source_ref' AND sub.condition_kind='QUALIFIER_PROOF_CHANGED'
+    AND sub.continuity_head_sha256=a.runtime_scope->>'continuity_head_sha256'
+    AND sub.continuity_revision::text=a.runtime_scope->>'continuity_revision'
+    AND sub.subscribed_receipt_sha256=a.runtime_scope->>'qualifier_receipt_sha256'
+    AND sub.state='SUSPENDED' FOR UPDATE;
+  IF NOT FOUND OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 prior
+   WHERE prior.shift_id=a.shift_id AND prior.original_work_id=a.runtime_scope->>'original_work_id'
+    AND (prior.state='SHADOW_PENDING' OR (prior.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION'
+     AND prior.source_receipt_sha256=suspension->>'receipt_sha256'))) THEN RETURN NULL;END IF;
+  INSERT INTO reality_internal.final_loop_resume_conditions_v1(
+   shift_id,owner_id,original_work_id,source_ref,condition_kind,subscribed_receipt_sha256,
+   continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
+  VALUES(a.shift_id,a.owner_id,qsub.original_work_id,qsub.source_ref,'VERIFIED_SUSPENSION_INVESTIGATION',
+   qsub.subscribed_receipt_sha256,qsub.continuity_head_sha256,qsub.continuity_revision,
+   'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY',suspension->'unresolved_proof_gates','RECOVER','SUSPENDED')
+  ON CONFLICT(shift_id,original_work_id,condition_kind) DO NOTHING;
+  IF NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 sub
+    WHERE sub.shift_id=a.shift_id AND sub.owner_id=a.owner_id AND sub.original_work_id=qsub.original_work_id
+     AND sub.condition_kind='VERIFIED_SUSPENSION_INVESTIGATION'
+     AND sub.continuity_head_sha256=qsub.continuity_head_sha256 AND sub.continuity_revision=qsub.continuity_revision
+     AND sub.subscribed_receipt_sha256=qsub.subscribed_receipt_sha256) THEN RETURN NULL;END IF;
+  causal:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+   a.shift_id::text||'|'||qsub.original_work_id||'|'||qsub.continuity_head_sha256||'|'||
+   qsub.continuity_revision::text||'|'||qsub.subscribed_receipt_sha256||'|'||(suspension->>'receipt_sha256'),'UTF8')),'hex');
+  INSERT INTO reality_internal.final_loop_resume_events_v1(
+   shift_id,owner_id,original_work_id,source_ref,signal_kind,source_receipt_sha256,previous_receipt_sha256,
+   event_causality_sha256,continuity_head_sha256,continuity_revision,signal_next_action,release_continuation_claim_id)
+  VALUES(a.shift_id,a.owner_id,qsub.original_work_id,qsub.source_ref,'VERIFIED_SUSPENSION_INVESTIGATION',
+   suspension->>'receipt_sha256',qsub.subscribed_receipt_sha256,causal,qsub.continuity_head_sha256,
+   qsub.continuity_revision,'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY',a.claim_id)
+  ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+  RETURN fresh_id;
+ END IF;
  SELECT e.* INTO old_event FROM reality_internal.final_loop_resume_events_v1 e
  JOIN reality_internal.final_loop_resume_conditions_v1 c
   ON c.shift_id=e.shift_id AND c.owner_id=e.owner_id AND c.original_work_id=e.original_work_id
