@@ -9,7 +9,7 @@ AS $function$
 DECLARE sh record; prior reality_internal.shift_repeated_blocker_observations_v1%ROWTYPE;
  v_claims integer; v_finals integer; v_key text; v_incident uuid;
  v_observed timestamptz:=clock_timestamp();
- exact_event record; evidence jsonb; evidence_hash text;
+ exact_event record; suspension record; current_proof jsonb; current_guard jsonb; evidence jsonb; evidence_hash text;
 BEGIN
  IF current_user<>'service_role' OR p_shift_id IS NULL OR
   p_worker_run_id IS NULL OR p_safe_result IS NULL OR
@@ -41,7 +41,7 @@ BEGIN
  -- First typed signed Final Loop failure is a durable incident, not a repeat counter.
  IF p_safe_result IN ('FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED',
   'FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED',
-  'FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED') THEN
+  'FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED','FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED') THEN
   SELECT e.event_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision,
    w.running_release_sha,w.release_receipt_sha256,a.runtime_scope->>'continuity_root_id' root_id
   INTO exact_event FROM reality_internal.final_loop_resume_events_v1 e
@@ -64,6 +64,49 @@ BEGIN
   LIMIT 1;
   IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_BLOCKER_INCIDENT_SOURCE_UNVERIFIED',
    'new_original_admitted',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false); END IF;
+  -- A successful suspension is evidence, not authority to repeat a failed effect.
+  IF p_safe_result='FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED' THEN
+   current_proof:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+   current_guard:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+   SELECT u.event_id,u.lineage_hash,r.receipt_id,r.receipt_sha256 INTO suspension
+   FROM public.universe_events u
+   JOIN public.universe_events parent ON parent.event_id=u.parent_event_id
+   JOIN reality_internal.final_loop_transition_receipts_v1 r
+    ON r.shift_id=p_shift_id AND r.owner_id=sh.owner_id AND r.worker_run_id=p_worker_run_id
+    AND r.original_work_id=exact_event.original_work_id AND r.source_ref=exact_event.source_ref
+    AND r.continuity_root_id=u.continuity_root_id AND r.continuity_head_sha256=exact_event.continuity_head_sha256
+    AND r.expected_revision=exact_event.continuity_revision AND r.decision='SUSPEND'
+    AND r.reason_code='PROVIDER_EFFECT_UNCERTAIN'
+   WHERE u.continuity_root_id::text=exact_event.root_id
+    AND u.entity_type='reality_final_loop_invocation_observation_v1' AND u.epistemic_status='OBSERVED'
+    AND 'sha256:'||parent.lineage_hash=exact_event.continuity_head_sha256
+    AND u.payload->>'owner_id'=sh.owner_id::text AND u.payload->>'shift_id'=p_shift_id::text
+    AND u.payload->>'original_work_id'=exact_event.original_work_id AND u.payload->>'source_ref'=exact_event.source_ref
+    AND u.provenance->>'worker_run_id'=p_worker_run_id::text
+    AND u.payload->>'provider_outcome_verified'='false' AND u.payload->>'original_job_completed'='false'
+    AND u.payload->>'execution_authorized'='false' AND u.payload->>'replay_authorized'='false'
+    AND u.payload->>'production_changed'='false'
+    AND u.payload->'unresolved_proof_gates' ? 'TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED'
+    AND u.payload->'terminal_recovery_history'->>'remaining_attempts'='0'
+    AND u.payload->'terminal_recovery_history'->>'replay_permitted'='false'
+    AND current_proof->>'status'='FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'
+    AND current_proof->>'continuity_head_sha256'='sha256:'||u.lineage_hash
+    AND current_proof->>'revision'=(exact_event.continuity_revision+1)::text
+    AND current_guard->>'status'='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+    AND current_guard->>'continuity_head_sha256'='sha256:'||u.lineage_hash
+    AND current_guard->>'revision'=(exact_event.continuity_revision+1)::text
+    AND EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 ev
+      WHERE ev.event_id=exact_event.event_id AND ev.state='SHADOW_OBSERVED')
+    AND EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 sub
+      WHERE sub.shift_id=p_shift_id AND sub.owner_id=sh.owner_id
+       AND sub.original_work_id=exact_event.original_work_id AND sub.source_ref=exact_event.source_ref
+       AND sub.continuity_head_sha256='sha256:'||u.lineage_hash
+       AND sub.continuity_revision=exact_event.continuity_revision+1 AND sub.state='SUSPENDED')
+   LIMIT 1;
+   IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+    'status','FINAL_LOOP_VERIFIED_SUSPENSION_SOURCE_UNVERIFIED',
+    'new_original_admitted',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false); END IF;
+  END IF;
   evidence:=pg_catalog.jsonb_build_object('schema','reality-signed-final-loop-blocker-v1',
    'owner_id',sh.owner_id,'shift_id',p_shift_id,'original_work_id',exact_event.original_work_id,
    'source_ref',exact_event.source_ref,'continuity_root_id',exact_event.root_id,
@@ -72,6 +115,14 @@ BEGIN
    'release_receipt_sha256',exact_event.release_receipt_sha256,'blocker_code',p_safe_result,
    'investigation_only',true,'root_cause_verified',false,'provider_outcome_verified',false,
    'replay_authorized',false,'original_job_completed',false,'installation_authorized',false,'production_changed',false);
+  IF p_safe_result='FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED' THEN
+   evidence:=evidence||pg_catalog.jsonb_build_object(
+    'verified_suspension_event_id',suspension.event_id,'verified_suspension_receipt_id',suspension.receipt_id,
+    'verified_suspension_receipt_sha256',suspension.receipt_sha256,
+    'continuity_head_sha256','sha256:'||suspension.lineage_hash,'continuity_revision',exact_event.continuity_revision+1,
+    'prior_continuity_head_sha256',exact_event.continuity_head_sha256,
+    'previous_attempt_budget_preserved',true,'new_attempt_authorized',false);
+  END IF;
   evidence_hash:=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(evidence::text,'UTF8')),'hex');
   INSERT INTO reality_internal.owner_shift_continuity_incidents_v1(
    owner_id,shift_id,kind,evidence_key,evidence_sha256,error_summary,source_evidence)
