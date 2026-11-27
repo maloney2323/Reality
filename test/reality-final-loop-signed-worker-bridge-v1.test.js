@@ -430,6 +430,28 @@ test('signed Final Loop consumes event shadow only for the same original, never 
  },{env:state});
  assert.equal(stale.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
  assert.equal(stale.event_resume_shadow.shadow_ready_event_count,0);
+ // Model a successor head after the previous observation was committed.
+ // Historical observations remain visible but never qualify a new wake.
+ const successor={...pending,revision:2,continuity_head_sha256:sha('4')};
+ const history={...event,event_state:'SHADOW_OBSERVED',
+  source_current:true,would_resume_suspended_obligation:false};
+ const current={...event,event_id:'77777777-7777-4777-8777-777777777777',continuity_revision:2};
+ const readSuccessor=(events)=>caller(async(db,name)=>{
+  if(name==='reality_read_current_final_loop_proof_envelope_v1')return successor;
+  if(name==='reality_read_final_loop_event_resume_shadow_v1')
+   return {...shadow,subscriptions:[{...shadow.subscriptions[0],continuity_revision:2}],events};
+  return collect(db,name);
+ },{env:state});
+ const historical=await readSuccessor([history,{...history,event_id:'88888888-8888-4888-8888-888888888888',
+  event_state:'SHADOW_STALE',source_current:false},current]);
+ assert.equal(historical.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ assert.equal(historical.event_resume_shadow.shadow_ready_event_count,1);
+ assert.equal(historical.event_resume_shadow.ready_event_refs[0].event_id,current.event_id);
+ for(const invalid of [{...history,event_state:'SHADOW_PENDING'},
+  {...history,would_resume_suspended_obligation:true},{...history,continuity_revision:3},
+  {...history,continuity_revision:0}]){
+  assert.equal((await readSuccessor([invalid,current])).status,'FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+ }
 });
 
 
