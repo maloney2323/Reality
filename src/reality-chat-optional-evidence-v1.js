@@ -11,14 +11,15 @@ export async function collectOptionalChatEvidence(entries,{timeoutMs=12000}={}){
   if(!/^[a-z][a-z0-9_]{2,48}$/.test(entry?.id||'')||
      typeof entry.read!=='function'||
      typeof entry.validate!=='function'||
-     !Object.hasOwn(entry,'fallback')||ids.has(entry.id))
+     !Object.hasOwn(entry,'fallback')||ids.has(entry.id)||
+     (entry.timeoutMs!==undefined&&(!Number.isInteger(entry.timeoutMs)||entry.timeoutMs<1||entry.timeoutMs>30000)))
    throw Error('CHAT_OPTIONAL_EVIDENCE_CONTRACT_INVALID');
   ids.add(entry.id);
  }
  const outcomes=await Promise.all(entries.map(async entry=>{
   let timer;
   const timeout=new Promise((_,reject)=>{
-   timer=setTimeout(()=>reject(Error('READBACK_TIMEOUT')),timeoutMs);
+   timer=setTimeout(()=>reject(Error('READBACK_TIMEOUT')),entry.timeoutMs??timeoutMs);
    timer.unref?.();
   });
   try{
