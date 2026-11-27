@@ -252,6 +252,14 @@ export async function investigateOneSignedShiftContinuityIncident({
    !HASH.test(claim.source_evidence.continuity_head_sha256||'')||
    !HASH.test(claim.source_evidence.release_receipt_sha256||'')||
    !/^[a-f0-9]{40}$/.test(claim.source_evidence.release_sha||'')||
+   (claim.source_evidence.blocker_code==='FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED'&&(
+    !UUID.test(claim.source_evidence.verified_suspension_event_id||'')||
+    !UUID.test(claim.source_evidence.verified_suspension_receipt_id||'')||
+    !HASH.test(claim.source_evidence.verified_suspension_receipt_sha256||'')||
+    !HASH.test(claim.source_evidence.prior_continuity_head_sha256||'')||
+    claim.source_evidence.prior_continuity_head_sha256===claim.source_evidence.continuity_head_sha256||
+    claim.source_evidence.previous_attempt_budget_preserved!==true||
+    claim.source_evidence.new_attempt_authorized!==false))||
    claim.source_evidence.investigation_only!==true||claim.source_evidence.replay_authorized!==false||
    claim.source_evidence.original_job_completed!==false||claim.source_evidence.installation_authorized!==false||
    claim.source_evidence.production_changed!==false))||
