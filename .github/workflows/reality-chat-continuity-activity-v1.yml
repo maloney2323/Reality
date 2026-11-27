@@ -1,0 +1,20 @@
+name: Reality Chat live Continuity activity acceptance
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'src/reality-chat-continuity-activity-v1.js'
+      - 'api/reality/personal-continuity-activity.js'
+      - 'test/reality-chat-continuity-activity-v1.test.js'
+      - '.github/workflows/reality-chat-continuity-activity-v1.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Test evidence-backed Chat progress
+        run: |
+          node --test test/reality-chat-continuity-activity-v1.test.js
+          node --check api/reality/personal-continuity-activity.js
