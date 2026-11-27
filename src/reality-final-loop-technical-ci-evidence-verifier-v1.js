@@ -81,7 +81,10 @@ export async function verifySourceBoundTechnicalRecoveryCi({
    repeat_prior_ci_dispatch_permitted:false}:{}),
   technical_proof_scope:'PR307_LINKED_TECHNICAL_RECOVERY_HANDOFF_ONLY',
   original_obligation_open:true,source_revision:c.source_revision};
- const token=String(env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
+ // Reuse the existing independently qualified release CI read credential.
+ // Prefer the least-privileged reader; never provision or copy a write token.
+ const token=String(env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN||
+  env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
   env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN||'').trim();
  const deployed=env.VERCEL_GIT_COMMIT_SHA;
  if(token.length<24||!SHA.test(deployed||'')||
