@@ -197,3 +197,33 @@ test('terminal evidence readback verifies provider without creating contract, au
  assert.equal(result.status,'RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED');assert.equal(result.independent_technical_ci_verified,true);assert.equal(result.contract_id,null);assert.equal(result.new_attempt_authorized,false);assert.equal(result.previous_attempt_budget_preserved,true);assert.equal(result.proof_gate_advanced,false);assert.equal(result.original_job_completed,false);assert.equal(result.execution_authorized,false);
  for(const invalid of [{...route,new_attempt_authorized:true},{...route,qualifier_receipt_sha256:sha('7')},{...route,contract_id:sha('1')}]){const r=runtime();const v=await verify(args(r.fetchImpl,{contractProposal:terminalProposal,existingCiRoute:invalid}));assert.equal(v.independent_technical_ci_verified,false);assert.equal(r.paths.length,0);}
 });
+
+test('existing release CI read credential alone permits exact read-only evidence verification',async()=>{
+ const r=runtime();
+ const readEnv={...env,REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:null,
+  REALITY_GITHUB_TOKEN:null,GITHUB_TOKEN:null,
+  REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:'test-github-release-read-only-token'};
+ const seen=[];
+ const result=await verify(args(async(url,opts)=>{
+  seen.push(opts.headers.authorization);
+  assert.equal(opts.method,'GET');
+  return r.fetchImpl(url,opts);
+ },{env:readEnv}));
+ assert.equal(result.status,'RECOVERY_TECHNICAL_CI_PROVIDER_ATTESTED_BUSINESS_PROOF_PENDING');
+ assert.ok(seen.length>0);
+ assert.ok(seen.every(x=>x==='Bearer test-github-release-read-only-token'));
+ assert.equal(result.execution_authorized,false);
+ assert.equal(result.original_job_completed,false);
+ assert.equal(result.production_changed,false);
+});
+test('configured read credential is preferred and rejection does not fall back to a broader credential',async()=>{
+ const r=runtime({unauthorized:true});
+ const seen=[];
+ const result=await verify(args(async(url,opts)=>{
+  seen.push(opts.headers.authorization);
+  return r.fetchImpl(url,opts);
+ },{env:{...env,REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:'test-github-release-read-only-token'}}));
+ assert.equal(result.status,'RECOVERY_TECHNICAL_CI_PROVIDER_RECONCILIATION_RETRY_DUE');
+ assert.deepEqual(seen,['Bearer test-github-release-read-only-token']);
+ assert.equal(result.independent_technical_ci_verified,false);
+});
