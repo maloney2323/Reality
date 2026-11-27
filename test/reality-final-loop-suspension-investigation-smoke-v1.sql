@@ -485,7 +485,7 @@ RESET ROLE;
 \ir ../sql/reality-continuity-request-local-readback-v1.sql
 SET ROLE service_role;
 SELECT pg_catalog.setval('pg_temp.fixture_readback_guard_calls'::regclass,1,false);
-DO $
+DO $$
 DECLARE e record; after_shadow jsonb; saved_guard jsonb; before_calls bigint; after_calls bigint; proof jsonb;
 BEGIN
  SELECT * INTO STRICT e FROM reality_internal.final_loop_resume_events_v1
@@ -514,11 +514,11 @@ BEGIN
  OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(proof->'events') x WHERE x->>'event_id'=e.event_id::text AND x->>'source_current'='false' AND x->>'would_resume_suspended_obligation'='false')
  THEN RAISE EXCEPTION 'REQUEST_LOCAL_STALE_GUARD_ACCEPTED';END IF;
  UPDATE public.suspension_fixture_proof SET guard=saved_guard WHERE shift_id=e.shift_id;
-END $;
+END $$;
 RESET ROLE;
 
 SET ROLE service_role;
-DO $
+DO $$
 DECLARE e record; run uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid(); plan text; ctx jsonb; r jsonb; proof jsonb;
 BEGIN
  SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING';
