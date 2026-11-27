@@ -297,7 +297,7 @@ export default async function handler(req,res){
     {id:'owner_handoff',read:()=>readOwnerOperationalIncidentChatBriefing({session,db:isolated}),
      validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false,fallback:null},
     {id:'verified_work',read:()=>readVerifiedOwnerCompletedWorkForChat({session,db:isolated}),validate:Array.isArray,fallback:[]},
-    {id:'self_visibility',read:()=>readRealitySelfVisibilityForChat({session,message:text,priorTurns:recent,db:isolated}),validate:Array.isArray,fallback:[]},
+    {id:'self_visibility',timeoutMs:5000,read:()=>readRealitySelfVisibilityForChat({session,message:text,priorTurns:recent,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'active_shift',read:()=>readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'worker_observation',read:()=>readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'mission',read:()=>readFreshPersonalAccountMissionState({session}),
@@ -305,7 +305,7 @@ export default async function handler(req,res){
    ],{timeoutMs:1800}):{values:{},unavailable:wantsContext?['owner_context']:[],status:wantsContext?'OPTIONAL_EVIDENCE_PARTIALLY_UNAVAILABLE':'CONVERSATION_ONLY_CONTEXT'};
    const t=ctx.values.time_horizon;
    const shift=ctx.values.active_shift?.find(x=>x?.source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'&&x.owner_shift_authorization_recorded===true)||null;
-   const observations=[...(ctx.values.verified_work||[]),...(ctx.values.self_visibility||[]),...(ctx.values.active_shift||[]),...(ctx.values.worker_observation||[])].slice(0,90);
+   const observations=[...(ctx.values.self_visibility||[]),...(ctx.values.verified_work||[]),...(ctx.values.active_shift||[]),...(ctx.values.worker_observation||[])].slice(0,90);
    const mission=ctx.values.mission?.state?.active_goal;
    const ownerUniverse=makeOwnerUniverseReadModel({observations});
    stage='READ_ONLY_MODEL_COGNITION';
@@ -316,6 +316,8 @@ export default async function handler(req,res){
     model:process.env.REALITY_CHAT_OPENAI_MODEL||'gpt-4.1-mini',
     ownerContext:{source_status:ctx.status,unavailable_sources:ctx.unavailable,
      currently_authorized_shift:shift,
+      current_operational_self_visibility:(ctx.values.self_visibility||[]).filter(x=>x.event_kind==='reality_current_verified_operational_self_visibility').slice(0,12).map(x=>x.current_operational_facts),
+      current_operational_receipts_take_precedence_over_legacy_audit_or_prior_conversation:true,
      temporal_intelligence:t?{past:t.past,present:t.present,future:t.future,
       final_loop:t.final_loop_owner,ceo:t.final_loop_owner?.executive||null,
       recovery:t.final_loop_recovery_guidance,universe_feedback:t.final_loop_universe_feedback,
@@ -381,7 +383,7 @@ export default async function handler(req,res){
    // Existing self-audit + exact pinned GitHub source tree. Fast and
    // independent of the employee-shift dashboard's readback success.
    // A model MUST NOT infer "missing engine" from absent optional evidence.
-   {id:'self_visibility',read:()=>readRealitySelfVisibilityForChat({
+   {id:'self_visibility',timeoutMs:5000,read:()=>readRealitySelfVisibilityForChat({
       session,message:text,
       priorTurns:history.messages.filter(x=>x.request_id!==requestId),
       db:isolated}),validate:Array.isArray,fallback:[]},
@@ -594,6 +596,7 @@ export default async function handler(req,res){
    feedback.observations:[];
   const ownerCurrentUniverseObservations=[
    ...(primaryMissionObservation?[primaryMissionObservation]:[]),
+   ...selfVisibilityObservations,
    ...finalLoopUniverseObservations,
    buildRealityProposedEmployeeRoleDiscussionContext(),
    ...native263TemporalObservations,...ownerCompletedWorkObservations,
@@ -601,7 +604,6 @@ export default async function handler(req,res){
    ...employeeShiftObservations,...workerWakeObservations,
    ...companyWorkforceObservations,...rileySourceWorkObservations,
    ...weeklyWorkloadObservations,
-   ...selfVisibilityObservations,
    ...incidentChatUniverseObservations(operationalIncidentsReadback),
    ...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
@@ -696,7 +698,9 @@ export default async function handler(req,res){
      work_authorized_by_read:false,
      required_truth:'These are existing weekly work candidates, not approved executable jobs. Proactively qualify current defects; never manufacture work or replay settled originals.'
     }:{status:'WEEKLY_QUEUE_READBACK_UNAVAILABLE_DO_NOT_CLAIM_NO_WORK'},
-    owner_original_work_current_state:ownerOriginalWork?{
+    current_operational_self_visibility:selfVisibilityObservations.filter(x=>x.event_kind==='reality_current_verified_operational_self_visibility').slice(0,12).map(x=>x.current_operational_facts),
+     current_operational_receipts_take_precedence_over_legacy_audit_or_prior_conversation:true,
+     owner_original_work_current_state:ownerOriginalWork?{
      source:'AUTHENTICATED_OWNER_SCOPED_DATABASE_READBACK',
      existing_authorized_shift_id:ownerOriginalWork.current_shift_id,
      unfinished_originals:reconciledOriginals?
