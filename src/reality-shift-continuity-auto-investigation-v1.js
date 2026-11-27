@@ -211,18 +211,26 @@ async function investigateSignedBuilderFailure({claim,db,env,shiftId,workerRunId
 }
 
 export async function investigateOneSignedShiftContinuityIncident({
- db,env=process.env,shiftId,workerRunId=null,call=shiftRpc,fetchImpl=fetch,
+ db,env=process.env,shiftId,workerRunId=null,suspensionEventId=null,call=shiftRpc,fetchImpl=fetch,
  invokeModel=null,readSource=readFreshEmployeeInquirySource,
  rolesBuilder=buildRealityProposedEmployeeRoleDiscussionContext
 }={}){
  if(env.VERCEL_ENV!=='preview'||db?.strictSecrets!==true||
   !db.secretKey||db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
-  !UUID.test(shiftId||'')||typeof call!=='function'||
+  !UUID.test(shiftId||'')||(suspensionEventId!==null&&(!UUID.test(suspensionEventId)||!UUID.test(workerRunId||'')))||typeof call!=='function'||
   typeof fetchImpl!=='function'||typeof readSource!=='function')
   fail('ISOLATED_SIGNED_SHIFT_BOUNDARY_REQUIRED');
  const claim=await call(db,'reality_claim_next_shift_continuity_investigation_v1',{
-  p_shift_id:shiftId,...(workerRunId?{p_worker_run_id:workerRunId}:{})
+  p_shift_id:shiftId,...(workerRunId?{p_worker_run_id:workerRunId}:{}),
+  ...(suspensionEventId?{p_event_id:suspensionEventId}:{})
  },{fetchImpl});
+ if(suspensionEventId!==null&&claim?.status==='SIGNED_SHIFT_CONTINUITY_INVESTIGATION_CLAIMED'&&
+  (claim.kind!=='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'||claim.source_evidence?.event_id!==suspensionEventId||
+   claim.source_evidence?.worker_run_id!==workerRunId||
+   claim.source_evidence?.blocker_code!=='FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED'))
+  fail('EXACT_SUSPENSION_INVESTIGATION_SCOPE_UNVERIFIED');
+ if(suspensionEventId!==null&&claim?.status==='SIGNED_BUILDER_FAILURE_INVESTIGATION_CLAIMED')
+  fail('SUSPENSION_INVESTIGATION_CANNOT_CLAIM_BUILDER');
  if(claim?.status==='SIGNED_BUILDER_FAILURE_INVESTIGATION_CLAIMED')
   return investigateSignedBuilderFailure({claim,db,env,shiftId,workerRunId,call,fetchImpl});
  const noWork=['NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
