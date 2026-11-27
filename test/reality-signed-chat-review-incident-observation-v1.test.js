@@ -57,8 +57,10 @@ test('observer uses exact durable source and preserves historical shift identity
   "grant execute on function public.reality_observe_signed_chat_review_incident_v1(uuid,uuid) to service_role"
  ])assert.ok(sql.includes(text),text);
  assert.doesNotMatch(sql,/update reality_internal\.genuine_capability_queue_v1|insert into reality_internal\.governed_employee_original_claims_v1|security definer|installation_authorized',true/i);
- assert.ok(worker.indexOf("'reality_observe_signed_chat_review_incident_v1'")<
-  worker.indexOf("await investigateOneSignedShiftContinuityIncident("));
+ const normal=worker.indexOf("workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION'");
+ const observer=worker.indexOf("'reality_observe_signed_chat_review_incident_v1'");
+ const investigator=worker.indexOf("await investigateOneSignedShiftContinuityIncident(",normal);
+ assert.ok(observer>0&&normal>observer&&investigator>normal);
  assert.match(worker,/signed_chat_review_incident_observation:signedChatReviewIncidentObservation/);
 });
 test('actual investigator accepts exact observed incident and passes same original evidence to model',async()=>{
