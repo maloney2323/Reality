@@ -79,7 +79,13 @@ test('same ledger, signed wake, immutable attempts and no authority grants',()=>
   'failure_history_sha256','for update','one_use_inquiry_only','p_worker_run_id',
   'grant execute on function public.reality_record_shift_investigation_remediation_v1'])assert.ok(sql.includes(v),v);
  assert.doesNotMatch(sql,/security definer|set investigation_attempts\s*=|installation_authorized',true|insert into reality_internal\.governed_employee_original_claims/);
- assert.ok(worker.indexOf('await qualifyVerifiedInvestigationRemediation')<worker.indexOf('await investigateOneSignedShiftContinuityIncident'));
+ const normal=worker.indexOf("workerStage='SOURCE_BACKED_SHIFT_CONTINUITY_SELF_OBSERVATION'");
+ const remediation=worker.indexOf('await qualifyVerifiedInvestigationRemediation');
+ const inquiry=worker.indexOf('await investigateOneSignedShiftContinuityIncident',normal);
+ assert.ok(remediation>0&&normal>remediation&&inquiry>normal);
+ const exact=worker.slice(worker.indexOf('if(suspensionInvestigationWake){'),worker.indexOf('// Continuous, standing EVIDENCE qualification intake'));
+ assert.match(exact,/suspensionEventId:governedWakeScope.event_id/);
+ assert.match(exact,/SUSPENSION_INVESTIGATION_RELEASE_WITNESS_UNVERIFIED/);
 });
 
 test('independent observation routes the frozen original through existing target review only',async()=>{
