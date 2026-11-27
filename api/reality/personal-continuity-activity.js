@@ -16,9 +16,11 @@ export default async function handler(req,res){
   const db=shiftDatabase(),ownerId=session.user_id;
   if(process.env.VERCEL_ENV!=='preview'||db.url!==session.config?.url)
    return res.status(403).json({ok:false,error:'CHAT_ACTIVITY_OWNER_SCOPE_UNVERIFIED'});
-  const [current,incidentReadback]=await Promise.all([
+  const [current,incidentReadback,finalReadback]=await Promise.all([
    readCurrentContinuitySelfVisibility({session,db}),
    shiftRpc(db,'reality_read_owner_shift_continuity_incidents_v1',{p_owner_id:ownerId},
+    {timeoutMs:4500}).catch(()=>null),
+   shiftRpc(db,'reality_read_owner_final_receipts_v1',{p_owner_id:ownerId},
     {timeoutMs:4500}).catch(()=>null)
   ]);
   if(!current)return res.status(503).json({ok:false,error:'CURRENT_CONTINUITY_READBACK_UNAVAILABLE'});
@@ -27,7 +29,7 @@ export default async function handler(req,res){
    shiftId,await shiftRpc(db,'reality_read_final_loop_event_resume_shadow_v1',{p_shift_id:shiftId},
     {timeoutMs:4000}).catch(()=>null)
   ])));
-  const data=projectChatContinuityActivity({current,incidentReadback,historyByShift,ownerId});
+  const data=projectChatContinuityActivity({current,incidentReadback,finalReadback,historyByShift,ownerId});
   if(!data)return res.status(503).json({ok:false,error:'CHAT_ACTIVITY_READBACK_UNVERIFIED'});
   return res.status(200).json({ok:true,...data});
  }catch{
