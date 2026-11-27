@@ -4,12 +4,15 @@ on:
     branches:
       - reality/isolated-openai-governance-gateway-20261108
       - feature/final-loop-governed-qualification-handoff-20261123
+      - feature/governed-provider-renewal-routing-20261127
       - reality/native263-temporal-chat-proof-20261113
       - reality/repair-source-bound-shift-gate-20261113
   pull_request:
     types: [opened, reopened, synchronize, edited]
     paths:
       - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts'
+      - 'test/reality-existing-broker-release-ci-v1.test.js'
       - 'sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql'
       - 'src/reality-final-loop-technical-ci-evidence-verifier-v1.js'
       - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
@@ -253,6 +256,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify existing broker release CI handler with synthetic provider and ledger evidence
+        run: node --experimental-strip-types --test test/reality-existing-broker-release-ci-v1.test.js
       - name: Verify Reality model boundary and original tool-continuation regressions
         run: |
           node --check src/reality-native-recovery-readonly-tool-v1.js
