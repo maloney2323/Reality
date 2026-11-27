@@ -463,7 +463,7 @@ END $$;
 -- stale and pending events sharing their exact evidence identity.
 -- The sequence counts only fixture guard calls; production readers remain read-only.
 CREATE TEMP SEQUENCE fixture_readback_guard_calls;
-GRANT USAGE,SELECT ON SEQUENCE pg_temp.fixture_readback_guard_calls TO service_role;
+GRANT USAGE,SELECT,UPDATE ON SEQUENCE pg_temp.fixture_readback_guard_calls TO service_role;
 CREATE OR REPLACE FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid)
 RETURNS jsonb LANGUAGE plpgsql AS $count$
 BEGIN
