@@ -104,3 +104,4 @@ jobs:
           echo 'REALITY_INSTALLATION_AUTHORIZED=false'
           sha256sum test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
           node --test test/reality-frozen-regressions/reality-general-execution-receipt-v1.test.js
+          node --test test/reality-extensions/reality-general-execution-receipt.model.test.mjs
