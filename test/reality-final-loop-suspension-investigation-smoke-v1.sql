@@ -150,7 +150,7 @@ BEGIN
 END $$;
 SET ROLE service_role;
 DO $$
-DECLARE e record; l record; run uuid; plan text; r jsonb; claim jsonb; second jsonb;
+DECLARE e record; l record; run uuid; plan text; r jsonb; claim jsonb; second jsonb; i record; fixture_receipt text;
 BEGIN
  SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
  SELECT * INTO l FROM reality_internal.governed_preview_shift_worker_leases_v1;
@@ -170,6 +170,26 @@ BEGIN
  IF second->>'model_inquiry_authorized'<>'false' THEN RAISE EXCEPTION 'DUPLICATE_INVESTIGATION_AUTHORIZED';END IF;
  r:=public.reality_observe_final_loop_suspension_investigation_v1(e.shift_id,e.event_id,run,(claim->>'incident_id')::uuid,'sha256:'||repeat('0',64));
  IF r->>'status'='SUSPENSION_INVESTIGATION_RECEIPT_INDEPENDENTLY_READ_BACK' THEN RAISE EXCEPTION 'UNRECORDED_INVESTIGATION_ACCEPTED';END IF;
+ -- Stand-in for the EXISTING governed investigation writer's receipt in the
+ -- isolated fixture only. The observer must independently recompute its hash.
+ UPDATE reality_internal.owner_shift_continuity_incidents_v1 SET phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
+  assigned_employee='Fixture engineer',independent_reviewer='Fixture verifier',diagnosis='Fixture diagnosis only',
+  proposed_upgrade='Fixture proposal only',independent_test_requirement='Fixture independent test only',
+  limitations='No actual provider or execution effect',model_response_id='resp_fixture_only'
+ WHERE incident_id=(claim->>'incident_id')::uuid RETURNING * INTO i;
+ fixture_receipt:='sha256:'||encode(sha256(convert_to(jsonb_build_object(
+  'owner_id',i.owner_id,'incident_id',i.incident_id,'evidence_sha256',i.evidence_sha256,
+  'model_response_id',i.model_response_id,'assigned_employee',i.assigned_employee,'reviewer',i.independent_reviewer,
+  'diagnosis',i.diagnosis,'proposed_upgrade',i.proposed_upgrade,'required_independent_test',i.independent_test_requirement,
+  'limitations',i.limitations,'new_original_jobs_created',0,'installation_authorized',false)::text,'UTF8')),'hex');
+ UPDATE reality_internal.owner_shift_continuity_incidents_v1 SET investigation_receipt_sha256=fixture_receipt WHERE incident_id=i.incident_id;
+ r:=public.reality_observe_final_loop_suspension_investigation_v1(e.shift_id,e.event_id,run,i.incident_id,fixture_receipt);
+ IF r->>'status'<>'SUSPENSION_INVESTIGATION_RECEIPT_INDEPENDENTLY_READ_BACK'
+ OR r->>'execution_authorized'<>'false' OR r->>'new_attempt_authorized'<>'false' OR r->>'original_job_completed'<>'false'
+ OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=e.event_id AND state='SHADOW_OBSERVED')
+ THEN RAISE EXCEPTION 'EXACT_INVESTIGATION_RECEIPT_NOT_OBSERVED: %',r;END IF;
+ r:=public.reality_observe_final_loop_suspension_investigation_v1(e.shift_id,e.event_id,run,i.incident_id,fixture_receipt);
+ IF r->>'status'='SUSPENSION_INVESTIGATION_RECEIPT_INDEPENDENTLY_READ_BACK' THEN RAISE EXCEPTION 'DUPLICATE_OBSERVATION_ACCEPTED';END IF;
  IF EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE canonical_prepare_invocation_id IS NOT NULL OR claimant_worker_run_id IS NOT NULL)
  THEN RAISE EXCEPTION 'CHILD_EXECUTION_EFFECT_CREATED';END IF;
 END $$;
