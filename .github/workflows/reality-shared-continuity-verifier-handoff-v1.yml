@@ -41,6 +41,10 @@ on:
       - 'test/reality-chat-self-visibility-v1.test.js'
       - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-continuity-request-local-readback-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-query-v1.sql'
+      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -83,6 +87,10 @@ on:
       - 'test/reality-chat-self-visibility-v1.test.js'
       - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-continuity-request-local-readback-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-query-v1.sql'
+      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -197,3 +205,5 @@ jobs:
           PGDATABASE=reality_suspension_smoke psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-suspension-investigation-smoke-v1.sql
           createdb reality_provider_checkpoint_smoke
           PGDATABASE=reality_provider_checkpoint_smoke psql -v ON_ERROR_STOP=1 -f test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql
+          createdb reality_worker_history_smoke
+          PGDATABASE=reality_worker_history_smoke psql -v ON_ERROR_STOP=1 -f test/reality-continuity-worker-history-readback-index-smoke-v1.sql
