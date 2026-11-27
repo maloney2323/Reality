@@ -33,7 +33,7 @@ const providerProof={
 };
 function fixture({
  observation=original,reobserved=original,proof=providerProof,registryStatus='ABSENT',
- after=null,
+ after=null,assessRegisteredCapability=null,
 }={}){
  let observations=0,registryReads=0,reproductions=0,drivers=0;
  const modelAdapter={
@@ -51,6 +51,7 @@ function fixture({
    return {independently_verified:true,original_work_id:WORK,
     capability_id:original.capability_id,status:registryStatus};
   },
+  assessRegisteredCapability,
   arbitrateAndReceipt:async()=>({
    original_work_id:WORK,owner_id:scope.owner_id,goal_id:scope.goal_id,
    capability_id:original.capability_id,
@@ -236,4 +237,71 @@ test('job-agnostic trusted connector receipt supports non-GitHub customer work',
  assert.equal(result.confirmed_gap.original_failure_ref,inventoryRef);
  assert.equal(result.production_changed,false);
  assert.equal(f.calls().drivers,1);
+});
+
+const fitnessReceipt=(request,status,changes={})=>({
+ ...request,fitness_status:status,independently_verified:true,
+ capability_version_sha256:'e'.repeat(64),
+ provider_evidence_ref:'reality:provider-verified:runtime:fitness-observation-012345',
+ external_action_performed:false,provider_effect_may_have_occurred:false,
+ installation_authorized:false,new_authority_granted:false,...changes,
+});
+test('registered capability fitness routes by independent operational condition without synthesis or effects',async()=>{
+ const cases={
+  SUFFICIENT:'REASSESS_ORIGINAL_OUTCOME_WITHOUT_REPLAY',
+  DISCONNECTED:'RESTORE_EXISTING_AUTHORIZED_CONNECTION',
+  INSUFFICIENT:'QUALIFY_EXTENSION_OF_EXISTING_CAPABILITY',
+  DEFECTIVE:'QUALIFY_REPAIR_OF_EXISTING_CAPABILITY',
+  INCOMPATIBLE:'RECONCILE_EXISTING_CAPABILITY_DEPENDENCIES',
+  UNAUTHORIZED:'REQUEST_MINIMUM_EXACT_AUTHORITY',
+ };
+ for(const [condition,next] of Object.entries(cases)){
+  const f=fixture({registryStatus:'ACTIVE',assessRegisteredCapability:async req=>{
+   assert.equal(req.read_only,true);assert.equal(req.execution_authorized,false);
+   assert.equal(req.original_work_id,WORK);
+   return fitnessReceipt(req,condition);
+  }});
+  const r=await f.engine.run({originalWorkId:WORK,scope});
+  assert.equal(r.status,'REGISTERED_CAPABILITY_FITNESS_VERIFIED_RECOVERY_QUALIFICATION_REQUIRED');
+  assert.equal(r.next_action,next);assert.equal(r.capability_assessment.fitness_status,condition);
+  assert.match(r.capability_assessment.evidence_hash,/^[a-f0-9]{64}$/);
+  assert.equal(r.installation_authorized,false);assert.equal(r.original_job_completed,false);
+  assert.equal(r.new_job_created,false);assert.equal(f.calls().drivers,0);
+ }
+});
+test('fitness requires exact owner, goal, lineage, capability version, frozen proof and no external effects',async()=>{
+ for(const change of [
+  {owner_id:'other-owner'},{goal_id:'different-goal'},{worldline_id:'other-worldline'},
+  {continuity_root_id:'other-root'},{original_work_id:'work:'+'f'.repeat(32)},
+  {capability_id:'different_capability'},{frozen_suite_sha256:'0'.repeat(64)},
+  {frozen_failure_ref:'different-failure'},{capability_version_sha256:'invalid'},
+  {fitness_status:'arbitrary'},{provider_evidence_ref:'unverified'},
+  {independently_verified:false},{provider_effect_may_have_occurred:true},
+  {installation_authorized:true},{new_authority_granted:true},
+ ]){
+  const f=fixture({registryStatus:'ACTIVE',
+   assessRegisteredCapability:async req=>fitnessReceipt(req,'DISCONNECTED',change)});
+  await assert.rejects(f.engine.run({originalWorkId:WORK,scope}),
+   /INDEPENDENT_REGISTERED_CAPABILITY_FITNESS_REQUIRED/);
+  assert.equal(f.calls().drivers,0);
+ }
+});
+test('the existing original-work handoff requires independent fitness receipt readback',async()=>{
+ const f=fixture({registryStatus:'ACTIVE',
+  assessRegisteredCapability:async req=>fitnessReceipt(req,'INSUFFICIENT')});
+ const request={original_work_id:WORK,authorization_continues_unchanged:true,
+  production_write_permitted:false,customer_job_completed:false,
+  original_execution_receipt:'internal:original-execution',independent_failure:original};
+ const handler=createGenuineCapabilityExecutionHandoff({engine:f.engine,scope,
+  persistAndReadback:async x=>{
+   assert.equal(x.no_new_job,true);assert.equal(x.execution_not_yet_settled,true);
+   assert.equal(x.capability_assessment.fitness_status,'INSUFFICIENT');
+   return {...x,independently_verified:true,receipt_ref:'supabase:continuity:fitness'};
+  }});
+ const r=await handler(request);
+ assert.equal(r.next_action,'QUALIFY_EXTENSION_OF_EXISTING_CAPABILITY');
+ assert.equal(r.original_job_completed,false);
+ const bad=createGenuineCapabilityExecutionHandoff({engine:f.engine,scope,
+  persistAndReadback:async x=>({...x,independently_verified:true,capability_assessment_hash:null})});
+ await assert.rejects(bad(request),/DURABLE_ORIGINAL_REPAIR_HANDOFF_READBACK_REQUIRED/);
 });

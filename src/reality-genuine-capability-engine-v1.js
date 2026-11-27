@@ -1,6 +1,7 @@
 // Reality Genuine Capability Engine v1.
 // Only independently observed missing abilities of a *real, already-authorized*
-// original job may initiate synthesis. No issue number, model approval, or
+// original job may initiate synthesis. Registered capabilities require an
+// independent fitness assessment; their existence alone is not operational proof. No issue number, model approval, or
 // customer-specific workflow is embedded in this engine.
 //
 // Existing governed driver owns model generation, independent sandbox,
@@ -81,12 +82,63 @@ function proofCheck(proof,observed){
  });
 }
 
+// A registered capability is an asset, not proof of fitness for this job.
+// The trusted assessor supplies independently observed, frozen-source-bound
+// evidence. This routes recovery but never invokes a connector or a builder.
+const fitnessActions=Object.freeze({
+ SUFFICIENT:'REASSESS_ORIGINAL_OUTCOME_WITHOUT_REPLAY',
+ DISCONNECTED:'RESTORE_EXISTING_AUTHORIZED_CONNECTION',
+ INSUFFICIENT:'QUALIFY_EXTENSION_OF_EXISTING_CAPABILITY',
+ DEFECTIVE:'QUALIFY_REPAIR_OF_EXISTING_CAPABILITY',
+ INCOMPATIBLE:'RECONCILE_EXISTING_CAPABILITY_DEPENDENCIES',
+ UNAUTHORIZED:'REQUEST_MINIMUM_EXACT_AUTHORITY',
+});
+function verifyRegisteredFitness(receipt,{scope,observed,gap}){
+ if(receipt?.independently_verified!==true||
+    receipt.original_work_id!==scope.original_work_id||
+    receipt.owner_id!==scope.owner_id||receipt.goal_id!==scope.goal_id||
+    receipt.worldline_id!==scope.worldline_id||
+    receipt.continuity_root_id!==scope.continuity_root_id||
+    receipt.capability_id!==observed.capability_id||
+    receipt.source_ref!==observed.source_ref||
+    receipt.verification_suite_ref!==observed.verification_suite_ref||
+    receipt.frozen_suite_sha256!==gap.frozen_suite_sha256||
+    receipt.frozen_failure_ref!==gap.frozen_failure_ref||
+    !Object.hasOwn(fitnessActions,receipt.fitness_status)||
+    !source(receipt.provider_evidence_ref)||
+    !HASH.test(receipt.capability_version_sha256||'')||
+    receipt.external_action_performed!==false||
+    receipt.provider_effect_may_have_occurred!==false||
+    receipt.no_automatic_retry===true||
+    receipt.installation_authorized!==false||
+    receipt.new_authority_granted!==false)
+  fail('INDEPENDENT_REGISTERED_CAPABILITY_FITNESS_REQUIRED');
+ const evidence=Object.freeze({
+  original_work_id:scope.original_work_id,owner_id:scope.owner_id,
+  goal_id:scope.goal_id,worldline_id:scope.worldline_id,
+  continuity_root_id:scope.continuity_root_id,
+  capability_id:observed.capability_id,
+  capability_version_sha256:receipt.capability_version_sha256,
+  source_ref:observed.source_ref,
+  verification_suite_ref:observed.verification_suite_ref,
+  frozen_suite_sha256:gap.frozen_suite_sha256,
+  frozen_failure_ref:gap.frozen_failure_ref,
+  provider_evidence_ref:receipt.provider_evidence_ref,
+  fitness_status:receipt.fitness_status,
+  next_action:fitnessActions[receipt.fitness_status],
+  independent_evidence_verified:true,
+  new_authority_granted:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false,
+ });
+ return Object.freeze({...evidence,evidence_hash:sha(evidence)});
+}
+
 // Every adapter here is a real provider boundary supplied by the caller.
 // The model must never supply observeOriginalFailure, reproduceFrozenFailure,
 // inspectRegisteredCapability, or authorize its own promotion.
 export function createGenuineCapabilityEngine({
  observeOriginalFailure,reobserveOriginalFailure,reproduceFrozenFailure,
- inspectRegisteredCapability,arbitrateAndReceipt=null,
+ inspectRegisteredCapability,assessRegisteredCapability=null,arbitrateAndReceipt=null,
  adapters=null,createAdapters=null,
  runRepair=continueOriginalJobFromVerifiedCapabilityGap,
 }={}){
@@ -97,6 +149,8 @@ export function createGenuineCapabilityEngine({
  }
  if(typeof createAdapters!=='function'&&createAdapters!==null)
   fail('TRUSTED_ADAPTER_FACTORY_INVALID');
+ if(assessRegisteredCapability!==null&&typeof assessRegisteredCapability!=='function')
+  fail('TRUSTED_FITNESS_ASSESSOR_INVALID');
  if(arbitrateAndReceipt!==null&&typeof arbitrateAndReceipt!=='function')
   fail('ARBITRAGE_RECEIPT_ADAPTER_INVALID');
  function checkDrivers(a){
@@ -137,12 +191,15 @@ export function createGenuineCapabilityEngine({
    existing.original_work_id!==originalWorkId||
    existing.capability_id!==observed.capability_id)
    fail('INDEPENDENT_CAPABILITY_REGISTRY_READBACK_REQUIRED');
-  if(existing.status==='ACTIVE')
+  if(existing.status==='ACTIVE'&&!assessRegisteredCapability)
    return Object.freeze({status:'CAPABILITY_ALREADY_PRESENT_REASSESS_JOB',
     original_work_id:originalWorkId,capability_id:observed.capability_id,
+    next_action:'INDEPENDENTLY_ASSESS_REGISTERED_CAPABILITY_FITNESS',
+    fitness_assessment_required:true,
+    new_job_created:false,installation_authorized:false,
     model_generated:false,installed:false,
-    original_job_completed:false});
-  if(existing.status!=='ABSENT')fail('CAPABILITY_REGISTRY_STATUS_UNRESOLVED');
+    original_job_completed:false,production_changed:false});
+  if(!['ABSENT','ACTIVE'].includes(existing.status))fail('CAPABILITY_REGISTRY_STATUS_UNRESOLVED');
   const reproduced=await reproduceFrozenFailure(Object.freeze({
    original_work_id:originalWorkId,
    source_ref:observed.source_ref,
@@ -152,6 +209,26 @@ export function createGenuineCapabilityEngine({
    execution_authorized:false,
   }));
   const gap=proofCheck(reproduced,observed);
+  if(existing.status==='ACTIVE'){
+   const fitness=await assessRegisteredCapability(Object.freeze({
+    original_work_id:originalWorkId,owner_id:scope.owner_id,goal_id:scope.goal_id,
+    continuity_root_id:scope.continuity_root_id,worldline_id:scope.worldline_id,
+    capability_id:observed.capability_id,source_ref:observed.source_ref,
+    verification_suite_ref:observed.verification_suite_ref,
+    frozen_suite_sha256:gap.frozen_suite_sha256,frozen_failure_ref:gap.frozen_failure_ref,
+    registry_status:'ACTIVE',read_only:true,execution_authorized:false,
+   }));
+   const assessment=verifyRegisteredFitness(fitness,{scope,observed,gap});
+   return Object.freeze({
+    version:GENUINE_CAPABILITY_ENGINE_VERSION,
+    status:'REGISTERED_CAPABILITY_FITNESS_VERIFIED_RECOVERY_QUALIFICATION_REQUIRED',
+    original_work_id:originalWorkId,capability_id:observed.capability_id,
+    capability_assessment:assessment,next_action:assessment.next_action,
+    new_job_created:false,model_generated:false,installed:false,
+    installation_authorized:false,owner_action_required:false,
+    original_job_completed:false,production_changed:false,
+   });
+  }
   // A verified missing capability is necessary, but NOT sufficient,
   // to call OpenAI. The controller must first prove reuse and authorized
   // protocol integration have been evaluated and write a bitemporal receipt.
@@ -281,12 +358,15 @@ export function createGenuineCapabilityExecutionHandoff({
    capability_phase:result.capability_phase||null,
    constitutional_state_hash:result.state?.head_hash||null,
    frozen_gap_hash:result.confirmed_gap?.evidence_hash||null,
+   ...(result.capability_assessment?{capability_assessment:result.capability_assessment,
+    capability_assessment_hash:result.capability_assessment.evidence_hash}:{}),
    no_new_job:true,execution_not_yet_settled:true,
   }));
   if(receipt?.independently_verified!==true||
     receipt.original_work_id!==scope.original_work_id||
     receipt.original_execution_receipt!==request.original_execution_receipt||
     receipt.status!==result.status||
+    (result.capability_assessment&&receipt.capability_assessment_hash!==result.capability_assessment.evidence_hash)||
     receipt.execution_not_yet_settled!==true)
    fail('DURABLE_ORIGINAL_REPAIR_HANDOFF_READBACK_REQUIRED');
   return Object.freeze({
@@ -297,6 +377,8 @@ export function createGenuineCapabilityExecutionHandoff({
    original_job_completed:false,
    installation_authorized_by_handoff:false,
    reconciliation_receipt_ref:receipt.receipt_ref||null,
+   ...(result.capability_assessment?{next_action:result.next_action,
+    capability_assessment_hash:result.capability_assessment.evidence_hash}:{}),
   });
  };
 }
