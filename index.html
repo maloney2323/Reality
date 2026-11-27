@@ -6724,7 +6724,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   const host=el('realityChatContinuitySteps'),headline=el('realityChatContinuityHeadline');
   el('realityChatContinuityChecked').textContent='Evidence checked '+new Date(data.observed_at).toLocaleTimeString()+
    ' · read-only updates';
-  const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations]);
+  const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations,data.final_receipts]);
   if(liveActivityFingerprint===key)return;
   liveActivityFingerprint=key;host.replaceChildren();
   headline.textContent=data.obligations.length?
@@ -6766,6 +6766,20 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    liveNode('p',job.original_complete?'See the final receipt in completed work.':
     'Original work remains open. No additional authorization is inferred from this display.',article);
   }
+  if(data.final_receipts.length){
+   const receipts=document.createElement('details');host.append(receipts);
+   liveNode('summary','Independently verified final receipts · '+data.final_receipts.length,receipts);
+   for(const r of data.final_receipts){
+    if(!/^work:[a-f0-9]{32}$/.test(r.original_work_id||''))continue;
+    const item=document.createElement('article');receipts.append(item);
+    liveNode('strong','Original completed · '+r.original_work_id,item);
+    liveNode('p','Settlement event: '+r.settlement_event_id,item);
+    liveNode('p','Installed commit: '+r.installed_commit_sha,item);
+    const a=document.createElement('a');item.append(a);
+    a.href='/api/reality/personal-genuine-final-receipt-pdf?work_id='+encodeURIComponent(r.original_work_id);
+    a.textContent='View verified final receipt (PDF)';a.target='_blank';a.rel='noopener noreferrer';
+   }
+  }
  }
  async function refreshLiveActivity(){
   if(!liveActivitySignedIn||realityCurrentRoute()!=='chat'||document.visibilityState!=='visible'||liveActivityAbort)return;
@@ -6783,6 +6797,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    if(!r.ok||data.ok!==true||data.status!=='OWNER_CHAT_CONTINUITY_ACTIVITY_READ_ONLY'||
     data.read_only!==true||data.execution_authorized!==false||data.installation_authorized!==false||
     data.production_changed!==false||!Array.isArray(data.obligations)||data.obligations.length>12||
+    !Array.isArray(data.final_receipts)||data.final_receipts.length>12||
     !Number.isFinite(Date.parse(data.observed_at)))throw Error('ACTIVITY_READBACK_UNVERIFIED');
    showLiveActivity(data);
   }catch{
