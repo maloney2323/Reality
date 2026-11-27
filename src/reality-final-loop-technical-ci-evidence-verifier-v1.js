@@ -66,7 +66,7 @@ function authorized({db,env,proposal,route}){
 }
 export async function verifySourceBoundTechnicalRecoveryCi({
  db,env=process.env,contractProposal,existingCiRoute,
- fetchImpl=fetch
+ fetchImpl=fetch,terminalContext=null,workerRunId=null
 }={}){
  if(!authorized({db,env,proposal:contractProposal,route:existingCiRoute})||
   typeof fetchImpl!=='function')
@@ -87,11 +87,13 @@ export async function verifySourceBoundTechnicalRecoveryCi({
   env.REALITY_BUILDER_DISPATCH_GITHUB_TOKEN||
   env.REALITY_GITHUB_TOKEN||env.GITHUB_TOKEN||'').trim();
  const deployed=env.VERCEL_GIT_COMMIT_SHA;
- if(token.length<24||!SHA.test(deployed||'')||
+ const brokerMode=terminal&&(env.REALITY_RELEASE_GITHUB_CI_READ_MODE==='EXISTING_GOVERNED_BROKER'||
+  db.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF);
+ if((!brokerMode&&token.length<24)||!SHA.test(deployed||'')||
   env.VERCEL_GIT_COMMIT_REF!==BRANCH)
   return result('RECOVERY_TECHNICAL_CI_PREVIEW_SOURCE_OR_PROVIDER_AUTH_UNAVAILABLE',{
    ...base});
- const get=async path=>{
+ const directGet=async path=>{
   const response=await fetchImpl('https://api.github.com/repos/'+REPO+path,{
    method:'GET',redirect:'error',cache:'no-store',
    signal:AbortSignal.timeout(10000),
@@ -102,6 +104,65 @@ export async function verifySourceBoundTechnicalRecoveryCi({
   if(!response?.ok)throw Error('RECOVERY_GITHUB_PROVIDER_UNAVAILABLE');
   return response.json();
  };
+ let get=directGet;
+ if(brokerMode){
+  const x=terminalContext,t=x?.terminal_history;
+  if(env.REALITY_RELEASE_GITHUB_CI_READ_MODE!=='EXISTING_GOVERNED_BROKER'||
+   db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||
+   db.url!=='https://'+db.project+'.supabase.co'||typeof db.secretKey!=='string'||db.secretKey.length<25||
+   x?.status!=='TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY'||x.worker_run_id!==workerRunId||
+   !UUID.test(workerRunId||'')||!UUID.test(x.event_id||'')||!UUID.test(x.release_claim_id||'')||
+   x.running_release_sha!==deployed||x.running_release_ref!==BRANCH||
+   x.owner_id!==c.owner_id||x.shift_id!==c.shift_id||x.original_work_id!==c.obligation_id||
+   x.source_ref!==c.source_ref||x.frozen_source_head_sha!==c.source_revision||
+   x.continuity_root_id!==c.continuity_root_id||x.qualifier_receipt_sha256!==c.qualifier_receipt_sha256||
+   !HASH.test(x.continuity_head_sha256||'')||!Number.isSafeInteger(x.continuity_revision)||
+   !HASH.test(x.review_receipt_sha256||'')||!HASH.test(x.investigation_receipt_sha256||'')||
+   x.read_only!==true||x.replay_authorized!==false||x.execution_authorized!==false||
+   x.previous_attempt_budget_preserved!==true||x.new_attempt_authorized!==false||
+   x.installation_authorized!==false||x.original_job_completed!==false||x.production_changed!==false||
+   t?.remaining_attempts!==0||t.replay_permitted!==false||t.new_attempt_authorized!==false||
+   t.maintenance_id!==route.maintenance_id||t.independent_diagnostic_receipt_sha256!==route.existing_diagnostic_receipt_sha256)
+   return result('RECOVERY_TECHNICAL_CI_GOVERNED_BROKER_CONTEXT_REQUIRED',base);
+  const request={mode:'terminal_ci',shift_id:c.shift_id,event_id:x.event_id,worker_run_id:workerRunId,release_sha:deployed};
+  const expected={owner_id:c.owner_id,shift_id:c.shift_id,event_id:x.event_id,worker_run_id:workerRunId,
+   release_claim_id:x.release_claim_id,release_sha:deployed,release_ref:BRANCH,original_work_id:c.obligation_id,
+   source_ref:c.source_ref,source_revision:c.source_revision,continuity_root_id:c.continuity_root_id,
+   continuity_revision:x.continuity_revision,continuity_head_sha256:x.continuity_head_sha256,
+   qualifier_receipt_sha256:c.qualifier_receipt_sha256,review_receipt_sha256:x.review_receipt_sha256,
+   investigation_receipt_sha256:x.investigation_receipt_sha256,maintenance_id:route.maintenance_id,
+   diagnostic_receipt_sha256:route.existing_diagnostic_receipt_sha256};
+  let b;
+  try{
+   const r=await fetchImpl(db.url+'/functions/v1/reality-signed-maintenance-repair-source-broker-v1',{
+    method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(60000),
+    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,'content-type':'application/json'},
+    body:JSON.stringify(request)});
+   b=await r.json();
+   if(!r.ok)return result('RECOVERY_TECHNICAL_CI_GOVERNED_BROKER_READBACK_BLOCKED',{...base,
+    broker_http_status:r.status,
+    broker_status:/^TERMINAL_CI_BROKER_[A-Z_]+$/.test(b?.status||'')?b.status:'UNVERIFIED',
+    broker_failed_operation:['EXACT_WORKFLOW_RUN','EXACT_CASE_DIRECTORY','EXACT_CASE_BLOB','EXACT_WORKFLOW_JOB','EXACT_WORKFLOW_ARTIFACT','RECHECK_CURRENT_AUTHORITY'].includes(b?.failed_operation)?b.failed_operation:null,
+    provider_http_status:Number.isInteger(b?.provider_http_status)?b.provider_http_status:null});
+  }catch{return result('RECOVERY_TECHNICAL_CI_GOVERNED_BROKER_READBACK_UNAVAILABLE',base);}
+  if(b?.status!=='TERMINAL_CI_BROKER_EXACT_READBACK'||b.provider_read_observed!==true||
+   b.credential_values_exposed!==false||b.source_read_only!==true||b.installation_authorized!==false||
+   b.original_job_completed!==false||b.production_changed!==false||
+   !b.scope||Object.keys(expected).length!==Object.keys(b.scope).length||
+   Object.keys(expected).some(k=>b.scope[k]!==expected[k])||!b.run||!b.entry||!b.blob||!b.jobs||!b.artifacts)
+   return result('RECOVERY_TECHNICAL_CI_GOVERNED_BROKER_SCOPE_UNVERIFIED',base);
+  // Feed the original verifier exactly the bounded observations returned by
+  // the existing broker. No fallback to direct GitHub, even on denial.
+  get=async path=>{
+   if(path==='/actions/workflows/reality-shared-continuity-verifier-handoff-v1.yml/runs?branch='+encodeURIComponent(BRANCH)+'&per_page=15')
+    return {workflow_runs:[b.run]};
+   if(path==='/contents/'+SPEC_DIR+'?ref='+deployed)return [b.entry];
+   if(path==='/contents/'+b.entry.path+'?ref='+deployed)return b.blob;
+   if(path==='/actions/runs/'+b.run.id+'/jobs?per_page=100')return b.jobs;
+   if(path==='/actions/runs/'+b.run.id+'/artifacts?per_page=100')return b.artifacts;
+   throw Error('TERMINAL_BROKER_UNREGISTERED_OBSERVATION');
+  };
+ }
  try{
   // Bind to exactly the SHA deployed by this signed preview. Do not accept
   // an older successful CI run from another release or another PR.

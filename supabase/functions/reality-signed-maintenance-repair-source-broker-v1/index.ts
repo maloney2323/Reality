@@ -34,6 +34,7 @@ function config(){
 async function rpc(c:{url:string,key:string},name:string,args:Record<string,unknown>){
  if(![
   'reality_read_current_final_loop_proof_envelope_v1',
+  'reality_read_final_loop_terminal_technical_context_v1',
   'reality_read_final_loop_shared_continuity_guard_v1',
   'reality_read_signed_maintenance_repair_source_scope_v1',
   'reality_read_signed_maintenance_frozen_test_draft_scope_v1',
@@ -592,6 +593,122 @@ async function verifiedReleaseCi(c:{url:string,key:string,github:string},b:any){
  return response(200,'RELEASE_CI_BROKER_EXACT_READBACK',{scope:b,lifecycle:runs[0],gateway:runs[1],
   provider_read_observed:true,credential_values_exposed:false});
 }
+// Exact signed terminal evidence transport. The existing verifier, not this
+// broker, evaluates the technical result. No dispatch, mutation or new warrant.
+async function terminalTechnicalCi(c:{url:string,key:string,github:string},b:any){
+ if(!b||Array.isArray(b)||Object.keys(b).sort().join(',')!==
+  'event_id,mode,release_sha,shift_id,worker_run_id'||
+  !UUID.test(b.shift_id||'')||!UUID.test(b.event_id||'')||
+  !UUID.test(b.worker_run_id||'')||!SHA.test(b.release_sha||''))
+  return response(400,'TERMINAL_CI_BROKER_EXACT_SCOPE_REQUIRED');
+ const branch='feature/final-loop-governed-qualification-handoff-20261123';
+ const dirPath='reality-final-loop-recovery-case-specs';
+ const workflow='.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml';
+ const workflowName='Reality shared Continuity and independent verifier handoff acceptance';
+ async function scope(){
+  const x=await rpc(c,'reality_read_final_loop_terminal_technical_context_v1',{
+   p_shift_id:b.shift_id,p_event_id:b.event_id,p_worker_run_id:b.worker_run_id});
+  const t=x.terminal_history;
+  if(x.status!=='TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY'||
+   x.shift_id!==b.shift_id||x.event_id!==b.event_id||x.worker_run_id!==b.worker_run_id||
+   x.running_release_sha!==b.release_sha||x.running_release_ref!==branch||
+   !UUID.test(x.release_claim_id||'')||!UUID.test(x.owner_id||'')||
+   !UUID.test(x.continuity_root_id||'')||!/^work:[a-f0-9]{32}$/.test(x.original_work_id||'')||
+   !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(x.source_ref||'')||
+   !SHA.test(x.frozen_source_head_sha||'')||!HASH.test(x.continuity_head_sha256||'')||
+   !Number.isSafeInteger(x.continuity_revision)||x.continuity_revision<1||
+   !HASH.test(x.qualifier_receipt_sha256||'')||!HASH.test(x.review_receipt_sha256||'')||
+   !HASH.test(x.investigation_receipt_sha256||'')||x.read_only!==true||
+   x.execution_authorized!==false||x.replay_authorized!==false||
+   x.installation_authorized!==false||x.original_job_completed!==false||x.production_changed!==false||
+   x.new_attempt_authorized!==false||x.previous_attempt_budget_preserved!==true||
+   t?.remaining_attempts!==0||t.replay_permitted!==false||t.new_attempt_authorized!==false||
+   !UUID.test(t.maintenance_id||'')||!HASH.test(t.independent_diagnostic_receipt_sha256||''))
+    return null;
+  return {owner_id:x.owner_id,shift_id:x.shift_id,event_id:x.event_id,worker_run_id:x.worker_run_id,
+   release_claim_id:x.release_claim_id,release_sha:x.running_release_sha,release_ref:x.running_release_ref,
+   original_work_id:x.original_work_id,source_ref:x.source_ref,source_revision:x.frozen_source_head_sha,
+   continuity_root_id:x.continuity_root_id,continuity_revision:x.continuity_revision,
+   continuity_head_sha256:x.continuity_head_sha256,qualifier_receipt_sha256:x.qualifier_receipt_sha256,
+   review_receipt_sha256:x.review_receipt_sha256,investigation_receipt_sha256:x.investigation_receipt_sha256,
+   maintenance_id:t.maintenance_id,diagnostic_receipt_sha256:t.independent_diagnostic_receipt_sha256};
+ }
+ const before=await scope();
+ if(!before)return response(409,'TERMINAL_CI_BROKER_CURRENT_AUTHORITY_UNVERIFIED');
+ let operation='EXACT_WORKFLOW_RUN',httpStatus:number|null=null;
+ async function read(path:string){
+  const r=await fetch(REPO+path,{method:'GET',redirect:'error',cache:'no-store',
+   signal:AbortSignal.timeout(10000),headers:{authorization:'Bearer '+c.github,
+    accept:'application/vnd.github+json','x-github-api-version':'2022-11-28',
+    'user-agent':'Reality-terminal-technical-evidence-readonly-v1'}});
+  if(!r.ok){httpStatus=r.status;throw Error('TERMINAL_CI_PROVIDER_READ_FAILED');}
+  return r.json();
+ }
+ try{
+  const runs=await read('/actions/workflows/reality-shared-continuity-verifier-handoff-v1.yml/runs?branch='+
+   encodeURIComponent(branch)+'&head_sha='+b.release_sha+'&per_page=15');
+  const matched=(Array.isArray(runs?.workflow_runs)?runs.workflow_runs:[]).filter((r:any)=>
+   r.name===workflowName&&r.path===workflow&&r.head_branch===branch&&r.head_sha===b.release_sha&&
+   r.repository?.full_name==='maloney2323/Reality'&&['push','pull_request'].includes(r.event)&&
+   r.status==='completed'&&r.conclusion==='success'&&Number.isSafeInteger(r.id)&&r.id>0);
+  if(!matched.length)return response(409,'TERMINAL_CI_BROKER_EXACT_RUN_PENDING');
+  const r=matched.sort((a:any,z:any)=>z.id-a.id)[0];
+  const run={id:r.id,name:r.name,path:r.path,head_branch:r.head_branch,head_sha:r.head_sha,
+   repository:{full_name:r.repository.full_name},event:r.event,status:r.status,conclusion:r.conclusion};
+  operation='EXACT_CASE_DIRECTORY';
+  const dir=await read('/contents/'+dirPath+'?ref='+b.release_sha);
+  if(!Array.isArray(dir)||dir.length<1||dir.length>8||dir.some((f:any)=>
+   f.type!=='file'||!/^[-a-z0-9]+\.json$/.test(f.name||'')||f.path!==dirPath+'/'+f.name||!SHA.test(f.sha||'')))
+   return response(409,'TERMINAL_CI_BROKER_CASE_DIRECTORY_UNVERIFIED');
+  let selected:any=null,entry:any=null;
+  for(const f of dir){
+   operation='EXACT_CASE_BLOB';
+   const v=await read('/contents/'+f.path+'?ref='+b.release_sha);
+   if(v?.path!==f.path||v.sha!==f.sha||v.encoding!=='base64'||!Number.isSafeInteger(v.size)||
+    v.size<500||v.size>12000||typeof v.content!=='string'||v.content.length>20000)
+    return response(409,'TERMINAL_CI_BROKER_CASE_BLOB_UNVERIFIED');
+   const bytes=Uint8Array.from(atob(v.content.replace(/\s/g,'')),k=>k.charCodeAt(0));
+   if(bytes.length!==v.size||await gitBlobSha(bytes)!==v.sha)
+    return response(409,'TERMINAL_CI_BROKER_CASE_BLOB_HASH_MISMATCH');
+   const spec=JSON.parse(new TextDecoder().decode(bytes));
+   if(spec.original_work_id!==before.original_work_id||spec.source_ref!==before.source_ref||
+    spec.maintenance_id!==before.maintenance_id)continue;
+   if(selected||spec.owner_id!==before.owner_id||spec.shift_id!==before.shift_id||
+    spec.continuity_root_id!==before.continuity_root_id||spec.source_head_sha!==before.source_revision||
+    spec.independent_prior_ci_diagnostic_receipt_sha256!==before.diagnostic_receipt_sha256)
+    return response(409,'TERMINAL_CI_BROKER_CASE_SCOPE_UNVERIFIED');
+   selected={path:v.path,sha:v.sha,size:v.size,encoding:v.encoding,content:v.content};
+   entry={type:f.type,name:f.name,path:f.path,sha:f.sha};
+  }
+  if(!selected)return response(409,'TERMINAL_CI_BROKER_EXACT_CASE_MISSING');
+  operation='EXACT_WORKFLOW_JOB';
+  const jobs=await read('/actions/runs/'+run.id+'/jobs?per_page=100');
+  operation='EXACT_WORKFLOW_ARTIFACT';
+  const arts=await read('/actions/runs/'+run.id+'/artifacts?per_page=100');
+  const js=(Array.isArray(jobs?.jobs)?jobs.jobs:[]).filter((j:any)=>j.name==='prove-cross-layer-continuity'&&
+   j.run_id===run.id&&j.head_sha===b.release_sha&&j.status==='completed'&&j.conclusion==='success'&&
+   Number.isSafeInteger(j.id)&&j.id>0&&Array.isArray(j.steps)&&
+   ['Execute genuine historical RED and corrected GREEN for source-bound technical blocker',
+    'Preserve case-specific RED and GREEN proof as CI artifact only'].every(n=>j.steps.some((s:any)=>s.name===n&&s.conclusion==='success')));
+  const ar=(Array.isArray(arts?.artifacts)?arts.artifacts:[]).filter((a:any)=>
+   a.name==='reality-final-loop-technical-recovery-frozen-red-green'&&a.expired===false&&
+   a.workflow_run?.id===run.id&&a.workflow_run?.head_sha===b.release_sha&&HASH.test(a.digest||'')&&
+   Number.isSafeInteger(a.id)&&a.id>0&&Number.isSafeInteger(a.size_in_bytes)&&a.size_in_bytes>500&&a.size_in_bytes<20000);
+  if(js.length!==1||ar.length!==1)return response(409,'TERMINAL_CI_BROKER_JOB_OR_ARTIFACT_UNVERIFIED');
+  const j=js[0],a=ar[0];
+  operation='RECHECK_CURRENT_AUTHORITY';
+  if(JSON.stringify(await scope())!==JSON.stringify(before))
+   return response(409,'TERMINAL_CI_BROKER_CONTINUITY_CHANGED');
+  return response(200,'TERMINAL_CI_BROKER_EXACT_READBACK',{scope:before,provider_read_observed:true,
+   credential_values_exposed:false,run,entry,blob:selected,
+   jobs:{jobs:[{id:j.id,name:j.name,run_id:j.run_id,head_sha:j.head_sha,status:j.status,conclusion:j.conclusion,
+    steps:j.steps.filter((s:any)=>['Execute genuine historical RED and corrected GREEN for source-bound technical blocker',
+     'Preserve case-specific RED and GREEN proof as CI artifact only'].includes(s.name)).map((s:any)=>({name:s.name,conclusion:s.conclusion}))}]},
+   artifacts:{artifacts:[{id:a.id,name:a.name,digest:a.digest,expired:a.expired,size_in_bytes:a.size_in_bytes,
+    workflow_run:{id:a.workflow_run.id,head_sha:a.workflow_run.head_sha}}]}});
+ }catch{return response(503,'TERMINAL_CI_BROKER_PROVIDER_READ_UNAVAILABLE',{failed_operation:operation,provider_http_status:httpStatus});}
+}
+
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return response(405,'SIGNED_SOURCE_BROKER_POST_ONLY');
@@ -606,6 +723,7 @@ Deno.serve(async req=>{
    return response(400,'SIGNED_SOURCE_BROKER_EXACT_BODY_REQUIRED');
   const b=JSON.parse(raw);
   if(b?.mode==='release_ci')return await verifiedReleaseCi(c,b);
+  if(b?.mode==='terminal_ci')return await terminalTechnicalCi(c,b);
   if(raw.length>620)return response(400,'SIGNED_SOURCE_BROKER_EXACT_BODY_REQUIRED');
   if(b?.mode==='case_ci'){
    return await verifiedCaseCi(c,b);

@@ -459,8 +459,66 @@ BEGIN
  PERFORM reality_internal.notify_final_loop_governed_trigger_v1(e.shift_id);
  IF (SELECT count(*) FROM net.fake_requests)<>4 THEN RAISE EXCEPTION 'CORRECTED_RELEASE_DUPLICATE_DELIVERED';END IF;
 END $$;
+-- Baseline/candidate comparison using the same live-shaped fixture with
+-- stale and pending events sharing their exact evidence identity.
+-- The sequence counts only fixture guard calls; production readers remain read-only.
+CREATE TEMP SEQUENCE fixture_readback_guard_calls;
+GRANT USAGE,SELECT ON SEQUENCE pg_temp.fixture_readback_guard_calls TO service_role;
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid)
+RETURNS jsonb LANGUAGE plpgsql AS $count$
+BEGIN
+ PERFORM pg_catalog.nextval('pg_temp.fixture_readback_guard_calls'::regclass);
+ RETURN (SELECT guard FROM public.suspension_fixture_proof WHERE shift_id=$1);
+END $count$;
 SET ROLE service_role;
-DO $$
+CREATE TEMP TABLE fixture_readback_before AS
+ SELECT public.reality_read_final_loop_event_resume_shadow_v1(shift_id) AS shadow
+ FROM reality_internal.governed_employee_shifts_v1;
+CREATE TEMP TABLE fixture_readback_count_before AS
+ SELECT last_value AS calls FROM pg_temp.fixture_readback_guard_calls;
+CREATE TEMP TABLE fixture_readback_exact_before AS
+ SELECT reality_internal.read_final_loop_verified_terminal_review_v1(owner_id,shift_id,original_work_id,source_ref,continuity_head_sha256,continuity_revision) AS terminal,
+ reality_internal.read_final_loop_verified_investigation_v1(owner_id,shift_id,original_work_id,source_ref,continuity_head_sha256,continuity_revision) AS investigation
+ FROM reality_internal.final_loop_resume_events_v1
+ WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING';
+RESET ROLE;
+\ir ../sql/reality-continuity-request-local-readback-v1.sql
+SET ROLE service_role;
+SELECT pg_catalog.setval('pg_temp.fixture_readback_guard_calls'::regclass,1,false);
+DO $
+DECLARE e record; after_shadow jsonb; saved_guard jsonb; before_calls bigint; after_calls bigint; proof jsonb;
+BEGIN
+ SELECT * INTO STRICT e FROM reality_internal.final_loop_resume_events_v1
+ WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING';
+ after_shadow:=public.reality_read_final_loop_event_resume_shadow_v1(e.shift_id);
+ SELECT calls INTO STRICT before_calls FROM fixture_readback_count_before;
+ SELECT last_value INTO STRICT after_calls FROM pg_temp.fixture_readback_guard_calls;
+ IF after_shadow IS DISTINCT FROM (SELECT shadow FROM fixture_readback_before) THEN
+  RAISE EXCEPTION 'REQUEST_LOCAL_SHADOW_CHANGED_OUTPUT';END IF;
+ IF before_calls<=after_calls OR after_calls<>1 THEN
+  RAISE EXCEPTION 'REQUEST_LOCAL_GUARD_WORK_NOT_REDUCED before=% after=%',before_calls,after_calls;END IF;
+ RAISE NOTICE 'REQUEST_LOCAL_GUARD_CALLS before=% after=%',before_calls,after_calls;
+ IF (SELECT terminal FROM fixture_readback_exact_before) IS NULL
+ OR (SELECT investigation FROM fixture_readback_exact_before) IS NULL
+ OR reality_internal.read_final_loop_verified_terminal_review_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)
+ IS DISTINCT FROM (SELECT terminal FROM fixture_readback_exact_before)
+ OR reality_internal.read_final_loop_verified_investigation_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)
+ IS DISTINCT FROM (SELECT investigation FROM fixture_readback_exact_before)
+ THEN RAISE EXCEPTION 'REQUEST_LOCAL_EXACT_PROOF_CHANGED';END IF;
+ IF reality_internal.read_final_loop_verified_terminal_review_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,'sha256:'||repeat('f',64),e.continuity_revision) IS NOT NULL
+ THEN RAISE EXCEPTION 'REQUEST_LOCAL_WRONG_HEAD_ACCEPTED';END IF;
+ SELECT guard INTO saved_guard FROM public.suspension_fixture_proof WHERE shift_id=e.shift_id;
+ UPDATE public.suspension_fixture_proof SET guard=jsonb_set(guard,'{revision}',to_jsonb(e.continuity_revision+1)) WHERE shift_id=e.shift_id;
+ proof:=public.reality_read_final_loop_event_resume_shadow_v1(e.shift_id);
+ IF reality_internal.read_final_loop_verified_terminal_review_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision) IS NOT NULL
+ OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(proof->'events') x WHERE x->>'event_id'=e.event_id::text AND x->>'source_current'='false' AND x->>'would_resume_suspended_obligation'='false')
+ THEN RAISE EXCEPTION 'REQUEST_LOCAL_STALE_GUARD_ACCEPTED';END IF;
+ UPDATE public.suspension_fixture_proof SET guard=saved_guard WHERE shift_id=e.shift_id;
+END $;
+RESET ROLE;
+
+SET ROLE service_role;
+DO $
 DECLARE e record; run uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid(); plan text; ctx jsonb; r jsonb; proof jsonb;
 BEGIN
  SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING';
@@ -477,6 +535,8 @@ BEGIN
  THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_CLAIM_UNVERIFIED %',r;END IF;
  ctx:=public.reality_read_final_loop_terminal_technical_context_v1(e.shift_id,e.event_id,run);
  IF ctx->>'status'<>'TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY' OR ctx->>'original_work_id'<>e.original_work_id
+ OR ctx->>'worker_run_id' IS DISTINCT FROM run::text OR ctx->>'running_release_sha' IS DISTINCT FROM repeat('3',40)
+ OR ctx->>'running_release_ref' IS DISTINCT FROM 'fixture-provider-read' OR ctx->>'release_claim_id' IS DISTINCT FROM e.release_continuation_claim_id::text
  THEN RAISE EXCEPTION 'TERMINAL_CONTEXT_UNVERIFIED %',ctx;END IF;
  proof:=jsonb_build_object('status','RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED','contract_id',NULL,
  'owner_id',e.owner_id,'shift_id',e.shift_id,'obligation_id',e.original_work_id,'source_ref',e.source_ref,

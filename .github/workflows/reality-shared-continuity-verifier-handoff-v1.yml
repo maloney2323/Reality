@@ -6,9 +6,6 @@ on:
     paths:
       - 'src/reality-final-loop-*.js'
       - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
-      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
-      - 'sql/reality-continuity-worker-history-readback-query-v1.sql'
-      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql'
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
@@ -44,6 +41,10 @@ on:
       - 'test/reality-chat-self-visibility-v1.test.js'
       - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-continuity-request-local-readback-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-query-v1.sql'
+      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -51,9 +52,6 @@ on:
     paths:
       - 'src/reality-final-loop-*.js'
       - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
-      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
-      - 'sql/reality-continuity-worker-history-readback-query-v1.sql'
-      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql'
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
@@ -89,6 +87,10 @@ on:
       - 'test/reality-chat-self-visibility-v1.test.js'
       - 'test/reality-chat-optional-evidence-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-continuity-request-local-readback-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-index-v1.sql'
+      - 'sql/reality-continuity-worker-history-readback-query-v1.sql'
+      - 'test/reality-continuity-worker-history-readback-index-smoke-v1.sql'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
@@ -135,7 +137,8 @@ jobs:
           node --test test/reality-signed-maintenance-repair-model-candidate-v1.test.js
           node --test test/reality-final-loop-blocker-liveness-v1.test.js
           node --test test/reality-signed-original-lineage-packet-v1.test.js
-          node --test test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js
+          node --experimental-strip-types --test test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js
+          node --experimental-strip-types --test test/reality-existing-broker-release-ci-v1.test.js
           node --test test/reality-final-loop-technical-ci-continuity-writer-v1.test.js
           node --test test/reality-final-loop-staged-plan-action-router-v1.test.js
           node --test test/reality-final-loop-universe-feedback-v1.test.js

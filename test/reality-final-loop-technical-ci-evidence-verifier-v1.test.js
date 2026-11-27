@@ -227,3 +227,91 @@ test('configured read credential is preferred and rejection does not fall back t
  assert.deepEqual(seen,['Bearer test-github-release-read-only-token']);
  assert.equal(result.independent_technical_ci_verified,false);
 });
+
+
+// Actual existing Deno handler + original verifier, with synthetic provider
+// responses only. No network, real credentials, ledger writes or dispatch.
+test('terminal verifier uses actual governed broker, checks fresh exact scope and never falls back',async()=>{
+ const project='hvkfreoagbrphwghjajw',url='https://'+project+'.supabase.co';
+ const service='fixture-service-key-not-a-secret',github='test-github-broker-token-not-a-secret';
+ const event='11111111-1111-4111-8111-111111111111',worker='22222222-2222-4222-8222-222222222222';
+ const claim='33333333-3333-4333-8333-333333333333';
+ const terminalProposal={status:'RECOVERY_EXISTING_TERMINAL_BUILDER_REQUALIFICATION_REQUIRED',read_only:true,
+  contract_candidate:null,previous_attempt_budget_preserved:true,repeat_prior_ci_dispatch_permitted:false,
+  terminal_requalification:{...contractProposal.contract_candidate,qualifier_receipt_sha256:sha('8'),
+   next_qualified_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'}};
+ const route={...existingCiRoute,status:'RECOVERY_TERMINAL_EXISTING_CI_DIAGNOSTIC_READBACK_READY',read_only:true,
+  contract_id:null,qualifier_receipt_sha256:sha('8'),previous_attempt_budget_preserved:true,new_attempt_authorized:false};
+ const ctx={status:'TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY',owner_id:owner,shift_id:shift,event_id:event,
+  worker_run_id:worker,release_claim_id:claim,running_release_sha:commit,running_release_ref:env.VERCEL_GIT_COMMIT_REF,
+  original_work_id:obligation,source_ref:source,frozen_source_head_sha:head,continuity_root_id:root,
+  continuity_revision:3,continuity_head_sha256:sha('2'),qualifier_receipt_sha256:sha('8'),
+  review_receipt_sha256:sha('3'),investigation_receipt_sha256:sha('4'),read_only:true,
+  previous_attempt_budget_preserved:true,new_attempt_authorized:false,replay_authorized:false,
+  original_job_completed:false,installation_authorized:false,production_changed:false,execution_authorized:false,
+  terminal_history:{remaining_attempts:0,replay_permitted:false,new_attempt_authorized:false,
+   maintenance_id:incident,independent_diagnostic_receipt_sha256:diag}};
+ let handler;const oldDeno=globalThis.Deno,oldFetch=globalThis.fetch;
+ globalThis.Deno={env:{get:k=>({SUPABASE_URL:url,SUPABASE_SERVICE_ROLE_KEY:service,REALITY_GITHUB_BROKER_TOKEN:github})[k]},
+  serve:fn=>{handler=fn}};
+ try{
+  await import('../supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts');
+  assert.equal(typeof handler,'function');
+  const brokerEnv={...env,REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:project,
+   REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:project,REALITY_RELEASE_GITHUB_CI_READ_MODE:'EXISTING_GOVERNED_BROKER',
+   REALITY_BUILDER_DISPATCH_GITHUB_TOKEN:'test-github-must-not-be-used'};
+  const reply=(status,value)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
+  async function exercise({initial=ctx,after=ctx,fixture={},alterResponse=null,deny=false,requestBody=null,auth=true}={}){
+   const r=runtime(fixture);let checks=0,brokerCalls=0;
+   globalThis.fetch=async(target,opts)=>{
+    if(String(target).startsWith(url+'/rest/v1/rpc/')){
+     assert.ok(String(target).endsWith('/reality_read_final_loop_terminal_technical_context_v1'));
+     assert.deepEqual(JSON.parse(opts.body),{p_shift_id:shift,p_event_id:event,p_worker_run_id:worker});
+     assert.equal(opts.headers.authorization,'Bearer '+service);
+     return reply(200,++checks===1?initial:after);
+    }
+    assert.equal(opts.method,'GET');assert.equal(opts.headers.authorization,'Bearer '+github);
+    if(deny)return reply(403,{message:'fixture provider denial'});
+    return r.fetchImpl(target,opts);
+   };
+   const result=await verify({db:{project,strictSecrets:true,url,secretKey:service},env:brokerEnv,
+    contractProposal:terminalProposal,existingCiRoute:route,terminalContext:ctx,workerRunId:worker,
+    fetchImpl:async(target,opts)=>{
+     brokerCalls++;assert.equal(target,url+'/functions/v1/reality-signed-maintenance-repair-source-broker-v1');
+     assert.equal(opts.method,'POST');
+     const request=new Request(target,{...opts,headers:{...opts.headers,apikey:auth?service:'wrong'},body:requestBody?JSON.stringify(requestBody):opts.body});
+     const response=await handler(request),value=await response.json();
+     assert.ok(!JSON.stringify(value).includes(service));assert.ok(!JSON.stringify(value).includes(github));
+     assert.equal(value.original_job_completed,false);assert.equal(value.installation_authorized,false);
+     return reply(response.status,alterResponse?alterResponse(value):value);
+    }});
+   return {result,checks,brokerCalls,paths:r.paths};
+  }
+  const good=await exercise();
+  assert.equal(good.result.status,'RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED');
+  assert.equal(good.result.independent_technical_ci_verified,true);assert.equal(good.result.new_attempt_authorized,false);
+  assert.equal(good.result.original_job_completed,false);assert.equal(good.result.execution_authorized,false);
+  assert.equal(good.checks,2);assert.equal(good.brokerCalls,1);assert.equal(good.paths.length,5);
+  for(const bad of [
+   {initial:{...ctx,running_release_sha:'a'.repeat(40)}},
+   {initial:{...ctx,status:'TERMINAL_TECHNICAL_CONTEXT_UNVERIFIED'}},
+   {initial:{...ctx,terminal_history:{...ctx.terminal_history,remaining_attempts:1}}},
+   {after:{...ctx,continuity_revision:4}},
+   {fixture:{run:{head_sha:'b'.repeat(40)}}},
+   {fixture:{sourceBlob:'f'.repeat(40)}},
+   {fixture:{artifact:{expired:true}}},
+   {fixture:{caseSpec:{...spec,continuity_root_id:'11111111-1111-4111-8111-111111111111'}}},
+   {alterResponse:b=>({...b,scope:{...b.scope,owner_id:'11111111-1111-4111-8111-111111111111'}})},
+   {deny:true},{auth:false},
+   {requestBody:{mode:'terminal_ci',shift_id:shift,event_id:event,worker_run_id:worker,release_sha:commit,target_url:'https://example.invalid'}}
+  ]){
+   const v=await exercise(bad);
+   assert.equal(v.result.independent_technical_ci_verified,false);
+   assert.equal(v.result.original_job_completed,false);assert.equal(v.result.execution_authorized,false);
+   assert.equal(v.brokerCalls,1);
+  }
+  const denied=await exercise({deny:true});
+  assert.equal(denied.result.broker_failed_operation,'EXACT_WORKFLOW_RUN');
+  assert.equal(denied.result.provider_http_status,403);
+ }finally{globalThis.fetch=oldFetch;globalThis.Deno=oldDeno;}
+});
