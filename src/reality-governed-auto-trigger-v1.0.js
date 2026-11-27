@@ -352,6 +352,8 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claime
   continuity_head_sha256:g.continuity_head_sha256,event_id:r.event_id};
  // A suspension receipt is routed only through the signed claim's exact
  // investigation-only branch. Never reinterpret it as a review/CI event.
+ if(r.event_kind==='VERIFIED_REVIEW_TECHNICAL_EVIDENCE')
+  return reject('VERIFIED_REVIEW_REQUIRES_EXACT_TERMINAL_TECHNICAL_LANE');
  if(r.event_kind==='VERIFIED_INVESTIGATION_REVIEW')
   return reject('VERIFIED_INVESTIGATION_REQUIRES_EXACT_INDEPENDENT_REVIEW_LANE');
  if(r.event_kind==='VERIFIED_SUSPENSION_INVESTIGATION')
