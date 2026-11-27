@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deriveOriginalResumeContract} from '../src/reality-genuine-original-resume-contract-v1.js';
+import {deriveOriginalResumeContract,decideInstalledSourceReuse} from '../src/reality-genuine-original-resume-contract-v1.js';
 const ready={original_work_id:'work:'+'a'.repeat(32),
  installed_commit_sha:'b'.repeat(40),original_source_sha:'c'.repeat(40),
  artifact_sha256:'d'.repeat(64),frozen_test_sha256:'e'.repeat(64),
@@ -52,4 +52,21 @@ test('general execution receipt resumes only under its pinned frozen suite and n
  assert.throws(()=>deriveOriginalResumeContract({
    ...known,frozen_test_path:ready.frozen_test_path
  }),/SOURCE_SPECIFIC_FROZEN_SUITE_REQUIRED/);
+});
+
+// Reuse is contingent on the exact independently read installed bytes;
+// having the same filename or a passing test does not establish authority.
+test('consolidated source may be reused only if exact approved provider bytes match',()=>{
+ const providerBytes=Buffer.from('exact installed capability bytes\n');
+ assert.equal(decideInstalledSourceReuse({providerBytes,existingBytes:Buffer.from(providerBytes)}),
+  'REUSE_EXACT_PROVIDER_BYTES');
+ assert.equal(decideInstalledSourceReuse({providerBytes}),'STAGE_EXACT_PROVIDER_BYTES');
+ for(const existingBytes of [Buffer.from('different bytes'),Buffer.from(''),providerBytes.toString()]){
+  assert.throws(()=>decideInstalledSourceReuse({providerBytes,existingBytes}),
+   /EXISTING_SOURCE_DIFFERS_FROM_APPROVED_INSTALL/);
+ }
+ for(const providerBytes of [undefined,Buffer.alloc(0),'untrusted text']){
+  assert.throws(()=>decideInstalledSourceReuse({providerBytes}),
+   /INSTALLED_PROVIDER_BYTES_REQUIRED/);
+ }
 });

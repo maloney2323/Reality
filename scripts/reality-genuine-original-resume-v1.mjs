@@ -2,11 +2,11 @@ import {isSignedRealityCapabilityPreviewRef}
  from '../src/reality-genuine-capability-signed-preview-ref-v1.js';
 // Resume the SAME owner-approved customer job in offline isolated execution.
 // GitHub OIDC authorizes broker readback and one-time original-work claim.
-import {readFileSync,writeFileSync,mkdirSync,existsSync,appendFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,lstatSync,appendFileSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {deriveOriginalResumeContract} from '../src/reality-genuine-original-resume-contract-v1.js';
+import {deriveOriginalResumeContract,decideInstalledSourceReuse} from '../src/reality-genuine-original-resume-contract-v1.js';
 import {verifyReconciliationProviderEvidence} from '../src/reality-original-provider-relationship-v1.js';
 const env=process.env, repo='maloney2323/Reality';
 const fail=x=>{throw Error('REALITY_ORIGINAL_RESUME_'+x)};
@@ -95,10 +95,30 @@ if(sha(originalTest)!==ready.frozen_test_sha256)
  fail('IMMUTABLE_ORIGINAL_FROZEN_TEST_CHANGED');
 async function installedFile(path){
  if(!/^(?:src\/reality-extensions\/[A-Za-z0-9._/-]+\.mjs|test\/reality-extensions\/[A-Za-z0-9._/-]+\.test\.js)$/.test(path)||
-    path.includes('..')||existsSync(path))fail('INSTALLED_FILE_PATH_UNSAFE');
+    path.includes('..'))fail('INSTALLED_FILE_PATH_UNSAFE');
+ // Always read the exact owner-approved install commit, even for a
+ // consolidated checkout. A local file cannot stand in for provider proof.
  const result=await github('/contents/'+path+'?ref='+ready.installed_commit_sha);
- if(result.path!==path||result.encoding!=='base64')fail('INSTALLED_SOURCE_MISSING');
+ if(result.path!==path||result.encoding!=='base64'||typeof result.content!=='string')
+  fail('INSTALLED_SOURCE_MISSING');
  const contents=Buffer.from(result.content.replace(/\s/g,''),'base64');
+ // Reject symlinks and non-files, including symlinked parent directories.
+ let parent=dirname(path);
+ while(parent!=='.'){
+  try{
+   const st=lstatSync(parent);
+   if(!st.isDirectory()||st.isSymbolicLink())fail('INSTALLED_FILE_PATH_UNSAFE');
+  }catch(e){if(e?.code!=='ENOENT')throw e}
+  parent=dirname(parent);
+ }
+ let existingBytes=null;
+ try{
+  const st=lstatSync(path);
+  if(!st.isFile()||st.isSymbolicLink())fail('INSTALLED_FILE_PATH_UNSAFE');
+  existingBytes=readFileSync(path);
+ }catch(e){if(e?.code!=='ENOENT')throw e}
+ const decision=decideInstalledSourceReuse({providerBytes:contents,existingBytes});
+ if(decision==='REUSE_EXACT_PROVIDER_BYTES')return;
  mkdirSync(dirname(path),{recursive:true});writeFileSync(path,contents,{flag:'wx'});
 }
 await installedFile(ready.source_path);

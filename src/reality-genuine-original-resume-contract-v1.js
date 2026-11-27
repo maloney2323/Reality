@@ -60,3 +60,15 @@ export function deriveOriginalResumeContract(ready){
   production_changed:false,installation_authorized:false,
  });
 }
+
+// A consolidated checkout may already contain an installed extension. Only
+// exact byte equality with the independently read approved install commit
+// permits reuse. This is a readback decision, never an install or a warrant.
+export function decideInstalledSourceReuse({providerBytes,existingBytes=null}={}){
+ if(!Buffer.isBuffer(providerBytes)||providerBytes.length===0)
+  fail('INSTALLED_PROVIDER_BYTES_REQUIRED');
+ if(existingBytes===null)return 'STAGE_EXACT_PROVIDER_BYTES';
+ if(!Buffer.isBuffer(existingBytes)||!existingBytes.equals(providerBytes))
+  fail('EXISTING_SOURCE_DIFFERS_FROM_APPROVED_INSTALL');
+ return 'REUSE_EXACT_PROVIDER_BYTES';
+}
