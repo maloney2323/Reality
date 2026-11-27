@@ -36,12 +36,16 @@ BEGIN
  OR c->>'idempotency_key' IS DISTINCT FROM c->>'input_digest'
  OR coalesce(c->>'source_ref','') !~ '^https://github[.]com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(issues|pull)/[1-9][0-9]*$'
  OR coalesce(c->>'connection_id','') !~ '^GITHUB_RELEASE_CI_READ:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+ OR c->>'connection_id' IS DISTINCT FROM 'GITHUB_RELEASE_CI_READ:'||pg_catalog.split_part(c->>'source_ref','/',4)||'/'||pg_catalog.split_part(c->>'source_ref','/',5)
  OR coalesce(c->>'release_sha','') !~ '^[a-f0-9]{40}$'
  OR coalesce(c->>'release_ref','') !~ '^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$'
  OR coalesce(c->>'paused_step','') NOT IN ('GITHUB_PUBLIC_REPOSITORY_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ')
  OR (c->>'paused_step'='GITHUB_PUBLIC_REPOSITORY_READ' AND c->'run_id' IS DISTINCT FROM 'null'::jsonb)
  OR (c->>'paused_step'<>'GITHUB_PUBLIC_REPOSITORY_READ' AND coalesce(c->>'run_id','') !~ '^[1-9][0-9]{0,15}$')
  OR coalesce(c->>'provider_http_status','') !~ '^[45][0-9]{2}$'
+ OR pg_catalog.jsonb_typeof(c->'provider_http_status') IS DISTINCT FROM 'number'
+ OR pg_catalog.jsonb_typeof(c->'continuity_revision') IS DISTINCT FROM 'number'
+ OR (c->>'paused_step'<>'GITHUB_PUBLIC_REPOSITORY_READ' AND pg_catalog.jsonb_typeof(c->'run_id') IS DISTINCT FROM 'number')
  OR coalesce(c->>'evidence_signal','') NOT IN ('HTTP_STATUS','HTTP_STATUS_AND_SSO_REQUIRED_HEADER','HTTP_STATUS_AND_RATE_LIMIT_REMAINING_ZERO','HTTP_STATUS_AND_RETRY_AFTER_PRESENT')
  OR NOT coalesce((c->>'failure_class',c->>'route',c->>'renewal_eligibility') IN (
  ('BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED','VERIFY_ISSUER_SCOPE_AND_RENEWAL_AUTHORITY','REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY'),
@@ -95,6 +99,7 @@ BEGIN
  OR handoff->>'qualifier_digest_verified' IS DISTINCT FROM 'true'
  OR handoff->>'continuity_identity_verified' IS DISTINCT FROM 'true'
  OR handoff->>'qualifier_receipt_sha256' IS DISTINCT FROM c->>'qualifier_receipt_sha256'
+ OR handoff->>'independent_original_outcome_verified' IS DISTINCT FROM 'false'
  THEN RETURN pg_catalog.jsonb_build_object('status','PROVIDER_CHECKPOINT_CONTINUITY_STALE','resume_permitted',false); END IF;
  -- Store only the allowlisted fields, never headers, payloads or credentials.
  e:=pg_catalog.jsonb_build_object('schema','reality-governed-provider-checkpoint-v1','identity',identity_fields,

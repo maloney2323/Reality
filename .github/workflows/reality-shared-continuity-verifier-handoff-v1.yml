@@ -5,6 +5,8 @@ on:
       - feature/final-loop-governed-qualification-handoff-20261123
     paths:
       - 'src/reality-final-loop-*.js'
+      - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql'
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
       - 'sql/reality-signed-maintenance-frozen-test-build-v1.sql'
@@ -45,6 +47,8 @@ on:
   pull_request:
     paths:
       - 'src/reality-final-loop-*.js'
+      - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql'
       - 'src/reality-governed-auto-trigger-v1.0.js'
       - 'sql/reality-final-loop-governed-auto-trigger-transport-v1.sql'
       - 'sql/reality-signed-maintenance-frozen-test-build-v1.sql'
@@ -190,3 +194,5 @@ jobs:
           grep -q 'ERROR:  TERMINAL_EVIDENCE_EVENT_NOT_STAGED_OR_LEASE_BYPASSED' /tmp/reality-identity-red.log
           createdb reality_suspension_smoke
           PGDATABASE=reality_suspension_smoke psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-suspension-investigation-smoke-v1.sql
+          createdb reality_provider_checkpoint_smoke
+          PGDATABASE=reality_provider_checkpoint_smoke psql -v ON_ERROR_STOP=1 -f test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql

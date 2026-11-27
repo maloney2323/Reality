@@ -359,7 +359,9 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    observed.original_work_id!==checkpoint.original_work_id||
    observed.continuity_revision!==checkpoint.continuity_revision||
    observed.continuity_head_sha256!==checkpoint.continuity_head_sha256||
-   observed.resume_permitted!==false||observed.renewal_authority_verified!==false)
+   observed.resume_permitted!==false||observed.renewal_authority_verified!==false||
+   observed.execution_freeze_verified!==false||observed.recovery_budget_changed!==false||
+   observed.current_revision_matches!==true)
    return Object.freeze({status:'PROVIDER_CHECKPOINT_READBACK_UNVERIFIED',resume_permitted:false});
   return Object.freeze({...observed,lease_created:false,credential_changed:false});
  }
