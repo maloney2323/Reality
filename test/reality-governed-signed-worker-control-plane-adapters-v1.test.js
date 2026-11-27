@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTrustedSignedWorkerReleaseControlPlaneAdapters as create,releaseFailureReceipt,requestReleaseProviderJson,verifiedVercelDeploymentReadiness}
+import {createTrustedSignedWorkerReleaseControlPlaneAdapters as create,releaseFailureReceipt,requestReleaseProviderJson,verifiedVercelDeploymentReadiness,decideProviderRecoveryContinuation}
  from '../src/reality-governed-signed-worker-control-plane-adapters-v1.js';
 const sha='a'.repeat(40),oldSha='b'.repeat(40);
 const project='abcdefghijklmnopqrst';
@@ -376,5 +376,64 @@ test('GitHub provider renewal routing is cause-aware, fail-closed and secret-fre
    assert.equal(JSON.stringify(receipt).includes('secret-material'),false);
    assert.equal(count,1);
   }
+ }
+});
+
+test('integrated provider recovery contract fails closed across every missing or mismatched proof',()=>{
+ const now=1700000000000;
+ const h=x=>'sha256:'+x.repeat(64);
+ const scope={checkpoint_id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',checkpoint_receipt_sha256:h('a'),
+  idempotency_key:h('b'),connection_id:'GITHUB_RELEASE_CI_READ:example-org/example-repo',
+  owner_id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',shift_id:'cccccccc-cccc-4ccc-cccc-cccccccccccc',
+  original_work_id:'work:'+'d'.repeat(32),continuity_root_id:'dddddddd-dddd-4ddd-dddd-dddddddddddd',
+  continuity_revision:3,continuity_head_sha256:h('c')};
+ const checkpoint={...scope,status:'PROVIDER_CHECKPOINT_DURABLE_READBACK',current_revision_matches:true,
+  receipt_sha256:h('a'),renewal_eligibility:'REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY'};
+ const proof=(source,hash,extra={})=>({...scope,source,receipt_sha256:h(hash),independently_verified:true,observed_at_ms:now-1000,...extra});
+ const authority=proof('INDEPENDENT_PROVIDER_RENEWAL_AUTHORITY_READBACK','d',{
+  cause:'EXPIRED_RENEWABLE_CREDENTIAL',issuer_kind:'GITHUB_APP_INSTALLATION',installation_id:123,
+  scope:'EXACT_REPOSITORY_ACTIONS_READ_ONLY',scope_escalation:false,provider_managed_binding_verified:true,
+  atomic_pointer_capability_verified:true,obligation_freeze_verified:true,recovery_budget_preserved:true,
+  circuit_state:'CLOSED',renewal_attempt_available:true,active_binding_id_sha256:h('e')});
+ const lease=proof('INDEPENDENT_PROVIDER_SHADOW_LEASE_READBACK','f',{
+  authority_receipt_sha256:authority.receipt_sha256,scope:authority.scope,installation_id:123,
+  shadow_only:true,active_binding_id_sha256:h('e'),shadow_binding_id_sha256:h('1'),
+  lease_id:'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',issuer_run_id:'ffffffff-ffff-4fff-ffff-ffffffffffff',expires_at_ms:now+60000});
+ const verification=proof('INDEPENDENT_PROVIDER_SHADOW_VERIFIER_READBACK','2',{
+  lease_id:lease.lease_id,lease_receipt_sha256:lease.receipt_sha256,shadow_binding_id_sha256:h('1'),
+  exact_repository_and_ci_access_verified:true,no_write_scope_verified:true,
+  verifier_run_id:'11111111-1111-4111-8111-111111111111'});
+ const activation=proof('INDEPENDENT_PROVIDER_ACTIVE_BINDING_READBACK','3',{
+  lease_id:lease.lease_id,verification_receipt_sha256:verification.receipt_sha256,
+  previous_binding_id_sha256:h('e'),active_binding_id_sha256:h('1'),atomic_compare_and_swap_verified:true});
+ const trigger=proof('INDEPENDENT_EXISTING_GOVERNED_TRIGGER_READBACK','4',{
+  activation_receipt_sha256:activation.receipt_sha256,atomic_claim_verified:true,same_original_obligation:true,
+  recovery_budget_preserved:true,claim_id:'22222222-2222-4222-8222-222222222222'});
+ const settlement=proof('INDEPENDENT_CONTINUITY_RECOVERY_RECONCILIATION','5',{
+  trigger_receipt_sha256:trigger.receipt_sha256,claim_id:trigger.claim_id,lifecycle_reconciled:true,
+  same_original_continuation_observed:true,duplicate_effect_absent:true,original_job_completed:false});
+ const stages=[
+  [{checkpoint:{...checkpoint,current_revision_matches:false}},'PROVIDER_RECOVERY_CHECKPOINT_NOT_CURRENT'],
+  [{checkpoint:{...checkpoint,renewal_eligibility:'NO_CREDENTIAL_REPLACEMENT'}},'PROVIDER_RECOVERY_NON_RENEWABLE_ROUTE'],
+  [{checkpoint},'PROVIDER_RECOVERY_EXACT_AUTHORITY_REQUIRED'],
+  [{checkpoint,authority:{...authority,circuit_state:'OPEN'}},'PROVIDER_RECOVERY_EXACT_AUTHORITY_REQUIRED'],
+  [{checkpoint,authority},'PROVIDER_RECOVERY_SHADOW_LEASE_REQUIRED'],
+  [{checkpoint,authority,lease:{...lease,expires_at_ms:now-1}},'PROVIDER_RECOVERY_SHADOW_LEASE_REQUIRED'],
+  [{checkpoint,authority,lease:{...lease,original_work_id:'work:'+'e'.repeat(32)}},'PROVIDER_RECOVERY_SHADOW_LEASE_REQUIRED'],
+  [{checkpoint,authority,lease},'PROVIDER_RECOVERY_INDEPENDENT_VERIFICATION_REQUIRED'],
+  [{checkpoint,authority,lease,verification:{...verification,verifier_run_id:lease.issuer_run_id}},'PROVIDER_RECOVERY_INDEPENDENT_VERIFICATION_REQUIRED'],
+  [{checkpoint,authority,lease,verification},'PROVIDER_RECOVERY_ATOMIC_ACTIVATION_REQUIRED'],
+  [{checkpoint,authority,lease,verification,activation:{...activation,atomic_compare_and_swap_verified:false}},'PROVIDER_RECOVERY_ATOMIC_ACTIVATION_REQUIRED'],
+  [{checkpoint,authority,lease,verification,activation},'PROVIDER_RECOVERY_EXISTING_TRIGGER_CLAIM_REQUIRED'],
+  [{checkpoint,authority,lease,verification,activation,trigger:{...trigger,idempotency_key:h('9')}},'PROVIDER_RECOVERY_EXISTING_TRIGGER_CLAIM_REQUIRED'],
+  [{checkpoint,authority,lease,verification,activation,trigger},'PROVIDER_RECOVERY_RECONCILIATION_REQUIRED'],
+  [{checkpoint,authority,lease,verification,activation,trigger,settlement},'PROVIDER_RECOVERY_CONTINUATION_RECEIPTS_RECONCILED']
+ ];
+ for(const [input,status] of stages){
+  const r=decideProviderRecoveryContinuation({...input,now});
+  assert.equal(r.status,status);
+  assert.equal(r.credential_mutation_authorized,false);
+  assert.equal(r.dispatch_permitted,false);
+  assert.equal(r.original_job_completed,false);
  }
 });

@@ -132,7 +132,9 @@ BEGIN
  x:=i.source_evidence->'identity'; p:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
  RETURN pg_catalog.jsonb_build_object('status','PROVIDER_CHECKPOINT_DURABLE_READBACK',
  'checkpoint_id',i.incident_id,'receipt_sha256',i.evidence_sha256,'idempotency_key',i.source_evidence->>'idempotency_key',
- 'original_work_id',x->>'original_work_id','continuity_revision',(x->>'continuity_revision')::bigint,
+ 'original_work_id',x->>'original_work_id','owner_id',i.owner_id,'shift_id',i.shift_id,
+ 'continuity_root_id',x->>'continuity_root_id','connection_id',x->>'connection_id',
+ 'renewal_eligibility',i.source_evidence->>'renewal_eligibility','continuity_revision',(x->>'continuity_revision')::bigint,
  'continuity_head_sha256',x->>'continuity_head_sha256','recorded_at',i.first_detected_at,
  'current_revision_matches',coalesce(p->>'revision'=x->>'continuity_revision' AND p->>'continuity_head_sha256'=x->>'continuity_head_sha256',false),
  'resume_permitted',false,'renewal_authority_verified',false,'lease_created',false,'credential_changed',false,

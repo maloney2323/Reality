@@ -159,7 +159,7 @@ export default async function handler(req,res){
     provider_failure:proof.provider_failure??null,
     connection_recovery_checkpoint:proof.connection_recovery_checkpoint??null,
     connection_checkpoint_receipt:checkpointReceipt,
-    next_governed_action:proof.provider_failure?.next_governed_action??'RECONCILE_EXISTING_QUALIFICATION_REQUIREMENT',
+    next_governed_action:checkpointReceipt?.recovery_progress?.next_governed_action??proof.provider_failure?.next_governed_action??'RECONCILE_EXISTING_QUALIFICATION_REQUIREMENT',
     release_switch_attempted:false
    });
   }

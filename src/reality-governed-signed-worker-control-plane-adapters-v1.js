@@ -109,6 +109,80 @@ function githubReadRecovery(operation,response,authenticated){
   require_independent_shadow_lease_verification:true,
   effect_replay_permitted:false,raw_secret_material_recorded:false});
 }
+// One recovery progression, consumed only inside the existing release controller.
+// Inputs are internal, independently read receipts, NOT client/model assertions.
+// This read model never creates authority, a lease, a pointer, a claim or a receipt.
+export function decideProviderRecoveryContinuation({checkpoint,authority,lease,verification,activation,trigger,settlement,now=Date.now()}={}){
+ const safe=(status,next,more={})=>Object.freeze({status,next_governed_action:next,...more,
+  read_only:true,credential_mutation_authorized:false,renewal_executed:false,
+  execution_authorized:false,dispatch_permitted:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false});
+ if(checkpoint?.status!=='PROVIDER_CHECKPOINT_DURABLE_READBACK'||checkpoint.current_revision_matches!==true||
+  !UUID.test(checkpoint.checkpoint_id||'')||!HASH.test(checkpoint.receipt_sha256||'')||
+  !HASH.test(checkpoint.idempotency_key||'')||!/^work:[a-f0-9]{32}$/.test(checkpoint.original_work_id||'')||
+  !UUID.test(checkpoint.owner_id||'')||!UUID.test(checkpoint.shift_id||'')||!UUID.test(checkpoint.continuity_root_id||'')||
+  !HASH.test(checkpoint.continuity_head_sha256||'')||!Number.isSafeInteger(checkpoint.continuity_revision)||
+  checkpoint.continuity_revision<1||!/^GITHUB_RELEASE_CI_READ:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(checkpoint.connection_id||'')||
+  !Number.isSafeInteger(now)||now<=0)
+  return safe('PROVIDER_RECOVERY_CHECKPOINT_NOT_CURRENT','RECONCILE_EXISTING_CHECKPOINT_WITHOUT_REPLAY');
+ const scope={checkpoint_id:checkpoint.checkpoint_id,checkpoint_receipt_sha256:checkpoint.receipt_sha256,
+  idempotency_key:checkpoint.idempotency_key,connection_id:checkpoint.connection_id,
+  owner_id:checkpoint.owner_id,shift_id:checkpoint.shift_id,original_work_id:checkpoint.original_work_id,
+  continuity_root_id:checkpoint.continuity_root_id,continuity_revision:checkpoint.continuity_revision,
+  continuity_head_sha256:checkpoint.continuity_head_sha256};
+ const stop=(status,next)=>safe(status,next,scope);
+ const same=r=>r&&Object.keys(scope).every(k=>r[k]===scope[k]);
+ const proof=(r,source)=>same(r)&&r.source===source&&r.independently_verified===true&&HASH.test(r.receipt_sha256||'')&&
+  Number.isSafeInteger(r.observed_at_ms)&&r.observed_at_ms<=now&&now-r.observed_at_ms<=300000;
+ if(checkpoint.renewal_eligibility!=='REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY')
+  return stop('PROVIDER_RECOVERY_NON_RENEWABLE_ROUTE','PRESERVE_CHECKPOINT_AND_FOLLOW_CLASSIFIED_POLICY');
+ if(!proof(authority,'INDEPENDENT_PROVIDER_RENEWAL_AUTHORITY_READBACK')||
+  authority.cause!=='EXPIRED_RENEWABLE_CREDENTIAL'||authority.issuer_kind!=='GITHUB_APP_INSTALLATION'||
+  !/^[1-9][0-9]{0,15}$/.test(String(authority.installation_id??''))||
+  authority.scope!=='EXACT_REPOSITORY_ACTIONS_READ_ONLY'||authority.scope_escalation!==false||
+  authority.provider_managed_binding_verified!==true||authority.atomic_pointer_capability_verified!==true||
+  authority.obligation_freeze_verified!==true||authority.recovery_budget_preserved!==true||
+  authority.circuit_state!=='CLOSED'||authority.renewal_attempt_available!==true||
+  !HASH.test(authority.active_binding_id_sha256||''))
+  return stop('PROVIDER_RECOVERY_EXACT_AUTHORITY_REQUIRED','QUALIFY_EXISTING_PROVIDER_NATIVE_RENEWAL_AND_ATOMIC_BINDING');
+ if(!proof(lease,'INDEPENDENT_PROVIDER_SHADOW_LEASE_READBACK')||
+  lease.authority_receipt_sha256!==authority.receipt_sha256||lease.scope!==authority.scope||
+  lease.installation_id!==authority.installation_id||lease.shadow_only!==true||
+  lease.active_binding_id_sha256!==authority.active_binding_id_sha256||
+  !UUID.test(lease.lease_id||'')||!HASH.test(lease.shadow_binding_id_sha256||'')||
+  lease.shadow_binding_id_sha256===authority.active_binding_id_sha256||
+  !Number.isSafeInteger(lease.expires_at_ms)||lease.expires_at_ms<=now||
+  lease.expires_at_ms-lease.observed_at_ms>600000)
+  return stop('PROVIDER_RECOVERY_SHADOW_LEASE_REQUIRED','QUALIFY_SHORT_LIVED_SHADOW_LEASE_UNDER_EXISTING_AUTHORITY');
+ if(!proof(verification,'INDEPENDENT_PROVIDER_SHADOW_VERIFIER_READBACK')||
+  verification.lease_id!==lease.lease_id||verification.lease_receipt_sha256!==lease.receipt_sha256||
+  verification.shadow_binding_id_sha256!==lease.shadow_binding_id_sha256||
+  verification.observed_at_ms<lease.observed_at_ms||verification.observed_at_ms>=lease.expires_at_ms||
+  verification.exact_repository_and_ci_access_verified!==true||verification.no_write_scope_verified!==true||
+  !UUID.test(verification.verifier_run_id||'')||!UUID.test(lease.issuer_run_id||'')||
+  verification.verifier_run_id===lease.issuer_run_id)
+  return stop('PROVIDER_RECOVERY_INDEPENDENT_VERIFICATION_REQUIRED','VERIFY_SHADOW_BINDING_WITH_EXISTING_EXACT_PROVIDER_VERIFIER');
+ if(!proof(activation,'INDEPENDENT_PROVIDER_ACTIVE_BINDING_READBACK')||
+  activation.lease_id!==lease.lease_id||activation.verification_receipt_sha256!==verification.receipt_sha256||
+  activation.previous_binding_id_sha256!==authority.active_binding_id_sha256||
+  activation.active_binding_id_sha256!==lease.shadow_binding_id_sha256||
+  activation.atomic_compare_and_swap_verified!==true||activation.observed_at_ms<verification.observed_at_ms||
+  activation.observed_at_ms>=lease.expires_at_ms)
+  return stop('PROVIDER_RECOVERY_ATOMIC_ACTIVATION_REQUIRED','RECONCILE_VERIFIED_SHADOW_POINTER_WITHOUT_REPLAY');
+ if(!proof(trigger,'INDEPENDENT_EXISTING_GOVERNED_TRIGGER_READBACK')||
+  trigger.activation_receipt_sha256!==activation.receipt_sha256||
+  trigger.observed_at_ms<activation.observed_at_ms||trigger.observed_at_ms>=lease.expires_at_ms||
+  trigger.atomic_claim_verified!==true||trigger.same_original_obligation!==true||
+  trigger.recovery_budget_preserved!==true||!UUID.test(trigger.claim_id||''))
+  return stop('PROVIDER_RECOVERY_EXISTING_TRIGGER_CLAIM_REQUIRED','QUALIFY_EXISTING_ATOMIC_RESUME_CLAIM_NO_REPLAY');
+ if(!proof(settlement,'INDEPENDENT_CONTINUITY_RECOVERY_RECONCILIATION')||
+  settlement.trigger_receipt_sha256!==trigger.receipt_sha256||settlement.claim_id!==trigger.claim_id||
+  settlement.observed_at_ms<trigger.observed_at_ms||settlement.lifecycle_reconciled!==true||
+  settlement.same_original_continuation_observed!==true||settlement.duplicate_effect_absent!==true||
+  settlement.original_job_completed!==false)
+  return stop('PROVIDER_RECOVERY_RECONCILIATION_REQUIRED','READ_EXISTING_LEDGER_AND_VERIFIER_NO_DUPLICATE_CLAIM');
+ return stop('PROVIDER_RECOVERY_CONTINUATION_RECEIPTS_RECONCILED','VERIFY_ORIGINAL_BUSINESS_OUTCOME_SEPARATELY');
+}
 class ReleaseProviderError extends Error{
  constructor(code,operation,kind,httpStatus=null,mismatches=[],recovery=null){
   super(code);
@@ -363,7 +437,8 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    observed.execution_freeze_verified!==false||observed.recovery_budget_changed!==false||
    observed.current_revision_matches!==true)
    return Object.freeze({status:'PROVIDER_CHECKPOINT_READBACK_UNVERIFIED',resume_permitted:false});
-  return Object.freeze({...observed,lease_created:false,credential_changed:false});
+  return Object.freeze({...observed,lease_created:false,credential_changed:false,
+   recovery_progress:decideProviderRecoveryContinuation({checkpoint:observed})});
  }
  async function readApprovedRelease({
   owner_id,shift_id,release_sha,scheduled_alias,capability_key
