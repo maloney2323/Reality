@@ -20,7 +20,7 @@ export async function collectOptionalChatEvidence(entries,{timeoutMs=12000}={}){
   let timer;
   const timeout=new Promise((_,reject)=>{
    timer=setTimeout(()=>reject(Error('READBACK_TIMEOUT')),entry.timeoutMs??timeoutMs);
-   timer.unref?.();
+   // Keep the bounded deadline alive until this awaited read settles.
   });
   try{
    const value=await Promise.race([
