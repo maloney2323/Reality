@@ -1,5 +1,10 @@
 name: Reality genuine capability engine — original job evidence gate
 on:
+  pull_request:
+    paths:
+      - 'src/reality-genuine-capability-engine-v1.js'
+      - 'test/reality-genuine-capability-engine-v1.test.js'
+      - '.github/workflows/reality-genuine-capability-engine-v1.yml'
   push:
     branches: [feature/reality-general-capability-engine-20261101]
     paths:

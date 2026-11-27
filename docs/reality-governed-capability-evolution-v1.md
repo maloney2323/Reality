@@ -1,0 +1,9 @@
+# Governed capability evolution: first increment
+
+The existing Genuine Capability Engine must distinguish registry presence from operational fitness. An ACTIVE record is not evidence that the capability can complete the original objective. The trusted independent assessor must bind the diagnosis to the same owner, goal, worldline, Continuity root, capability version, original source and frozen failure. The existing durable handoff must independently read back the assessment digest. No new execution path or authority is created.
+
+The six fitness routes are sufficient (reassess without replay), disconnected (restore existing authorized connection), insufficient (qualify extension), defective (qualify repair), incompatible (reconcile dependencies), and unauthorized (request minimum exact authority). Missing capabilities continue through the existing BUILD arbitration and constitutional driver. Unknown or unverified fitness remains unresolved.
+
+This increment implements and tests the evidence/decision contract only. It does not connect a live provider assessor, execute a correction, manage credentials, or change the original recovery budget. The signed worker intake still requires a trusted handoff for operational blockers. The subsequent integration must use the existing recovery/authorization controller and Continuity persistence, not a second driver. A protected credential binding is an explicit authority boundary; do not export secrets or bypass provider controls.
+
+Live acceptance: independently reproduce a real preview runtime dependency failure, observe its exact capability/connection/authority state, persist the same-original fitness decision, qualify the minimum allowed correction, obtain exact approval when needed, independently verify the real runtime connection, and resume the original objective without duplicate effects. Neither source tests nor a registered capability constitutes live acceptance.
