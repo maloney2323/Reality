@@ -162,7 +162,7 @@ GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_investigatio
 
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_independent_investigation_review_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text; prior_event uuid;
+DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text;
 BEGIN
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
@@ -289,7 +289,7 @@ GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_terminal_rev
 
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_terminal_technical_evidence_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text;
+DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text; prior_event uuid;
 BEGIN
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
