@@ -379,3 +379,149 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_observe_final_loop_suspension_investigation_v1(uuid,uuid,uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_observe_final_loop_suspension_investigation_v1(uuid,uuid,uuid,uuid,text) TO service_role;
+
+-- Direct-original independent review, in the SAME review ledger as ordinary
+-- evidence-job incidents. A missing qualified job is not an invitation to invent one.
+ALTER TABLE reality_internal.shift_continuity_independent_reviews_v1
+ ALTER COLUMN qualified_job_id DROP NOT NULL,
+ ALTER COLUMN previously_reviewed_sha256 DROP NOT NULL,
+ ADD COLUMN IF NOT EXISTS original_work_id text,
+ ADD COLUMN IF NOT EXISTS continuity_head_sha256 text,
+ ADD COLUMN IF NOT EXISTS review_event_id uuid,
+ ADD COLUMN IF NOT EXISTS frozen_source_head_sha text,
+ ADD COLUMN IF NOT EXISTS independent_verdict jsonb;
+ALTER TABLE reality_internal.shift_continuity_independent_reviews_v1
+ ADD CONSTRAINT shift_continuity_direct_original_review_scope_v1 CHECK(
+ (qualified_job_id IS NOT NULL AND previously_reviewed_sha256 IS NOT NULL AND original_work_id IS NULL
+  AND review_event_id IS NULL AND frozen_source_head_sha IS NULL)
+ OR (qualified_job_id IS NULL AND previously_reviewed_sha256 IS NULL
+  AND original_work_id IS NOT NULL AND original_work_id~'^work:[a-f0-9]{32}$'
+  AND continuity_head_sha256 IS NOT NULL AND continuity_head_sha256~'^sha256:[a-f0-9]{64}$'
+  AND review_event_id IS NOT NULL AND frozen_source_head_sha IS NOT NULL AND frozen_source_head_sha~'^[a-f0-9]{40}$'));
+CREATE UNIQUE INDEX shift_continuity_direct_original_review_event_once_v1
+ ON reality_internal.shift_continuity_independent_reviews_v1(review_event_id) WHERE review_event_id IS NOT NULL;
+
+-- New overload of the established review claim, exact event-bound. The old
+-- two-argument function continues to serve qualified evidence jobs.
+CREATE OR REPLACE FUNCTION public.reality_claim_shift_continuity_independent_review_v1(
+ p_shift_id uuid,p_worker_run_id uuid,p_event_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE e record; i record; evidence jsonb; frozen text; v_id uuid;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'SIGNED_INDEPENDENT_CONTINUITY_REVIEW_REQUIRED';END IF;
+ SELECT ev.* INTO e FROM reality_internal.final_loop_resume_events_v1 ev
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=p_worker_run_id
+  AND run.status='STARTED' AND run.finished_at IS NULL AND run.started_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+ JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
+  AND wake.owner_id=ev.owner_id AND wake.shift_id=ev.shift_id AND wake.release_claim_id=ev.release_continuation_claim_id
+  AND wake.operating_lane='NORMAL_SIGNED_SHIFT'
+ JOIN reality_internal.governed_employee_shift_worker_pulses_v1 pulse ON pulse.shift_id=ev.shift_id AND pulse.owner_id=ev.owner_id
+  AND pulse.last_worker_status='WAKE_RECEIVED' AND pulse.last_worker_seen_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+ WHERE ev.event_id=p_event_id AND ev.shift_id=p_shift_id AND ev.governed_wake_worker_run_id=p_worker_run_id
+  AND ev.signal_kind='VERIFIED_INVESTIGATION_REVIEW' AND ev.signal_next_action='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
+  AND ev.state='SHADOW_PENDING' AND ev.governed_wake_queued_at>pg_catalog.clock_timestamp()-interval '5 minutes'
+ FOR UPDATE OF ev;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','NO_CONTINUITY_INDEPENDENT_REVIEW_READY',
+  'installation_authorized',false,'original_job_completed',false,'production_changed',false);END IF;
+ evidence:=reality_internal.read_final_loop_verified_investigation_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision);
+ IF evidence IS NULL OR evidence->>'investigation_receipt_sha256' IS DISTINCT FROM e.source_receipt_sha256
+  OR evidence->>'suspension_receipt_sha256' IS DISTINCT FROM e.previous_receipt_sha256
+  OR evidence->>'investigation_worker_run_id'=p_worker_run_id::text
+ THEN RETURN pg_catalog.jsonb_build_object('status','NO_CONTINUITY_INDEPENDENT_REVIEW_READY',
+  'installation_authorized',false,'original_job_completed',false,'production_changed',false);END IF;
+ SELECT inc.* INTO i FROM reality_internal.owner_shift_continuity_incidents_v1 inc
+ WHERE inc.incident_id=(evidence->>'incident_id')::uuid AND inc.qualified_job_id IS NULL
+  AND inc.independent_reviewer IS NOT NULL AND inc.reviewer_function_id IS NOT NULL
+  AND inc.reviewer_function_id<>inc.assigned_function_id
+  AND NOT EXISTS(SELECT 1 FROM reality_internal.shift_continuity_independent_reviews_v1 r WHERE r.incident_id=inc.incident_id)
+ FOR UPDATE OF inc;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','NO_CONTINUITY_INDEPENDENT_REVIEW_READY',
+  'installation_authorized',false,'original_job_completed',false,'production_changed',false);END IF;
+ frozen:=evidence->>'frozen_source_head_sha';
+ IF frozen IS NULL OR frozen!~'^[a-f0-9]{40}$' THEN RAISE EXCEPTION 'DIRECT_ORIGINAL_REVIEW_FROZEN_HEAD_UNVERIFIED';END IF;
+ v_id:=pg_catalog.gen_random_uuid();
+ INSERT INTO reality_internal.shift_continuity_independent_reviews_v1(
+  incident_id,owner_id,shift_id,qualified_job_id,claim_id,worker_run_id,reviewer,reviewer_function_id,
+  source_ref,previously_reviewed_sha256,investigation_receipt_sha256,original_work_id,continuity_head_sha256,review_event_id,frozen_source_head_sha)
+ VALUES(i.incident_id,e.owner_id,e.shift_id,NULL,v_id,p_worker_run_id,i.independent_reviewer,i.reviewer_function_id,
+  e.source_ref,NULL,i.investigation_receipt_sha256,e.original_work_id,e.continuity_head_sha256,e.event_id,frozen);
+ RETURN pg_catalog.jsonb_build_object('status','SIGNED_CONTINUITY_ORIGINAL_REVIEW_CLAIMED','incident_id',i.incident_id,
+  'owner_id',e.owner_id,'shift_id',e.shift_id,'job_id',NULL,'claim_id',v_id,'worker_run_id',p_worker_run_id,
+  'investigation_worker_run_id',evidence->>'investigation_worker_run_id','event_id',e.event_id,
+  'reviewer',i.independent_reviewer,'reviewer_function_id',i.reviewer_function_id,'source_ref',e.source_ref,
+  'original_work_id',e.original_work_id,'continuity_head_sha256',e.continuity_head_sha256,'continuity_revision',e.continuity_revision,
+  'frozen_source_head_sha',frozen,'investigation_receipt_sha256',i.investigation_receipt_sha256,
+  'installation_authorized',false,'execution_authorized',false,'replay_authorized',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_claim_shift_continuity_independent_review_v1(uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_claim_shift_continuity_independent_review_v1(uuid,uuid,uuid) TO service_role;
+
+-- Same reviewer, distinct evidence contract: compare actual PR HEAD, not a
+-- metadata digest to a frozen manifest digest. Reject replay/approval advice
+-- as non-authoritative; current qualified actions remain evidence-only.
+CREATE OR REPLACE FUNCTION public.reality_record_shift_continuity_independent_review_v1(
+ p_incident_id uuid,p_claim_id uuid,p_worker_run_id uuid,p_source_ref text,p_provider_sha256 text,p_checked_at timestamptz,
+ p_event_id uuid,p_source_head_sha text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE r reality_internal.shift_continuity_independent_reviews_v1%ROWTYPE;
+ e record; evidence jsonb; verdict jsonb; v_status text; v_receipt text;
+BEGIN
+ IF current_user<>'service_role' OR p_provider_sha256 IS NULL OR p_provider_sha256!~'^sha256:[a-f0-9]{64}$'
+ OR p_source_head_sha IS NULL OR p_source_head_sha!~'^[a-f0-9]{40}$'
+ OR p_checked_at IS NULL OR p_checked_at<pg_catalog.clock_timestamp()-interval '3 minutes'
+ OR p_checked_at>pg_catalog.clock_timestamp()+interval '1 minute'
+ THEN RAISE EXCEPTION 'CONTINUITY_PROVIDER_PROOF_REQUIRED';END IF;
+ SELECT * INTO r FROM reality_internal.shift_continuity_independent_reviews_v1
+ WHERE incident_id=p_incident_id AND claim_id=p_claim_id AND worker_run_id=p_worker_run_id
+  AND source_ref=p_source_ref AND review_event_id=p_event_id AND qualified_job_id IS NULL
+  AND status='REVIEW_CLAIMED' AND claimed_at>pg_catalog.clock_timestamp()-interval '3 minutes' FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'CONTINUITY_INDEPENDENT_REVIEW_LEASE_INVALID';END IF;
+ SELECT ev.* INTO e FROM reality_internal.final_loop_resume_events_v1 ev
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=p_worker_run_id
+  AND run.status='STARTED' AND run.finished_at IS NULL
+ WHERE ev.event_id=p_event_id AND ev.owner_id=r.owner_id AND ev.shift_id=r.shift_id
+  AND ev.original_work_id=r.original_work_id AND ev.source_ref=r.source_ref
+  AND ev.continuity_head_sha256=r.continuity_head_sha256 AND ev.state='SHADOW_PENDING'
+  AND ev.signal_kind='VERIFIED_INVESTIGATION_REVIEW' AND ev.governed_wake_worker_run_id=p_worker_run_id
+ FOR UPDATE OF ev;
+ IF NOT FOUND THEN RAISE EXCEPTION 'CONTINUITY_INDEPENDENT_REVIEW_EVENT_UNVERIFIED';END IF;
+ evidence:=reality_internal.read_final_loop_verified_investigation_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision);
+ IF evidence IS NULL OR evidence->>'investigation_receipt_sha256' IS DISTINCT FROM r.investigation_receipt_sha256
+  OR evidence->>'investigation_receipt_sha256' IS DISTINCT FROM e.source_receipt_sha256
+  OR evidence->>'suspension_receipt_sha256' IS DISTINCT FROM e.previous_receipt_sha256
+  OR evidence->>'frozen_source_head_sha' IS DISTINCT FROM r.frozen_source_head_sha
+  OR evidence->>'investigation_worker_run_id'=p_worker_run_id::text
+ THEN RAISE EXCEPTION 'CONTINUITY_INDEPENDENT_REVIEW_SOURCE_DRIFT';END IF;
+ v_status:=CASE WHEN p_source_head_sha=r.frozen_source_head_sha THEN 'SOURCE_MATCHED_NEEDS_FROZEN_TEST'
+  ELSE 'SOURCE_CHANGED_NEEDS_FROZEN_TEST' END;
+ verdict:=pg_catalog.jsonb_build_object('schema','reality-direct-original-independent-investigation-review-v1',
+  'incident_id',r.incident_id,'claim_id',r.claim_id,'owner_id',r.owner_id,'shift_id',r.shift_id,
+  'original_work_id',r.original_work_id,'source_ref',r.source_ref,'continuity_head_sha256',r.continuity_head_sha256,
+  'continuity_revision',e.continuity_revision,'review_event_id',p_event_id,'review_worker_run_id',p_worker_run_id,
+  'investigation_worker_run_id',evidence->>'investigation_worker_run_id',
+  'investigation_receipt_sha256',r.investigation_receipt_sha256,'suspension_receipt_sha256',e.previous_receipt_sha256,
+  'frozen_source_head_sha',r.frozen_source_head_sha,'observed_source_head_sha',p_source_head_sha,
+  'provider_proof_sha256',p_provider_sha256,'provider_checked_at',p_checked_at,
+  'reviewer_function_id',r.reviewer_function_id,'review_status',v_status,
+  'unresolved_proof_gates',evidence->'unresolved_proof_gates',
+  'recommendation_disposition','ADVISORY_ONLY_NO_AUTHORITY_OR_REPLAY',
+  'next_action',CASE WHEN v_status='SOURCE_MATCHED_NEEDS_FROZEN_TEST'
+    THEN 'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'
+    ELSE 'INDEPENDENTLY_QUALIFY_NEW_SOURCE_EPOCH_NO_REPLAY' END,
+  'previous_attempt_budget_preserved',true,'new_attempt_authorized',false,'replay_authorized',false,
+  'root_cause_verified',false,'repair_executed',false,'original_job_completed',false,
+  'installation_authorized',false,'execution_authorized',false,'production_changed',false);
+ v_receipt:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(verdict::text,'UTF8')),'hex');
+ UPDATE reality_internal.shift_continuity_independent_reviews_v1
+ SET status=v_status,current_provider_sha256=p_provider_sha256,provider_checked_at=p_checked_at,
+  source_head_sha=p_source_head_sha,receipt_sha256=v_receipt,independent_verdict=verdict,completed_at=pg_catalog.clock_timestamp()
+ WHERE incident_id=r.incident_id AND status='REVIEW_CLAIMED';
+ UPDATE reality_internal.final_loop_resume_events_v1 SET state='SHADOW_OBSERVED',observed_at=pg_catalog.clock_timestamp()
+ WHERE event_id=p_event_id AND state='SHADOW_PENDING' AND governed_wake_worker_run_id=p_worker_run_id;
+ IF NOT FOUND THEN RAISE EXCEPTION 'CONTINUITY_INDEPENDENT_REVIEW_EVENT_CAS_FAILED';END IF;
+ RETURN verdict||pg_catalog.jsonb_build_object('status',v_status,'job_id',NULL,'reviewer',r.reviewer,
+  'independent_review_receipt_sha256',v_receipt);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_record_shift_continuity_independent_review_v1(uuid,uuid,uuid,text,text,timestamptz,uuid,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_record_shift_continuity_independent_review_v1(uuid,uuid,uuid,text,text,timestamptz,uuid,text) TO service_role;
