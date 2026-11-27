@@ -449,6 +449,8 @@ BEGIN
    AND (NOT review_release OR (
     ((ev.signal_kind='QUALIFIER_PROOF_CHANGED' AND ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM')
      OR (ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+      AND ev.release_continuation_claim_id=release_claim)
+     OR (ev.signal_kind='VERIFIED_INVESTIGATION_REVIEW' AND ev.signal_next_action='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
       AND ev.release_continuation_claim_id=release_claim))
     AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
      WHERE a.claim_id=release_claim AND a.runtime_scope->>'original_work_id'=ev.original_work_id
@@ -459,6 +461,9 @@ BEGIN
    AND (ev.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' OR
     (ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND review_release
      AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+     AND ev.release_continuation_claim_id=release_claim) OR
+    (ev.signal_kind='VERIFIED_INVESTIGATION_REVIEW' AND review_release
+     AND ev.signal_next_action='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
      AND ev.release_continuation_claim_id=release_claim) OR
     (ev.signal_kind='QUALIFIER_PROOF_CHANGED' AND ev.signal_next_action IN
      ('VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC',
@@ -538,6 +543,15 @@ BEGIN
        WHERE a.claim_id=release_claim AND a.runtime_scope->>'continuity_head_sha256'=ev.continuity_head_sha256
         AND a.runtime_scope->>'continuity_revision'=ev.continuity_revision::text
         AND a.runtime_scope->>'qualifier_receipt_sha256'=ev.previous_receipt_sha256))
+    OR (ev.signal_kind='VERIFIED_INVESTIGATION_REVIEW' AND review_release
+     AND ev.release_continuation_claim_id=release_claim
+     AND ev.source_receipt_sha256=(reality_internal.read_final_loop_verified_investigation_v1(
+       ev.owner_id,ev.shift_id,ev.original_work_id,ev.source_ref,ev.continuity_head_sha256,ev.continuity_revision)->>'investigation_receipt_sha256')
+     AND ev.previous_receipt_sha256=(reality_internal.read_final_loop_verified_investigation_v1(
+       ev.owner_id,ev.shift_id,ev.original_work_id,ev.source_ref,ev.continuity_head_sha256,ev.continuity_revision)->>'suspension_receipt_sha256')
+     AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
+      WHERE a.claim_id=release_claim AND a.runtime_scope->>'continuity_head_sha256'=ev.continuity_head_sha256
+       AND a.runtime_scope->>'continuity_revision'=ev.continuity_revision::text))
    )
   ORDER BY ev.created_at,ev.event_id LIMIT 1 FOR UPDATE OF ev SKIP LOCKED;
   IF NOT FOUND THEN RETURN NULL;END IF;
@@ -584,6 +598,15 @@ BEGIN
   IF TG_TABLE_NAME='governed_worker_release_approvals_v1' THEN
    PERFORM reality_internal.stage_final_loop_release_continuation_v1(NEW.request_id);
    PERFORM reality_internal.notify_final_loop_governed_trigger_v1(NEW.shift_id);
+  ELSIF TG_TABLE_NAME='signed_worker_actual_runs_v1' THEN
+   -- Only a completed investigation may request a distinct review run.
+   IF NEW.status='COMPLETED' AND OLD.status='STARTED'
+    AND NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION' THEN
+    PERFORM reality_internal.stage_final_loop_independent_investigation_review_v1(a.request_id)
+    FROM reality_internal.governed_signed_worker_release_wakes_v1 w
+    JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
+    WHERE w.worker_run_id=NEW.run_id AND w.operating_lane='NORMAL_SIGNED_SHIFT';
+   END IF;
   ELSIF TG_TABLE_NAME='governed_preview_shift_worker_leases_v1' THEN
    IF NEW.released_at IS NOT NULL AND OLD.released_at IS DISTINCT FROM NEW.released_at THEN
     PERFORM reality_internal.notify_final_loop_governed_trigger_v1(NULL);
@@ -597,6 +620,10 @@ BEGIN
  RETURN NEW;
 END $$;
 REVOKE ALL ON FUNCTION reality_internal.on_final_loop_governed_wake_v1() FROM PUBLIC,anon,authenticated,service_role;
+DROP TRIGGER IF EXISTS final_loop_completed_investigation_wake_v1 ON reality_internal.signed_worker_actual_runs_v1;
+CREATE TRIGGER final_loop_completed_investigation_wake_v1 AFTER UPDATE OF status ON reality_internal.signed_worker_actual_runs_v1
+ FOR EACH ROW WHEN (OLD.status='STARTED' AND NEW.status='COMPLETED' AND NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION')
+ EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
 
 
 CREATE OR REPLACE FUNCTION public.reality_record_review_release_alias_observation_v1(
@@ -638,6 +665,9 @@ BEGIN
     AND (e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
       OR (e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION'
        AND e.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+       AND e.release_continuation_claim_id=a.claim_id)
+      OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
+       AND e.signal_next_action='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
        AND e.release_continuation_claim_id=a.claim_id))
     AND e.governed_wake_request_id IS NOT NULL
     AND e.governed_wake_queued_at>=a.claimed_at
@@ -651,7 +681,7 @@ CREATE OR REPLACE FUNCTION public.reality_claim_canonical_governed_wake_v1(
  p_owner_id uuid,p_shift_id uuid,p_plan_fingerprint text,p_event_id uuid,
  p_nonce uuid,p_kind text,p_release_sha text,p_worker_run_id uuid,p_lease_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE n int:=0; claimed_event record; investigation_only boolean:=false;
+DECLARE n int:=0; claimed_event record; investigation_only boolean:=false; independent_review_only boolean:=false; evidence jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'CANONICAL_WAKE_SERVICE_ONLY';END IF;
  IF p_nonce IS NULL OR p_event_id IS NULL OR p_kind IS NULL OR p_kind NOT IN('START','RESUME')
@@ -706,12 +736,23 @@ BEGIN
       claimed_event.continuity_head_sha256,claimed_event.continuity_revision)->>'receipt_sha256')
    THEN RAISE EXCEPTION 'SUSPENSION_INVESTIGATION_CLAIM_PROOF_UNVERIFIED';END IF;
    investigation_only:=true;
+  ELSIF claimed_event.signal_kind='VERIFIED_INVESTIGATION_REVIEW' THEN
+   evidence:=reality_internal.read_final_loop_verified_investigation_v1(
+      claimed_event.owner_id,claimed_event.shift_id,claimed_event.original_work_id,claimed_event.source_ref,
+      claimed_event.continuity_head_sha256,claimed_event.continuity_revision);
+   IF claimed_event.signal_next_action<>'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
+    OR claimed_event.release_continuation_claim_id IS NULL
+    OR claimed_event.source_receipt_sha256 IS DISTINCT FROM evidence->>'investigation_receipt_sha256'
+    OR claimed_event.previous_receipt_sha256 IS DISTINCT FROM evidence->>'suspension_receipt_sha256'
+    OR evidence->>'investigation_worker_run_id'=p_worker_run_id::text
+   THEN RAISE EXCEPTION 'INDEPENDENT_INVESTIGATION_REVIEW_CLAIM_PROOF_UNVERIFIED';END IF;
+   independent_review_only:=true;
   END IF;
  END IF;
  END IF;
  RETURN pg_catalog.jsonb_build_object('status',CASE WHEN n=1 THEN 'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' ELSE 'CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED' END,
  'event_id',p_event_id,'worker_run_id',p_worker_run_id,'shift_id',p_shift_id,
- 'investigation_only',investigation_only,
+ 'investigation_only',investigation_only,'independent_review_only',independent_review_only,
  'execution_authorized',false,'original_job_completed',false,'production_changed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) FROM PUBLIC,anon,authenticated;
@@ -751,6 +792,9 @@ BEGIN
   'signal_next_action',e.signal_next_action,
 
   'source_current',case
+   when e.signal_kind='VERIFIED_INVESTIGATION_REVIEW' then coalesce(
+    e.source_receipt_sha256=(reality_internal.read_final_loop_verified_investigation_v1(
+      e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)->>'investigation_receipt_sha256'),false)
    when e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' then coalesce(
     e.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
       e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)->>'receipt_sha256'),false)
@@ -775,7 +819,10 @@ BEGIN
   'would_resume_suspended_obligation',e.state='SHADOW_PENDING' AND
    e.continuity_revision=(v_proof->>'revision')::bigint AND
    e.continuity_head_sha256=v_proof->>'continuity_head_sha256' AND
-  case when e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' then coalesce(
+  case when e.signal_kind='VERIFIED_INVESTIGATION_REVIEW' then coalesce(
+    e.source_receipt_sha256=(reality_internal.read_final_loop_verified_investigation_v1(
+      e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)->>'investigation_receipt_sha256'),false)
+   when e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' then coalesce(
     e.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
       e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision)->>'receipt_sha256'),false)
    when e.signal_kind='INDEPENDENT_FROZEN_CI_RECEIPT' then exists(
