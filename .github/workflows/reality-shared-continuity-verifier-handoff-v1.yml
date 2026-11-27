@@ -30,6 +30,9 @@ on:
       - 'supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql'
       - 'supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql'
       - 'test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   pull_request:
@@ -60,6 +63,9 @@ on:
       - 'supabase/migrations/20261124033000_final_loop_proof_carrying_recovery_ledger_v1.sql'
       - 'supabase/migrations/20261124041000_final_loop_technical_ci_continuity_observation_v1.sql'
       - 'test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
       - 'src/reality-governed-shift-boundary-v1.js'
       - '.github/workflows/reality-shared-continuity-verifier-handoff-v1.yml'
   workflow_dispatch:
@@ -159,3 +165,5 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-governed-start-smoke-v1.sql
+          createdb reality_suspension_smoke
+          PGDATABASE=reality_suspension_smoke psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-suspension-investigation-smoke-v1.sql
