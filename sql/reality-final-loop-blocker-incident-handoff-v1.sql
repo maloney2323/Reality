@@ -628,7 +628,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
 DECLARE e record; evidence jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'TERMINAL_TECHNICAL_CONTEXT_SERVICE_ONLY';END IF;
- SELECT ev.* INTO e FROM reality_internal.final_loop_resume_events_v1 ev
+ SELECT ev.*,wake.running_release_sha,wake.running_release_ref INTO e FROM reality_internal.final_loop_resume_events_v1 ev
  JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=p_worker_run_id
   AND run.status='STARTED' AND run.finished_at IS NULL AND run.started_at>pg_catalog.clock_timestamp()-interval '3 minutes'
  JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
@@ -656,6 +656,8 @@ BEGIN
  THEN RETURN pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_CONTEXT_UNVERIFIED',
   'execution_authorized',false,'original_job_completed',false);END IF;
  RETURN evidence||pg_catalog.jsonb_build_object('status','TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY',
+  'worker_run_id',p_worker_run_id,'running_release_sha',e.running_release_sha,
+  'running_release_ref',e.running_release_ref,'release_claim_id',e.release_continuation_claim_id,
   'event_id',e.event_id,'owner_id',e.owner_id,'shift_id',e.shift_id,'original_work_id',e.original_work_id,
   'source_ref',e.source_ref,'continuity_head_sha256',e.continuity_head_sha256,'continuity_revision',e.continuity_revision,
   'read_only',true,'execution_authorized',false,'original_job_completed',false,'installation_authorized',false,

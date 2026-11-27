@@ -532,7 +532,8 @@ export default async function handler(req,res){
    const ledger=await shiftRpc(db,'reality_read_owner_internal_maintenance_v1',{p_owner_id:context.owner_id});
    const existingRoute=routeExistingSignedCaseCiForRecovery({contractProposal:proposal,maintenanceLedger:ledger,resumeTrigger:trigger});
    workerStage='TERMINAL_TECHNICAL_PROVIDER_READBACK';
-   const proof=await verifySourceBoundTechnicalRecoveryCi({db,env:process.env,contractProposal:proposal,existingCiRoute:existingRoute,fetchImpl:fetch});
+   const proof=await verifySourceBoundTechnicalRecoveryCi({db,env:process.env,contractProposal:proposal,existingCiRoute:existingRoute,
+    terminalContext:context,workerRunId:actualWorkerRunId,fetchImpl:fetch});
    workerStage='TERMINAL_TECHNICAL_CONTINUITY_RETURN';
    const returned=await returnTerminalTechnicalEvidenceToContinuity({db,env:process.env,wake:wakeReceipt,
     workerRunId:actualWorkerRunId,eventId:governedWakeScope.event_id,context,technicalCiProviderProof:proof});
@@ -555,6 +556,8 @@ export default async function handler(req,res){
    if(!wakeLeaseReleasedBeforeResponse)throw Error('TERMINAL_TECHNICAL_LEASE_RELEASE_UNVERIFIED');
    return res.status(200).json({status:verified?'TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN':'TERMINAL_TECHNICAL_EVIDENCE_UNVERIFIED',
     terminal_technical_evidence_only:true,signed_worker_release_wake:witness,provider_proof_status:proof.status,
+    provider_readback_diagnostic:{broker_status:proof.broker_status??null,broker_http_status:proof.broker_http_status??null,
+     failed_operation:proof.broker_failed_operation??null,provider_http_status:proof.provider_http_status??null},
     continuity_return:returned,original_job_completed:false,execution_authorized:false,
     installation_authorized:false,replay_authorized:false,production_changed:false,new_shift_started:false});
   }

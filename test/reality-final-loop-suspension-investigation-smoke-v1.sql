@@ -477,6 +477,8 @@ BEGIN
  THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_CLAIM_UNVERIFIED %',r;END IF;
  ctx:=public.reality_read_final_loop_terminal_technical_context_v1(e.shift_id,e.event_id,run);
  IF ctx->>'status'<>'TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY' OR ctx->>'original_work_id'<>e.original_work_id
+ OR ctx->>'worker_run_id' IS DISTINCT FROM run::text OR ctx->>'running_release_sha' IS DISTINCT FROM repeat('3',40)
+ OR ctx->>'running_release_ref' IS DISTINCT FROM 'fixture-provider-read' OR ctx->>'release_claim_id' IS DISTINCT FROM e.release_continuation_claim_id::text
  THEN RAISE EXCEPTION 'TERMINAL_CONTEXT_UNVERIFIED %',ctx;END IF;
  proof:=jsonb_build_object('status','RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED','contract_id',NULL,
  'owner_id',e.owner_id,'shift_id',e.shift_id,'obligation_id',e.original_work_id,'source_ref',e.source_ref,
