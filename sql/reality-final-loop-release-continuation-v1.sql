@@ -10,7 +10,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS final_loop_original_signal_once_v1
  ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,signal_kind,source_receipt_sha256)
  WHERE release_continuation_claim_id IS NULL;
 DROP INDEX IF EXISTS reality_internal.final_loop_release_continuation_once_v1;
-CREATE UNIQUE INDEX final_loop_release_continuation_once_v1
+CREATE UNIQUE INDEX IF NOT EXISTS final_loop_release_continuation_once_v1
  ON reality_internal.final_loop_resume_events_v1(release_continuation_claim_id)
  WHERE release_continuation_claim_id IS NOT NULL AND signal_kind<>'VERIFIED_INVESTIGATION_REVIEW';
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_verified_investigation_review_once_v1
