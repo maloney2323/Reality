@@ -411,7 +411,7 @@ BEGIN
      AND EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
        WHERE a.claim_id=release_claim AND a.runtime_scope->>'continuity_head_sha256'=ev.continuity_head_sha256
         AND a.runtime_scope->>'continuity_revision'=ev.continuity_revision::text
-        AND a.runtime_scope->>'qualifier_receipt_sha256'=ev.previous_receipt_sha256)))
+        AND a.runtime_scope->>'qualifier_receipt_sha256'=ev.previous_receipt_sha256))
    )
   ORDER BY ev.created_at,ev.event_id LIMIT 1 FOR UPDATE OF ev SKIP LOCKED;
   IF NOT FOUND THEN RETURN NULL;END IF;
