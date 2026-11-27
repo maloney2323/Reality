@@ -257,6 +257,21 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 .reality-chat-progress{background:#172b39;border:1px solid #395b70;border-radius:10px;padding:12px;margin:10px 0}
 .reality-chat-progress strong{display:block;margin-bottom:4px;color:#eaf5fc}
 .reality-chat-progress small{color:#b5ccda;font-size:12px}
+#realityChatContinuityActivity[hidden]{display:none!important}
+#realityChatContinuityActivity{margin:10px 0 16px;overflow-wrap:anywhere}
+#realityChatContinuityHeadline{font-size:15px;line-height:1.5}
+#realityChatContinuitySteps article{border-top:1px solid #395b70;padding:12px 0}
+#realityChatContinuitySteps ol{list-style:none;padding:0;margin:10px 0}
+#realityChatContinuitySteps li{border-left:2px solid #395b70;padding:4px 0 14px 12px;margin-left:6px}
+#realityChatContinuitySteps li[data-state="verified"]{border-left-color:#7dd3a5}
+#realityChatContinuitySteps li[data-state="blocked"]{border-left-color:#f3c577}
+#realityChatContinuitySteps li[data-state="running"]{border-left-color:#94cbf4}
+#realityChatContinuitySteps p{margin:4px 0;font-size:13px;white-space:pre-wrap;line-height:1.5}
+#realityChatContinuitySteps details{font-size:12px;margin-top:7px;color:#b5ccda}
+#realityChatContinuitySteps details summary{cursor:pointer;padding:6px 0}
+#realityChatContinuitySteps .live-step-state{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.025em;color:#b5ccda}
+#realityChatContinuitySteps .live-step-state[data-state="blocked"]{color:#f3c577}
+#realityChatContinuitySteps .live-step-state[data-state="verified"]{color:#7dd3a5}
 #privateReady #homeOwnerAuthorizations .home-owner-item{border-color:#55899c}
 #privateReady #homeOwnerAuthorizations .home-owner-item button{width:100%;min-height:50px;font-size:15px}
 @media(max-width:640px){#privateChat{padding:15px!important}.reality-chat-activity{padding:12px}}
@@ -1615,6 +1630,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <p style="color:#afc2d5;font-size:11px">Open issues are observations, not executable job warrants. Reality must exclude previously settled jobs and independently qualify any new execution.</p>
   </section>
   <div id="privateTranscript" aria-live="polite" style="max-height:480px;overflow-y:auto;margin:12px 0"></div>
+  <section id="realityChatContinuityActivity" class="bubble reality-chat-progress" aria-label="Reality live operational conversation" hidden>
+   <div class="label">REALITY · LIVE WORK</div>
+   <div id="realityChatContinuityHeadline" role="status" aria-live="polite">Reading actual operational events…</div>
+   <small id="realityChatContinuityChecked"></small>
+   <div id="realityChatContinuitySteps"></div>
+   <button type="button" id="realityChatContinuityRefresh" class="simple-secondary">Refresh live evidence</button>
+  </section>
   <div id="realityRileyShiftLaunch" style="border:1px solid #5886a4;border-radius:12px;background:#142c3c;padding:14px;margin:12px 0" aria-label="Authorize Riley's three-hour shift">
     <strong style="font-size:16px">Ready to start Riley?</strong>
     <p class="muted" style="margin:8px 0">No shift starts when you set a goal or send an ordinary message. Open the signed-in shift control, inspect the exact 3-hour scope, and authorize it once. Independent upgrade installation still requires separate approval.</p>
@@ -6682,6 +6704,110 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  };
 
  const realityCurrentRoute=()=>document.body.dataset.realityRoute||'home';
+ // Observe, never wake. A single in-flight GET refreshes only the visible
+ // signed-in conversation. Nothing here is an execution request.
+ let liveActivityEpoch=0,liveActivityTimer=null,liveActivityAbort=null,liveActivityFingerprint='';
+ let liveActivitySignedIn=false;
+ function stopLiveActivity(){
+  liveActivitySignedIn=false;++liveActivityEpoch;
+  clearTimeout(liveActivityTimer);liveActivityTimer=null;
+  liveActivityAbort?.abort();liveActivityAbort=null;liveActivityFingerprint='';
+  el('realityChatContinuityActivity').hidden=true;
+  el('realityChatContinuitySteps').replaceChildren();
+  el('realityChatContinuityChecked').textContent='';
+  el('realityChatContinuityHeadline').textContent='Reading actual operational events…';
+ }
+ function liveNode(tag,text,host){
+  const n=document.createElement(tag);n.textContent=String(text||'');host.append(n);return n;
+ }
+ function showLiveActivity(data){
+  const host=el('realityChatContinuitySteps'),headline=el('realityChatContinuityHeadline');
+  el('realityChatContinuityChecked').textContent='Evidence checked '+new Date(data.observed_at).toLocaleTimeString()+
+   ' · read-only updates';
+  const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations]);
+  if(liveActivityFingerprint===key)return;
+  liveActivityFingerprint=key;host.replaceChildren();
+  headline.textContent=data.obligations.length?
+   'I’m tracking '+data.obligations.length+' original obligation(s) in your authorized shift.'+
+    (data.partial?' Some evidence is unavailable; missing proof is not completion.':''):
+   data.active_shift_count?'An authorized shift exists, but its current obligations are not independently visible yet.':
+    'No current authorized shift was returned by this read. Previously recorded work remains in the ledger.';
+  for(const job of data.obligations){
+   const article=document.createElement('article');host.append(article);
+   liveNode('strong','Original work · '+job.source_ref,article);
+   liveNode('p','Continuity revision '+job.revision+' · '+job.shift_status,article);
+   if(job.active_release)liveNode('p','Last recorded release activation: '+job.active_release.sha.slice(0,12),article);
+   const list=document.createElement('ol');article.append(list);
+   for(const step of job.steps){
+    const li=document.createElement('li');li.dataset.state=step.state;list.append(li);
+    const state=liveNode('div',step.state==='proposal'?'Proposal · not approval':step.state,li);
+    state.className='live-step-state';state.dataset.state=step.state;
+    liveNode('strong',step.label,li);liveNode('p',step.detail,li);
+    if(step.investigator)liveNode('p','Investigator: '+step.investigator,li);
+    if(step.reviewer)liveNode('p','Independent reviewer: '+step.reviewer,li);
+    if(step.diagnosis)liveNode('p','Findings: '+step.diagnosis,li);
+    if(step.proposal)liveNode('p','Proposed correction: '+step.proposal,li);
+    if(step.test)liveNode('p','Required independent test: '+step.test,li);
+    if(step.limitations)liveNode('p','Limitations: '+step.limitations,li);
+    if(step.receipt||step.worker_run_id){
+     const d=document.createElement('details');li.append(d);
+     liveNode('summary','Evidence and receipt',d);
+     if(step.at)liveNode('p',new Date(step.at).toLocaleString(),d);
+     if(step.receipt)liveNode('p','Receipt: '+step.receipt,d);
+     if(step.worker_run_id)liveNode('p','Signed worker: '+step.worker_run_id,d);
+    }
+   }
+   if(job.gates.length){
+    liveNode('strong','Why work cannot advance yet',article);
+    for(const gate of job.gates)liveNode('p','• '+gate,article);
+   }
+   liveNode('strong',job.original_complete?'Independent outcome and Universe return verified':'Next qualified action',article);
+   if(!job.original_complete)liveNode('p',job.next_action||'Current next action unavailable.',article);
+   liveNode('p',job.original_complete?'See the final receipt in completed work.':
+    'Original work remains open. No additional authorization is inferred from this display.',article);
+  }
+ }
+ async function refreshLiveActivity(){
+  if(!liveActivitySignedIn||realityCurrentRoute()!=='chat'||document.visibilityState!=='visible'||liveActivityAbort)return;
+  const epoch=liveActivityEpoch,controller=new AbortController();liveActivityAbort=controller;
+  const deadline=setTimeout(()=>controller.abort(),15000);
+  clearTimeout(liveActivityTimer);liveActivityTimer=null;
+  el('realityChatContinuityActivity').hidden=false;
+  try{
+   const r=await fetch('/api/reality/personal-continuity-activity',{
+    method:'GET',credentials:'same-origin',cache:'no-store',signal:controller.signal});
+   if(epoch!==liveActivityEpoch)return;
+   if(r.status===401||r.status===403){stopLiveActivity();return}
+   const data=await r.json();
+   if(epoch!==liveActivityEpoch)return;
+   if(!r.ok||data.ok!==true||data.status!=='OWNER_CHAT_CONTINUITY_ACTIVITY_READ_ONLY'||
+    data.read_only!==true||data.execution_authorized!==false||data.installation_authorized!==false||
+    data.production_changed!==false||!Array.isArray(data.obligations)||data.obligations.length>12||
+    !Number.isFinite(Date.parse(data.observed_at)))throw Error('ACTIVITY_READBACK_UNVERIFIED');
+   showLiveActivity(data);
+  }catch{
+   if(epoch===liveActivityEpoch){
+    liveActivityFingerprint='';
+    el('realityChatContinuityHeadline').textContent='Live evidence read unavailable. Any previously displayed steps are historical, not a new status.';
+    el('realityChatContinuityChecked').textContent='Current check failed · no execution or completion inferred';
+   }
+  }finally{
+   clearTimeout(deadline);
+   if(liveActivityAbort===controller)liveActivityAbort=null;
+   if(epoch===liveActivityEpoch&&liveActivitySignedIn&&document.visibilityState==='visible')
+    liveActivityTimer=setTimeout(refreshLiveActivity,8000);
+  }
+ }
+ function startLiveActivity(){
+  liveActivitySignedIn=true;
+  if(realityCurrentRoute()==='chat')void refreshLiveActivity();
+ }
+ el('realityChatContinuityRefresh').onclick=()=>void refreshLiveActivity();
+ document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')void refreshLiveActivity();
+  else{clearTimeout(liveActivityTimer);liveActivityTimer=null}
+ });
+
  function showSignedIn(yes){
   const previouslySignedIn=el('privateReady').style.display==='block';
   el('accountShortcut').textContent=yes?'Account · Signed in':'Account · Sign in';
@@ -6692,6 +6818,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   el('privateLogin').style.display=yes?'none':'block';
   // Avoid re-triggering a large fan-out of private readers when revalidating.
   if(previouslySignedIn!==yes)el('privateReady').style.display=yes?'block':'none';
+  if(yes&&!liveActivitySignedIn)startLiveActivity();
+  if(!yes)stopLiveActivity();
   guidedSetup.authenticated=yes;
   guidedSetup.accountError='';
   realitySimpleAccount(yes);
