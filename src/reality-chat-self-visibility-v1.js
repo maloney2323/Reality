@@ -26,7 +26,7 @@ const relevant=text=>/\b(reality|itself|own|existing|already|your|system|capabil
  /\b(capabilit|authorization|verification|govern|existing|already|architect|inspect|engine|system|source|code|roi|drift|self|ability|abilities|upgrade|improve|universe|underlying|memory|context|what can|what do you have)\b|see everything|see itself|what it can do/i.test(text||'');
 export function needsRealityCapabilityInspection(message,priorTurns=[]){
  if(typeof message!=='string'||!message.trim())return false;
- if(relevant(message))return true;
+ if(relevant(message)||/\b(shift|original work|original job|worker|release|recovery|continuation|full loop|autonomous|investigation|independent review)\b/i.test(message))return true;
  // A short "yes please" may refer to a prior explicit inspection request.
  if(!/^(?:yes|sure|go ahead|please|okay|ok)(?:[,.! ]+.{0,55})?$/i.test(message.trim()))
   return false;
@@ -151,7 +151,7 @@ export function projectCurrentContinuitySelfVisibility(value,ownerId){
    !UUID.test(ob.continuity_root_id||'')||!HASH.test(ob.continuity_head_sha256||'')||
    !HASH.test(ob.guard_receipt_sha256||'')||!HASH.test(ob.qualifier_receipt_sha256||'')||
    !Number.isSafeInteger(ob.continuity_revision)||ob.continuity_revision<1||
-   typeof ob.source_ref!=='string'||!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:pull|issues)\/[1-9][0-9]*$/.test(ob.source_ref)||
+   typeof ob.source_ref!=='string'||ob.source_ref.length<8||ob.source_ref.length>2048||
    ob.existing_shift_authorized!==true||ob.read_only!==true||ob.execution_authorized!==false||
    ob.installation_authorized!==false||ob.production_changed!==false||
    !Array.isArray(ob.unresolved_proof_gates)||!Array.isArray(ob.current_events)||ob.current_events.length>8)return null;
@@ -255,6 +255,7 @@ export async function readRealitySelfVisibilityForChat({
    relevant_existing_source_paths:selected.paths,
    topics:selected.topics,
    installed_capability_proven_by_source_tree:false,
+   current_operational_readback_status:current?'OWNER_SCOPED_READBACK_AVAILABLE':'UNKNOWN_CURRENT_OPERATIONAL_READBACK_UNAVAILABLE',
    execution_authorized:false,installation_authorized:false,
    production_changed:false
   }));
@@ -277,6 +278,7 @@ export async function readRealitySelfVisibilityForChat({
     ' This self-inspection does NOT authorize changes.',
    capabilities:audit.capabilities,
    owner_active_shift_count:audit.active_owner_shift_count,
+   current_operational_readback_status:current?'OWNER_SCOPED_READBACK_AVAILABLE':'UNKNOWN_CURRENT_OPERATIONAL_READBACK_UNAVAILABLE',
    full_shift_automation_proven:audit.full_shift_automation_proven,
    execution_authorized:false,installation_authorized:false,
    production_changed:false
