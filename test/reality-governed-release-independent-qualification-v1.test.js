@@ -149,6 +149,21 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  const run=extra=>qualify({env:e,dbProject:parent,direction,fetchImpl,...extra});
  const result=await run();
  assert.equal(result.status,'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY');
+ const rejected=()=>run({fetchImpl:async(url,init)=>String(url).endsWith('/2004')?
+  {ok:false,status:401}:fetchImpl(url,init)});
+ const blocked=await rejected(),checkpoint=blocked.connection_recovery_checkpoint;
+ assert.equal(blocked.status,'INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE');
+ assert.equal(checkpoint.original_work_id,direction.original_work_id);
+ assert.equal(checkpoint.shift_id,direction.shift_id);
+ assert.equal(checkpoint.continuity_root_id,direction.continuity_root_id);
+ assert.equal(checkpoint.continuity_revision,3);
+ assert.equal(checkpoint.paused_step,'GITHUB_LIFECYCLE_CI_READ');
+ assert.equal(checkpoint.run_id,2004);
+ assert.equal(checkpoint.state,'CHECKPOINT_CANDIDATE_NOT_DURABLE');
+ assert.equal(checkpoint.resume_permitted,false);
+ assert.equal(checkpoint.durable_freeze_verified,false);
+ assert.equal(checkpoint.idempotency_key,(await rejected()).connection_recovery_checkpoint.idempotency_key);
+ assert.equal(blocked.release_activated,false);
  assert.equal(result.candidate.isolated_database_independently_verified,false);
  assert.equal(result.candidate.runtime_scope.runtime_database_project_ref,parent);
  assert.equal(result.candidate.runtime_scope.qualification_database_project_ref,project);

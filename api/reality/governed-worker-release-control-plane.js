@@ -149,6 +149,7 @@ export default async function handler(req,res){
    return result(res,409,'GOVERNED_RELEASE_INDEPENDENT_QUALIFICATION_BLOCKED',{
     qualification_status:proof.status,
     provider_failure:proof.provider_failure??null,
+    connection_recovery_checkpoint:proof.connection_recovery_checkpoint??null,
     next_governed_action:proof.provider_failure?.next_governed_action??'RECONCILE_EXISTING_QUALIFICATION_REQUIREMENT',
     release_switch_attempted:false
    });

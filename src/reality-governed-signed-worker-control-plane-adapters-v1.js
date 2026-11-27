@@ -74,7 +74,7 @@ export const observedReleaseHttpStatus=value=>value&&typeof value==='object'?htt
 // Classify only bounded facts supplied by the direct provider response.
 // A 401 cannot distinguish expiration, revocation, rotation or bad credentials.
 // No token material, raw response headers or authorization URL leave this boundary.
-function githubReadRecovery(operation,kind,response,authenticated){
+function githubReadRecovery(operation,response,authenticated){
  if(!['GITHUB_PUBLIC_REPOSITORY_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ'].includes(operation))return null;
  const header=name=>{try{return response?.headers?.get?.(name)??null}catch{return null}};
  const status=numericHttp(response?.status);
@@ -147,7 +147,7 @@ export async function requestReleaseProviderJson(fetchImpl,url,init,operation,ti
     status!==null&&status>=500?'PROVIDER_SERVER_ERROR':'HTTP_REQUEST_REJECTED';
    const authenticated=typeof init?.headers?.Authorization==='string'||typeof init?.headers?.authorization==='string';
    throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK',operation,kind,status,[],
-    githubReadRecovery(operation,kind,response,authenticated));
+    githubReadRecovery(operation,response,authenticated));
   }
   let data;
   try{data=await response.json()}catch{
