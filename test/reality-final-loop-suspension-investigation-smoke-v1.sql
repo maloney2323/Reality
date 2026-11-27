@@ -51,10 +51,17 @@ CREATE TABLE reality_internal.shift_repeated_blocker_observations_v1(shift_id uu
 CREATE TABLE reality_internal.owner_shift_continuity_incidents_v1(incident_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),owner_id uuid,shift_id uuid,
  kind text,evidence_key text,evidence_sha256 text,error_summary text,source_evidence jsonb,source_claim_id uuid,phase text DEFAULT 'DETECTED',
  investigation_lease_id uuid,investigation_claimed_at timestamptz,investigation_attempts integer DEFAULT 0,first_detected_at timestamptz DEFAULT clock_timestamp(),
- assigned_employee text,independent_reviewer text,diagnosis text,proposed_upgrade text,independent_test_requirement text,limitations text,
+ assigned_employee text,independent_reviewer text,assigned_function_id text,reviewer_function_id text,qualified_job_id uuid,investigated_at timestamptz,
+ diagnosis text,proposed_upgrade text,independent_test_requirement text,limitations text,
  model_response_id text,investigation_receipt_sha256 text,observation_count integer DEFAULT 1,last_observed_at timestamptz,
  UNIQUE(owner_id,shift_id,kind,evidence_key),
  CONSTRAINT owner_shift_continuity_incidents_v1_kind_check CHECK(kind='SIGNED_SHIFT_REPEATED_NO_PROGRESS'));
+CREATE TABLE reality_internal.shift_continuity_independent_reviews_v1(incident_id uuid PRIMARY KEY,owner_id uuid NOT NULL,shift_id uuid NOT NULL,
+ qualified_job_id uuid NOT NULL,claim_id uuid NOT NULL,worker_run_id uuid NOT NULL,reviewer text NOT NULL,reviewer_function_id text NOT NULL,
+ source_ref text NOT NULL,previously_reviewed_sha256 text NOT NULL,investigation_receipt_sha256 text NOT NULL,
+ claimed_at timestamptz DEFAULT clock_timestamp(),status text DEFAULT 'REVIEW_CLAIMED',
+ current_provider_sha256 text,provider_checked_at timestamptz,source_head_sha text,receipt_sha256 text,completed_at timestamptz,
+ installation_authorized boolean DEFAULT false,production_changed boolean DEFAULT false,original_job_completed boolean DEFAULT false);
 CREATE TABLE public.suspension_fixture_proof(shift_id uuid PRIMARY KEY,proof jsonb,guard jsonb);
 CREATE FUNCTION public.reality_read_current_final_loop_proof_envelope_v1(uuid) RETURNS jsonb LANGUAGE sql AS
  'SELECT proof FROM public.suspension_fixture_proof WHERE shift_id=$1';
@@ -65,6 +72,8 @@ CREATE FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) 
 GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA reality_internal TO service_role;
 GRANT SELECT ON public.universe_events,public.suspension_fixture_proof TO service_role;
 CREATE TRIGGER fixture_resume AFTER INSERT ON reality_internal.final_loop_resume_events_v1
+ FOR EACH ROW EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
+CREATE TRIGGER fixture_lease_release AFTER UPDATE OF released_at ON reality_internal.governed_preview_shift_worker_leases_v1
  FOR EACH ROW EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
 CREATE TRIGGER fixture_alias AFTER UPDATE OF provider_alias_observed_at ON reality_internal.governed_worker_release_approvals_v1
  FOR EACH ROW WHEN (OLD.provider_alias_observed_at IS NULL AND NEW.provider_alias_observed_at IS NOT NULL)
@@ -83,7 +92,7 @@ DECLARE o uuid:=gen_random_uuid(); s uuid:=gen_random_uuid(); root uuid:=gen_ran
  plan text:='sha256:'||repeat('c',64); oldhead text:='sha256:'||repeat('d',64); head text:='sha256:'||repeat('e',64);
  q text:='sha256:'||repeat('f',64); receipt_hash text:='sha256:'||repeat('1',64); wake_hash text:='sha256:'||repeat('2',64);
  gates jsonb:='["TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED","CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED"]';
- scope jsonb; payload jsonb; proof jsonb; guard jsonb; eventrow record;
+ scope jsonb; payload jsonb; proof jsonb; guard jsonb; qualification jsonb; eventrow record;
 BEGIN
  INSERT INTO reality_internal.governed_employee_shifts_v1 VALUES(s,o,plan,'AWAITING_EXACT_ORIGINAL_WORK',now(),now()-interval '1 hour','infinity',NULL,now());
  INSERT INTO reality_internal.governed_employee_completion_warrants_v1(shift_id,owner_id,plan_fingerprint,source_scope,mode,state)
@@ -119,6 +128,13 @@ BEGIN
  'continuity_identity_verified',true,'qualifier_digest_verified',true,'source_proof_verified',true,'independent_original_outcome_verified',false,
  'execution_spine_readback',jsonb_build_object('status','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN','canonical_return_event_id',observed,'replay_authorized',false))));
  INSERT INTO public.suspension_fixture_proof VALUES(s,proof,guard);
+ qualification:=jsonb_build_object('shift_id',s,'original_candidate_work_id',work,'source_proof_bound',true,
+  'review_scope_qualified',true,'exact_goal_event_verified',true,'exact_acceptance_approval_verified',true,
+  'source_head_sha',repeat('c',40),'accepted_review_scope',jsonb_build_object('source_head_sha',repeat('c',40),
+  'parent_original_work_id',work,'source_ref',src,'execution_authorized',false),'unsatisfied_gates',gates,
+  'recovery_terminal_history',jsonb_build_object('remaining_attempts',0,'replay_permitted',false,'new_attempt_authorized',false));
+ INSERT INTO reality_internal.owner_continuity_qualification_routes_v1 VALUES(o,src,
+  'sha256:'||encode(sha256(convert_to(qualification::text,'UTF8')),'hex'),qualification,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',clock_timestamp());
  scope:=jsonb_build_object('target_deployment_id','dpl_fixture_corrected','runtime_database_project_ref','hvkfreoagbrphwghjajw',
  'target_environment','CANONICAL_BENCHMARK_PREVIEW','exact_runtime_database_contract_verified',true,'independent_gateway_ci_verified',true,
  'independent_qualification_branch_verified',true,'independent_transport_proof_sha256',wake_hash,'child_execution_enabled',false,'parent_delivery_enabled',false,
@@ -173,7 +189,8 @@ BEGIN
  -- Stand-in for the EXISTING governed investigation writer's receipt in the
  -- isolated fixture only. The observer must independently recompute its hash.
  UPDATE reality_internal.owner_shift_continuity_incidents_v1 SET phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF',
-  assigned_employee='Fixture engineer',independent_reviewer='Fixture verifier',diagnosis='Fixture diagnosis only',
+  assigned_employee='Fixture engineer',independent_reviewer='Fixture verifier',assigned_function_id='engineering',reviewer_function_id='quality',
+  investigated_at=clock_timestamp(),diagnosis='Fixture diagnosis only',
   proposed_upgrade='Fixture proposal only',independent_test_requirement='Fixture independent test only',
   limitations='No actual provider or execution effect',model_response_id='resp_fixture_only'
  WHERE incident_id=(claim->>'incident_id')::uuid RETURNING * INTO i;
@@ -194,7 +211,72 @@ BEGIN
  THEN RAISE EXCEPTION 'CHILD_EXECUTION_EFFECT_CREATED';END IF;
 END $$;
 RESET ROLE;
+-- The first event is observed but its worker is still running: no review delivery.
+DO $$
+DECLARE i record; first_event record; review_event record;
+BEGIN
+ SELECT * INTO i FROM reality_internal.owner_shift_continuity_incidents_v1;
+ SELECT * INTO first_event FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW')
+ THEN RAISE EXCEPTION 'REVIEW_QUEUED_BEFORE_DISTINCT_RUN_READY';END IF;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp(),
+ worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION' WHERE run_id=first_event.governed_wake_worker_run_id;
+ SELECT * INTO review_event FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
+ IF NOT FOUND OR review_event.source_receipt_sha256<>i.investigation_receipt_sha256
+ OR review_event.previous_receipt_sha256<>first_event.source_receipt_sha256
+ OR review_event.release_continuation_claim_id<>first_event.release_continuation_claim_id
+ OR review_event.governed_wake_request_id IS NOT NULL THEN RAISE EXCEPTION 'REVIEW_EVENT_NOT_BOUND_OR_LEASE_NOT_RESPECTED';END IF;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET released_at=clock_timestamp(),lease_expires_at=clock_timestamp();
+ SELECT * INTO review_event FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
+ IF review_event.governed_wake_request_id IS NULL OR (SELECT count(*) FROM net.fake_requests)<>2
+ THEN RAISE EXCEPTION 'REVIEW_NOT_DELIVERED_ON_LEASE_RELEASE';END IF;
+ PERFORM reality_internal.notify_final_loop_governed_trigger_v1(i.shift_id);
+ IF (SELECT count(*) FROM net.fake_requests)<>2 THEN RAISE EXCEPTION 'REVIEW_SIGNAL_REPLAYED';END IF;
+END $$;
+SET ROLE service_role;
+DO $$
+DECLARE e record; oldrun uuid; newrun uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid();
+ plan text; r jsonb; claim jsonb; i record; verdict record;
+BEGIN
+ SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
+ SELECT governed_wake_worker_run_id INTO oldrun FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
+ SELECT plan_fingerprint INTO plan FROM reality_internal.governed_employee_shifts_v1 WHERE shift_id=e.shift_id;
+ r:=public.reality_claim_shift_continuity_independent_review_v1(e.shift_id,oldrun,e.event_id);
+ IF r->>'status'<>'NO_CONTINUITY_INDEPENDENT_REVIEW_READY' THEN RAISE EXCEPTION 'DIAGNOSING_RUN_CLAIMED_OWN_REVIEW';END IF;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET claim_id=lease,claimed_at=clock_timestamp()-interval '1 second',
+  released_at=NULL,lease_expires_at=clock_timestamp()+interval '2 minutes';
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1 VALUES(newrun,'STARTED',clock_timestamp(),NULL,'FIXTURE_DISTINCT_REVIEW');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1 VALUES(newrun,e.owner_id,e.shift_id,
+  e.release_continuation_claim_id,repeat('2',40),'fixture-corrected','NORMAL_SIGNED_SHIFT','sha256:'||repeat('2',64));
+ UPDATE reality_internal.governed_employee_shift_worker_pulses_v1 SET last_worker_seen_at=clock_timestamp(),last_worker_status='WAKE_RECEIVED'
+ WHERE shift_id=e.shift_id;
+ r:=public.reality_claim_canonical_governed_wake_v1(e.owner_id,e.shift_id,plan,e.event_id,e.governed_wake_nonce,'RESUME',repeat('2',40),newrun,lease);
+ IF r->>'status'<>'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' OR r->>'independent_review_only'<>'true'
+ OR r->>'investigation_only'<>'false' OR r->>'execution_authorized'<>'false'
+ THEN RAISE EXCEPTION 'DISTINCT_REVIEW_CLAIM_NOT_FENCED: %',r;END IF;
+ claim:=public.reality_claim_shift_continuity_independent_review_v1(e.shift_id,newrun,e.event_id);
+ IF claim->>'status'<>'SIGNED_CONTINUITY_ORIGINAL_REVIEW_CLAIMED' OR claim->>'job_id' IS NOT NULL
+ OR claim->>'investigation_worker_run_id'<>oldrun::text OR claim->>'original_work_id'<>e.original_work_id
+ OR claim->>'execution_authorized'<>'false' THEN RAISE EXCEPTION 'DIRECT_ORIGINAL_REVIEW_NOT_CLAIMED: %',claim;END IF;
+ r:=public.reality_claim_shift_continuity_independent_review_v1(e.shift_id,newrun,e.event_id);
+ IF r->>'status'<>'NO_CONTINUITY_INDEPENDENT_REVIEW_READY' THEN RAISE EXCEPTION 'DUPLICATE_REVIEW_CLAIMED';END IF;
+ r:=public.reality_record_shift_continuity_independent_review_v1((claim->>'incident_id')::uuid,(claim->>'claim_id')::uuid,newrun,
+ e.source_ref,'sha256:'||repeat('8',64),clock_timestamp(),e.event_id,repeat('c',40));
+ IF r->>'status'<>'SOURCE_MATCHED_NEEDS_FROZEN_TEST' OR r->>'root_cause_verified'<>'false'
+ OR r->>'recommendation_disposition'<>'ADVISORY_ONLY_NO_AUTHORITY_OR_REPLAY'
+ OR r->>'new_attempt_authorized'<>'false' OR r->>'original_job_completed'<>'false'
+ THEN RAISE EXCEPTION 'INDEPENDENT_REVIEW_VERDICT_UNVERIFIED: %',r;END IF;
+ SELECT * INTO verdict FROM reality_internal.shift_continuity_independent_reviews_v1 WHERE incident_id=(claim->>'incident_id')::uuid;
+ IF verdict.receipt_sha256 IS DISTINCT FROM 'sha256:'||encode(sha256(convert_to(verdict.independent_verdict::text,'UTF8')),'hex')
+ OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=e.event_id AND state='SHADOW_OBSERVED')
+ OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE canonical_prepare_invocation_id IS NOT NULL OR claimant_worker_run_id IS NOT NULL)
+ THEN RAISE EXCEPTION 'REVIEW_HASH_OR_ORIGINAL_AUTHORITY_DRIFT';END IF;
+END $$;
+RESET ROLE;
 DO $$ BEGIN
+ IF has_function_privilege('authenticated','public.reality_claim_shift_continuity_independent_review_v1(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('anon','public.reality_record_shift_continuity_independent_review_v1(uuid,uuid,uuid,text,text,timestamptz,uuid,text)','EXECUTE')
+ THEN RAISE EXCEPTION 'DIRECT_ORIGINAL_REVIEW_RPC_EXPOSED';END IF;
  IF has_function_privilege('authenticated','public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid,uuid)','EXECUTE')
  OR has_function_privilege('anon','public.reality_observe_final_loop_suspension_investigation_v1(uuid,uuid,uuid,uuid,text)','EXECUTE')
  THEN RAISE EXCEPTION 'INVESTIGATION_RPC_PUBLICLY_EXPOSED';END IF;
