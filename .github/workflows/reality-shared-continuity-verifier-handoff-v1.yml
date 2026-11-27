@@ -182,5 +182,11 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-governed-start-smoke-v1.sql
+          createdb reality_identity_red
+          if PGDATABASE=reality_identity_red psql -v ON_ERROR_STOP=1 -v identity_red=1 -f test/reality-final-loop-suspension-investigation-smoke-v1.sql > /tmp/reality-identity-red.log 2>&1; then
+            echo 'Original identity defect did not reproduce'; exit 1
+          fi
+          cat /tmp/reality-identity-red.log
+          grep -q 'ERROR:  TERMINAL_EVIDENCE_EVENT_NOT_STAGED_OR_LEASE_BYPASSED' /tmp/reality-identity-red.log
           createdb reality_suspension_smoke
           PGDATABASE=reality_suspension_smoke psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-suspension-investigation-smoke-v1.sql
