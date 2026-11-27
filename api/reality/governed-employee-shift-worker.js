@@ -320,6 +320,7 @@ export default async function handler(req,res){
      realRun.installation_authorized!==false||
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
+  let suspensionInvestigationWake=false;
   if(governedWakeScope&&canonicalEventRuntime){
    const receipt=await shiftRpc(db,'reality_claim_canonical_governed_wake_v1',{
     p_owner_id:governedWakeScope.owner_id,p_shift_id:governedWakeScope.shift_id,p_plan_fingerprint:governedWakeScope.plan_fingerprint,
@@ -329,6 +330,7 @@ export default async function handler(req,res){
     receipt.shift_id!==governedWakeScope.shift_id||receipt.worker_run_id!==actualWorkerRunId||receipt.execution_authorized!==false||
     receipt.original_job_completed!==false||receipt.production_changed!==false)
     throw Error('CANONICAL_GOVERNED_WAKE_NOT_DURABLY_CLAIMED');
+   suspensionInvestigationWake=receipt.investigation_only===true;
   }
   // Explicitly authenticated, preview-only source staging for the SAME
   // signed worker and its durable lease/run. This is NOT a second worker
@@ -480,6 +482,70 @@ export default async function handler(req,res){
    throw Error('GOVERNED_AUTO_TRIGGER_WAKE_SCOPE_CHANGED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // A dedicated, claimed suspension event is evidence-only. Stop before
+  // all ordinary employee executors, child claims, and model recovery effects.
+  if(suspensionInvestigationWake){
+   workerStage='VERIFIED_SUSPENSION_INVESTIGATION_RELEASE_ATTESTATION';
+   if(!canonicalEventRuntime||governedWakeScope?.kind!=='RESUME'||
+      wakeReceipt.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+      process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED!=='true'||
+      process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+      process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+      process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true')
+    throw Error('SUSPENSION_INVESTIGATION_RUNTIME_FENCE_REJECTED');
+   const witness=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
+    p_worker_run_id:actualWorkerRunId,p_owner_id:governedWakeScope.owner_id,
+    p_shift_id:wakeReceipt.shift_id,p_release_sha:governedWakeScope.release_sha,
+    p_release_ref:process.env.VERCEL_GIT_COMMIT_REF,
+    p_registered_capabilities:['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'],
+    p_wake_claim_id:governedWakeClaimId,
+    p_capability_key:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'});
+   if(witness?.status!=='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'||
+      witness.worker_run_id!==actualWorkerRunId||witness.shift_id!==wakeReceipt.shift_id||
+      witness.release_sha!==governedWakeScope.release_sha||witness.original_job_completed!==false||
+      witness.production_changed!==false)
+    throw Error('SUSPENSION_INVESTIGATION_RELEASE_WITNESS_UNVERIFIED');
+   workerStage='EXACT_VERIFIED_SUSPENSION_INVESTIGATION';
+   const investigation=await investigateOneSignedShiftContinuityIncident({
+    db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+    suspensionEventId:governedWakeScope.event_id,fetchImpl:fetch});
+   let observation={status:'SUSPENSION_INVESTIGATION_OUTCOME_UNVERIFIED',execution_authorized:false};
+   if(investigation?.status==='SHIFT_CONTINUITY_INVESTIGATION_RECORDED'){
+    observation=await shiftRpc(db,'reality_observe_final_loop_suspension_investigation_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_event_id:governedWakeScope.event_id,
+     p_worker_run_id:actualWorkerRunId,p_incident_id:investigation.incident_id,
+     p_receipt_sha256:investigation.investigation_receipt_sha256});
+   }
+   const verified=observation?.status==='SUSPENSION_INVESTIGATION_RECEIPT_INDEPENDENTLY_READ_BACK'&&
+    observation.event_id===governedWakeScope.event_id&&observation.worker_run_id===actualWorkerRunId&&
+    observation.incident_id===investigation.incident_id&&
+    observation.investigation_receipt_sha256===investigation.investigation_receipt_sha256&&
+    observation.previous_attempt_budget_preserved===true&&observation.replay_authorized===false&&
+    observation.new_attempt_authorized===false&&observation.execution_authorized===false&&
+    observation.original_job_completed===false&&observation.installation_authorized===false&&observation.production_changed===false;
+   const pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
+    p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
+    p_safe_result:verified?'SUSPENSION_INVESTIGATION_RECEIPT_INDEPENDENTLY_READ_BACK':'SUSPENSION_INVESTIGATION_OUTCOME_UNVERIFIED'});
+   if(!isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+    throw Error('SUSPENSION_INVESTIGATION_COMPLETION_PULSE_UNVERIFIED');
+   durableWorkerCompletion=pulse;
+   workerStage='WORKER_RESPONSE_PUBLICATION';
+   const attested=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
+    p_run_id:actualWorkerRunId,p_status:'COMPLETED',p_stage:workerStage});
+   workerCompletionAttestedBeforeResponse=attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+    attested.run_id===actualWorkerRunId&&attested.original_job_completed===false&&
+    attested.installation_authorized===false&&attested.production_changed===false;
+   if(!workerCompletionAttestedBeforeResponse)throw Error('SUSPENSION_INVESTIGATION_COMPLETION_ATTESTATION_UNVERIFIED');
+   const released=await shiftRpc(db,'reality_release_governed_shift_worker_run_v1',{p_claim_id:governedWakeClaimId});
+   wakeLeaseReleasedBeforeResponse=released?.status==='WAKE_RELEASED'&&
+    released.original_job_completed===false&&released.installation_authorized===false;
+   if(!wakeLeaseReleasedBeforeResponse)throw Error('SUSPENSION_INVESTIGATION_LEASE_RELEASE_UNVERIFIED');
+   return res.status(200).json({status:verified?'VERIFIED_SUSPENSION_INVESTIGATION_RECORDED_ORIGINAL_OPEN':
+    'SUSPENSION_INVESTIGATION_OUTCOME_UNVERIFIED',investigation_only:true,
+    signed_worker_release_wake:witness,investigation,observation,
+    original_job_completed:false,execution_authorized:false,installation_authorized:false,
+    replay_authorized:false,production_changed:false,new_shift_started:false});
+  }
   // Continuous, standing EVIDENCE qualification intake: all existing employee
   // schedule, capabilities, incidents, Chat work and signed shift steps.
   // The source-neutral database function deduplicates by authoritative ledger
