@@ -12,13 +12,22 @@ const names={
  VERIFIED_INVESTIGATION_REVIEW:'Independent investigation review',
  VERIFIED_REVIEW_TECHNICAL_EVIDENCE:'Technical evidence return'
 };
-export function projectChatContinuityActivity({current,incidentReadback,historyByShift={},ownerId}={}){
+export function projectChatContinuityActivity({current,incidentReadback,finalReadback,historyByShift={},ownerId}={}){
  if(!current||!Array.isArray(current.observations)||!date(current.observed_at))return null;
  const incidentValid=incidentReadback?.status==='OWNER_SHIFT_CONTINUITY_INCIDENTS_READ_ONLY'&&
   incidentReadback.owner_id===ownerId&&incidentReadback.owner_scope_verified===true&&
   incidentReadback.read_only===true&&incidentReadback.execution_authorized===false&&
   incidentReadback.installation_authorized===false&&incidentReadback.production_changed===false&&
   Array.isArray(incidentReadback.items)&&incidentReadback.items.length<=8;
+ const finalValid=finalReadback?.status==='INDEPENDENT_FINAL_RECEIPT_READBACK'&&
+  finalReadback.does_not_authorize_actions===true&&Array.isArray(finalReadback.receipts)&&finalReadback.receipts.length<=12;
+ const receipts=finalValid?finalReadback.receipts.filter(r=>r.status==='FULL_LOOP_INDEPENDENTLY_VERIFIED'&&
+  /^work:[a-f0-9]{32}$/.test(r.original_work_id||'')&&UUID.test(r.settlement_event_id||'')&&
+  /^[a-f0-9]{64}$/.test(r.artifact_sha256||'')&&/^[a-f0-9]{40}$/.test(r.installed_commit_sha||'')&&
+  HASH.test(r.verifier_artifact_digest||'')&&Number.isSafeInteger(r.provider_run_id)&&r.provider_run_id>0&&
+  r.production_changed===false).map(r=>({original_work_id:r.original_work_id,
+   settlement_event_id:r.settlement_event_id,installed_commit_sha:r.installed_commit_sha,
+   verifier_artifact_digest:r.verifier_artifact_digest})):[]; 
  const obligations=current.observations.slice(0,12).map(entry=>{
   const ob=entry.current_operational_facts;
   const recent=ob.current_events.filter(e=>UUID.test(e?.event_id||'')&&HASH.test(e.source_receipt_sha256||''));
@@ -50,7 +59,7 @@ export function projectChatContinuityActivity({current,incidentReadback,historyB
     e.worker_status==='STARTED'?'running':e.worker_status==='COMPLETED'?'blocked':'pending';
    const detail=verified?(isInv?'Signed investigation receipt verified. The diagnosis and proposed repair remain advisory.':
     'Separate reviewer receipt verified. Repair and original outcome still unproven.'):
-    e.worker_status==='FAILED'?'Signed worker failure recorded. Exact cause requires investigation.':
+    e.worker_status==='FAILED'?'Signed worker failure recorded at '+(human(e.worker_stage)||'unknown stage')+'. Exact cause requires investigation.':
     e.state==='SHADOW_OBSERVED'?'Signal observed; independent business outcome is not implied.':
     e.worker_status==='COMPLETED'?'Worker ended without an observed event receipt. Reconciliation required; do not replay.':
     e.worker_status==='STARTED'?'Signed worker running · '+human(e.worker_stage):
@@ -59,12 +68,15 @@ export function projectChatContinuityActivity({current,incidentReadback,historyB
     receipt:isInv?inv.investigation_receipt_sha256:isReview?review.receipt_sha256:e.source_receipt_sha256,
     at:date(e.observed_at),worker_run_id:e.governed_wake_worker_run_id||null});
   }
-  if(incident)timeline.push({id:incident.incident_id+':proposal',label:'Investigation findings and proposed correction',
+  if(incident){const proposalStep={id:incident.incident_id+':proposal',label:'Investigation findings and proposed correction',
    state:'proposal',detail:'Recorded employee proposal — not independently verified root cause or permission to install.',
    investigator:bounded(incident.assigned_employee,120),reviewer:bounded(incident.independent_reviewer,120),
    diagnosis:bounded(incident.diagnosis),proposal:bounded(incident.proposed_upgrade),
    test:bounded(incident.independent_test_requirement),limitations:bounded(incident.limitations),
-   receipt:incident.investigation_receipt_sha256,at:null});
+   receipt:incident.investigation_receipt_sha256,at:null};
+   const index=timeline.findIndex(s=>s.id===inv?.investigation_event_id);
+   if(index>=0)timeline.splice(index+1,0,proposalStep);else timeline.push(proposalStep);
+  }
   const originalComplete=ob.independent_original_outcome_verified===true&&ob.universe_return_verified===true;
   const gates=ob.unresolved_proof_gates.filter(x=>typeof x==='string').slice(0,24);
   return {original_work_id:ob.original_work_id,source_ref:bounded(ob.source_ref,2048),shift_id:ob.shift_id,
@@ -76,6 +88,6 @@ export function projectChatContinuityActivity({current,incidentReadback,historyB
  });
  return {status:'OWNER_CHAT_CONTINUITY_ACTIVITY_READ_ONLY',observed_at:current.observed_at,
   active_shift_count:current.active_shift_count,unverified_guard_count:current.unverified_guard_count,
-  partial:!incidentValid||current.unverified_guard_count>0||obligations.some(o=>!o.history_available),
-  obligations,read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false};
+  partial:!incidentValid||!finalValid||current.unverified_guard_count>0||obligations.some(o=>!o.history_available),
+  obligations,final_receipts:receipts,read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false};
 }
