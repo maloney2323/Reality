@@ -389,7 +389,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    const ready=[];
    for(const s of eventRead.subscriptions){
     if(!known.has(s?.source_ref+'|'+s?.original_work_id)||
-       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT'].includes(
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION'].includes(
         s.condition_kind)||
        !['SUSPENDED','SHADOW_SIGNALED'].includes(s.state)||
        !HASH.test(s.subscribed_receipt_sha256||'')||
@@ -400,7 +400,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    for(const e of eventRead.events){
     if(!UUID.test(e?.event_id||'')||
        !known.has(e.source_ref+'|'+e.original_work_id)||
-       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT'].includes(
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION'].includes(
         e.event_kind)||
        !['SHADOW_PENDING','SHADOW_OBSERVED','SHADOW_STALE'].includes(
         e.event_state)||
@@ -423,6 +423,10 @@ export async function inspectFinalLoopOnExistingSignedWorker({
        s.condition_kind===e.event_kind&&s.continuity_revision===e.continuity_revision);
       if(subscriptions.length!==1)
        return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
+      if(e.event_kind==='VERIFIED_SUSPENSION_INVESTIGATION'&&
+       (e.signal_next_action!=='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'||
+        subscriptions[0].next_qualified_action!==e.signal_next_action))
+       return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
       // The subscription describes the prior suspended state. A verified
       // current qualifier may supersede its action without changing the
       // original identity or granting a fresh attempt budget.
