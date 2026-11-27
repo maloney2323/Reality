@@ -379,7 +379,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
       eventRead.production_changed!==false||
       !Array.isArray(eventRead.subscriptions)||
       !Array.isArray(eventRead.events)||
-      eventRead.subscriptions.length>p.jobs.length*4||
+      eventRead.subscriptions.length>p.jobs.length*5||
       eventRead.events.length>128)
     return safe('FINAL_LOOP_EVENT_RESUME_SCOPE_OR_AUTHORITY_INVALID');
    const known=new Set(p.jobs.filter(j=>
@@ -389,7 +389,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    const ready=[];
    for(const s of eventRead.subscriptions){
     if(!known.has(s?.source_ref+'|'+s?.original_work_id)||
-       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW'].includes(
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE'].includes(
         s.condition_kind)||
        !['SUSPENDED','SHADOW_SIGNALED'].includes(s.state)||
        !HASH.test(s.subscribed_receipt_sha256||'')||
@@ -400,7 +400,7 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    for(const e of eventRead.events){
     if(!UUID.test(e?.event_id||'')||
        !known.has(e.source_ref+'|'+e.original_work_id)||
-       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW'].includes(
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE'].includes(
         e.event_kind)||
        !['SHADOW_PENDING','SHADOW_OBSERVED','SHADOW_STALE'].includes(
         e.event_state)||
@@ -423,6 +423,10 @@ export async function inspectFinalLoopOnExistingSignedWorker({
        s.condition_kind===e.event_kind&&s.continuity_revision===e.continuity_revision);
       if(subscriptions.length!==1)
        return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
+      if(e.event_kind==='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'&&
+       (e.signal_next_action!=='READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'||
+        subscriptions[0].next_qualified_action!==e.signal_next_action))
+       return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
       if(e.event_kind==='VERIFIED_INVESTIGATION_REVIEW'&&
        (e.signal_next_action!=='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'||
         subscriptions[0].next_qualified_action!==e.signal_next_action))
