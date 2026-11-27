@@ -8,6 +8,11 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, edited]
     paths:
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql'
+      - 'src/reality-final-loop-technical-ci-evidence-verifier-v1.js'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js'
       - .github/workflows/reality-governed-openai-gateway-isolated-20261108.yml
       - src/reality-governed-openai-gateway-v1.js
       - src/reality-native-recovery-readonly-tool-v1.js

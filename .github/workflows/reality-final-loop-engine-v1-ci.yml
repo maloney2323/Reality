@@ -2,6 +2,11 @@ name: Reality Final Loop Engine lifecycle acceptance
 on:
   push:
     paths:
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql'
+      - 'src/reality-final-loop-technical-ci-evidence-verifier-v1.js'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js'
       - 'src/reality-shift-unified-execution-controller-v1.js'
       - 'src/reality-final-loop-time-horizon-v1.js'
       - 'src/reality-final-loop-executive-brief-v1.js'
@@ -92,6 +97,11 @@ on:
       - '.github/workflows/reality-final-loop-engine-v1-ci.yml'
   pull_request:
     paths:
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql'
+      - 'src/reality-final-loop-technical-ci-evidence-verifier-v1.js'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js'
       - 'src/reality-shift-unified-execution-controller-v1.js'
       - 'src/reality-final-loop-time-horizon-v1.js'
       - 'src/reality-final-loop-executive-brief-v1.js'
