@@ -129,10 +129,17 @@ test('full acceptance requires genuinely independent original, verified Universe
 test('live signed worker publishes whole-cycle verdict AFTER independent return fence',()=>{
  const s=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',
   import.meta.url),'utf8');
- assert.ok(s.indexOf("workerStage='FINAL_LOOP_WHOLE_CYCLE_INDEPENDENT_ACCEPTANCE_CHECK'")>
-  s.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
- assert.ok(s.indexOf("workerStage='FINAL_LOOP_WHOLE_CYCLE_INDEPENDENT_ACCEPTANCE_CHECK'")<
-  s.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'"));
+ const returnFence=s.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'");
+ const acceptance=s.indexOf("workerStage='FINAL_LOOP_WHOLE_CYCLE_INDEPENDENT_ACCEPTANCE_CHECK'");
+ const publication=s.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",acceptance);
+ assert.ok(returnFence>0&&acceptance>returnFence&&publication>acceptance);
+ const investigationStart=s.indexOf('if(suspensionInvestigationWake){');
+ const investigationEnd=s.indexOf('// Continuous, standing EVIDENCE qualification intake',investigationStart);
+ assert.ok(investigationStart>0&&investigationEnd>investigationStart&&investigationEnd<returnFence);
+ const investigation=s.slice(investigationStart,investigationEnd);
+ assert.match(investigation,/VERIFIED_SUSPENSION_INVESTIGATION_RECORDED_ORIGINAL_OPEN/);
+ assert.match(investigation,/original_job_completed:false/);
+ assert.doesNotMatch(investigation,/evaluateRealityWholeCycleAcceptance/);
  assert.match(s,/reality_read_owner_final_loop_child_approvals_v1/);
  assert.match(s,/final_loop_whole_cycle_acceptance:finalLoopWholeCycleAcceptance/);
  assert.match(s,/verifiedContinuation:reconcileVerifiedFinalLoopContinuation\(\{/);
