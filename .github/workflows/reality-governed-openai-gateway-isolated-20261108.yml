@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - reality/isolated-openai-governance-gateway-20261108
+      - feature/final-loop-governed-qualification-handoff-20261123
       - reality/native263-temporal-chat-proof-20261113
       - reality/repair-source-bound-shift-gate-20261113
   pull_request:
