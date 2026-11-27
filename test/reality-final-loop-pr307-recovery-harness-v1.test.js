@@ -129,9 +129,13 @@ test('same signed worker publishes recovery candidate after return fence, never 
   import.meta.url),'utf8');
  assert.match(worker,/projectRecoveryContractFromFinalLoop/);
  assert.match(worker,/final_loop_proof_carrying_recovery:finalLoopProofCarryingRecovery/);
- assert.ok(worker.indexOf('const finalLoopProofCarryingRecovery=')>
-  worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
- assert.ok(worker.indexOf('const finalLoopProofCarryingRecovery=')<
-  worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'"));
+ const fence=worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'");
+ const recovery=worker.indexOf('const finalLoopProofCarryingRecovery=');
+ const publication=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",recovery);
+ assert.ok(fence>0&&recovery>fence&&publication>recovery);
+ const suspensionStart=worker.indexOf('if(suspensionInvestigationWake){');
+ const suspensionEnd=worker.indexOf('// Continuous, standing EVIDENCE qualification intake',suspensionStart);
+ assert.ok(suspensionStart>0&&suspensionEnd>suspensionStart&&suspensionEnd<fence);
+ assert.doesNotMatch(worker.slice(suspensionStart,suspensionEnd),/projectRecoveryContractFromFinalLoop|advanceOneSignedProofRecovery/);
  assert.doesNotMatch(worker,/reality_claim_proof_recovery_from_model_v1/);
 });
