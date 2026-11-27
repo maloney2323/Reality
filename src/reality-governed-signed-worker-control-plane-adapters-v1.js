@@ -53,11 +53,12 @@ const operations=new Set(['VERCEL_ALIAS_READ','VERCEL_DEPLOYMENT_READ','VERCEL_A
  'VERCEL_CANDIDATE_READ','VERCEL_ISOLATED_PEER_READ',
  'reality_read_governed_worker_release_schedule_v1','reality_read_current_shift_execution_graph_v1',
  'reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1',
+ 'reality_record_governed_provider_checkpoint_v1','reality_read_governed_provider_checkpoint_v1',
  'reality_claim_governed_signed_worker_release_v1','reality_read_governed_signed_worker_release_approval_v1',
  'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
 const identityFields=new Set(['alias','project_id','deployment_id','repository','release_sha','release_ref',
  'ready_state','preview_target','schedule_contract','branch_ancestry','ci_identity','ci_result','peer_host']);
-const writeOps=new Set(['VERCEL_ALIAS_ASSIGN','reality_claim_governed_signed_worker_release_v1',
+const writeOps=new Set(['VERCEL_ALIAS_ASSIGN','reality_record_governed_provider_checkpoint_v1','reality_claim_governed_signed_worker_release_v1',
  'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
 // Vercel GET /v13/deployments documents readyState; state is the
 // legacy compatible shape. Never accept missing or contradictory evidence.
@@ -202,7 +203,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   const readRpcs=['reality_read_governed_worker_release_schedule_v1',
    'reality_read_current_shift_execution_graph_v1','reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1'];
   if(inspectionOnly===true&&!readRpcs.includes(name))throw Error('RELEASE_INSPECTION_MUTATION_FORBIDDEN');
-  if(![...readRpcs,
+  if(![...readRpcs,'reality_record_governed_provider_checkpoint_v1','reality_read_governed_provider_checkpoint_v1',
     'reality_claim_governed_signed_worker_release_v1',
     'reality_read_governed_signed_worker_release_approval_v1',
     'reality_prepare_governed_signed_worker_release_v1',
@@ -331,6 +332,36 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    ...current,release_direction_drift:drift,
    next_governed_action:drift?'VERIFY_CANDIDATE_RUNTIME_DATABASE_AND_SAME_SHIFT_BEFORE_EXACT_APPROVAL':
     'INDEPENDENTLY_VERIFY_ACTUAL_SIGNED_SCHEDULED_WAKE_AND_CAPABILITY'});
+ }
+ // Evidence-only checkpoint on the existing Continuity incident ledger.
+ // A failed/ambiguous write is never automatically repeated within this call.
+ async function persistProviderCheckpoint(checkpoint){
+  if(inspectionOnly||env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+   checkpoint?.state!=='CHECKPOINT_CANDIDATE_NOT_DURABLE'||
+   checkpoint.owner_id!==env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID||
+   checkpoint.shift_id!==env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID||
+   checkpoint.release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   checkpoint.release_ref!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||
+   checkpoint.connection_id!=='GITHUB_RELEASE_CI_READ:'+env.REALITY_VERIFIED_GITHUB_REPOSITORY||
+   !HASH.test(checkpoint.idempotency_key||'')||checkpoint.input_digest!==checkpoint.idempotency_key||
+   checkpoint.resume_permitted!==false||checkpoint.renewal_authority_verified!==false)
+   throw Error('PROVIDER_CHECKPOINT_SCOPE_UNVERIFIED');
+  const written=await serviceRpc('reality_record_governed_provider_checkpoint_v1',{p_checkpoint:checkpoint});
+  if(written?.status!=='PROVIDER_CHECKPOINT_RECORDED_OR_EXISTING'||
+   written.idempotency_key!==checkpoint.idempotency_key||!UUID.test(written.checkpoint_id||'')||
+   !HASH.test(written.receipt_sha256||'')||written.resume_permitted!==false)
+   return Object.freeze({status:'PROVIDER_CHECKPOINT_NOT_VERIFIED',resume_permitted:false});
+  const observed=await serviceRpc('reality_read_governed_provider_checkpoint_v1',{
+   p_owner_id:checkpoint.owner_id,p_shift_id:checkpoint.shift_id,p_checkpoint_id:written.checkpoint_id});
+  if(observed?.status!=='PROVIDER_CHECKPOINT_DURABLE_READBACK'||
+   observed.checkpoint_id!==written.checkpoint_id||observed.receipt_sha256!==written.receipt_sha256||
+   observed.idempotency_key!==checkpoint.idempotency_key||
+   observed.original_work_id!==checkpoint.original_work_id||
+   observed.continuity_revision!==checkpoint.continuity_revision||
+   observed.continuity_head_sha256!==checkpoint.continuity_head_sha256||
+   observed.resume_permitted!==false||observed.renewal_authority_verified!==false)
+   return Object.freeze({status:'PROVIDER_CHECKPOINT_READBACK_UNVERIFIED',resume_permitted:false});
+  return Object.freeze({...observed,lease_created:false,credential_changed:false});
  }
  async function readApprovedRelease({
   owner_id,shift_id,release_sha,scheduled_alias,capability_key
@@ -485,7 +516,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  return Object.freeze({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
   ready:true,read_only:inspectionOnly===true,
-  readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,recordObservedReviewDelivery,
+  readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,recordObservedReviewDelivery,persistProviderCheckpoint,
   readLastProviderFailure:()=>lastFailure,
   owner_approval_granted:false,provider_assignment_attempted:false
  });

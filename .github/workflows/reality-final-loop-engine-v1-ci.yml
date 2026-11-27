@@ -27,6 +27,8 @@ on:
       - 'src/reality-signed-worker-capability-delivery-v1.js'
       - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
       - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'test/reality-governed-provider-continuity-checkpoint-v1.test.js'
       - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
       - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
       - 'sql/reality-governed-worker-release-schedule-read-v1.sql'
@@ -120,6 +122,8 @@ on:
       - 'src/reality-signed-worker-capability-delivery-v1.js'
       - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
       - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'test/reality-governed-provider-continuity-checkpoint-v1.test.js'
       - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
       - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
       - 'sql/reality-governed-worker-release-schedule-read-v1.sql'
@@ -286,6 +290,7 @@ jobs:
           node --test test/reality-signed-worker-capability-delivery-v1.test.js
           node --test test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
           node --test test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
+          node --test test/reality-governed-provider-continuity-checkpoint-v1.test.js
           node --test test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js
           node --test test/reality-signed-worker-scheduled-release-verifier-v1.test.js
           node --test test/reality-governed-release-independent-qualification-v1.test.js

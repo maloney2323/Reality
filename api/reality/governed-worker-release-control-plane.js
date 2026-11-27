@@ -145,14 +145,24 @@ export default async function handler(req,res){
    env,dbProject:db.project,db,fetchImpl:fetch,direction
   });
   if(proof.status!==(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':
-    'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY'))
+    'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY')){
+   // Only the existing authorized preparation channel can record evidence.
+   // An approval or switch request cannot use this branch to change authority.
+   let checkpointReceipt=null;
+   if(canonical&&proof.connection_recovery_checkpoint&&
+    ['OWNER_PREPARE_EXACT_RELEASE','PREPARE_EXACT_RELEASE'].includes(req.body.intent)){
+    try{checkpointReceipt=await adapters.persistProviderCheckpoint(proof.connection_recovery_checkpoint)}
+    catch{checkpointReceipt={status:'PROVIDER_CHECKPOINT_OUTCOME_UNVERIFIED_RECONCILE_NO_REPLAY',resume_permitted:false};}
+   }
    return result(res,409,'GOVERNED_RELEASE_INDEPENDENT_QUALIFICATION_BLOCKED',{
     qualification_status:proof.status,
     provider_failure:proof.provider_failure??null,
     connection_recovery_checkpoint:proof.connection_recovery_checkpoint??null,
+    connection_checkpoint_receipt:checkpointReceipt,
     next_governed_action:proof.provider_failure?.next_governed_action??'RECONCILE_EXISTING_QUALIFICATION_REQUIREMENT',
     release_switch_attempted:false
    });
+  }
   if(!UUID.test(env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID||'')||
    !UUID.test(env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID||'')||
    !SHA.test(env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||'')||

@@ -42,10 +42,11 @@ function githubFailureCheckpoint(error,direction,branch,sha,repo,operation,runId
  const fields={owner_id:direction.owner_id,shift_id:direction.shift_id,
   original_work_id:direction.original_work_id,continuity_root_id:direction.continuity_root_id,
   continuity_revision:direction.continuity_revision,continuity_head_sha256:direction.continuity_head_sha256,
-  plan_fingerprint:direction.plan_fingerprint,release_ref:branch,release_sha:sha,
+  plan_fingerprint:direction.plan_fingerprint,source_ref:direction.source_ref,
+  qualifier_receipt_sha256:direction.qualifier_receipt_sha256,release_ref:branch,release_sha:sha,
   connection_id:'GITHUB_RELEASE_CI_READ:'+repo,paused_step:operation,run_id:runId,
   policy_id:failure.connection_recovery.policy_id};
- const input=digest(fields);
+ const input=digest(Object.fromEntries(Object.keys(fields).sort().map(k=>[k,fields[k]])));
  return {provider_failure:failure,connection_recovery_checkpoint:Object.freeze({
   ...fields,input_digest:input,idempotency_key:input,
   failure_class:failure.connection_recovery.cause,route:failure.connection_recovery.route,
