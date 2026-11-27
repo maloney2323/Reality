@@ -71,8 +71,39 @@ export function verifiedVercelDeploymentReadiness(deployment){
 }
 const numericHttp=n=>Number.isInteger(n)&&n>=100&&n<=599?n:null;
 export const observedReleaseHttpStatus=value=>value&&typeof value==='object'?httpCodes.get(value)??null:null;
+// Classify only bounded facts supplied by the direct provider response.
+// A 401 cannot distinguish expiration, revocation, rotation or bad credentials.
+// No token material, raw response headers or authorization URL leave this boundary.
+function githubReadRecovery(operation,kind,response,authenticated){
+ if(!['GITHUB_PUBLIC_REPOSITORY_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ'].includes(operation))return null;
+ const header=name=>{try{return response?.headers?.get?.(name)??null}catch{return null}};
+ const status=numericHttp(response?.status);
+ const sso=header('x-github-sso');
+ const rate=header('x-ratelimit-remaining');
+ const retry=header('retry-after');
+ let cause='PROVIDER_READ_CAUSE_UNVERIFIED',route='QUARANTINE_AND_INVESTIGATE';
+ if(status===403&&typeof sso==='string'&&/^required(?:;|$)/i.test(sso)){
+  cause='ORGANIZATION_SSO_AUTHORIZATION_REQUIRED';route='REQUEST_EXACT_REAUTHORIZATION';
+ }else if(status===429||(status===403&&(rate==='0'||(typeof retry==='string'&&/^\d{1,8}$/.test(retry))))){
+  cause='PROVIDER_RATE_LIMIT_OBSERVED';route='SUSPEND_UNTIL_PROVIDER_RECHECK';
+ }else if(status===401&&authenticated){
+  cause='BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED';route='VERIFY_ISSUER_SCOPE_AND_RENEWAL_AUTHORITY';
+ }else if(status===401){
+  cause='ANONYMOUS_READ_REJECTED';route='VERIFY_EXPLICIT_READ_POLICY';
+ }else if(status===403||status===404){
+  cause='RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED';route='VERIFY_REPOSITORY_PERMISSION_AND_SSO';
+ }else if(status!==null&&status>=500){
+  cause='PROVIDER_SERVER_FAILURE';route='SUSPEND_UNTIL_PROVIDER_RECHECK';
+ }
+ return Object.freeze({policy_id:'GOVERNED_GITHUB_READ_RECOVERY_V1',cause,route,
+  credential_mode:authenticated?'AUTHENTICATED':'PUBLIC_ONLY',
+  renewal_authority_verified:false,renewal_permitted:false,
+  automatic_retry_permitted:false,preserve_current_binding:true,
+  require_independent_shadow_lease_verification:true,
+  effect_replay_permitted:false,raw_secret_material_recorded:false});
+}
 class ReleaseProviderError extends Error{
- constructor(code,operation,kind,httpStatus=null,mismatches=[]){
+ constructor(code,operation,kind,httpStatus=null,mismatches=[],recovery=null){
   super(code);
   const op=operations.has(operation)?operation:'UNKNOWN_RELEASE_OPERATION';
   const effect=writeOps.has(op);
@@ -93,7 +124,8 @@ class ReleaseProviderError extends Error{
    identity_matches:kind==='IDENTITY_MISMATCH'?false:null,
    mismatched_fields:Object.freeze(mismatches.filter(f=>identityFields.has(f))),
    next_governed_action:next,automatic_replay_permitted:false,
-   effect_reconciliation_required:effect,credential_values_exposed:false});
+   effect_reconciliation_required:effect,credential_values_exposed:false,
+   ...(recovery&&!effect?{connection_recovery:recovery}:{})});
  }
 }
 export function releaseFailureReceipt(error){
@@ -113,7 +145,9 @@ export async function requestReleaseProviderJson(fetchImpl,url,init,operation,ti
    const kind=status===401?'AUTHENTICATION_REJECTED':status===403?'ACCESS_DENIED':
     status===404?'RESOURCE_NOT_FOUND_OR_HIDDEN':status===429?'RATE_LIMITED':
     status!==null&&status>=500?'PROVIDER_SERVER_ERROR':'HTTP_REQUEST_REJECTED';
-   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK',operation,kind,status);
+   const authenticated=typeof init?.headers?.Authorization==='string'||typeof init?.headers?.authorization==='string';
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK',operation,kind,status,[],
+    githubReadRecovery(operation,kind,response,authenticated));
   }
   let data;
   try{data=await response.json()}catch{

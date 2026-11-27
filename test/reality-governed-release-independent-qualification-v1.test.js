@@ -299,6 +299,10 @@ test('public CI is explicit, credential-free, exact and never falls back after r
  const authRejected=await run({e:env,ciStatus:401});
  assert.equal(authRejected.result.status,'INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE');
  assert.equal(authRejected.result.provider_failure.credential_rejected,true);
+ assert.equal(authRejected.result.provider_failure.connection_recovery.cause,'BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED');
+ assert.equal(authRejected.result.provider_failure.connection_recovery.renewal_permitted,false);
+ assert.equal(authRejected.result.provider_failure.connection_recovery.automatic_retry_permitted,false);
+ assert.equal(authRejected.result.provider_failure.connection_recovery.effect_replay_permitted,false);
  assert.equal(authRejected.calls.length,2);
  assert.equal((await run({e:{...publicEnv,REALITY_RELEASE_GITHUB_CI_READ_MODE:'AUTO'}})).result.status,
   'PINNED_RELEASE_OR_PROVIDER_PROOF_CONFIG_MISSING');

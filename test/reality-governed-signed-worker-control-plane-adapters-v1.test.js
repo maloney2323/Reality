@@ -337,3 +337,35 @@ test('active alias verification accepts documented readyState, rejects non-ready
   assert.equal(reads,2);
  }
 });
+
+test('GitHub provider renewal routing is cause-aware, fail-closed and secret-free',async()=>{
+ const cases=[
+  [401,{},true,'BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED','VERIFY_ISSUER_SCOPE_AND_RENEWAL_AUTHORITY'],
+  [401,{},false,'ANONYMOUS_READ_REJECTED','VERIFY_EXPLICIT_READ_POLICY'],
+  [403,{'x-github-sso':'required; url=https://example.invalid/secret-material'},true,'ORGANIZATION_SSO_AUTHORIZATION_REQUIRED','REQUEST_EXACT_REAUTHORIZATION'],
+  [403,{'x-ratelimit-remaining':'0'},true,'PROVIDER_RATE_LIMIT_OBSERVED','SUSPEND_UNTIL_PROVIDER_RECHECK'],
+  [429,{},true,'PROVIDER_RATE_LIMIT_OBSERVED','SUSPEND_UNTIL_PROVIDER_RECHECK'],
+  [403,{},true,'RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED','VERIFY_REPOSITORY_PERMISSION_AND_SSO'],
+  [404,{},true,'RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED','VERIFY_REPOSITORY_PERMISSION_AND_SSO'],
+  [503,{},true,'PROVIDER_SERVER_FAILURE','SUSPEND_UNTIL_PROVIDER_RECHECK']
+ ];
+ for(const [status,headers,auth,cause,route] of cases){
+  let count=0;
+  const fetchImpl=async()=>{count++;return {ok:false,status,headers:new Headers(headers),json:async()=>{throw Error('body must not be read')}}};
+  try{
+   await requestReleaseProviderJson(fetchImpl,'https://api.github.com/repos/example-org/example-repo/actions/runs/1',
+    {method:'GET',headers:auth?{Authorization:'Bearer secret-material'}:{}},'GITHUB_LIFECYCLE_CI_READ');
+   assert.fail('must fail');
+  }catch(e){
+   const receipt=releaseFailureReceipt(e);
+   assert.equal(receipt.connection_recovery.cause,cause);
+   assert.equal(receipt.connection_recovery.route,route);
+   assert.equal(receipt.connection_recovery.renewal_permitted,false);
+   assert.equal(receipt.connection_recovery.automatic_retry_permitted,false);
+   assert.equal(receipt.connection_recovery.preserve_current_binding,true);
+   assert.equal(receipt.connection_recovery.effect_replay_permitted,false);
+   assert.equal(JSON.stringify(receipt).includes('secret-material'),false);
+   assert.equal(count,1);
+  }
+ }
+});

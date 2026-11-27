@@ -34,6 +34,26 @@ const publicRepoMatches=(r,repo)=>r?.full_name===repo&&r.private===false&&
 const publicRunMatches=(run,repo,identity)=>run?.repository?.full_name===repo&&
  run.repository.private===false&&run.repository.id===identity.id;
 const providerFailure=error=>({provider_failure:releaseFailureReceipt(error)});
+// Read-only proposed checkpoint for the EXISTING Continuity writer.
+// Never claim a durable freeze, renewal lease, or resume authorization.
+function githubFailureCheckpoint(error,direction,branch,sha,repo,operation,runId){
+ const failure=releaseFailureReceipt(error);
+ if(!failure?.connection_recovery||!direction)return providerFailure(error);
+ const fields={owner_id:direction.owner_id,shift_id:direction.shift_id,
+  original_work_id:direction.original_work_id,continuity_root_id:direction.continuity_root_id,
+  continuity_revision:direction.continuity_revision,continuity_head_sha256:direction.continuity_head_sha256,
+  plan_fingerprint:direction.plan_fingerprint,release_ref:branch,release_sha:sha,
+  connection_id:'GITHUB_RELEASE_CI_READ:'+repo,paused_step:operation,run_id:runId,
+  policy_id:failure.connection_recovery.policy_id};
+ const input=digest(fields);
+ return {provider_failure:failure,connection_recovery_checkpoint:Object.freeze({
+  ...fields,input_digest:input,idempotency_key:input,
+  failure_class:failure.connection_recovery.cause,route:failure.connection_recovery.route,
+  state:'CHECKPOINT_CANDIDATE_NOT_DURABLE',durable_freeze_verified:false,
+  renewal_authority_verified:false,resume_permitted:false,
+  next_governed_action:'FREEZE_EXISTING_CONTINUITY_CHECKPOINT_AND_VERIFY_CONNECTION_AUTHORITY'
+ })};
+}
 const identityFailure=(operation,value,fields)=>providerFailure(
  releaseIdentityFailure('RELEASE_QUALIFICATION_IDENTITY_MISMATCH',operation,value,fields));
 export async function qualifyCurrentIsolatedSignedWorkerRelease({
@@ -132,7 +152,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  let publicIdentity=null;
  if(publicCI){
   try{publicIdentity=await getJson(fetchImpl,githubBase,null,'GITHUB_PUBLIC_REPOSITORY_READ')}
-  catch(error){return safe('INDEPENDENT_PUBLIC_REPOSITORY_READ_UNAVAILABLE',providerFailure(error))}
+  catch(error){return safe('INDEPENDENT_PUBLIC_REPOSITORY_READ_UNAVAILABLE',githubFailureCheckpoint(error,canonical?direction:null,branch,sha,repo,'GITHUB_PUBLIC_REPOSITORY_READ',null))}
   if(!publicRepoMatches(publicIdentity,repo))return safe('INDEPENDENT_PUBLIC_REPOSITORY_IDENTITY_NOT_VERIFIED',
    identityFailure('GITHUB_PUBLIC_REPOSITORY_READ',publicIdentity,['repository']));
  }
@@ -141,7 +161,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   ci=await getJson(fetchImpl,
    githubBase+'/actions/runs/'+ciId,githubToken,'GITHUB_LIFECYCLE_CI_READ');
  }catch(error){
-  return safe('INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE',providerFailure(error));
+  return safe('INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE',githubFailureCheckpoint(error,canonical?direction:null,branch,sha,repo,'GITHUB_LIFECYCLE_CI_READ',ciId));
  }
  if(publicCI&&!publicRunMatches(ci,repo,publicIdentity))return safe('INDEPENDENT_PUBLIC_LIFECYCLE_REPOSITORY_IDENTITY_NOT_VERIFIED',
   identityFailure('GITHUB_LIFECYCLE_CI_READ',ci,['repository']));
@@ -155,7 +175,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  let gateway=null;
  if(canonical){
   try{gateway=await getJson(fetchImpl,githubBase+'/actions/runs/'+gatewayId,githubToken,'GITHUB_GATEWAY_CI_READ')}
-  catch(error){return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE',providerFailure(error))}
+  catch(error){return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE',githubFailureCheckpoint(error,canonical?direction:null,branch,sha,repo,'GITHUB_GATEWAY_CI_READ',gatewayId))}
   if(publicCI&&!publicRunMatches(gateway,repo,publicIdentity))return safe('INDEPENDENT_PUBLIC_GATEWAY_REPOSITORY_IDENTITY_NOT_VERIFIED',
    identityFailure('GITHUB_GATEWAY_CI_READ',gateway,['repository']));
   if(gateway?.id!==gatewayId||gateway.head_sha!==sha||gateway.head_branch!==branch||
