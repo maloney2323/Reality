@@ -631,7 +631,14 @@ test('signed worker connects the same Continuity/verifier BEFORE its first opera
  const maintenance=worker.indexOf("workerStage='SIGNED_MAINTENANCE_REGISTERED_EXECUTOR_HANDOFF'");
  const universe=worker.indexOf("workerStage='SIGNED_MAINTENANCE_POSTINSTALL_UNIVERSE_RECONCILIATION'");
  const returnFence=worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'");
- const publish=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'");
+ const publish=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",returnFence);
+ const exactStart=worker.indexOf('if(suspensionInvestigationWake){');
+ const exact=worker.slice(exactStart,i);
+ assert.ok(exactStart>0&&exactStart<i);
+ assert.match(exact,/suspensionEventId:governedWakeScope.event_id/);
+ assert.match(exact,/reality_observe_final_loop_suspension_investigation_v1/);
+ assert.match(exact,/return res.status\(200\).json/);
+ assert.doesNotMatch(exact,/claim_final_loop_child_review_v1|execute_signed_continuity_recovery_v1/);
  assert.ok(i>0&&i<q&&q<gate&&gate<effect&&effect<maintenance);
  assert.ok(universe>maintenance&&returnFence>universe&&publish>returnFence);
  assert.match(worker,/FINAL_LOOP_SHARED_CONTINUITY_PREEXECUTION_FENCE_REJECTED/);
