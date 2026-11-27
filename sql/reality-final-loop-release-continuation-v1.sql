@@ -216,12 +216,14 @@ REVOKE ALL ON FUNCTION reality_internal.stage_final_loop_independent_investigati
 -- completed distinct review, never by a model recommendation.
 CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_verified_terminal_review_v1(
  p_owner_id uuid,p_shift_id uuid,p_original_work_id text,p_source_ref text,p_head text,p_revision bigint)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE result jsonb;
+BEGIN
  SELECT r.independent_verdict||pg_catalog.jsonb_build_object(
   'review_receipt_sha256',r.receipt_sha256,'review_event_id',e.event_id,
   'qualifier_receipt_sha256',q.reconciliation_receipt_sha256,
   'continuity_root_id',g.value->>'continuity_root_id',
-  'terminal_history',q.reconciliation_snapshot->'recovery_terminal_history')
+  'terminal_history',q.reconciliation_snapshot->'recovery_terminal_history') INTO result
  FROM reality_internal.shift_continuity_independent_reviews_v1 r
  JOIN reality_internal.final_loop_resume_events_v1 e ON e.event_id=r.review_event_id
   AND e.owner_id=r.owner_id AND e.shift_id=r.shift_id AND e.original_work_id=r.original_work_id
@@ -274,7 +276,8 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
     AND ob->>'qualifier_digest_verified'='true' AND ob->>'qualifier_receipt_sha256'=q.reconciliation_receipt_sha256
     AND ob->>'independent_original_outcome_verified'='false')
  ORDER BY r.completed_at DESC LIMIT 1;
-$fn$;
+ RETURN result;
+END $fn$;
 REVOKE ALL ON FUNCTION reality_internal.read_final_loop_verified_terminal_review_v1(uuid,uuid,text,text,text,bigint) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_terminal_review_v1(uuid,uuid,text,text,text,bigint) TO service_role;
 
@@ -817,6 +820,9 @@ BEGIN
        AND e.release_continuation_claim_id=a.claim_id)
       OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
        AND e.signal_next_action='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
+       AND e.release_continuation_claim_id=a.claim_id)
+      OR (e.signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'
+       AND e.signal_next_action='READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'
        AND e.release_continuation_claim_id=a.claim_id))
     AND e.governed_wake_request_id IS NOT NULL
     AND e.governed_wake_queued_at>=a.claimed_at
