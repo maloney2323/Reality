@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {needsRealityCapabilityInspection,readRealitySelfVisibilityForChat,
- reconcileOwnerOriginalStatesForChat}
+ reconcileOwnerOriginalStatesForChat,projectCurrentContinuitySelfVisibility}
  from '../src/reality-chat-self-visibility-v1.js';
 const sha='a'.repeat(40),tree='b'.repeat(40);
 const session={user_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
@@ -37,7 +37,7 @@ const sourceGet=async(u,request)=>{
 };
 const base={session,message:'Investigate Reality drifting ROI visualization and existing verification capabilities',
  env,db,fetchImpl:sourceGet,
- readAudit:async()=>null};
+ readAudit:async()=>null,readCurrent:async()=>null};
 
 test('exact current and follow-up owner questions trigger source-backed self-inspection',()=>{
  for(const text of [
@@ -204,4 +204,44 @@ test('unverified assistant settlement claims or another original never close a j
   assert.equal(x.effectively_unsettled_original_count,1);
   assert.equal(x.source_projection_disagreements.length,0);
  }
+});
+
+test('current canonical receipts take precedence over source-only self descriptions without granting authority',async()=>{
+ const owner=session.user_id,shift='11111111-2222-4333-8444-555555555555';
+ const root='22222222-3333-4444-8555-666666666666',incident='33333333-4444-4555-8666-777777777777';
+ const investigator='44444444-5555-4666-8777-888888888888',reviewer='55555555-6666-4777-8888-999999999999';
+ const H=x=>'sha256:'+x.repeat(64),work='work:'+'1'.repeat(32),head=H('2');
+ const observed='2026-11-27T13:00:00Z';
+ const investigation={incident_id:incident,investigation_worker_run_id:investigator,
+  investigation_receipt_sha256:H('3'),suspension_receipt_sha256:H('4')};
+ const ob={shift_id:shift,shift_status:'AWAITING_EXACT_ORIGINAL_WORK',existing_shift_authorized:true,
+  warrant_mode:'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS',original_work_id:work,
+  source_ref:'https://github.com/fixture/repository/pull/1',continuity_root_id:root,continuity_head_sha256:head,
+  continuity_revision:3,guard_receipt_sha256:H('5'),qualifier_receipt_sha256:H('6'),
+  unresolved_proof_gates:['FROZEN_TEST_MISSING'],current_events:[],
+  verified_investigation:investigation,verified_independent_review:null,active_release_observation:null,
+  operational_next_action:'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',
+  read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false};
+ const raw={status:'OWNER_CURRENT_CONTINUITY_SELF_VISIBILITY_READ_ONLY',owner_id:owner,
+  observed_at:observed,active_shift_count:1,unverified_guard_count:0,obligations:[ob],
+  owner_scope_verified:true,read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false};
+ const current=projectCurrentContinuitySelfVisibility(raw,owner);
+ assert.equal(current.observations[0].autonomous_investigation_verified_live,true);
+ assert.equal(current.observations[0].independent_review_verified_live,false);
+ assert.match(current.observations[0].summary,/Autonomous investigation VERIFIED LIVE/);
+ const result=await readRealitySelfVisibilityForChat({...base,
+  readCurrent:async()=>current,readSource:async()=>({sha,tree_sha:tree,files:paths})});
+ assert.equal(result[0].event_kind,'reality_current_verified_operational_self_visibility');
+ assert.equal(result[0].execution_authorized,false);
+ assert.equal(result[1].event_kind,'reality_pinned_provider_source_capability_inventory');
+ const review={receipt_sha256:H('7'),investigation_receipt_sha256:H('3'),investigation_worker_run_id:investigator,
+  review_worker_run_id:reviewer,original_work_id:work,continuity_head_sha256:head,continuity_revision:3,
+  review_status:'SOURCE_MATCHED_NEEDS_FROZEN_TEST',execution_authorized:false,replay_authorized:false,
+  original_job_completed:false,production_changed:false};
+ const reviewed=projectCurrentContinuitySelfVisibility({...raw,obligations:[{...ob,verified_independent_review:review}]},owner);
+ assert.equal(reviewed.observations[0].independent_review_verified_live,true);
+ assert.match(reviewed.observations[0].summary,/Not proof of repair/);
+ assert.equal(projectCurrentContinuitySelfVisibility(raw,reviewer),null);
+ assert.equal(projectCurrentContinuitySelfVisibility({...raw,execution_authorized:true},owner),null);
+ assert.equal(projectCurrentContinuitySelfVisibility({...raw,obligations:[{...ob,verified_independent_review:{...review,review_worker_run_id:investigator}}]},owner),null);
 });
