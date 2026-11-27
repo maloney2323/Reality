@@ -252,6 +252,61 @@ BEGIN
  PERFORM reality_internal.notify_final_loop_governed_trigger_v1(i.shift_id);
  IF (SELECT count(*) FROM net.fake_requests)<>2 THEN RAISE EXCEPTION 'REVIEW_SIGNAL_REPLAYED';END IF;
 END $$;
+-- Reproduce the real three-reader identity boundary. The fixture still
+-- supplies synthetic proof data; all event staging, trigger and dispatch
+-- paths below are the actual installed SQL.
+CREATE FUNCTION public.reality_read_owner_shift_execution_graph_v1(uuid,uuid)
+ RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $role$
+BEGIN
+ if current_user<>'service_role' then
+  RAISE EXCEPTION 'UNIFIED_SHIFT_EXECUTION_SERVICE_ONLY'; END IF;
+ RETURN '{}'::jsonb;
+END $role$;
+CREATE OR REPLACE FUNCTION public.reality_read_current_final_loop_proof_envelope_v1(uuid)
+ RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $role$
+BEGIN
+ IF current_user <> 'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CANONICAL_READER_SERVICE_ONLY'; END IF;
+ PERFORM public.reality_read_owner_shift_execution_graph_v1(NULL,$1);
+ RETURN (SELECT proof FROM public.suspension_fixture_proof WHERE shift_id=$1);
+END $role$;
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid)
+ RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $role$
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_SHARED_CONTINUITY_SERVICE_ONLY';END IF;
+ PERFORM public.reality_read_current_final_loop_proof_envelope_v1($1);
+ RETURN (SELECT guard FROM public.suspension_fixture_proof WHERE shift_id=$1);
+END $role$;
+REVOKE ALL ON FUNCTION public.reality_read_owner_shift_execution_graph_v1(uuid,uuid),
+ public.reality_read_current_final_loop_proof_envelope_v1(uuid),
+ public.reality_read_final_loop_shared_continuity_guard_v1(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_read_owner_shift_execution_graph_v1(uuid,uuid),
+ public.reality_read_current_final_loop_proof_envelope_v1(uuid),
+ public.reality_read_final_loop_shared_continuity_guard_v1(uuid) TO service_role;
+DO $$ BEGIN
+ BEGIN
+  PERFORM public.reality_read_final_loop_shared_continuity_guard_v1(NULL);
+  RAISE EXCEPTION 'FIXTURE_MISSING_REAL_IDENTITY_FENCE';
+ EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM<>'FINAL_LOOP_SHARED_CONTINUITY_SERVICE_ONLY' THEN RAISE;END IF;
+ END;
+END $$;
+\if :{?identity_red}
+\echo 'Testing original trigger identity defect'
+\else
+\ir ../sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql
+-- Reapplication must be a no-op, with public access still forbidden.
+\ir ../sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql
+DO $$ DECLARE sig text; BEGIN
+ FOREACH sig IN ARRAY ARRAY['public.reality_read_owner_shift_execution_graph_v1(uuid,uuid)',
+  'public.reality_read_current_final_loop_proof_envelope_v1(uuid)',
+  'public.reality_read_final_loop_shared_continuity_guard_v1(uuid)'] LOOP
+  IF has_function_privilege('anon',sig,'EXECUTE') OR has_function_privilege('authenticated',sig,'EXECUTE')
+   OR NOT has_function_privilege('service_role',sig,'EXECUTE')
+  THEN RAISE EXCEPTION 'CONTINUITY_READER_PRIVILEGE_CHANGED'; END IF;
+ END LOOP;
+END $$;
+\endif
 SET ROLE service_role;
 DO $$
 DECLARE e record; oldrun uuid; newrun uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid();
@@ -336,6 +391,8 @@ BEGIN
  UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET released_at=clock_timestamp(),lease_expires_at=clock_timestamp();
  SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE';
  IF e.governed_wake_request_id IS NULL OR (SELECT count(*) FROM net.fake_requests)<>3 THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_NOT_DELIVERED';END IF;
+ PERFORM reality_internal.notify_final_loop_governed_trigger_v1(e.shift_id);
+ IF (SELECT count(*) FROM net.fake_requests)<>3 THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_DELIVERY_REPLAYED';END IF;
 END $$;
 SET ROLE service_role;
 DO $$
