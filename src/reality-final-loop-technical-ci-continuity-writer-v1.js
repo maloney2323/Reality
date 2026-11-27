@@ -137,3 +137,67 @@ export async function attachVerifiedTechnicalCiToContinuity({
   observation_receipt_sha256:after.observation_receipt_sha256,
   next_governed_action:'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'});
 }
+
+/** Existing technical evidence verifier -> canonical original-bound evidence
+ * return. Never freeze a fresh strategy to make a read-only observation. */
+export async function returnTerminalTechnicalEvidenceToContinuity({
+ db,env=process.env,wake,workerRunId,eventId,context,technicalCiProviderProof,call=shiftRpc
+}={}){
+ const c=context,p=technicalCiProviderProof;
+ if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||
+  db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+  db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||
+  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+  env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true'||
+  wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+  !UUID.test(workerRunId||'')||!UUID.test(eventId||'')||
+  c?.status!=='TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY'||
+  c.event_id!==eventId||c.shift_id!==wake.shift_id||
+  c.execution_authorized!==false||c.replay_authorized!==false||
+  c.new_attempt_authorized!==false||c.previous_attempt_budget_preserved!==true||
+  c.review_worker_run_id===workerRunId||c.investigation_worker_run_id===workerRunId||
+  c.terminal_history?.remaining_attempts!==0||
+  !HASH.test(c.review_receipt_sha256||'')||!HASH.test(c.qualifier_receipt_sha256||'')||
+  !HASH.test(c.continuity_head_sha256||'')||!Number.isSafeInteger(c.continuity_revision)||
+  p?.status!=='RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED'||
+  p.contract_id!==null||p.owner_id!==c.owner_id||p.shift_id!==c.shift_id||
+  p.obligation_id!==c.original_work_id||p.source_ref!==c.source_ref||
+  p.source_revision!==c.frozen_source_head_sha||p.qualifier_receipt_sha256!==c.qualifier_receipt_sha256||
+  p.maintenance_id!==c.terminal_history.maintenance_id||
+  p.existing_diagnostic_receipt_sha256!==c.terminal_history.independent_diagnostic_receipt_sha256||
+  p.independent_technical_ci_verified!==true||p.frozen_technical_red_verified!==true||
+  p.independent_ci_provider_observation!==true||p.original_business_case_red_verified!==false||
+  p.original_job_completed!==false||p.execution_authorized!==false||p.production_changed!==false||
+  p.previous_attempt_budget_preserved!==true||p.new_attempt_authorized!==false||
+  p.repeat_prior_ci_dispatch_permitted!==false||
+  !HASH.test(p.github_artifact_digest||'')||p.github_release_sha!==env.VERCEL_GIT_COMMIT_SHA||
+  typeof call!=='function')return out('TERMINAL_TECHNICAL_EXACT_CONTEXT_OR_PROVIDER_PROOF_UNVERIFIED');
+ const exact={shift_id:c.shift_id,original_work_id:c.original_work_id,review_receipt_sha256:c.review_receipt_sha256};
+ let r;
+ try{r=await call(db,'reality_record_final_loop_technical_ci_observation_v1',{
+  p_shift_id:c.shift_id,p_event_id:eventId,p_worker_run_id:workerRunId,p_proof:p
+ },{timeoutMs:10000})}catch{return out('TERMINAL_TECHNICAL_WRITE_UNCERTAIN_NO_REPLAY',exact)}
+ if(r?.status!=='TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN'||
+  r.original_work_id!==c.original_work_id||!UUID.test(r.event_id||'')||
+  !UUID.test(r.checkpoint_receipt_id||'')||!HASH.test(r.observation_receipt_sha256||'')||
+  !HASH.test(r.continuity_head_sha256||'')||r.continuity_head_sha256===c.continuity_head_sha256||
+  r.revision!==c.continuity_revision+1||r.technical_observation_recorded!==true||
+  r.previous_attempt_budget_preserved!==true||r.new_attempt_authorized!==false||
+  r.original_business_red_verified!==false||r.original_job_completed!==false||
+  r.execution_authorized!==false||r.replay_authorized!==false||r.production_changed!==false)
+  return out('TERMINAL_TECHNICAL_RETURN_NOT_VERIFIED',exact);
+ let g;
+ try{g=await call(db,'reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:c.shift_id},{timeoutMs:6000})}
+ catch{return out('TERMINAL_TECHNICAL_RETURN_INDEPENDENT_READBACK_REQUIRED',exact)}
+ if(g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'||g.owner_id!==c.owner_id||g.shift_id!==c.shift_id||
+  g.continuity_root_id!==c.continuity_root_id||g.continuity_head_sha256!==r.continuity_head_sha256||
+  g.revision!==r.revision||g.execution_authorized!==false||!g.obligations?.some(o=>
+   o.original_work_id===c.original_work_id&&o.source_ref===c.source_ref&&
+   o.qualifier_digest_verified===true&&o.independent_original_outcome_verified===false))
+  return out('TERMINAL_TECHNICAL_RETURN_INDEPENDENT_READBACK_MISMATCH',exact);
+ return out('TERMINAL_TECHNICAL_EVIDENCE_DURABLY_RECONCILED_ORIGINAL_OPEN',{
+  ...exact,technical_observation_recorded:true,observation_receipt_sha256:r.observation_receipt_sha256,
+  continuity_head_sha256:r.continuity_head_sha256,continuity_revision:r.revision,canonical_event_id:r.event_id,
+  previous_attempt_budget_preserved:true,new_attempt_authorized:false,replay_authorized:false,
+  next_governed_action:'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED'});
+}
