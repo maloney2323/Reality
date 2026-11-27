@@ -326,3 +326,56 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid,uuid) TO service_role;
+
+-- Independently recompute the existing investigation receipt before observing
+-- the delivered signal. This is not repair/outcome verification or settlement.
+CREATE OR REPLACE FUNCTION public.reality_observe_final_loop_suspension_investigation_v1(
+ p_shift_id uuid,p_event_id uuid,p_worker_run_id uuid,p_incident_id uuid,p_receipt_sha256 text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE e record; i reality_internal.owner_shift_continuity_incidents_v1%ROWTYPE;
+ proof jsonb; computed text; n int;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'SUSPENSION_INVESTIGATION_OBSERVATION_SERVICE_ONLY';END IF;
+ SELECT ev.* INTO e FROM reality_internal.final_loop_resume_events_v1 ev
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=p_worker_run_id
+  AND run.status='STARTED' AND run.finished_at IS NULL
+ WHERE ev.shift_id=p_shift_id AND ev.event_id=p_event_id AND ev.governed_wake_worker_run_id=p_worker_run_id
+  AND ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' AND ev.state='SHADOW_PENDING'
+  AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+ FOR UPDATE OF ev;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','SUSPENSION_INVESTIGATION_EVENT_UNVERIFIED','execution_authorized',false);END IF;
+ SELECT * INTO i FROM reality_internal.owner_shift_continuity_incidents_v1
+ WHERE incident_id=p_incident_id AND owner_id=e.owner_id AND shift_id=e.shift_id
+  AND kind='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'
+  AND phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'
+  AND investigation_receipt_sha256=p_receipt_sha256
+  AND source_evidence->>'event_id'=e.event_id::text
+  AND source_evidence->>'worker_run_id'=p_worker_run_id::text
+  AND source_evidence->>'original_work_id'=e.original_work_id
+  AND source_evidence->>'continuity_head_sha256'=e.continuity_head_sha256
+  AND source_evidence->>'verified_suspension_receipt_sha256'=e.source_receipt_sha256
+  AND source_evidence->>'replay_authorized'='false'
+  AND source_evidence->>'new_attempt_authorized'='false'
+  AND evidence_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(source_evidence::text,'UTF8')),'hex')
+ FOR UPDATE;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','SUSPENSION_INVESTIGATION_RECEIPT_UNVERIFIED','execution_authorized',false);END IF;
+ proof:=pg_catalog.jsonb_build_object('owner_id',i.owner_id,'incident_id',i.incident_id,
+  'evidence_sha256',i.evidence_sha256,'model_response_id',i.model_response_id,
+  'assigned_employee',i.assigned_employee,'reviewer',i.independent_reviewer,
+  'diagnosis',i.diagnosis,'proposed_upgrade',i.proposed_upgrade,
+  'required_independent_test',i.independent_test_requirement,'limitations',i.limitations,
+  'new_original_jobs_created',0,'installation_authorized',false);
+ computed:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(proof::text,'UTF8')),'hex');
+ IF computed IS DISTINCT FROM p_receipt_sha256 THEN RETURN pg_catalog.jsonb_build_object('status','SUSPENSION_INVESTIGATION_RECEIPT_HASH_MISMATCH','execution_authorized',false);END IF;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET state='SHADOW_OBSERVED',observed_at=pg_catalog.clock_timestamp()
+ WHERE event_id=p_event_id AND state='SHADOW_PENDING' AND governed_wake_worker_run_id=p_worker_run_id;
+ GET DIAGNOSTICS n=ROW_COUNT;
+ IF n<>1 THEN RAISE EXCEPTION 'SUSPENSION_INVESTIGATION_OBSERVATION_CAS_FAILED';END IF;
+ RETURN pg_catalog.jsonb_build_object('status','SUSPENSION_INVESTIGATION_RECEIPT_INDEPENDENTLY_READ_BACK',
+  'event_id',p_event_id,'incident_id',p_incident_id,'worker_run_id',p_worker_run_id,
+  'investigation_receipt_sha256',computed,'continuity_revision',e.continuity_revision,
+  'previous_attempt_budget_preserved',true,'replay_authorized',false,'new_attempt_authorized',false,
+  'execution_authorized',false,'original_job_completed',false,'installation_authorized',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_observe_final_loop_suspension_investigation_v1(uuid,uuid,uuid,uuid,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_observe_final_loop_suspension_investigation_v1(uuid,uuid,uuid,uuid,text) TO service_role;
