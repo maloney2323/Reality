@@ -62,7 +62,22 @@ CREATE TABLE reality_internal.shift_continuity_independent_reviews_v1(incident_i
  claimed_at timestamptz DEFAULT clock_timestamp(),status text DEFAULT 'REVIEW_CLAIMED',
  current_provider_sha256 text,provider_checked_at timestamptz,source_head_sha text,receipt_sha256 text,completed_at timestamptz,
  installation_authorized boolean DEFAULT false,production_changed boolean DEFAULT false,original_job_completed boolean DEFAULT false);
+ALTER TABLE public.universe_events ADD COLUMN event_kind text,ADD COLUMN entity_id uuid,ADD COLUMN effective_time timestamptz,ADD COLUMN evidence_refs jsonb;
+ALTER TABLE reality_internal.final_loop_transition_receipts_v1 ADD COLUMN plan_fingerprint text,ADD COLUMN frozen_shift_scope_sha256 text;
 CREATE TABLE public.suspension_fixture_proof(shift_id uuid PRIMARY KEY,proof jsonb,guard jsonb);
+-- Simulate the existing canonical proof reader deriving its current head
+-- and revision from the appended observation/transition, not a real effect.
+CREATE FUNCTION public.fixture_terminal_observation_head() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fixture$
+BEGIN
+ IF NEW.entity_type='reality_final_loop_terminal_technical_observation_v1' THEN
+ UPDATE public.suspension_fixture_proof SET
+ proof=proof||pg_catalog.jsonb_build_object('continuity_head_sha256','sha256:'||NEW.lineage_hash,'revision',(proof->>'revision')::bigint+1),
+ guard=guard||pg_catalog.jsonb_build_object('continuity_head_sha256','sha256:'||NEW.lineage_hash,'revision',(guard->>'revision')::bigint+1)
+ WHERE shift_id=(NEW.payload->>'shift_id')::uuid;
+ END IF;
+ RETURN NEW;
+END $fixture$;
+CREATE TRIGGER fixture_terminal_head AFTER INSERT ON public.universe_events FOR EACH ROW EXECUTE FUNCTION public.fixture_terminal_observation_head();
 CREATE FUNCTION public.reality_read_current_final_loop_proof_envelope_v1(uuid) RETURNS jsonb LANGUAGE sql AS
  'SELECT proof FROM public.suspension_fixture_proof WHERE shift_id=$1';
 CREATE FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) RETURNS jsonb LANGUAGE sql AS
@@ -70,7 +85,7 @@ CREATE FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) 
 \ir ../sql/reality-final-loop-release-continuation-v1.sql
 \ir ../sql/reality-final-loop-blocker-incident-handoff-v1.sql
 GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA reality_internal TO service_role;
-GRANT SELECT ON public.universe_events,public.suspension_fixture_proof TO service_role;
+GRANT SELECT,INSERT,UPDATE ON public.universe_events,public.suspension_fixture_proof TO service_role;
 CREATE TRIGGER fixture_resume AFTER INSERT ON reality_internal.final_loop_resume_events_v1
  FOR EACH ROW EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
 CREATE TRIGGER fixture_lease_release AFTER UPDATE OF released_at ON reality_internal.governed_preview_shift_worker_leases_v1
@@ -113,11 +128,11 @@ BEGIN
  payload:=jsonb_build_object('owner_id',o,'shift_id',s,'original_work_id',work,'source_ref',src,'provider_outcome_verified',false,
  'original_job_completed',false,'execution_authorized',false,'replay_authorized',false,'production_changed',false,
  'unresolved_proof_gates',gates,'terminal_recovery_history',jsonb_build_object('remaining_attempts',0,'replay_permitted',false));
- INSERT INTO public.universe_events VALUES(parent,root,world,NULL,'fixture_prior','OBSERVED',repeat('d',64),repeat('a',64),'{}','{}',now()-interval '6 minutes');
- INSERT INTO public.universe_events VALUES(observed,root,world,parent,'reality_final_loop_invocation_observation_v1','OBSERVED',repeat('e',64),
+ INSERT INTO public.universe_events(event_id,continuity_root_id,worldline_id,parent_event_id,entity_type,epistemic_status,lineage_hash,content_hash,payload,provenance,assertion_time) VALUES(parent,root,world,NULL,'fixture_prior','OBSERVED',repeat('d',64),repeat('a',64),'{}','{}',now()-interval '6 minutes');
+ INSERT INTO public.universe_events(event_id,continuity_root_id,worldline_id,parent_event_id,entity_type,epistemic_status,lineage_hash,content_hash,payload,provenance,assertion_time) VALUES(observed,root,world,parent,'reality_final_loop_invocation_observation_v1','OBSERVED',repeat('e',64),
  encode(sha256(convert_to(public.reality_continuity_canonical_json_v1(payload),'UTF8')),'hex'),payload,
  jsonb_build_object('worker_run_id',oldrun,'continuity_spine',jsonb_build_object('prior_lineage_hash',repeat('d',64),'source_event_id',parent)),now()-interval '4 minutes');
- INSERT INTO reality_internal.final_loop_transition_receipts_v1 VALUES(receipt,o,s,work,src,root,oldhead,2,'SUSPEND','PROVIDER_EFFECT_UNCERTAIN',oldrun,receipt_hash);
+ INSERT INTO reality_internal.final_loop_transition_receipts_v1(receipt_id,owner_id,shift_id,original_work_id,source_ref,continuity_root_id,continuity_head_sha256,expected_revision,decision,reason_code,worker_run_id,receipt_sha256) VALUES(receipt,o,s,work,src,root,oldhead,2,'SUSPEND','PROVIDER_EFFECT_UNCERTAIN',oldrun,receipt_hash);
  INSERT INTO reality_internal.final_loop_child_approval_packets_v1 VALUES(packet,src,'EFFECT_RESERVED_RECONCILE_ONLY');
  INSERT INTO reality_internal.final_loop_child_review_work_v1(child_work_id,packet_id,owner_id,shift_id,parent_original_work_id,phase)
  VALUES(gen_random_uuid(),packet,o,s,work,'ADMITTED');
@@ -130,12 +145,13 @@ BEGIN
  'original_claim_admitted',false,'universe_return_verified',false,
  'continuity_identity_verified',true,'qualifier_digest_verified',true,'source_proof_verified',true,'independent_original_outcome_verified',false,
  'execution_spine_readback',jsonb_build_object('status','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN','canonical_return_event_id',observed,'replay_authorized',false))));
- INSERT INTO public.suspension_fixture_proof VALUES(s,proof,guard);
+ INSERT INTO public.suspension_fixture_proof VALUES(s,proof||jsonb_build_object('continuity_root_id',root,'frozen_shift_scope_sha256',wake_hash),guard);
  qualification:=jsonb_build_object('shift_id',s,'original_candidate_work_id',work,'source_proof_bound',true,
   'review_scope_qualified',true,'exact_goal_event_verified',true,'exact_acceptance_approval_verified',true,
   'source_head_sha',repeat('c',40),'accepted_review_scope',jsonb_build_object('source_head_sha',repeat('c',40),
   'parent_original_work_id',work,'source_ref',src,'execution_authorized',false),'unsatisfied_gates',gates,
-  'recovery_terminal_history',jsonb_build_object('remaining_attempts',0,'replay_permitted',false,'new_attempt_authorized',false));
+  'recovery_terminal_boundary',true,'recovery_terminal_history',jsonb_build_object('original_work_id',work,'maintenance_id',gen_random_uuid(),
+   'remaining_attempts',0,'replay_permitted',false,'new_attempt_authorized',false,'independent_diagnostic_receipt_sha256','sha256:'||repeat('7',64)));
  INSERT INTO reality_internal.owner_continuity_qualification_routes_v1 VALUES(o,src,
   'sha256:'||encode(sha256(convert_to(qualification::text,'UTF8')),'hex'),qualification,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',clock_timestamp());
  scope:=jsonb_build_object('target_deployment_id','dpl_fixture_corrected','runtime_database_project_ref','hvkfreoagbrphwghjajw',
@@ -286,6 +302,9 @@ BEGIN
  visibility:=public.reality_read_owner_current_continuity_self_visibility_v1(e.owner_id);
  IF visibility->'obligations'->0->'verified_independent_review' IS DISTINCT FROM 'null'::jsonb
  THEN RAISE EXCEPTION 'SELF_VISIBILITY_PREMATURE_REVIEW_PROOF';END IF;
+ -- Bind the fixture guard to the actual canonical qualifier digest, not the initial placeholder.
+ UPDATE public.suspension_fixture_proof f SET guard=jsonb_set(f.guard,'{obligations,0,qualifier_receipt_sha256}',to_jsonb(q.reconciliation_receipt_sha256))
+ FROM reality_internal.owner_continuity_qualification_routes_v1 q WHERE f.shift_id=e.shift_id AND q.owner_id=e.owner_id AND q.source_ref=e.source_ref;
  UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp(),
  worker_stage='INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION' WHERE run_id=newrun;
  visibility:=public.reality_read_owner_current_continuity_self_visibility_v1(e.owner_id);
@@ -306,3 +325,57 @@ DO $$ BEGIN
  OR has_function_privilege('anon','public.reality_observe_final_loop_suspension_investigation_v1(uuid,uuid,uuid,uuid,text)','EXECUTE')
  THEN RAISE EXCEPTION 'INVESTIGATION_RPC_PUBLICLY_EXPOSED';END IF;
 END $$;
+
+-- Continue the same fixture original through the distinct terminal evidence
+-- run, without installing or resetting its exhausted strategy.
+DO $$
+DECLARE e record;
+BEGIN
+ SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE';
+ IF NOT FOUND OR e.governed_wake_request_id IS NOT NULL THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_EVENT_NOT_STAGED_OR_LEASE_BYPASSED';END IF;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET released_at=clock_timestamp(),lease_expires_at=clock_timestamp();
+ SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE';
+ IF e.governed_wake_request_id IS NULL OR (SELECT count(*) FROM net.fake_requests)<>3 THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_NOT_DELIVERED';END IF;
+END $$;
+SET ROLE service_role;
+DO $$
+DECLARE e record; run uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid(); plan text; ctx jsonb; r jsonb; proof jsonb;
+BEGIN
+ SELECT * INTO e FROM reality_internal.final_loop_resume_events_v1 WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE';
+ SELECT plan_fingerprint INTO plan FROM reality_internal.governed_employee_shifts_v1 WHERE shift_id=e.shift_id;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET claim_id=lease,claimed_at=clock_timestamp()-interval '1 second',
+ released_at=NULL,lease_expires_at=clock_timestamp()+interval '2 minutes';
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1 VALUES(run,'STARTED',clock_timestamp(),NULL,'FIXTURE_TERMINAL_READBACK');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1 VALUES(run,e.owner_id,e.shift_id,e.release_continuation_claim_id,
+ repeat('2',40),'fixture-corrected','NORMAL_SIGNED_SHIFT','sha256:'||repeat('2',64));
+ UPDATE reality_internal.governed_employee_shift_worker_pulses_v1 SET last_worker_seen_at=clock_timestamp(),last_worker_status='WAKE_RECEIVED'
+ WHERE shift_id=e.shift_id;
+ r:=public.reality_claim_canonical_governed_wake_v1(e.owner_id,e.shift_id,plan,e.event_id,e.governed_wake_nonce,'RESUME',repeat('2',40),run,lease);
+ IF r->>'status'<>'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' OR r->>'terminal_technical_evidence_only'<>'true' OR r->>'execution_authorized'<>'false'
+ THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_CLAIM_UNVERIFIED %',r;END IF;
+ ctx:=public.reality_read_final_loop_terminal_technical_context_v1(e.shift_id,e.event_id,run);
+ IF ctx->>'status'<>'TERMINAL_TECHNICAL_CONTEXT_VERIFIED_READ_ONLY' OR ctx->>'original_work_id'<>e.original_work_id
+ THEN RAISE EXCEPTION 'TERMINAL_CONTEXT_UNVERIFIED %',ctx;END IF;
+ proof:=jsonb_build_object('status','RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED','contract_id',NULL,
+ 'owner_id',e.owner_id,'shift_id',e.shift_id,'obligation_id',e.original_work_id,'source_ref',e.source_ref,
+ 'source_revision',ctx->>'frozen_source_head_sha','qualifier_receipt_sha256',ctx->>'qualifier_receipt_sha256',
+ 'maintenance_id',ctx->'terminal_history'->>'maintenance_id','existing_diagnostic_receipt_sha256',ctx->'terminal_history'->>'independent_diagnostic_receipt_sha256',
+ 'independent_technical_ci_verified',true,'frozen_technical_red_verified',true,'independent_ci_provider_observation',true,
+ 'original_business_case_red_verified',false,'business_original_warrant_verified',false,'original_job_completed',false,
+ 'previous_attempt_budget_preserved',true,'new_attempt_authorized',false,'repeat_prior_ci_dispatch_permitted',false,
+ 'execution_authorized',false,'production_changed',false,'github_artifact_digest','sha256:'||repeat('9',64),
+ 'signed_case_spec_git_blob_sha',repeat('a',40),'github_run_id',123,'github_job_id',456,'github_artifact_id',789,'github_release_sha',repeat('2',40));
+ r:=public.reality_record_final_loop_technical_ci_observation_v1(e.shift_id,e.event_id,run,proof||jsonb_build_object('original_business_case_red_verified',true));
+ IF r->>'status'<>'TERMINAL_TECHNICAL_PROVIDER_PROOF_UNVERIFIED' THEN RAISE EXCEPTION 'TECHNICAL_PROOF_PROMOTED_TO_BUSINESS_RED';END IF;
+ r:=public.reality_record_final_loop_technical_ci_observation_v1(e.shift_id,e.event_id,run,proof);
+ IF r->>'status'<>'TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN' OR r->>'revision'<>'4'
+ OR r->>'original_job_completed'<>'false' OR r->>'new_attempt_authorized'<>'false'
+ THEN RAISE EXCEPTION 'TERMINAL_EVIDENCE_RETURN_UNVERIFIED %',r;END IF;
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 WHERE shift_id=e.shift_id AND (continuity_revision<>4 OR state<>'SUSPENDED'))
+ OR NOT EXISTS(SELECT 1 FROM public.universe_events WHERE entity_type='reality_final_loop_terminal_technical_observation_v1'
+ AND payload->>'original_work_id'=e.original_work_id AND payload->'terminal_recovery_history'->>'remaining_attempts'='0')
+ THEN RAISE EXCEPTION 'TERMINAL_RETURN_LOST_ORIGINAL_OR_BUDGET';END IF;
+ r:=public.reality_record_final_loop_technical_ci_observation_v1(e.shift_id,e.event_id,run,proof);
+ IF r->>'status'='TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN' THEN RAISE EXCEPTION 'TECHNICAL_RETURN_REPLAYED';END IF;
+END $$;
+RESET ROLE;
