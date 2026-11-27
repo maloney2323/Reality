@@ -37,8 +37,8 @@ test('fenced phase is observed in existing signed wake before same-worker invest
  const observer=worker.indexOf("reality_observe_signed_chat_review_incident_v1");
  const investigator=worker.indexOf("investigateOneSignedShiftContinuityIncident");
  assert.ok(observer>0&&investigator>0);
- const occurrence=worker.indexOf("const shiftContinuityInvestigation=");
- assert.ok(observer<occurrence);
+ const occurrence=worker.search(/(?:const|let) shiftContinuityInvestigation=/);
+ assert.ok(occurrence>0&&observer<occurrence);
  const sql=read('../supabase/migrations/20261122151000_governed_unsettled_transition_continuity_v1.sql');
  assert.ok(sql.includes("p_worker_run_id")&&sql.includes("last_worker_status='WAKE_RECEIVED'"));
  assert.ok(sql.includes("r.status='STARTED'")||sql.includes("run.status='STARTED'"));
@@ -61,10 +61,10 @@ test('model investigator strictly validates transition scope and cannot replay u
   "provider_status:Number.isInteger(r?.status)",
   "effect_settled:false,replay_authorized:false",
   "method:'GET'",
-  "source_evidence:chatReviewIncident?claim.source_evidence:null",
   "independent_unsettled_transition_readback:unsettledTransitionReadback",
   "Do not retry POST"
  ])assert.ok(investigator.includes(guard),guard);
+ assert.match(investigator,/source_evidence:chatReviewIncident(?:\|\|finalLoopIncident)?\?claim\.source_evidence:null/);
  const broker=read('../supabase/functions/reality-chat-recovery-quarantine-broker-v1/index.ts');
  assert.ok(broker.includes("RECOVERY_FENCED_PROVIDER_EFFECT_UNVERIFIED_NO_REPLAY"));
  assert.ok(broker.includes("if(s.phase==='SIGNED_CHAT_RECOVERY_PUBLISH_FENCED')"));
