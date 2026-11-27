@@ -69,6 +69,7 @@ jobs:
           node --check src/reality-genuine-capability-engine-v1.js
           node --test test/reality-genuine-capability-failure-classifier-v1.test.js
           node --test test/reality-genuine-capability-engine-v1.test.js
+          node --test test/reality-verified-ci-failure-evidence-candidate-v1.test.js
           node --test test/reality-genuine-capability-live-intake-v1.test.js
           node --test test/reality-genuine-capability-value-passport-v1.test.js
           node --test test/reality-genuine-capability-github-wakeup-v1.test.js
