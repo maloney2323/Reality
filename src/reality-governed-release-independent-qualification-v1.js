@@ -49,6 +49,9 @@ function githubFailureCheckpoint(error,direction,branch,sha,repo,operation,runId
  return {provider_failure:failure,connection_recovery_checkpoint:Object.freeze({
   ...fields,input_digest:input,idempotency_key:input,
   failure_class:failure.connection_recovery.cause,route:failure.connection_recovery.route,
+  renewal_eligibility:failure.connection_recovery.renewal_eligibility,
+  evidence_signal:failure.connection_recovery.evidence_signal,
+  provider_http_status:failure.http_status,provider_failure_fingerprint:digest(failure),
   state:'CHECKPOINT_CANDIDATE_NOT_DURABLE',durable_freeze_verified:false,
   renewal_authority_verified:false,resume_permitted:false,
   next_governed_action:'FREEZE_EXISTING_CONTINUITY_CHECKPOINT_AND_VERIFY_CONNECTION_AUTHORITY'

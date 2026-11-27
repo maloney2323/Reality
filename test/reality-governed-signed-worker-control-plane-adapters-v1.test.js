@@ -360,6 +360,15 @@ test('GitHub provider renewal routing is cause-aware, fail-closed and secret-fre
    const receipt=releaseFailureReceipt(e);
    assert.equal(receipt.connection_recovery.cause,cause);
    assert.equal(receipt.connection_recovery.route,route);
+   const eligibility={
+    BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED:'REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY',
+    ORGANIZATION_SSO_AUTHORIZATION_REQUIRED:'REAUTHORIZATION_ONLY',
+    RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED:'SCOPE_OR_AUTHORITY_REVIEW_ONLY'
+   }[cause]??'NO_CREDENTIAL_REPLACEMENT';
+   assert.equal(receipt.connection_recovery.renewal_eligibility,eligibility);
+   assert.equal(receipt.connection_recovery.evidence_signal,
+    cause==='ORGANIZATION_SSO_AUTHORIZATION_REQUIRED'?'HTTP_STATUS_AND_SSO_REQUIRED_HEADER':
+    headers['x-ratelimit-remaining']==='0'?'HTTP_STATUS_AND_RATE_LIMIT_REMAINING_ZERO':'HTTP_STATUS');
    assert.equal(receipt.connection_recovery.renewal_permitted,false);
    assert.equal(receipt.connection_recovery.automatic_retry_permitted,false);
    assert.equal(receipt.connection_recovery.preserve_current_binding,true);

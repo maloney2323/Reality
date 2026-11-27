@@ -82,21 +82,27 @@ function githubReadRecovery(operation,response,authenticated){
  const rate=header('x-ratelimit-remaining');
  const retry=header('retry-after');
  let cause='PROVIDER_READ_CAUSE_UNVERIFIED',route='QUARANTINE_AND_INVESTIGATE';
+ let signal='HTTP_STATUS',eligibility='NOT_ESTABLISHED';
  if(status===403&&typeof sso==='string'&&/^required(?:;|$)/i.test(sso)){
   cause='ORGANIZATION_SSO_AUTHORIZATION_REQUIRED';route='REQUEST_EXACT_REAUTHORIZATION';
+  signal='HTTP_STATUS_AND_SSO_REQUIRED_HEADER';eligibility='REAUTHORIZATION_ONLY';
  }else if(status===429||(status===403&&(rate==='0'||(typeof retry==='string'&&/^\d{1,8}$/.test(retry))))){
   cause='PROVIDER_RATE_LIMIT_OBSERVED';route='SUSPEND_UNTIL_PROVIDER_RECHECK';
+  signal=status===429?'HTTP_STATUS':rate==='0'?'HTTP_STATUS_AND_RATE_LIMIT_REMAINING_ZERO':'HTTP_STATUS_AND_RETRY_AFTER_PRESENT';
+  eligibility='NO_CREDENTIAL_REPLACEMENT';
  }else if(status===401&&authenticated){
   cause='BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED';route='VERIFY_ISSUER_SCOPE_AND_RENEWAL_AUTHORITY';
+  eligibility='REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY';
  }else if(status===401){
-  cause='ANONYMOUS_READ_REJECTED';route='VERIFY_EXPLICIT_READ_POLICY';
+  cause='ANONYMOUS_READ_REJECTED';route='VERIFY_EXPLICIT_READ_POLICY';eligibility='NO_CREDENTIAL_REPLACEMENT';
  }else if(status===403||status===404){
-  cause='RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED';route='VERIFY_REPOSITORY_PERMISSION_AND_SSO';
+  cause='RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED';route='VERIFY_REPOSITORY_PERMISSION_AND_SSO';eligibility='SCOPE_OR_AUTHORITY_REVIEW_ONLY';
  }else if(status!==null&&status>=500){
-  cause='PROVIDER_SERVER_FAILURE';route='SUSPEND_UNTIL_PROVIDER_RECHECK';
+  cause='PROVIDER_SERVER_FAILURE';route='SUSPEND_UNTIL_PROVIDER_RECHECK';eligibility='NO_CREDENTIAL_REPLACEMENT';
  }
  return Object.freeze({policy_id:'GOVERNED_GITHUB_READ_RECOVERY_V1',cause,route,
   credential_mode:authenticated?'AUTHENTICATED':'PUBLIC_ONLY',
+  renewal_eligibility:eligibility,evidence_signal:signal,
   renewal_authority_verified:false,renewal_permitted:false,
   automatic_retry_permitted:false,preserve_current_binding:true,
   require_independent_shadow_lease_verification:true,
