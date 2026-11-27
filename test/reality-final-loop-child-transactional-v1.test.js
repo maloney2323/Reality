@@ -836,11 +836,30 @@ test('canonical continuity RPCs use the existing exact gateway allowlist',async(
 test('signed child failure reaches the existing incident observer before wake completion',()=>{
  const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  const sql=readFileSync(new URL('../sql/reality-final-loop-blocker-incident-handoff-v1.sql',import.meta.url),'utf8');
- assert.match(worker,/p_safe_result:finalLoopChildReview.continuity_blocker_code/);
+ assert.match(worker,/p_safe_result:verifiedSuspensionInvestigationDue\?[\s\S]*?finalLoopChildReview\.continuity_blocker_code/);
  assert.match(worker,/final_loop_blocker_incident:finalLoopBlockerIncident/);
  assert.match(sql,/SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED/);
  assert.match(sql,/e.governed_wake_worker_run_id=p_worker_run_id/);
  assert.match(sql,/e.original_work_id=a.runtime_scope->>'original_work_id'/);
  assert.match(sql,/'replay_authorized',false/);
  assert.doesNotMatch(sql,/net\.http_post|DELETE FROM/);
+});
+
+
+test('verified suspension reaches existing investigation without replay or a second wake',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const sql=readFileSync(new URL('../sql/reality-final-loop-blocker-incident-handoff-v1.sql',import.meta.url),'utf8');
+ const investigator=readFileSync(new URL('../src/reality-shift-continuity-auto-investigation-v1.js',import.meta.url),'utf8');
+ const start=worker.indexOf('const verifiedSuspensionInvestigationDue=');
+ const stop=worker.indexOf('let finalLoopParentIntegration=',start);
+ assert.ok(start>=0&&stop>start);
+ const route=worker.slice(start,stop);
+ for(const marker of ['FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN','QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY','child_claimed===false','model_invoked===false','original_job_completed===false','FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED','reality_observe_signed_shift_no_progress_v1','investigateOneSignedShiftContinuityIncident']) assert.ok(route.includes(marker),marker);
+ assert.ok(route.indexOf('reality_observe_signed_shift_no_progress_v1')<route.indexOf('investigateOneSignedShiftContinuityIncident'));
+ const fence=sql.slice(sql.indexOf("IF p_safe_result='FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED' THEN"),sql.indexOf("evidence:=pg_catalog.jsonb_build_object('schema','reality-signed-final-loop-blocker-v1'"));
+ for(const marker of ["r.decision='SUSPEND'","r.reason_code='PROVIDER_EFFECT_UNCERTAIN'","u.payload->>'replay_authorized'='false'","u.payload->'terminal_recovery_history'->>'remaining_attempts'='0'","current_guard->>'continuity_head_sha256'='sha256:'||u.lineage_hash","sub.state='SUSPENDED'","FINAL_LOOP_VERIFIED_SUSPENSION_SOURCE_UNVERIFIED"]) assert.ok(fence.includes(marker),marker);
+ assert.match(sql,/ON CONFLICT\(owner_id,shift_id,kind,evidence_key\) DO NOTHING/);
+ assert.match(investigator,/previous_attempt_budget_preserved!==true/);
+ assert.match(investigator,/new_attempt_authorized!==false/);
+ assert.doesNotMatch(fence,/INSERT INTO|UPDATE reality_internal|net\.http_post/);
 });
