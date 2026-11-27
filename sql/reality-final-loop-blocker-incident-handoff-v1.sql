@@ -525,3 +525,97 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_record_shift_continuity_independent_review_v1(uuid,uuid,uuid,text,text,timestamptz,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_record_shift_continuity_independent_review_v1(uuid,uuid,uuid,text,text,timestamptz,uuid,text) TO service_role;
+
+-- One read-only operational projection from the SAME canonical Continuity
+-- guard, signed event inbox, release receipts and existing review ledger.
+-- No capability catalog, owner grant or alternative state store.
+CREATE OR REPLACE FUNCTION public.reality_read_owner_current_continuity_self_visibility_v1(p_owner_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE sh record; g jsonb; ob jsonb; investigation jsonb; review jsonb; events jsonb;
+ release_evidence jsonb; rows jsonb:='[]'::jsonb; gaps int:=0; active_count int:=0;
+BEGIN
+ IF current_user<>'service_role' OR p_owner_id IS NULL THEN
+  RAISE EXCEPTION 'CURRENT_SELF_VISIBILITY_OWNER_SERVICE_REQUIRED';END IF;
+ FOR sh IN SELECT s.shift_id,s.status,w.mode FROM reality_internal.governed_employee_shifts_v1 s
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w ON w.shift_id=s.shift_id
+  AND w.owner_id=s.owner_id AND w.plan_fingerprint=s.plan_fingerprint
+ WHERE s.owner_id=p_owner_id AND s.authorized_at IS NOT NULL AND s.closed_at IS NULL
+ AND s.planned_start_at<=pg_catalog.clock_timestamp() AND s.planned_end_at>pg_catalog.clock_timestamp()
+ AND w.state='ACTIVE' ORDER BY s.shift_id LIMIT 12
+ LOOP
+  active_count:=active_count+1;
+  g:=public.reality_read_final_loop_shared_continuity_guard_v1(sh.shift_id);
+  IF g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+   OR g->>'owner_id' IS DISTINCT FROM p_owner_id::text OR g->>'shift_id' IS DISTINCT FROM sh.shift_id::text
+   OR g->>'read_only' IS DISTINCT FROM 'true' OR g->>'execution_authorized' IS DISTINCT FROM 'false'
+   OR g->>'production_changed' IS DISTINCT FROM 'false'
+   OR pg_catalog.jsonb_typeof(g->'obligations') IS DISTINCT FROM 'array' THEN
+   gaps:=gaps+1; CONTINUE;
+  END IF;
+  FOR ob IN SELECT value FROM pg_catalog.jsonb_array_elements(g->'obligations') LIMIT 12 LOOP
+   IF ob->>'continuity_identity_verified' IS DISTINCT FROM 'true'
+    OR ob->>'qualifier_digest_verified' IS DISTINCT FROM 'true'
+    OR ob->>'source_proof_verified' IS DISTINCT FROM 'true' THEN gaps:=gaps+1; CONTINUE;END IF;
+   investigation:=reality_internal.read_final_loop_verified_investigation_v1(p_owner_id,sh.shift_id,
+    ob->>'original_work_id',ob->>'source_ref',g->>'continuity_head_sha256',(g->>'revision')::bigint);
+   -- A recorded review is not an independently validated repair. Verify its
+   -- own digest and a distinct completed, owner-bound signed worker witness.
+   SELECT r.independent_verdict||pg_catalog.jsonb_build_object('receipt_sha256',r.receipt_sha256,
+    'reviewer',r.reviewer,'completed_at',r.completed_at) INTO review
+   FROM reality_internal.shift_continuity_independent_reviews_v1 r
+   JOIN reality_internal.final_loop_resume_events_v1 e ON e.event_id=r.review_event_id AND e.state='SHADOW_OBSERVED'
+    AND e.governed_wake_worker_run_id=r.worker_run_id AND e.source_receipt_sha256=r.investigation_receipt_sha256
+    AND e.owner_id=r.owner_id AND e.shift_id=r.shift_id AND e.original_work_id=r.original_work_id
+   JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=r.worker_run_id AND run.status='COMPLETED'
+    AND run.finished_at>=r.completed_at
+   JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
+    AND wake.owner_id=r.owner_id AND wake.shift_id=r.shift_id AND wake.release_claim_id=e.release_continuation_claim_id
+   WHERE r.owner_id=p_owner_id AND r.shift_id=sh.shift_id AND r.original_work_id=ob->>'original_work_id'
+    AND r.continuity_head_sha256=g->>'continuity_head_sha256' AND r.source_ref=ob->>'source_ref'
+    AND r.investigation_receipt_sha256=investigation->>'investigation_receipt_sha256'
+    AND r.worker_run_id::text<>investigation->>'investigation_worker_run_id'
+    AND r.receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(r.independent_verdict::text,'UTF8')),'hex')
+    AND r.independent_verdict->>'execution_authorized'='false' AND r.independent_verdict->>'replay_authorized'='false'
+    AND r.independent_verdict->>'original_job_completed'='false' AND r.independent_verdict->>'production_changed'='false'
+   ORDER BY r.completed_at DESC LIMIT 1;
+   SELECT coalesce(pg_catalog.jsonb_agg(x),'[]'::jsonb) INTO events FROM (
+    SELECT e.event_id,e.signal_kind,e.signal_next_action,e.state,e.source_receipt_sha256,
+     e.governed_wake_worker_run_id,run.status AS worker_status,run.worker_stage,e.observed_at
+    FROM reality_internal.final_loop_resume_events_v1 e
+    LEFT JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=e.governed_wake_worker_run_id
+    WHERE e.owner_id=p_owner_id AND e.shift_id=sh.shift_id AND e.original_work_id=ob->>'original_work_id'
+     AND e.source_ref=ob->>'source_ref' AND e.continuity_revision=(g->>'revision')::bigint
+     AND e.continuity_head_sha256=g->>'continuity_head_sha256'
+    ORDER BY e.created_at DESC LIMIT 8) x;
+   SELECT pg_catalog.jsonb_build_object('release_sha',a.release_sha,'approval_receipt_sha256',a.approval_receipt_sha256,
+    'alias_observed_at',a.provider_alias_observed_at,'deployment_id',a.provider_alias_observed_deployment_id)
+    INTO release_evidence FROM reality_internal.governed_worker_release_approvals_v1 a
+   WHERE a.owner_id=p_owner_id AND a.shift_id=sh.shift_id AND a.state='CLAIMED_ONCE'
+    AND a.runtime_scope->>'original_work_id'=ob->>'original_work_id' AND a.runtime_scope->>'source_ref'=ob->>'source_ref'
+    AND a.provider_alias_observed_at>=a.claimed_at
+    AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
+    AND a.approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+   ORDER BY a.provider_alias_observed_at DESC LIMIT 1;
+   rows:=rows||pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
+    'shift_id',sh.shift_id,'shift_status',sh.status,'warrant_mode',sh.mode,'existing_shift_authorized',true,
+    'original_work_id',ob->>'original_work_id','source_ref',ob->>'source_ref',
+    'continuity_root_id',g->>'continuity_root_id','continuity_head_sha256',g->>'continuity_head_sha256',
+    'continuity_revision',(g->>'revision')::bigint,'guard_receipt_sha256',g->>'handoff_observation_sha256',
+    'qualifier_receipt_sha256',ob->>'qualifier_receipt_sha256','unresolved_proof_gates',ob->'unresolved_proof_gates',
+    'qualifier_next_action',ob->>'next_qualified_action','original_claim_admitted',ob->'original_claim_admitted',
+    'independent_original_outcome_verified',ob->'independent_original_outcome_verified',
+    'universe_return_verified',ob->'universe_return_verified','active_release_observation',release_evidence,
+    'verified_investigation',investigation,'verified_independent_review',review,'current_events',events,
+    'operational_next_action',CASE WHEN review IS NOT NULL THEN review->>'next_action'
+     WHEN investigation IS NOT NULL THEN 'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'
+     ELSE ob->>'next_qualified_action' END,
+    'read_only',true,'execution_authorized',false,'installation_authorized',false,'production_changed',false));
+  END LOOP;
+ END LOOP;
+ RETURN pg_catalog.jsonb_build_object('status','OWNER_CURRENT_CONTINUITY_SELF_VISIBILITY_READ_ONLY',
+  'owner_id',p_owner_id,'observed_at',pg_catalog.clock_timestamp(),'active_shift_count',active_count,
+  'unverified_guard_count',gaps,'obligations',rows,'owner_scope_verified',true,
+  'read_only',true,'execution_authorized',false,'installation_authorized',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_read_owner_current_continuity_self_visibility_v1(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_read_owner_current_continuity_self_visibility_v1(uuid) TO service_role;
