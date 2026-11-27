@@ -350,6 +350,10 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claime
   original_work_id:r.original_work_id,source_ref:r.source_ref,
   continuity_root_id:g.continuity_root_id,continuity_revision:g.revision,
   continuity_head_sha256:g.continuity_head_sha256,event_id:r.event_id};
+ // A suspension receipt is routed only through the signed claim's exact
+ // investigation-only branch. Never reinterpret it as a review/CI event.
+ if(r.event_kind==='VERIFIED_SUSPENSION_INVESTIGATION')
+  return reject('VERIFIED_SUSPENSION_REQUIRES_EXACT_INVESTIGATION_LANE');
  if(r.event_kind==='INDEPENDENT_FROZEN_CI_RECEIPT'){
   if(h.independent_internal_ci_verified!==true)return reject('CI_PROOF_NOT_RECONCILED');
   return safe('FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE',{
