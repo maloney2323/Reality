@@ -320,7 +320,7 @@ export default async function handler(req,res){
      realRun.installation_authorized!==false||
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
-  let suspensionInvestigationWake=false;
+  let suspensionInvestigationWake=false,independentInvestigationReviewWake=false;
   if(governedWakeScope&&canonicalEventRuntime){
    const receipt=await shiftRpc(db,'reality_claim_canonical_governed_wake_v1',{
     p_owner_id:governedWakeScope.owner_id,p_shift_id:governedWakeScope.shift_id,p_plan_fingerprint:governedWakeScope.plan_fingerprint,
@@ -331,6 +331,8 @@ export default async function handler(req,res){
     receipt.original_job_completed!==false||receipt.production_changed!==false)
     throw Error('CANONICAL_GOVERNED_WAKE_NOT_DURABLY_CLAIMED');
    suspensionInvestigationWake=receipt.investigation_only===true;
+   independentInvestigationReviewWake=receipt.independent_review_only===true;
+   if(suspensionInvestigationWake&&independentInvestigationReviewWake)throw Error('GOVERNED_WAKE_CONFLICTING_EVIDENCE_LANES');
   }
   // Explicitly authenticated, preview-only source staging for the SAME
   // signed worker and its durable lease/run. This is NOT a second worker
@@ -482,6 +484,59 @@ export default async function handler(req,res){
    throw Error('GOVERNED_AUTO_TRIGGER_WAKE_SCOPE_CHANGED');
   if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED')
    activePulseShiftId=wakeReceipt.shift_id;
+  // A different signed run reviews the saved investigation, before any
+  // ordinary executor or model. No new job or owner authority is minted.
+  if(independentInvestigationReviewWake){
+   workerStage='INDEPENDENT_INVESTIGATION_REVIEW_RELEASE_ATTESTATION';
+   if(!canonicalEventRuntime||governedWakeScope?.kind!=='RESUME'||
+      wakeReceipt.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+      process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED!=='true'||
+      process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+      process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'||
+      process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true')
+    throw Error('INDEPENDENT_INVESTIGATION_REVIEW_RUNTIME_FENCE_REJECTED');
+   const witness=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
+    p_worker_run_id:actualWorkerRunId,p_owner_id:governedWakeScope.owner_id,
+    p_shift_id:wakeReceipt.shift_id,p_release_sha:governedWakeScope.release_sha,
+    p_release_ref:process.env.VERCEL_GIT_COMMIT_REF,
+    p_registered_capabilities:['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'],
+    p_wake_claim_id:governedWakeClaimId,p_capability_key:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'});
+   if(witness?.status!=='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'||
+      witness.worker_run_id!==actualWorkerRunId||witness.shift_id!==wakeReceipt.shift_id||
+      witness.release_sha!==governedWakeScope.release_sha||witness.original_job_completed!==false||
+      witness.production_changed!==false)
+    throw Error('INDEPENDENT_INVESTIGATION_REVIEW_RELEASE_WITNESS_UNVERIFIED');
+   workerStage='EXACT_INDEPENDENT_INVESTIGATION_REVIEW';
+   const review=await advanceOneShiftContinuityIndependentReview({
+    db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
+    reviewEventId:governedWakeScope.event_id,fetchImpl:fetch});
+   const verified=['SOURCE_MATCHED_NEEDS_FROZEN_TEST','SOURCE_CHANGED_NEEDS_FROZEN_TEST'].includes(review?.status)&&
+    review.review_event_id===governedWakeScope.event_id&&review.independent_source_reobservation_completed===true&&
+    review.independent_repair_test_completed===false&&review.previous_attempt_budget_preserved===true&&
+    review.new_attempt_authorized===false&&review.replay_authorized===false&&review.execution_authorized===false&&
+    review.original_job_completed===false&&review.installation_authorized===false&&review.production_changed===false;
+   const pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
+    p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
+    p_safe_result:verified?'INDEPENDENT_INVESTIGATION_REVIEW_RECORDED_ORIGINAL_OPEN':'INDEPENDENT_INVESTIGATION_REVIEW_UNVERIFIED'});
+   if(!isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+    throw Error('INDEPENDENT_INVESTIGATION_REVIEW_COMPLETION_PULSE_UNVERIFIED');
+   durableWorkerCompletion=pulse;
+   workerStage='INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION';
+   const attested=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
+    p_run_id:actualWorkerRunId,p_status:'COMPLETED',p_stage:workerStage});
+   workerCompletionAttestedBeforeResponse=attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+    attested.run_id===actualWorkerRunId&&attested.original_job_completed===false&&
+    attested.installation_authorized===false&&attested.production_changed===false;
+   if(!workerCompletionAttestedBeforeResponse)throw Error('INDEPENDENT_INVESTIGATION_REVIEW_ATTESTATION_UNVERIFIED');
+   const released=await shiftRpc(db,'reality_release_governed_shift_worker_run_v1',{p_claim_id:governedWakeClaimId});
+   wakeLeaseReleasedBeforeResponse=released?.status==='WAKE_RELEASED'&&
+    released.original_job_completed===false&&released.installation_authorized===false;
+   if(!wakeLeaseReleasedBeforeResponse)throw Error('INDEPENDENT_INVESTIGATION_REVIEW_LEASE_RELEASE_UNVERIFIED');
+   return res.status(200).json({status:verified?'INDEPENDENT_INVESTIGATION_REVIEW_RECORDED_ORIGINAL_OPEN':
+    'INDEPENDENT_INVESTIGATION_REVIEW_UNVERIFIED',independent_review_only:true,signed_worker_release_wake:witness,
+    independent_review:review,original_job_completed:false,execution_authorized:false,
+    installation_authorized:false,replay_authorized:false,production_changed:false,new_shift_started:false});
+  }
   // A dedicated, claimed suspension event is evidence-only. Stop before
   // all ordinary employee executors, child claims, and model recovery effects.
   if(suspensionInvestigationWake){
