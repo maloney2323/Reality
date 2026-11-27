@@ -227,3 +227,102 @@ BEGIN
 END $function$;
 REVOKE ALL ON FUNCTION public.reality_observe_signed_shift_no_progress_v1(uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_observe_signed_shift_no_progress_v1(uuid,uuid,text) TO service_role;
+-- Exact investigation-only continuation: no original/child executor claim,
+-- no repeat of an uncertain provider invocation and no new recovery budget.
+CREATE OR REPLACE FUNCTION public.reality_claim_next_shift_continuity_investigation_v1(
+ p_shift_id uuid,p_worker_run_id uuid,p_event_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
+DECLARE e record; proof jsonb; guard jsonb; suspension jsonb; evidence jsonb; digest text;
+ i reality_internal.owner_shift_continuity_incidents_v1%ROWTYPE;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'CONTINUITY_INVESTIGATION_SIGNED_SERVICE_REQUIRED';END IF;
+ SELECT ev.*,a.release_sha,a.release_ref,w.release_receipt_sha256 INTO e
+ FROM reality_internal.final_loop_resume_events_v1 ev
+ JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=ev.release_continuation_claim_id
+  AND a.owner_id=ev.owner_id AND a.shift_id=ev.shift_id AND a.state='CLAIMED_ONCE'
+  AND a.runtime_scope->>'original_work_id'=ev.original_work_id AND a.runtime_scope->>'source_ref'=ev.source_ref
+  AND a.runtime_scope->>'continuity_head_sha256'=ev.continuity_head_sha256
+  AND a.runtime_scope->>'continuity_revision'=ev.continuity_revision::text
+  AND a.runtime_scope->>'qualifier_receipt_sha256'=ev.previous_receipt_sha256
+  AND a.provider_alias_observed_at>=a.claimed_at
+  AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
+  AND a.runtime_scope->>'child_execution_enabled'='false' AND a.runtime_scope->>'parent_delivery_enabled'='false'
+ JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=p_worker_run_id
+  AND r.status='STARTED' AND r.finished_at IS NULL
+ JOIN reality_internal.governed_signed_worker_release_wakes_v1 w ON w.worker_run_id=r.run_id
+  AND w.release_claim_id=a.claim_id AND w.owner_id=ev.owner_id AND w.shift_id=ev.shift_id
+  AND w.running_release_sha=a.release_sha AND w.running_release_ref=a.release_ref AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+ JOIN reality_internal.governed_employee_shift_worker_pulses_v1 pulse ON pulse.shift_id=ev.shift_id AND pulse.owner_id=ev.owner_id
+  AND pulse.last_worker_status='WAKE_RECEIVED' AND pulse.last_worker_seen_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+ WHERE ev.event_id=p_event_id AND ev.shift_id=p_shift_id AND ev.governed_wake_worker_run_id=p_worker_run_id
+  AND ev.state='SHADOW_PENDING' AND ev.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION'
+  AND ev.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
+  AND ev.governed_wake_queued_at>pg_catalog.clock_timestamp()-interval '5 minutes'
+  AND EXISTS(SELECT 1 FROM reality_internal.governed_preview_shift_worker_leases_v1 l
+    WHERE l.worker_key='preview-governed-employee-shift-worker' AND l.released_at IS NULL
+     AND l.lease_expires_at>pg_catalog.clock_timestamp() AND r.started_at>=l.claimed_at)
+ FOR UPDATE OF ev;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
+  'model_inquiry_authorized',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false);END IF;
+ suspension:=reality_internal.read_final_loop_verified_suspension_v1(e.owner_id,e.shift_id,e.original_work_id,e.source_ref,
+  e.continuity_head_sha256,e.continuity_revision);
+ proof:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+ guard:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+ IF suspension IS NULL OR suspension->>'receipt_sha256' IS DISTINCT FROM e.source_receipt_sha256
+  OR proof->>'status' IS DISTINCT FROM 'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'
+  OR proof->>'continuity_head_sha256' IS DISTINCT FROM e.continuity_head_sha256
+  OR proof->>'revision' IS DISTINCT FROM e.continuity_revision::text
+  OR guard->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+  OR guard->>'continuity_head_sha256' IS DISTINCT FROM e.continuity_head_sha256
+  OR guard->>'revision' IS DISTINCT FROM e.continuity_revision::text
+  OR guard->>'execution_authorized' IS DISTINCT FROM 'false'
+  OR guard->>'original_job_completed' IS DISTINCT FROM 'false'
+  OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(guard->'obligations') x
+   WHERE x->>'original_work_id'=e.original_work_id AND x->>'source_ref'=e.source_ref
+    AND x->>'continuity_identity_verified'='true' AND x->>'qualifier_digest_verified'='true'
+    AND x->>'source_proof_verified'='true' AND x->>'independent_original_outcome_verified'='false'
+    AND x->'execution_spine_readback'->>'status'='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'
+    AND x->'execution_spine_readback'->>'canonical_return_event_id'=suspension->>'event_id'
+    AND x->'execution_spine_readback'->>'replay_authorized'='false')
+ THEN RETURN pg_catalog.jsonb_build_object('status','NO_CURRENT_SIGNED_SHIFT_CONTINUITY_SCOPE',
+  'model_inquiry_authorized',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false);END IF;
+ -- One investigation identity per suspension receipt, including any earlier
+ -- same-wake incident; a new release or worker must never reset it.
+ IF EXISTS(SELECT 1 FROM reality_internal.owner_shift_continuity_incidents_v1 prior
+  WHERE prior.owner_id=e.owner_id AND prior.shift_id=e.shift_id
+   AND prior.source_evidence->>'original_work_id'=e.original_work_id
+   AND prior.source_evidence->>'verified_suspension_receipt_sha256'=e.source_receipt_sha256)
+ THEN RETURN pg_catalog.jsonb_build_object('status','NO_DETECTED_SHIFT_CONTINUITY_INCIDENT',
+  'model_inquiry_authorized',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false);END IF;
+ evidence:=pg_catalog.jsonb_build_object('schema','reality-signed-final-loop-blocker-v1',
+  'owner_id',e.owner_id,'shift_id',e.shift_id,'original_work_id',e.original_work_id,'source_ref',e.source_ref,
+  'continuity_root_id',suspension->>'root_id','continuity_head_sha256',e.continuity_head_sha256,
+  'continuity_revision',e.continuity_revision,'event_id',e.event_id,'worker_run_id',p_worker_run_id,
+  'release_sha',e.release_sha,'release_receipt_sha256',e.release_receipt_sha256,
+  'blocker_code','FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED',
+  'verified_suspension_event_id',suspension->>'event_id','verified_suspension_receipt_id',suspension->>'receipt_id',
+  'verified_suspension_receipt_sha256',suspension->>'receipt_sha256',
+  'prior_continuity_head_sha256',suspension->>'prior_head_sha256',
+  'unresolved_proof_gates',suspension->'unresolved_proof_gates',
+  'investigation_only',true,'root_cause_verified',false,'provider_outcome_verified',false,
+  'previous_attempt_budget_preserved',true,'new_attempt_authorized',false,'replay_authorized',false,
+  'original_job_completed',false,'installation_authorized',false,'production_changed',false);
+ digest:=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(evidence::text,'UTF8')),'hex');
+ INSERT INTO reality_internal.owner_shift_continuity_incidents_v1(owner_id,shift_id,kind,evidence_key,evidence_sha256,
+  error_summary,source_evidence,phase,investigation_lease_id,investigation_claimed_at,investigation_attempts)
+ VALUES(e.owner_id,e.shift_id,'SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED',digest,'sha256:'||digest,
+  'Verified suspension: independently investigate distinct evidence; preserve original obligation and exhausted recovery budget. No effect replay.',
+  evidence,'INVESTIGATION_CLAIMED',pg_catalog.gen_random_uuid(),pg_catalog.clock_timestamp(),1)
+ ON CONFLICT(owner_id,shift_id,kind,evidence_key) DO NOTHING RETURNING * INTO i;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','NO_DETECTED_SHIFT_CONTINUITY_INCIDENT',
+  'model_inquiry_authorized',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false);END IF;
+ RETURN pg_catalog.jsonb_build_object('status','SIGNED_SHIFT_CONTINUITY_INVESTIGATION_CLAIMED',
+  'owner_id',i.owner_id,'shift_id',i.shift_id,'incident_id',i.incident_id,'lease_id',i.investigation_lease_id,
+  'kind',i.kind,'source_claim_id',i.source_claim_id,'source_evidence',i.source_evidence,
+  'error_summary',i.error_summary,'evidence_sha256',i.evidence_sha256,'first_detected_at',i.first_detected_at,
+  'investigation_attempt',i.investigation_attempts,'failed_source_ref',e.source_ref,
+  'scope','SOURCE_BACKED_SHIFT_FAILURE_INVESTIGATION_ONLY','model_inquiry_authorized',true,
+  'new_original_jobs_created',0,'execution_authorized',false,'installation_authorized',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_claim_next_shift_continuity_investigation_v1(uuid,uuid,uuid) TO service_role;
