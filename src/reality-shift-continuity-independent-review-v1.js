@@ -14,29 +14,36 @@ const safe=(status,data={})=>Object.freeze({status,...data,
  installation_authorized:false,production_changed:false});
 const fail=x=>{throw Error('CONTINUITY_INDEPENDENT_REVIEW_'+x)};
 export async function advanceOneShiftContinuityIndependentReview({
- db,env=process.env,shiftId,workerRunId,call=shiftRpc,
+ db,env=process.env,shiftId,workerRunId,reviewEventId=null,call=shiftRpc,
  readSource=readFreshEmployeeInquirySource,fetchImpl=fetch,
  rolesBuilder=buildRealityProposedEmployeeRoleDiscussionContext
 }={}){
  if(env.VERCEL_ENV!=='preview'||!db?.strictSecrets||!db.secretKey||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
   !UUID.test(shiftId||'')||!UUID.test(workerRunId||'')||
+  (reviewEventId!==null&&!UUID.test(reviewEventId))||
   typeof call!=='function'||typeof readSource!=='function'||
   typeof fetchImpl!=='function'||typeof rolesBuilder!=='function')
   fail('SIGNED_REVIEW_SCOPE_REQUIRED');
  const claim=await call(db,'reality_claim_shift_continuity_independent_review_v1',{
-  p_shift_id:shiftId,p_worker_run_id:workerRunId
+  p_shift_id:shiftId,p_worker_run_id:workerRunId,...(reviewEventId?{p_event_id:reviewEventId}:{})
  },{fetchImpl});
  if(claim?.status==='NO_CONTINUITY_INDEPENDENT_REVIEW_READY'&&
   claim.installation_authorized===false&&
   claim.original_job_completed===false&&claim.production_changed===false)
   return safe(claim.status,{signed_review_claimed:false});
- if(claim?.status!=='SIGNED_CONTINUITY_REVIEW_CLAIMED'||
+ const direct=reviewEventId!==null;
+ if(claim?.status!==(direct?'SIGNED_CONTINUITY_ORIGINAL_REVIEW_CLAIMED':'SIGNED_CONTINUITY_REVIEW_CLAIMED')||
   !UUID.test(claim.incident_id||'')||!UUID.test(claim.owner_id||'')||
-  !UUID.test(claim.job_id||'')||!UUID.test(claim.claim_id||'')||
+  (direct?(claim.job_id!==null||claim.event_id!==reviewEventId||
+   !UUID.test(claim.investigation_worker_run_id||'')||claim.investigation_worker_run_id===workerRunId||
+   !/^work:[a-f0-9]{32}$/.test(claim.original_work_id||'')||!SHA.test(claim.continuity_head_sha256||'')||
+   !Number.isSafeInteger(claim.continuity_revision)||claim.continuity_revision<1||
+   !/^[a-f0-9]{40}$/.test(claim.frozen_source_head_sha||'')||claim.execution_authorized!==false||claim.replay_authorized!==false):
+   !UUID.test(claim.job_id||''))||!UUID.test(claim.claim_id||'')||
   claim.shift_id!==shiftId||claim.worker_run_id!==workerRunId||
   !SOURCE.test(claim.source_ref||'')||
-  !SHA.test(claim.previously_reviewed_sha256||'')||
+  (!direct&&!SHA.test(claim.previously_reviewed_sha256||''))||
   !SHA.test(claim.investigation_receipt_sha256||'')||
   claim.installation_authorized!==false||
   claim.original_job_completed!==false||claim.production_changed!==false)
@@ -49,8 +56,8 @@ export async function advanceOneShiftContinuityIndependentReview({
  let first,second;
  try{
   const token=String(env.REALITY_GITHUB_TOKEN||'').trim();
-  first=await readSource(claim.source_ref,{fetchImpl,token});
-  second=await readSource(claim.source_ref,{fetchImpl,token});
+  first=await readSource(claim.source_ref,{fetchImpl,token,...(direct?{requireFrozenPrHead:true}:{})});
+  second=await readSource(claim.source_ref,{fetchImpl,token,...(direct?{requireFrozenPrHead:true}:{})});
  }catch{
   return safe('INDEPENDENT_REVIEW_PROVIDER_UNAVAILABLE',{
    incident_id:claim.incident_id,
@@ -62,7 +69,8 @@ export async function advanceOneShiftContinuityIndependentReview({
   !SHA.test(second.provider_proof_sha256||'')||
   !Number.isFinite(Date.parse(first.checked_at||''))||
   !Number.isFinite(Date.parse(second.checked_at||''))||
-  first.provider_proof_sha256!==second.provider_proof_sha256)
+  first.provider_proof_sha256!==second.provider_proof_sha256||
+  (direct&&(!/^[a-f0-9]{40}$/.test(first.source_head_sha||'')||first.source_head_sha!==second.source_head_sha)))
   return safe('SOURCE_CHANGED_DURING_INDEPENDENT_REOBSERVATION',{
    incident_id:claim.incident_id,
    next_action:'WATCHDOG_FENCES_UNSTABLE_SOURCE_EVIDENCE'});
@@ -72,12 +80,21 @@ export async function advanceOneShiftContinuityIndependentReview({
   p_worker_run_id:workerRunId,
   p_source_ref:claim.source_ref,
   p_provider_sha256:second.provider_proof_sha256,
-  p_checked_at:second.checked_at
+  p_checked_at:second.checked_at,...(direct?{p_event_id:reviewEventId,p_source_head_sha:second.source_head_sha}:{})
  },{fetchImpl});
  if(!['SOURCE_CHANGED_NEEDS_FROZEN_TEST',
    'SOURCE_MATCHED_NEEDS_FROZEN_TEST'].includes(receipt?.status)||
   receipt.incident_id!==claim.incident_id||
   receipt.job_id!==claim.job_id||
+  (direct&&(receipt.original_work_id!==claim.original_work_id||receipt.continuity_head_sha256!==claim.continuity_head_sha256||
+   receipt.review_event_id!==reviewEventId||receipt.review_worker_run_id!==workerRunId||
+   receipt.investigation_worker_run_id!==claim.investigation_worker_run_id||
+   receipt.investigation_receipt_sha256!==claim.investigation_receipt_sha256||
+   receipt.frozen_source_head_sha!==claim.frozen_source_head_sha||receipt.observed_source_head_sha!==second.source_head_sha||
+   receipt.provider_proof_sha256!==second.provider_proof_sha256||
+   receipt.status!==(second.source_head_sha===claim.frozen_source_head_sha?'SOURCE_MATCHED_NEEDS_FROZEN_TEST':'SOURCE_CHANGED_NEEDS_FROZEN_TEST')||
+   receipt.recommendation_disposition!=='ADVISORY_ONLY_NO_AUTHORITY_OR_REPLAY'||receipt.previous_attempt_budget_preserved!==true||
+   receipt.new_attempt_authorized!==false||receipt.replay_authorized!==false||receipt.execution_authorized!==false||receipt.root_cause_verified!==false))||
   receipt.reviewer!==claim.reviewer||
   !SHA.test(receipt.independent_review_receipt_sha256||'')||
   receipt.original_job_completed!==false||
@@ -89,7 +106,13 @@ export async function advanceOneShiftContinuityIndependentReview({
   incident_id:claim.incident_id,job_id:claim.job_id,reviewer:claim.reviewer,
   independent_review_receipt_sha256:receipt.independent_review_receipt_sha256,
   source_proof_sha256:second.provider_proof_sha256,
-  prior_review_proof_sha256:claim.previously_reviewed_sha256,
+  prior_review_proof_sha256:direct?null:claim.previously_reviewed_sha256,
+  ...(direct?{original_work_id:claim.original_work_id,review_event_id:reviewEventId,
+   investigation_receipt_sha256:claim.investigation_receipt_sha256,
+   frozen_source_head_sha:claim.frozen_source_head_sha,observed_source_head_sha:second.source_head_sha,
+   recommendation_disposition:receipt.recommendation_disposition,
+   previous_attempt_budget_preserved:true,new_attempt_authorized:false,replay_authorized:false,
+   execution_authorized:false,root_cause_verified:false}:{}),
   next_action:receipt.next_action,
   independent_source_reobservation_completed:true,
   independent_repair_test_completed:false
