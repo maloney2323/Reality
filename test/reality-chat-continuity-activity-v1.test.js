@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {projectChatContinuityActivity} from '../src/reality-chat-continuity-activity-v1.js';
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const h=n=>'sha256:'+String(n).repeat(64);
@@ -47,4 +48,19 @@ test('missing evidence is unavailable, not no work, and closed shift can retain 
  const r=projectChatContinuityActivity({...input,current:{...current,observations:[],active_shift_count:0},finalReadback:{...finalReadback,receipts:[{status:'FULL_LOOP_INDEPENDENTLY_VERIFIED',original_work_id:work,settlement_event_id:id(7),artifact_sha256:'a'.repeat(64),installed_commit_sha:'b'.repeat(40),verifier_artifact_digest:h(4),provider_run_id:1,production_changed:false}]}});
  assert.equal(r.final_receipts.length,1);
  assert.equal(r.installation_authorized,false);
+});
+
+test('Work Center reuses one authenticated Continuity read and renderer without granting authority',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/id="wcContinuityActivityMount"/);
+ assert.match(html,/wcContinuityActivityMount'\)\.append\(el\('realityChatContinuityActivity'\)\)/);
+ assert.equal(html.split("fetch('/api/reality/personal-continuity-activity'").length,2);
+ assert.match(html,/continuityVisibleRoute=\(\)=>\['chat','work'\]/);
+ assert.match(html,/Past · Independently verified completions/);
+ assert.match(html,/Present · Original obligations and evidence/);
+ assert.match(html,/Future work: review discoveries/);
+ assert.match(html,/data\.partial\?'Final receipt evidence is incomplete/);
+ assert.match(html,/data\.execution_authorized!==false\|\|data\.installation_authorized!==false/);
+ assert.match(html,/realityCurrentRoute\(\)==='chat'&&document\.visibilityState==='visible'\)\s*liveActivityTimer/);
+ assert.match(html,/No new|no additional progress is inferred/);
 });

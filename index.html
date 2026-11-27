@@ -1770,6 +1770,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
 </section>
 <section class="reality-matrix" aria-label="Reality past present future"><div class="matrix-head"><div><div class="label">REALITY TIMELINE</div><h2>Past · Present · Future</h2></div><span class="badge">ONE WORK REALITY</span></div><div class="matrix-grid"><div class="matrix-card"><strong>PAST</strong><div class="matrix-count" id="matrixPastCount">—</div><p>Verified and completed work.</p></div><div class="matrix-card"><strong>PRESENT</strong><div class="matrix-count" id="matrixPresentCount">—</div><p>Work active, verifying, or needing you.</p></div><div class="matrix-card"><strong>FUTURE</strong><div class="matrix-count" id="matrixFutureCount">—</div><p>Discovered or ready work.</p></div></div></section>
 <section class="work-center" id="workCenter" aria-label="Reality Work Center">
+ <section id="wcContinuityHistory" aria-label="Work history and current evidence" class="wc-completion">
+  <h3>Past · Present · Future</h3>
+  <p class="wc-note">Your existing original work, recorded evidence and next decisions. A missing read is not missing work.</p>
+  <div id="wcContinuityActivityMount"></div>
+  <p class="wc-note">Future work: review discoveries and qualified opportunities below. Discovery does not grant execution authority.</p>
+  <p><a href="/value#results">Verified outcomes and value</a> · <a href="/shifts">Shift history</a> · <a href="/employees">Employee schedules</a></p>
+ </section>
  <section id="wcRepairQuickStart" class="repair-current" aria-label="Reality guided self-repair" style="padding:18px;margin:0 0 18px;border:1px solid #6ba5ba;border-radius:16px;background:#142437">
   <div class="repair-kicker">REALITY · EASY SELF-REPAIR</div>
   <h3 style="font-size:22px;margin:5px 0">Reality repairs the problem, then finishes your job</h3>
@@ -6706,6 +6713,13 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  };
 
  const realityCurrentRoute=()=>document.body.dataset.realityRoute||'home';
+ const continuityVisibleRoute=()=>['chat','work'].includes(realityCurrentRoute());
+ const continuityWorkPage=()=>realityCurrentRoute()==='work';
+ // Reuse the one owner-scoped activity view and readback; no second data store.
+ if(continuityWorkPage()){
+  el('wcContinuityActivityMount').append(el('realityChatContinuityActivity'));
+  el('realityChatContinuityActivity').setAttribute('aria-label','Original work history and evidence');
+ }
  // Observe, never wake. A single in-flight GET refreshes only the visible
  // signed-in conversation. Nothing here is an execution request.
  let liveActivityEpoch=0,liveActivityTimer=null,liveActivityAbort=null,liveActivityFingerprint='';
@@ -6725,7 +6739,8 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  function showLiveActivity(data){
   const host=el('realityChatContinuitySteps'),headline=el('realityChatContinuityHeadline');
   el('realityChatContinuityChecked').textContent='Checked '+new Date(data.observed_at).toLocaleTimeString()+' · live evidence';
-  headline.hidden=true;el('realityChatContinuityChecked').hidden=true;el('realityChatContinuityRefresh').hidden=true;
+  headline.hidden=true;el('realityChatContinuityChecked').hidden=!continuityWorkPage();el('realityChatContinuityRefresh').hidden=!continuityWorkPage();
+  el('realityChatContinuityRefresh').textContent=continuityWorkPage()?'Refresh verified work history':'Retry live update';
   const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations,data.final_receipts]);
   if(liveActivityFingerprint===key)return;
   const open=new Set([...host.querySelectorAll('details[open][data-disclosure]')].map(d=>d.dataset.disclosure));
@@ -6768,9 +6783,10 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     if(step.worker_run_id)liveNode('p','Signed worker: '+step.worker_run_id,d);
    }
   };
+  if(continuityWorkPage())liveNode('h4','Present · Original obligations and evidence',host);
   for(const job of data.obligations){
    const article=document.createElement('div');article.className='bubble reality-operational-message';host.append(article);
-   liveNode('div','REALITY',article).className='label';
+   liveNode('div',continuityWorkPage()?sourceLabel(job.source_ref):'REALITY',article).className='label';
    const verified=job.steps.filter(s=>s.state==='verified');
    const running=job.steps.find(s=>s.state==='running');
    const proposal=job.steps.find(s=>s.state==='proposal');
@@ -6805,8 +6821,13 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    }
    liveNode('p','This read-only update does not grant new authority or confirm an installation.',d);
   }
+  if(continuityWorkPage()){
+   liveNode('h4','Past · Independently verified completions',host);
+   if(!data.final_receipts.length)liveNode('p',data.partial?'Final receipt evidence is incomplete; no absence of work is inferred.':'No final receipts were returned by this read.',host);
+  }
   if(data.final_receipts.length){
    const receipts=disclosure(host,'Verified completed jobs ('+data.final_receipts.length+')','final-receipts');
+   if(continuityWorkPage())receipts.open=true;
    for(const r of data.final_receipts){
     if(!/^work:[a-f0-9]{32}$/.test(r.original_work_id||''))continue;
     const item=document.createElement('article');receipts.append(item);
@@ -6820,7 +6841,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   }
  }
  async function refreshLiveActivity(){
-  if(!liveActivitySignedIn||realityCurrentRoute()!=='chat'||document.visibilityState!=='visible'||liveActivityAbort)return;
+  if(!liveActivitySignedIn||!continuityVisibleRoute()||document.visibilityState!=='visible'||liveActivityAbort)return;
   const epoch=liveActivityEpoch,controller=new AbortController();liveActivityAbort=controller;
   const deadline=setTimeout(()=>controller.abort(),15000);
   clearTimeout(liveActivityTimer);liveActivityTimer=null;
@@ -6849,13 +6870,13 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   }finally{
    clearTimeout(deadline);
    if(liveActivityAbort===controller)liveActivityAbort=null;
-   if(epoch===liveActivityEpoch&&liveActivitySignedIn&&document.visibilityState==='visible')
+   if(epoch===liveActivityEpoch&&liveActivitySignedIn&&realityCurrentRoute()==='chat'&&document.visibilityState==='visible')
     liveActivityTimer=setTimeout(refreshLiveActivity,8000);
   }
  }
  function startLiveActivity(){
   liveActivitySignedIn=true;
-  if(realityCurrentRoute()==='chat')void refreshLiveActivity();
+  if(continuityVisibleRoute())void refreshLiveActivity();
  }
  el('realityChatContinuityRefresh').onclick=()=>void refreshLiveActivity();
  document.addEventListener('visibilitychange',()=>{
