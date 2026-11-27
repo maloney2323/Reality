@@ -149,6 +149,31 @@ test('canonical benchmark qualification is a distinct topology, requires same cu
  const run=extra=>qualify({env:e,dbProject:parent,direction,fetchImpl,...extra});
  const result=await run();
  assert.equal(result.status,'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY');
+ const brokerPath='.github/workflows/reality-governed-openai-gateway-isolated-20261108.yml';
+ const be={...e,REALITY_RELEASE_GITHUB_CI_READ_MODE:'EXISTING_GOVERNED_BROKER',
+  REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN:undefined,REALITY_SIGNED_WORKER_RELEASE_GATEWAY_CI_WORKFLOW_PATH:brokerPath};
+ const bd={project:parent,strictSecrets:true,url:'https://'+parent+'.supabase.co',secretKey:'x'.repeat(30)};
+ let brokerCalls=0,blockedBroker=false,tampered=false;
+ const bf=async(url,init)=>{
+  assert.ok(!String(url).includes('api.github.com'));
+  if(!String(url).includes('/functions/v1/'))return fetchImpl(url,init);
+  brokerCalls++;
+  assert.equal(init.method,'POST');assert.equal(init.headers.Authorization,'Bearer '+bd.secretKey);
+  const scope=JSON.parse(init.body);
+  assert.equal(scope.original_work_id,direction.original_work_id);
+  if(blockedBroker)return {ok:false,status:503};
+  const mk=(id,name,path)=>({id,head_sha:sha,head_branch:branch,name,path,status:'completed',conclusion:'success',event:'push',repository:{full_name:'org/repo'}});
+  return {ok:true,json:async()=>({status:'RELEASE_CI_BROKER_EXACT_READBACK',provider_read_observed:true,
+   credential_values_exposed:false,source_read_only:true,installation_authorized:false,original_job_completed:false,production_changed:false,
+   scope:tampered?{...scope,continuity_revision:4}:scope,
+   lifecycle:mk(2004,'Reality Final Loop Engine lifecycle acceptance','.github/workflows/reality-final-loop-engine-v1-ci.yml'),
+   gateway:mk(2005,'Reality — Isolated governed OpenAI gateway proof',brokerPath)})};
+ };
+ const br=()=>run({env:be,db:bd,fetchImpl:bf});
+ assert.equal((await br()).status,'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY');
+ tampered=true;assert.equal((await br()).status,'EXISTING_GOVERNED_BROKER_EVIDENCE_UNVERIFIED');
+ tampered=false;blockedBroker=true;assert.equal((await br()).status,'EXISTING_GOVERNED_BROKER_READBACK_BLOCKED');
+ assert.equal(brokerCalls,3);
  const rejected=()=>run({fetchImpl:async(url,init)=>String(url).endsWith('/2004')?
   {ok:false,status:401}:fetchImpl(url,init)});
  const blocked=await rejected(),checkpoint=blocked.connection_recovery_checkpoint;

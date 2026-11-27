@@ -75,7 +75,8 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  const repo=env.REALITY_VERIFIED_GITHUB_REPOSITORY;
  const ciReadMode=env.REALITY_RELEASE_GITHUB_CI_READ_MODE??'AUTHENTICATED';
  const publicCI=ciReadMode==='PUBLIC_ONLY';
- if(!['AUTHENTICATED','PUBLIC_ONLY'].includes(ciReadMode)||typeof fetchImpl!=='function'||!SHA.test(sha||'')||
+ const brokerCI=ciReadMode==='EXISTING_GOVERNED_BROKER';
+ if(!['AUTHENTICATED','PUBLIC_ONLY','EXISTING_GOVERNED_BROKER'].includes(ciReadMode)||typeof fetchImpl!=='function'||!SHA.test(sha||'')||
   !REF.test(branch||'')||!PROJECT.test(dbProject||'')||
   !PROJECT.test(isolated||'')||!PROJECT.test(parent||'')||
   isolated===parent||(canonical?parent!==dbProject:isolated!==dbProject)||
@@ -86,11 +87,15 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo||'')||
   typeof env.REALITY_RELEASE_CONTROL_SUPABASE_MANAGEMENT_TOKEN!=='string'||
   env.REALITY_RELEASE_CONTROL_SUPABASE_MANAGEMENT_TOKEN.length<20||
-  (!publicCI&&(typeof env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN!=='string'||
+  (!publicCI&&!brokerCI&&(typeof env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN!=='string'||
   env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN.length<20))||
   typeof env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN!=='string'||
   env.REALITY_VERIFIED_VERCEL_RELEASE_API_TOKEN.length<20)
   return safe('PINNED_RELEASE_OR_PROVIDER_PROOF_CONFIG_MISSING');
+ if(brokerCI&&(!canonical||db?.strictSecrets!==true||db.project!==dbProject||
+  !['https://'+dbProject+'.supabase.co/','https://'+dbProject+'.supabase.co'].includes(db.url)||
+  typeof db.secretKey!=='string'||db.secretKey.length<20||
+  env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF!==dbProject))return safe('EXISTING_GOVERNED_BROKER_SCOPE_NOT_READY');
  const lane=inspectFinalLoopSignedWorkerOperatingLane({env,dbProject});
  if(lane.status!==(canonical?'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY':
     'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED')||
@@ -152,7 +157,31 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   return safe('REVIEW_TRANSPORT_DIAGNOSTIC_ONLY_NOT_RELEASE_CAPACITY');
  const [org,name]=repo.split('/');
  const githubBase='https://api.github.com/repos/'+encodeURIComponent(org)+'/'+encodeURIComponent(name);
- const githubToken=publicCI?null:env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN;
+ const githubToken=publicCI||brokerCI?null:env.REALITY_RELEASE_CONTROL_GITHUB_READ_TOKEN;
+ let brokerRead=null;
+ if(brokerCI){
+  if(gatewayPath!=='.github/workflows/reality-governed-openai-gateway-isolated-20261108.yml')return safe('EXISTING_GOVERNED_BROKER_WORKFLOW_NOT_REGISTERED');
+  const scope={mode:'release_ci',owner_id:direction.owner_id,shift_id:direction.shift_id,
+   original_work_id:direction.original_work_id,source_ref:direction.source_ref,
+   continuity_root_id:direction.continuity_root_id,continuity_revision:direction.continuity_revision,
+   continuity_head_sha256:direction.continuity_head_sha256,plan_fingerprint:direction.plan_fingerprint,
+   qualifier_receipt_sha256:direction.qualifier_receipt_sha256,release_ref:branch,release_sha:sha,
+   lifecycle_run_id:ciId,gateway_run_id:gatewayId};
+  try{
+   const r=await fetchImpl(db.url.replace(/\/$/,'')+'/functions/v1/reality-signed-maintenance-repair-source-broker-v1',{
+    method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(25000),
+    headers:{apikey:db.secretKey,Authorization:'Bearer '+db.secretKey,'content-type':'application/json'},body:JSON.stringify(scope)});
+   if(!r.ok)return safe('EXISTING_GOVERNED_BROKER_READBACK_BLOCKED');
+   brokerRead=await r.json();
+   if(brokerRead?.status!=='RELEASE_CI_BROKER_EXACT_READBACK'||brokerRead.provider_read_observed!==true||
+    brokerRead.credential_values_exposed!==false||brokerRead.source_read_only!==true||
+    brokerRead.installation_authorized!==false||brokerRead.original_job_completed!==false||
+    brokerRead.production_changed!==false||!brokerRead.scope||
+    Object.keys(scope).some(k=>brokerRead.scope[k]!==scope[k])||
+    brokerRead.lifecycle?.repository?.full_name!==repo||brokerRead.gateway?.repository?.full_name!==repo)
+    return safe('EXISTING_GOVERNED_BROKER_EVIDENCE_UNVERIFIED');
+  }catch{return safe('EXISTING_GOVERNED_BROKER_READBACK_BLOCKED')}
+ }
  let publicIdentity=null;
  if(publicCI){
   try{publicIdentity=await getJson(fetchImpl,githubBase,null,'GITHUB_PUBLIC_REPOSITORY_READ')}
@@ -162,7 +191,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
  }
  let ci;
  try{
-  ci=await getJson(fetchImpl,
+  ci=brokerCI?brokerRead.lifecycle:await getJson(fetchImpl,
    githubBase+'/actions/runs/'+ciId,githubToken,'GITHUB_LIFECYCLE_CI_READ');
  }catch(error){
   return safe('INDEPENDENT_EXACT_GITHUB_CI_READ_UNAVAILABLE',githubFailureCheckpoint(error,canonical?direction:null,branch,sha,repo,'GITHUB_LIFECYCLE_CI_READ',ciId));
@@ -178,7 +207,7 @@ export async function qualifyCurrentIsolatedSignedWorkerRelease({
   return safe('INDEPENDENT_EXACT_RELEASE_CI_NOT_PASSED',identityFailure('GITHUB_LIFECYCLE_CI_READ',ci,[...(ci?.head_sha!==sha?['release_sha']:[]),...(ci?.head_branch!==branch?['release_ref']:[]),...(ci?.id!==ciId||ci?.name!=='Reality Final Loop Engine lifecycle acceptance'||ci?.path!=='.github/workflows/reality-final-loop-engine-v1-ci.yml'?['ci_identity']:[]),...(ci?.status!=='completed'||ci?.conclusion!=='success'||!['push','pull_request'].includes(ci?.event)?['ci_result']:[])]));
  let gateway=null;
  if(canonical){
-  try{gateway=await getJson(fetchImpl,githubBase+'/actions/runs/'+gatewayId,githubToken,'GITHUB_GATEWAY_CI_READ')}
+  try{gateway=brokerCI?brokerRead.gateway:await getJson(fetchImpl,githubBase+'/actions/runs/'+gatewayId,githubToken,'GITHUB_GATEWAY_CI_READ')}
   catch(error){return safe('INDEPENDENT_GATEWAY_CI_READ_UNAVAILABLE',githubFailureCheckpoint(error,canonical?direction:null,branch,sha,repo,'GITHUB_GATEWAY_CI_READ',gatewayId))}
   if(publicCI&&!publicRunMatches(gateway,repo,publicIdentity))return safe('INDEPENDENT_PUBLIC_GATEWAY_REPOSITORY_IDENTITY_NOT_VERIFIED',
    identityFailure('GITHUB_GATEWAY_CI_READ',gateway,['repository']));

@@ -33,6 +33,8 @@ function config(){
 }
 async function rpc(c:{url:string,key:string},name:string,args:Record<string,unknown>){
  if(![
+  'reality_read_current_final_loop_proof_envelope_v1',
+  'reality_read_final_loop_shared_continuity_guard_v1',
   'reality_read_signed_maintenance_repair_source_scope_v1',
   'reality_read_signed_maintenance_frozen_test_draft_scope_v1',
   'reality_read_signed_existing_maintenance_case_ci_scope_v1',
@@ -540,6 +542,56 @@ async function verifiedTarget(c:{url:string,key:string,github:string},b:any){
   install_target_verified:true,owner_approval_ready:false,repair_installed:false});
 }
 
+// Read-only release evidence through the existing protected broker.
+// No generic URL, new credential, provider write or authority grant.
+async function verifiedReleaseCi(c:{url:string,key:string,github:string},b:any){
+ const keys='continuity_head_sha256,continuity_revision,continuity_root_id,gateway_run_id,lifecycle_run_id,mode,original_work_id,owner_id,plan_fingerprint,qualifier_receipt_sha256,release_ref,release_sha,shift_id,source_ref';
+ if(Object.keys(b).sort().join(',')!==keys||
+  !UUID.test(b.owner_id||'')||!UUID.test(b.shift_id||'')||!UUID.test(b.continuity_root_id||'')||
+  !/^work:[a-f0-9]{32}$/.test(b.original_work_id||'')||
+  !HASH.test(b.continuity_head_sha256||'')||!HASH.test(b.plan_fingerprint||'')||!HASH.test(b.qualifier_receipt_sha256||'')||
+  !Number.isSafeInteger(b.continuity_revision)||b.continuity_revision<1||
+  !SHA.test(b.release_sha||'')||!(/^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$/).test(b.release_ref||'')||
+  !/^https:\/\/github[.]com\/maloney2323\/Reality\/(issues|pull)\/[1-9][0-9]*$/.test(b.source_ref||'')||
+  !Number.isSafeInteger(b.lifecycle_run_id)||b.lifecycle_run_id<1||
+  !Number.isSafeInteger(b.gateway_run_id)||b.gateway_run_id<1||b.gateway_run_id===b.lifecycle_run_id)
+  return response(400,'RELEASE_CI_BROKER_EXACT_SCOPE_REQUIRED');
+ async function scopeCurrent(){
+  const p=await rpc(c,'reality_read_current_final_loop_proof_envelope_v1',{p_shift_id:b.shift_id});
+  const g=await rpc(c,'reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:b.shift_id});
+  const jobs=Array.isArray(p.jobs)?p.jobs.filter((j:any)=>j.original_work_id===b.original_work_id&&j.source_ref===b.source_ref):[];
+  const hs=Array.isArray(g.obligations)?g.obligations.filter((j:any)=>j.original_work_id===b.original_work_id&&j.source_ref===b.source_ref):[];
+  return p.status==='FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'&&
+   p.read_only===true&&p.independent_owner_scope_verified===true&&g.status==='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'&&
+   p.owner_id===b.owner_id&&g.owner_id===b.owner_id&&p.shift_id===b.shift_id&&g.shift_id===b.shift_id&&
+   p.plan_fingerprint===b.plan_fingerprint&&p.continuity_root_id===b.continuity_root_id&&g.continuity_root_id===b.continuity_root_id&&
+   p.continuity_head_sha256===b.continuity_head_sha256&&g.continuity_head_sha256===b.continuity_head_sha256&&
+   p.revision===b.continuity_revision&&g.revision===b.continuity_revision&&
+   jobs.length===1&&jobs[0].independent_source_proof_verified===true&&
+   hs.length===1&&hs[0].qualifier_digest_verified===true&&hs[0].continuity_identity_verified===true&&
+   hs[0].independent_original_outcome_verified===false&&hs[0].qualifier_receipt_sha256===b.qualifier_receipt_sha256;
+ }
+ if(!await scopeCurrent())return response(409,'RELEASE_CI_BROKER_CURRENT_AUTHORITY_UNVERIFIED');
+ const repo=REPO.slice('https://api.github.com/repos/'.length);
+ const paths=['.github/workflows/reality-final-loop-engine-v1-ci.yml','.github/workflows/reality-governed-openai-gateway-isolated-20261108.yml'];
+ const names=['Reality Final Loop Engine lifecycle acceptance','Reality — Isolated governed OpenAI gateway proof'];
+ const ids=[b.lifecycle_run_id,b.gateway_run_id];
+ const runs=[];
+ for(let i=0;i<ids.length;i++){
+  let r:any;
+  try{r=await github(c,'/actions/runs/'+ids[i])}
+  catch{return response(503,'RELEASE_CI_BROKER_PROVIDER_READ_UNAVAILABLE',{failed_operation:i===0?'GITHUB_LIFECYCLE_CI_READ':'GITHUB_GATEWAY_CI_READ'})}
+  if(r.id!==ids[i]||r.head_sha!==b.release_sha||r.head_branch!==b.release_ref||
+   r.repository?.full_name!==repo||r.name!==names[i]||r.path!==paths[i]||
+   r.status!=='completed'||r.conclusion!=='success'||!['push','pull_request'].includes(r.event))
+   return response(409,'RELEASE_CI_BROKER_EXACT_RUN_UNVERIFIED');
+  runs.push({id:r.id,head_sha:r.head_sha,head_branch:r.head_branch,name:r.name,path:r.path,
+   status:r.status,conclusion:r.conclusion,event:r.event,repository:{full_name:repo}});
+ }
+ if(!await scopeCurrent())return response(409,'RELEASE_CI_BROKER_CONTINUITY_CHANGED');
+ return response(200,'RELEASE_CI_BROKER_EXACT_READBACK',{scope:b,lifecycle:runs[0],gateway:runs[1],
+  provider_read_observed:true,credential_values_exposed:false});
+}
 Deno.serve(async req=>{
  try{
   if(req.method!=='POST')return response(405,'SIGNED_SOURCE_BROKER_POST_ONLY');
@@ -550,9 +602,11 @@ Deno.serve(async req=>{
   if(req.headers.get('content-type')!=='application/json')
    return response(415,'SIGNED_SOURCE_BROKER_JSON_ONLY');
   const raw=await req.text();
-  if(raw.length<120||raw.length>620)
+  if(raw.length<120||raw.length>1800)
    return response(400,'SIGNED_SOURCE_BROKER_EXACT_BODY_REQUIRED');
   const b=JSON.parse(raw);
+  if(b?.mode==='release_ci')return await verifiedReleaseCi(c,b);
+  if(raw.length>620)return response(400,'SIGNED_SOURCE_BROKER_EXACT_BODY_REQUIRED');
   if(b?.mode==='case_ci'){
    return await verifiedCaseCi(c,b);
   }
