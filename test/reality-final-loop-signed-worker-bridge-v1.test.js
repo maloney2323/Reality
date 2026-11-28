@@ -579,6 +579,25 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
   canonical_return_event_id:partial.historical_subset_return_event_id,
   canonical_return_head_sha256:partial.historical_subset_return_head_sha256})).status,
   'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
+ // A terminal failed worker can return evidence but is never a successful
+ // provider operation. The earlier completed observation remains unchanged.
+ const failed={...historic,child_work_id:'work:'+'b'.repeat(32),
+  invocation_id:'00000000-0000-4000-8000-000000000021',
+  worker_run_id:'00000000-0000-4000-8000-000000000022',
+  event_id:'00000000-0000-4000-8000-000000000023',
+  worker_completed:false,worker_terminal_status:'FAILED',
+  worker_failure_attested:true,provider_outcome_unknown:true,
+  worker_failure_stage:'EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE'};
+ const terminal={...partial,status:'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN',
+  signed_observation_count:2,observations:[historic,failed],
+  historical_subset_return_event_id:null,historical_subset_return_head_sha256:null};
+ assert.equal((await observe(terminal)).status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ for(const bad of [{worker_failure_attested:false},{provider_outcome_unknown:false},
+  {worker_failure_stage:'FOREIGN_STAGE'},{worker_completed:true},
+  {model_artifact_recorded:true},{provider_outcome_verified:true},{replay_authorized:true}]){
+  assert.equal((await observe({...terminal,observations:[historic,{...failed,...bad}]})).status,
+   'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
+ }
  assert.equal((await observe({...evidence,replay_authorized:true})).status,
   'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
  assert.equal((await observe({...evidence,signed_observation_count:1})).status,
