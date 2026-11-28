@@ -392,3 +392,16 @@ test('canonical approved scope binds exact receipt and five scopes to the shared
  assert.equal(routes.routes[0].canonical_execution_handoff.status,result.status);
  assert.equal(routes.routes[1].canonical_execution_handoff,null);
 });
+
+
+test('exact claimed review uses fresh staged route read instead of speculative duplicate',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const start=worker.indexOf('const exactReviewRouteRequired=');
+ const end=worker.indexOf('// The existing signed worker advances the SAME Final Loop child',start);
+ assert.ok(start>=0&&end>start);
+ const route=worker.slice(start,end);
+ assert.match(route,/if\(exactReviewRouteRequired\)\{[\s\S]*?requireFreshFinalLoopContinuity\(\)[\s\S]*?readCurrentFinalLoopStagedActions\(currentReviewContinuity,currentReviewGraph\)/);
+ assert.match(route,/FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED[\s\S]*?\} else if\(hasReview[\s\S]*?readCurrentFinalLoopStagedActions\(lastFinalLoopContinuity,unifiedGraph\)/);
+ assert.equal((route.match(/readCurrentFinalLoopStagedActions\(/g)||[]).length,2);
+ assert.match(route,/claimedEventId:governedWakeScope.event_id/);
+});
