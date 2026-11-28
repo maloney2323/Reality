@@ -417,6 +417,22 @@ export async function continueSignedExistingEmployeeShift({
   p_owner_id:session.user_id,p_conversation_id:conversationId,
   p_request_id:requestId
  });
+ // A durable intent is not a wake or worker execution receipt.
+ if(result?.status==='CHAT_EXISTING_SHIFT_CONTINUATION_INTENT_RECORDED'){
+  if(result.owner_id!==session.user_id||result.request_id!==requestId||
+     result.source_ref!==source.source_ref||!validUuid(result.shift_id)||
+     result.intent_recorded!==true||result.wake_enqueued!==false||
+     result.worker_execution_verified!==false||result.execution_authorized!==false||
+     result.installation_authorized!==false||result.production_changed!==false||
+     result.original_job_completed!==false||result.new_shift_started!==false)
+   fail('CHAT_WORK_EXISTING_SHIFT_INTENT_RECEIPT_UNVERIFIED',503);
+  return Object.freeze({status:result.status,
+   capability_id:'governed-existing-shift-continuation',
+   request_id:requestId,source_ref:source.source_ref,shift_id:result.shift_id,
+   intent_recorded:true,wake_enqueued:false,worker_execution_verified:false,
+   execution_started:false,execution_authorized:false,installation_authorized:false,
+   original_job_completed:false,production_changed:false,new_shift_started:false});
+ }
  const statuses=new Set(['CHAT_EXISTING_SHIFT_WAKE_ENQUEUED',
   'CHAT_EXISTING_SHIFT_WAKE_ALREADY_QUEUED']);
  if(statuses.has(result?.status)){
