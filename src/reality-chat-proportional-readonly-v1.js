@@ -8,7 +8,7 @@ import {buildGovernedChatSignal}
 import {runRealityCognitiveRuntime}
  from './reality-cognitive-runtime-v1.0.js';
 import {extractReliabilityClaims} from './reality-reliability-claim-extraction-v0.1.js';
-import {compileFinalOutputClaimAssessment,summarizeOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
+import {compileFinalOutputClaimAssessment,summarizeOutputClaimAssessment,requiresSourceRenderedOperationalReply} from './reality-final-chat-publication-proof-v0.1.js';
 
 // Reuse only the already authenticated, structured current operational
 // observations. This is a bounded comparison input, not another truth ledger.
@@ -107,6 +107,55 @@ export function isProportionalReadOnlyChat({message,goalCommand=null,publicResea
   !ACTION.test(message.trim())&&
   !SIGNED_EXISTING_SHIFT_ACTION.test(message.trim());
 }
+// The existing owner-scoped fallback is also the deterministic publication
+// renderer for operational requests. No model-authored bytes are appended.
+function renderSourceBoundOperationalReply({snapshot,operationalTimeHorizon,claimAssessment}){
+   // Do not repeat unverified model prose. A source-attested status can
+   // still be reported from the exact existing owner readback, not from
+   // the failed extractor. The original draft's coverage remains unknown.
+   const fact=snapshot.facts.find(f=>f.key==='shift.shift_status');
+   const id=snapshot.facts.find(f=>f.key==='shift.active_owner_shift_id');
+   const statusVerified=fact&&id&&fact.evidence_ref===id.evidence_ref&&
+    UUID.test(id.value||'')&&['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(fact.value);
+   let released='I cannot independently establish the operational assertions in my draft. I have withheld it. ';
+   if(statusVerified){
+    const statusText={QUEUED:'queued',RUNNING:'running',AWAITING_EXACT_ORIGINAL_WORK:'awaiting exact original work'}[fact.value];
+    released+='The authenticated shift record '+id.value+' is '+statusText+'. ';
+    claimAssessment=Object.freeze({...claimAssessment,released_source_fact_refs:[fact.evidence_ref],
+     released_source_facts:[fact,id].map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref}))});
+   }
+   // A canonical guard may survive even when the separate shift briefing
+   // is unavailable. Render only the existing exact guarded facts; never
+   // infer a shift status or outcome from an original's admission.
+   const originals=(operationalTimeHorizon?.present?.obligations||[]).slice(0,3);
+   const recordedFacts=[];
+   for(const o of originals){
+    if(o.existing_shift_authorized!==true||o.read_only!==true||
+       o.execution_authorized!==false||o.installation_authorized!==false||
+       o.production_changed!==false||!UUID.test(o.shift_id||'')||
+       !/^work:[a-f0-9]{32}$/.test(o.original_work_id||'')||
+       !/^sha256:[a-f0-9]{64}$/.test(o.guard_receipt_sha256||'')||
+       !Number.isSafeInteger(o.continuity_revision)||o.continuity_revision<1)continue;
+    const prefix='original.'+o.original_work_id+'.';
+    const fields=['shift_id','original_work_id','continuity_revision','existing_shift_authorized'];
+    if(/^[A-Z][A-Z0-9_]{2,119}$/.test(o.operational_next_action||''))fields.push('operational_next_action');
+    const rows=fields.map(key=>snapshot.facts.find(f=>f.key===prefix+key&&f.value===o[key]&&f.evidence_ref===o.guard_receipt_sha256));
+    if(rows.some(f=>!f))continue;
+    released+='The current guarded original '+o.original_work_id+' is at Continuity revision '+o.continuity_revision+
+     ' under existing authorized shift '+o.shift_id+'. ';
+    if(fields.includes('operational_next_action'))
+     released+='The recorded next action is '+o.operational_next_action.toLowerCase().replaceAll('_',' ')+'. ';
+    recordedFacts.push(...rows.map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref})));
+   }
+   if(recordedFacts.length){
+    const rows=[...(claimAssessment.released_source_facts||[]),...recordedFacts];
+    claimAssessment=Object.freeze({...claimAssessment,released_source_facts:rows,
+     released_source_fact_refs:[...new Set(rows.map(f=>f.evidence_ref))]});
+   }
+   released+='No new work, installation or original-job completion is established by this reply.';
+ return {released,claimAssessment};
+}
+
 export async function generateProportionalReadOnlyReply({
  message,conversationId,requestId,ownerId,sourceRef,
  verifiedPriorTurns=[],worldlineId,ownerContext=null,
@@ -171,14 +220,16 @@ export async function generateProportionalReadOnlyReply({
  let released=reconciled.answer,claimAssessment=null;
  // Only owner-operational status turns need the extra bounded extraction.
  // Greetings/advice without operational context stay on the ordinary fast lane.
- const operational=Boolean(ownerContext?.currently_authorized_shift||
+ const strictOperational=requiresSourceRenderedOperationalReply(message);
+ const operational=strictOperational||Boolean(ownerContext?.currently_authorized_shift||
   operationalTimeHorizon?.present?.obligations?.length);
- if(operational&&reconciled.disposition==='CONVERSATIONAL_CLAIMS_UNCHANGED'){
+ if(operational&&(strictOperational||reconciled.disposition==='CONVERSATIONAL_CLAIMS_UNCHANGED')){
   const snapshot=operationalClaimSnapshot({worldId:worldlineId,ownerContext,horizon:operationalTimeHorizon});
+  const draft=strictOperational?result.answer:released;
   try{
-   const extraction=await extractReliabilityClaims({modelOutput:released,worldId:worldlineId,
+   const extraction=await extractReliabilityClaims({modelOutput:draft,worldId:worldlineId,
     snapshot,apiKey,model,fetchImpl,allowEmptyEvidence:true});
-   claimAssessment=compileFinalOutputClaimAssessment({answer:released,candidate:extraction.candidate,
+   claimAssessment=compileFinalOutputClaimAssessment({answer:draft,candidate:extraction.candidate,
     snapshot,review:{unassessed_claims:extraction.unadjudicated_claims},
     extractionStatus:extraction.extraction_status});
    // An explicitly operational extraction with no assessed assertion is
@@ -186,7 +237,13 @@ export async function generateProportionalReadOnlyReply({
    // empty extraction as a false claim or as verified semantic coverage.
    const missingOperationalCoverage=extraction.candidate.scope==='OPERATIONAL'&&
     claimAssessment.status==='CLAIM_COVERAGE_UNVERIFIED';
-   if(claimAssessment.unsupported_assertion_detected||missingOperationalCoverage)
+   if(strictOperational){
+    // Even a falsely CONVERSATIONAL or partially correct extraction does not
+    // permit free-form operational assertions. Retain the model assessment
+    // as diagnostic evidence, then publish only exact source facts.
+    claimAssessment=Object.freeze({...claimAssessment,publication_contract:'SOURCE_RENDERED_OPERATIONAL_REPORT'});
+    ({released,claimAssessment}=renderSourceBoundOperationalReply({snapshot,operationalTimeHorizon,claimAssessment}));
+   }else if(claimAssessment.unsupported_assertion_detected||missingOperationalCoverage)
     released='The available owner-scoped evidence does not establish the operational assertion in my draft. I have withheld that assertion; the actual outcome remains unverified.';
   }catch(error){
    // Preserve only allowlisted diagnostic categories, not model/provider
@@ -196,50 +253,9 @@ export async function generateProportionalReadOnlyReply({
     rawCode:['TimeoutError','AbortError'].includes(error?.name)?'RELIABILITY_EXTRACTION_TIMEOUT':
     'RELIABILITY_EXTRACTION_OR_ASSESSMENT_UNCLASSIFIED_FAILURE';
    claimAssessment=Object.freeze({...compileFinalOutputClaimAssessment({
-    answer:released,snapshot,extractionStatus:'EXTRACTION_UNAVAILABLE'}),extraction_failure_code:failureCode});
-   // Do not repeat unverified model prose. A source-attested status can
-   // still be reported from the exact existing owner readback, not from
-   // the failed extractor. The original draft's coverage remains unknown.
-   const fact=snapshot.facts.find(f=>f.key==='shift.shift_status');
-   const id=snapshot.facts.find(f=>f.key==='shift.active_owner_shift_id');
-   const statusVerified=fact&&id&&fact.evidence_ref===id.evidence_ref&&
-    UUID.test(id.value||'')&&['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(fact.value);
-   released='I cannot independently establish the operational assertions in my draft. I have withheld it. ';
-   if(statusVerified){
-    const statusText={QUEUED:'queued',RUNNING:'running',AWAITING_EXACT_ORIGINAL_WORK:'awaiting exact original work'}[fact.value];
-    released+='The authenticated shift record '+id.value+' is '+statusText+'. ';
-    claimAssessment=Object.freeze({...claimAssessment,released_source_fact_refs:[fact.evidence_ref],
-     released_source_facts:[fact,id].map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref}))});
-   }
-   // A canonical guard may survive even when the separate shift briefing
-   // is unavailable. Render only the existing exact guarded facts; never
-   // infer a shift status or outcome from an original's admission.
-   const originals=(operationalTimeHorizon?.present?.obligations||[]).slice(0,3);
-   const recordedFacts=[];
-   for(const o of originals){
-    if(o.existing_shift_authorized!==true||o.read_only!==true||
-       o.execution_authorized!==false||o.installation_authorized!==false||
-       o.production_changed!==false||!UUID.test(o.shift_id||'')||
-       !/^work:[a-f0-9]{32}$/.test(o.original_work_id||'')||
-       !/^sha256:[a-f0-9]{64}$/.test(o.guard_receipt_sha256||'')||
-       !Number.isSafeInteger(o.continuity_revision)||o.continuity_revision<1)continue;
-    const prefix='original.'+o.original_work_id+'.';
-    const fields=['shift_id','original_work_id','continuity_revision','existing_shift_authorized'];
-    if(/^[A-Z][A-Z0-9_]{2,119}$/.test(o.operational_next_action||''))fields.push('operational_next_action');
-    const rows=fields.map(key=>snapshot.facts.find(f=>f.key===prefix+key&&f.value===o[key]&&f.evidence_ref===o.guard_receipt_sha256));
-    if(rows.some(f=>!f))continue;
-    released+='The current guarded original '+o.original_work_id+' is at Continuity revision '+o.continuity_revision+
-     ' under existing authorized shift '+o.shift_id+'. ';
-    if(fields.includes('operational_next_action'))
-     released+='The recorded next action is '+o.operational_next_action.toLowerCase().replaceAll('_',' ')+'. ';
-    recordedFacts.push(...rows.map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref})));
-   }
-   if(recordedFacts.length){
-    const rows=[...(claimAssessment.released_source_facts||[]),...recordedFacts];
-    claimAssessment=Object.freeze({...claimAssessment,released_source_facts:rows,
-     released_source_fact_refs:[...new Set(rows.map(f=>f.evidence_ref))]});
-   }
-   released+='No new work, installation or original-job completion is established by this reply.';
+    answer:draft,snapshot,extractionStatus:'EXTRACTION_UNAVAILABLE'}),extraction_failure_code:failureCode,
+    ...(strictOperational?{publication_contract:'SOURCE_RENDERED_OPERATIONAL_REPORT'}:{})});
+   ({released,claimAssessment}=renderSourceBoundOperationalReply({snapshot,operationalTimeHorizon,claimAssessment}));
   }
  }
  // The server adapter supplies the existing durable ledger writer. Pure
