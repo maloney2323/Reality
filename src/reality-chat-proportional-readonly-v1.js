@@ -188,10 +188,30 @@ export async function generateProportionalReadOnlyReply({
     claimAssessment.status==='CLAIM_COVERAGE_UNVERIFIED';
    if(claimAssessment.unsupported_assertion_detected||missingOperationalCoverage)
     released='The available owner-scoped evidence does not establish the operational assertion in my draft. I have withheld that assertion; the actual outcome remains unverified.';
-  }catch{
-   // Do not turn extractor failure into a verified operational statement.
-   claimAssessment=compileFinalOutputClaimAssessment({answer:released,extractionStatus:'EXTRACTION_UNAVAILABLE'});
-   released='I cannot independently establish the operational assertions in this response from the available evidence. The underlying work has not been marked complete.';
+  }catch(error){
+   // Preserve only allowlisted diagnostic categories, not model/provider
+   // prose, credentials, or arbitrary error bodies. The draft stays withheld.
+   const rawCode=String(error?.message||'');
+   const failureCode=/^RELIABILITY_EXTRACTION_(?:PREREQUISITES|PROVIDER_ERROR_[1-5][0-9]{2}|MALFORMED_OUTPUT|INVALID_SHAPE|OVERSIZED|QUOTE_NOT_IN_MODEL_OUTPUT|ASSERTION_INVALID)$/.test(rawCode)?
+    rawCode:['TimeoutError','AbortError'].includes(error?.name)?'RELIABILITY_EXTRACTION_TIMEOUT':
+    'RELIABILITY_EXTRACTION_OR_ASSESSMENT_UNCLASSIFIED_FAILURE';
+   claimAssessment=Object.freeze({...compileFinalOutputClaimAssessment({
+    answer:released,snapshot,extractionStatus:'EXTRACTION_UNAVAILABLE'}),extraction_failure_code:failureCode});
+   // Do not repeat unverified model prose. A source-attested status can
+   // still be reported from the exact existing owner readback, not from
+   // the failed extractor. The original draft's coverage remains unknown.
+   const fact=snapshot.facts.find(f=>f.key==='shift.shift_status');
+   const id=snapshot.facts.find(f=>f.key==='shift.active_owner_shift_id');
+   const statusVerified=fact&&id&&fact.evidence_ref===id.evidence_ref&&
+    UUID.test(id.value||'')&&['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(fact.value);
+   released='I cannot independently establish the operational assertions in my draft. I have withheld it. ';
+   if(statusVerified){
+    const statusText={QUEUED:'queued',RUNNING:'running',AWAITING_EXACT_ORIGINAL_WORK:'awaiting exact original work'}[fact.value];
+    released+='The authenticated shift record '+id.value+' is '+statusText+'. ';
+    claimAssessment=Object.freeze({...claimAssessment,released_source_fact_refs:[fact.evidence_ref],
+     released_source_facts:[fact,id].map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref}))});
+   }
+   released+='No new work, installation or original-job completion is established by this reply.';
   }
  }
  // The server adapter supplies the existing durable ledger writer. Pure
