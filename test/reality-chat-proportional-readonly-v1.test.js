@@ -247,3 +247,23 @@ test('fast Chat preserves the same owner incident evidence as full cognition wit
  assert.match(lane,/external_actions_authorized:false/);
  assert.match(api,/incidentChatUniverseObservations\(operationalIncidentsReadback\)/);
 });
+
+
+test('empty operational extraction withholds the draft; ordinary conversation and supported facts survive',async()=>{
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const run=async(answer,claims,operational)=>generateProportionalReadOnlyReply({...args,
+  ownerContext:{currently_authorized_shift:shift},
+  runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer}),
+  fetchImpl:async()=>({ok:true,json:async()=>({id:'resp_fixture',output_text:JSON.stringify({
+   claims,actions:[],operational,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})})})});
+ const missed='The supplier credited our account yesterday.';
+ const withheld=await run(missed,[],true);
+ assert.equal(withheld.output_claim_assessment.status,'CLAIM_COVERAGE_UNVERIFIED');
+ assert.equal(JSON.stringify(withheld).includes(missed),false);
+ assert.match(withheld.answer,/withheld/);
+ const conversational='We can discuss the available options.';
+ assert.equal((await run(conversational,[],false)).answer,conversational);
+ const supported='The shift status is AWAITING_EXACT_ORIGINAL_WORK.';
+ assert.equal((await run(supported,[{key:'shift.shift_status',value:shift.shift_status,quote:supported,assertion:'AFFIRMED'}],true)).answer,supported);
+});
