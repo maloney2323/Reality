@@ -67,6 +67,11 @@ test('categorized review reuses exact preflight, prior maintenance budget and ex
  assert.doesNotMatch(upgrade,/CREATE TABLE|CREATE TRIGGER|cron\.schedule\(|cron\.unschedule\(|cron\.alter_job\(/i);
  assert.match(bridge,/const acceptedReview=e.event_kind==='QUALIFIER_PROOF_CHANGED'/);
  assert.match(worker,/claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes/);
- assert.match(worker,/finalLoopGovernedResumeTrigger.reason==='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'/);
+ const selection=worker.slice(worker.indexOf("workerStage='EXACT_CLAIMED_EVENT_CAPABILITY_SELECTION'"),worker.indexOf("workerStage='EXACT_CLAIMED_REVIEW_CAPABILITY_DISPATCH'"));
+ assert.match(selection,/routeVerifiedFinalLoopResumeTrigger\(/);
+ assert.match(selection,/selectEngineeringDispatchScope\(/);
+ assert.match(selection,/ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY'/);
+ const router=readFileSync(new URL('../src/reality-evidence-driven-capability-router-v1.js',import.meta.url),'utf8');
+ assert.match(router,/trigger.reason!=='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'/);
  assert.match(worker,/final_loop_categorized_review_trigger:finalLoopCategorizedReviewTrigger/);
 });
