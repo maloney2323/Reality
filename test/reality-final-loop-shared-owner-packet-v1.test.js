@@ -114,7 +114,11 @@ test('the existing worker registers packet handler without treating packet as au
   import.meta.url),'utf8');
  assert.match(code,/FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY/);
  assert.match(code,/PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET/);
- assert.match(code,/finalLoopStagedActionRoutes\.status===/);
+ assert.match(code,/selectStagedRegisteredCapabilities\(\{routes:finalLoopStagedActionRoutes,/);
+ assert.match(code,/selectedRoutes:stagedPacketCapability.routes/);
+ const router=readFileSync(new URL('../src/reality-final-loop-staged-plan-action-router-v1.js',import.meta.url),'utf8');
+ assert.match(router,/routes\?\.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'/);
+ assert.match(router,/r\.authority_scope==='EXACT_OWNER_APPROVAL_PENDING'/);
  assert.match(code,/REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED/);
  assert.doesNotMatch(code,/owner_approval_granted:\s*true/);
 });
