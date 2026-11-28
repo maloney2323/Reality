@@ -175,7 +175,12 @@ export function verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId}={}){
        !UUID.test(x.invocation_id||'')||!UUID.test(x.worker_run_id||'')||!UUID.test(x.event_id||'')||
        !HASH.test(x.scope_sha256||'')||!HASH.test(x.event_head_sha256||'')||
        !HASH.test(x.release_receipt_sha256||'')||!Number.isSafeInteger(x.event_revision)||x.event_revision<1||
-       !/^[a-f0-9]{40}$/.test(x.release_sha||'')||x.worker_completed!==true||
+       !/^[a-f0-9]{40}$/.test(x.release_sha||'')||
+       !(x.worker_completed===true&&x.worker_failure_attested===undefined&&x.worker_terminal_status===undefined||
+         x.worker_completed===false&&x.worker_terminal_status==='FAILED'&&
+         x.worker_failure_attested===true&&x.provider_outcome_unknown===true&&
+         x.worker_failure_stage==='EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE'&&
+         x.model_artifact_recorded===false)||
        x.provider_outcome_verified!==false||x.replay_authorized!==false||
        typeof x.model_artifact_recorded!=='boolean')||
       e.canonical_return_committed!==(e.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN')||
