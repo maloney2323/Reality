@@ -373,3 +373,41 @@ export function selectClaimedEvidenceCapability({receipt,delivery,workerRunId}={
  if(delivery.kind!=='RESUME')throw Error(mode.fenceError);
  return mode;
 }
+
+
+// Scope the legacy engineering fan-out to its own work. An independently
+// identified exact review event needs review qualification/dispatch, not
+// unrelated corrective drafts, CI canaries, installation or settlement.
+// This is a scheduling decision ONLY: it grants no action, retry or approval.
+// All other event kinds retain the installed engineering path until their
+// own durable capability selection is independently established.
+export function selectEngineeringDispatchScope({
+ trigger,continuity,delivery,wake,canonicalEventRuntime,strictContinuityCycle
+}={}){
+ const legacy='EXISTING_SIGNED_SHIFT_ENGINEERING';
+ const guard=continuity?.shared_continuity_guard;
+ const events=continuity?.event_resume_shadow?.ready_event_refs;
+ if(canonicalEventRuntime!==true||strictContinuityCycle!==true||
+    delivery?.kind!=='RESUME'||!UUID.test(delivery.event_id||'')||
+    wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    wake.shift_id!==delivery.shift_id||
+    trigger?.status!=='FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED'||
+    trigger.reason!=='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'||
+    trigger.dispatch_permitted!==false||
+    trigger.execution_authorized_by_trigger!==false||
+    trigger.original_job_completed!==false||
+    continuity?.owner_id!==delivery.owner_id||continuity.shift_id!==delivery.shift_id||
+    guard?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+    guard.execution_authorized!==false||guard.original_job_completed!==false||
+    !Array.isArray(events))return legacy;
+ const matches=events.filter(e=>e?.event_id===delivery.event_id);
+ if(matches.length!==1)return legacy;
+ const event=matches[0];
+ if(event.event_kind!=='QUALIFIER_PROOF_CHANGED'||
+    event.next_qualified_action!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+    event.continuity_revision!==guard.revision||
+    event.continuity_head_sha256!==guard.continuity_head_sha256||
+    event.executor_invoked!==false||event.execution_authorized!==false)
+  return legacy;
+ return 'EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY';
+}
