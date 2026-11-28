@@ -64,7 +64,8 @@ CREATE TABLE reality_internal.shift_continuity_independent_reviews_v1(incident_i
  source_ref text NOT NULL,previously_reviewed_sha256 text NOT NULL,investigation_receipt_sha256 text NOT NULL,
  claimed_at timestamptz DEFAULT clock_timestamp(),status text DEFAULT 'REVIEW_CLAIMED',
  current_provider_sha256 text,provider_checked_at timestamptz,source_head_sha text,receipt_sha256 text,completed_at timestamptz,
- installation_authorized boolean DEFAULT false,production_changed boolean DEFAULT false,original_job_completed boolean DEFAULT false);
+ installation_authorized boolean DEFAULT false,production_changed boolean DEFAULT false,original_job_completed boolean DEFAULT false,
+ original_work_id text,continuity_head_sha256 text,review_event_id uuid,frozen_source_head_sha text,independent_verdict jsonb);
 ALTER TABLE public.universe_events ADD COLUMN event_kind text,ADD COLUMN entity_id uuid,ADD COLUMN effective_time timestamptz,ADD COLUMN evidence_refs jsonb;
 ALTER TABLE reality_internal.final_loop_transition_receipts_v1 ADD COLUMN plan_fingerprint text,ADD COLUMN frozen_shift_scope_sha256 text;
 CREATE TABLE public.suspension_fixture_proof(shift_id uuid PRIMARY KEY,proof jsonb,guard jsonb);
@@ -658,7 +659,7 @@ DECLARE u record; q record; sub record; a record; p record; e record; inc record
  run uuid:=gen_random_uuid(); req uuid:=gen_random_uuid(); rel uuid:=gen_random_uuid();
  incident uuid:=gen_random_uuid(); ev uuid:=gen_random_uuid(); nonce uuid:=gen_random_uuid();
  now_at timestamptz:=clock_timestamp(); qhash text; ihash text; rhash text;
- source_evidence jsonb; scope jsonb; snapshot jsonb; spine jsonb; guard jsonb; verdict jsonb;
+ source_evidence jsonb; scope jsonb; snapshot jsonb; spine jsonb; v_guard jsonb; verdict jsonb;
  observations jsonb:=jsonb_build_array(jsonb_build_object('worker_completed',true,
   'model_artifact_recorded',false,'provider_outcome_verified',false,'replay_authorized',false));
 BEGIN
@@ -689,9 +690,9 @@ BEGIN
   'observation_sha256','sha256:'||encode(sha256(convert_to(observations::text,'UTF8')),'hex'),
   'observations',observations,'replay_authorized',false,'execution_authorized',false,
   'original_job_completed',false);
- SELECT f.guard INTO guard FROM public.suspension_fixture_proof f WHERE shift_id=sub.shift_id;
+ SELECT f.guard INTO v_guard FROM public.suspension_fixture_proof f WHERE shift_id=sub.shift_id;
  UPDATE public.suspension_fixture_proof f SET guard=f.guard||jsonb_build_object('obligations',
-  jsonb_build_array((guard->'obligations'->0)||jsonb_build_object(
+  jsonb_build_array((v_guard->'obligations'->0)||jsonb_build_object(
    'qualifier_receipt_sha256',qhash,'execution_spine_readback',spine)))
   WHERE shift_id=sub.shift_id;
  scope:=a.runtime_scope||jsonb_build_object('target_deployment_id','dpl_fixture_current_invocation',
