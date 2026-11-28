@@ -330,6 +330,15 @@ export function boundedRegisteredCapabilityCheckpoint(action,result){
 // These are installed capability types, not a hard-coded sequence of jobs.
 // An ordinary claim selects none; conflicting evidence modes fail closed.
 const evidenceModes=Object.freeze({
+ ledger_return_only:Object.freeze({
+  key:'RETURN_VERIFIED_INVOCATION_OBSERVATIONS_NO_REPLAY',
+  releaseStage:'LEDGER_RETURN_RELEASE_ATTESTATION',
+  publicationStage:'LEDGER_RETURN_RESPONSE_PUBLICATION',
+  errorPrefix:'LEDGER_RETURN',
+  fenceError:'LEDGER_RETURN_RUNTIME_FENCE_REJECTED',
+  witnessError:'LEDGER_RETURN_RELEASE_WITNESS_UNVERIFIED',
+  attestationError:'LEDGER_RETURN_ATTESTATION_UNVERIFIED'
+ }),
  terminal_technical_evidence_only:Object.freeze({
   key:'READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY',
   releaseStage:'TERMINAL_TECHNICAL_EVIDENCE_RELEASE_ATTESTATION',
