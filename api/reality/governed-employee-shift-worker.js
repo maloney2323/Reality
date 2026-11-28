@@ -849,10 +849,13 @@ export default async function handler(req,res){
     'FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE'
    ].includes(ingressTrigger.status);
    if(!otherQualifiedRoute){
-    if(ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY')
-     throw Error('EXACT_CLAIMED_EVENT_CAPABILITY_UNVERIFIED_'+String(ingressTrigger.reason||'NO_ROUTE').slice(0,85));
+    if(ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY'){
+     const reason=String(ingressTrigger.reason||'NO_ROUTE');
+     workerStage=/^[A-Z][A-Z0-9_]{5,70}$/.test(reason)?reason:'EXACT_CLAIMED_EVENT_CAPABILITY_UNVERIFIED';
+     throw Error('EXACT_CLAIMED_EVENT_CAPABILITY_UNVERIFIED');
+    }
     const currentReviewContinuity=await requireFreshFinalLoopContinuity();
-    const unifiedGraph=assertRealityUnifiedShiftGraph(
+    const exactReviewGraph=assertRealityUnifiedShiftGraph(
      await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),
      {expectedShiftId:wakeReceipt.shift_id});
     const [staged,preflight]=await Promise.all([
@@ -860,19 +863,19 @@ export default async function handler(req,res){
      shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{p_shift_id:wakeReceipt.shift_id},{timeoutMs:6000})
     ]);
     const finalLoopStagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
-     graph:unifiedGraph,staged,preflight,continuity:currentReviewContinuity});
+     graph:exactReviewGraph,staged,preflight,continuity:currentReviewContinuity});
     const finalLoopCategorizedReviewTrigger=routeVerifiedFinalLoopResumeTrigger({
      continuity:currentReviewContinuity,shiftId:wakeReceipt.shift_id,
      claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes});
-    const {registeredRecoveryActionKeys,signedWorkerDurableReleaseWake}=await readSignedWorkerReleaseWitness(unifiedGraph);
+    const {registeredRecoveryActionKeys,signedWorkerDurableReleaseWake}=await readSignedWorkerReleaseWitness(exactReviewGraph);
     workerStage='EXACT_CLAIMED_REVIEW_CAPABILITY_DISPATCH';
     let finalLoopChildReview={status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',original_job_completed:false,production_changed:false};
-    let shiftContinuityInvestigation={status:'NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'};
+    let exactReviewInvestigation={status:'NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'};
   // The existing router selects the ledger's exact capability. The registry
   // contains trusted adapters only; no model-generated handler or code is run.
   const selectedEventCapability=selectRegisteredSignedEventCapability({
    trigger:finalLoopCategorizedReviewTrigger,delivery:governedWakeScope,
-   wake:wakeReceipt,graph:unifiedGraph,release:signedWorkerDurableReleaseWake,
+   wake:wakeReceipt,graph:exactReviewGraph,release:signedWorkerDurableReleaseWake,
    workerRunId:actualWorkerRunId,registeredActionKeys:registeredRecoveryActionKeys,
    env:process.env
   });
@@ -940,7 +943,7 @@ export default async function handler(req,res){
       'FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED':unresolvedInvocationInvestigationDue?
       'FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED':finalLoopChildReview.continuity_blocker_code});
     if(finalLoopBlockerIncident?.status==='SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED'){
-     shiftContinuityInvestigation=await investigateOneSignedShiftContinuityIncident({
+     exactReviewInvestigation=await investigateOneSignedShiftContinuityIncident({
       db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
      }).catch(error=>({status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
        failure_code:classifySignedContinuityClaimTransportError(error),execution_authorized:false,
@@ -955,7 +958,7 @@ export default async function handler(req,res){
     // Preserve the selected capability's result, rather than letting an
     // unrelated operation overwrite the completion pulse. A fresh verifier
     // return is required; no claim of original completion is made here.
-    workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE';
+    workerStage='EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE';
     const finalLoopContinuityReturn=await requireFreshFinalLoopContinuity();
     const pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
      p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
@@ -981,7 +984,7 @@ export default async function handler(req,res){
      final_loop_continuity_return:finalLoopContinuityReturn,
      final_loop_categorized_review_trigger:finalLoopCategorizedReviewTrigger,
      final_loop_child_review:finalLoopChildReview,final_loop_blocker_incident:finalLoopBlockerIncident,
-     shift_continuity_investigation:shiftContinuityInvestigation,
+     shift_continuity_investigation:exactReviewInvestigation,
      original_job_completed:false,execution_authorized:false,installation_authorized:false,
      production_changed:false,new_shift_started:false});
    }
