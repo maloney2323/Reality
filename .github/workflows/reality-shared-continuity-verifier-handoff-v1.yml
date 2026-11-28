@@ -43,6 +43,8 @@ on:
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'sql/reality-continuity-terminal-readback-plan-v1.sql'
       - 'sql/reality-maintenance-chat-operational-eligibility-v1.sql'
+      - 'sql/reality-governed-chat-continuation-connection-v1.sql'
+      - 'test/reality-governed-chat-continuation-connection-smoke-v1.sql'
       - 'test/reality-maintenance-chat-operational-eligibility-smoke-v1.sql'
       - 'src/reality-signed-chat-to-work-v1.js'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
@@ -89,6 +91,8 @@ on:
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'sql/reality-continuity-terminal-readback-plan-v1.sql'
       - 'sql/reality-maintenance-chat-operational-eligibility-v1.sql'
+      - 'sql/reality-governed-chat-continuation-connection-v1.sql'
+      - 'test/reality-governed-chat-continuation-connection-smoke-v1.sql'
       - 'test/reality-maintenance-chat-operational-eligibility-smoke-v1.sql'
       - 'src/reality-signed-chat-to-work-v1.js'
       - 'sql/reality-final-loop-blocker-incident-handoff-v1.sql'
@@ -207,3 +211,5 @@ jobs:
           PGDATABASE=reality_provider_checkpoint_smoke psql -v ON_ERROR_STOP=1 -f test/reality-governed-provider-continuity-checkpoint-smoke-v1.sql
           createdb reality_maintenance_chat_smoke
           PGDATABASE=reality_maintenance_chat_smoke psql -v ON_ERROR_STOP=1 -f test/reality-maintenance-chat-operational-eligibility-smoke-v1.sql
+          createdb reality_governed_chat_connection_smoke
+          PGDATABASE=reality_governed_chat_connection_smoke psql -v ON_ERROR_STOP=1 -f test/reality-governed-chat-continuation-connection-smoke-v1.sql
