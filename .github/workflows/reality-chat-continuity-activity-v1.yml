@@ -4,6 +4,12 @@ on:
     paths:
       - 'index.html'
       - 'src/reality-chat-continuity-activity-v1.js'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-chat-self-visibility-v1.js'
+      - 'src/reality-chat-proportional-readonly-v1.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'test/reality-chat-self-visibility-v1.test.js'
+      - 'test/reality-chat-proportional-readonly-v1.test.js'
       - 'api/reality/personal-continuity-activity.js'
       - 'test/reality-chat-continuity-activity-v1.test.js'
       - '.github/workflows/reality-chat-continuity-activity-v1.yml'
@@ -18,3 +24,5 @@ jobs:
         run: |
           node --test test/reality-chat-continuity-activity-v1.test.js
           node --check api/reality/personal-continuity-activity.js
+          node --check api/reality/personal-chat.js
+          node --test test/reality-chat-self-visibility-v1.test.js test/reality-chat-proportional-readonly-v1.test.js

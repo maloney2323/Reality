@@ -25,14 +25,16 @@ const fail=code=>{throw Error('CHAT_READ_ONLY_'+code)};
 // is explicitly returned by a separate work adapter. Historical quotations and
 // suggestions are not authority. Reconcile the saved owner shift before any
 // model-authored claim that the owner must start or authorize a new shift.
-export function reconcileReadOnlyOperationalAnswer({answer,ownerContext}={}){
+export function reconcileReadOnlyOperationalAnswer({answer,ownerContext,operationalTimeHorizon=null}={}){
  const a=String(answer||'');
  const s=ownerContext?.currently_authorized_shift;
+ const current=operationalTimeHorizon?.present?.obligations||[];
+ const exactShifts=[...new Set(current.filter(o=>o.existing_shift_authorized===true&&UUID.test(o.shift_id||'')).map(o=>o.shift_id))];
  const active=s?.owner_shift_authorization_recorded===true&&
   s?.shift_start_command_already_satisfied===true&&
   ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.shift_status)&&
   UUID.test(s.active_owner_shift_id||'')?
-  s.active_owner_shift_id:null;
+  s.active_owner_shift_id:exactShifts.length===1?exactShifts[0]:null;
  const unsupportedRun=
   /\b(?:sandbox(?:ed)? (?:deployment )?simulation|simulation results|independent (?:acceptance )?tests?|test assertions|production installation)\b[^.!?\n]{0,150}\b(?:completed|passed|verified|executed|succeeded|successful|activated|installed|deployed)\b/i.test(a)||
   /\b(?:completed|passed|verified|executed|succeeded|successful|activated|installed|deployed)\b[^.!?\n]{0,150}\b(?:sandbox(?:ed)? (?:deployment )?simulation|simulation results|independent (?:acceptance )?tests?|test assertions|production installation)\b/i.test(a);
@@ -48,12 +50,17 @@ export function reconcileReadOnlyOperationalAnswer({answer,ownerContext}={}){
  if(!unsupportedRun&&!unsupportedPromise&&!unsupportedApproval&&
     !contradictedShift&&!unnecessaryShift)
   return Object.freeze({answer:a,disposition:'CONVERSATIONAL_CLAIMS_UNCHANGED'});
+ const exact=current.length===1?current[0]:null;
+ const currentTruth=exact?' Current original '+exact.original_work_id+' is at Continuity revision '+exact.continuity_revision+'. '+
+  (exact.active_release_observation?'The recorded release is '+exact.active_release_observation.release_sha+' (approval receipt '+exact.active_release_observation.approval_receipt_sha256+'). ':'')+
+  (exact.current_events?.some(e=>e.interpretation==='WORKER_FINISHED_EVIDENCE_NOT_ACCEPTED')?'A worker invocation finished but its evidence is not yet accepted. ':'')+
+  'Current next action: '+exact.operational_next_action+'.': '';
  const truth=active?
   'The existing owner-authorized shift '+active+
   ' is open. It does not need a second start or shift approval for work already covered by its warrant.':
   'I cannot verify an active signed shift from the owner-scoped evidence available to this Chat turn.';
  return Object.freeze({
-  answer:truth+' This Chat response did not run a sandbox simulation, install code, record an approval event or independently verify an operational result. '+
+  answer:truth+currentTruth+' This Chat response did not run a sandbox simulation, install code, record an approval event or independently verify an operational result. '+
    'Existing owner permission and source-backed work should be reconciled by the governed executor against the exact scoped warrant and any tested installation artifact. '+
    'I can explain the next evidence-backed action, but must not claim it has executed without a provider and ledger receipt.',
   disposition:'UNSUPPORTED_OPERATIONAL_CLAIM_REPLACED_WITH_OWNER_SCOPED_TRUTH'
@@ -68,7 +75,7 @@ export function isProportionalReadOnlyChat({message,goalCommand=null,publicResea
 export async function generateProportionalReadOnlyReply({
  message,conversationId,requestId,ownerId,sourceRef,
  verifiedPriorTurns=[],worldlineId,ownerContext=null,
- verifiedUniverseObservations=[],apiKey,model='gpt-4.1-mini',
+ verifiedUniverseObservations=[],operationalTimeHorizon=null,apiKey,model='gpt-4.1-mini',
  runtime=runRealityCognitiveRuntime
 }={}){
  if(typeof message!=='string'||!message.trim()||
@@ -104,6 +111,7 @@ export async function generateProportionalReadOnlyReply({
     recent_exchanges:prior
    },
    owner_business_context:ownerContext,
+   operational_time_horizon:operationalTimeHorizon,
    governance_proportionality:{
     mode:'READ_ONLY_CONVERSATION',
     answer_and_planning_allowed_without_new_job_or_shift:true,
@@ -126,7 +134,7 @@ export async function generateProportionalReadOnlyReply({
   fail('MODEL_OUTPUT_OR_EXECUTION_BOUNDARY_UNVERIFIED');
  return Object.freeze({
   status:'READ_ONLY_AUTHENTICATED_MODEL_REPLY_PREPARED',
-  answer:reconcileReadOnlyOperationalAnswer({answer:result.answer,ownerContext}).answer,
+  answer:reconcileReadOnlyOperationalAnswer({answer:result.answer,ownerContext,operationalTimeHorizon}).answer,
   model:result.model||model,
   semantic_correctness_independently_verified:false,
   independent_business_outcome_verified:false,

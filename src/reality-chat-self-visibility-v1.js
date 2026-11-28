@@ -304,6 +304,78 @@ export async function readRealitySelfVisibilityForChat({
  return observations;
 }
 
+// The present operational read must not depend on the optional capability
+// inventory's topic filter. Share one existing RPC read with that inventory.
+export async function readOperationalSelfVisibilityForChat({
+ readCurrent=readCurrentContinuitySelfVisibility,...args
+}={}){
+ const pending=Promise.resolve().then(()=>readCurrent(args)).catch(()=>null);
+ const [current,inventory]=await Promise.all([
+  pending,readRealitySelfVisibilityForChat({...args,readCurrent:()=>pending}).catch(()=>[])
+ ]);
+ return Object.freeze({current,observations:[
+  ...(current?.observations||[]),
+  ...inventory.filter(x=>x.event_kind!=='reality_current_verified_operational_self_visibility')
+ ]});
+}
+
+// Projection of the existing owner-scoped ledger and verifier. No new state,
+// query, work admission or authority. Historical jobs remain individually scoped.
+export function projectChatOperationalHorizon({visibility=null,settlements=[]}={}){
+ const c=visibility?.current;
+ const available=!!c&&Number.isFinite(Date.parse(c.observed_at||''))&&
+  Number.isSafeInteger(c.active_shift_count)&&c.active_shift_count>=0&&
+  Number.isSafeInteger(c.unverified_guard_count)&&c.unverified_guard_count>=0&&
+  Array.isArray(c.observations);
+ const entries=available?c.observations.filter(e=>
+  e.event_kind==='reality_current_verified_operational_self_visibility'&&
+  e.source_kind==='OWNER_SCOPED_CANONICAL_CONTINUITY_AND_SIGNED_RECEIPT_READBACK'&&
+  e.execution_authorized===false&&e.installation_authorized===false&&
+  e.production_changed===false&&e.current_operational_facts).slice(0,12):[];
+ const obligations=entries.map(e=>{
+  const o=e.current_operational_facts;
+  const events=o.current_events.map(x=>({
+   ...x,interpretation:x.state==='SHADOW_STALE'?'SUPERSEDED_HISTORICAL_EVENT':
+    x.state==='SHADOW_OBSERVED'?'OBSERVATION_ACCEPTED_NOT_ORIGINAL_SETTLEMENT':
+    x.worker_status==='COMPLETED'?'WORKER_FINISHED_EVIDENCE_NOT_ACCEPTED':
+    x.worker_status==='FAILED'?'WORKER_FAILURE_RECORDED':
+    x.worker_status==='STARTED'?'START_RECORDED_CURRENT_ACTIVITY_UNVERIFIED':
+    'NO_COMPLETED_WORKER_RECEIPT'
+  }));
+  return {...o,current_events:events.filter(x=>x.state!=='SHADOW_STALE'),
+   superseded_events:events.filter(x=>x.state==='SHADOW_STALE')};
+ });
+ const past=settlements.filter(e=>
+  e?.event_kind==='owner_independent_original_job_final_receipt'&&
+  e.source_kind==='SERVICE_VERIFIED_OWNER_SCOPED_EXISTING_FINAL_RECEIPT_LEDGER'&&
+  e.original_job_completed===true&&e.production_changed===false&&
+  WORK.test(e.original_work_id||'')&&UUID.test(e.independent_settlement_event_id||'')&&
+  SHA.test(e.installed_commit_sha||'')&&Number.isFinite(Date.parse(e.assertion_time||''))
+ ).slice(0,5).map(e=>({original_work_id:e.original_work_id,verified_at:e.assertion_time,
+  installed_commit_sha:e.installed_commit_sha,receipt_id:e.independent_settlement_event_id,
+  shift_membership_not_inferred:true}));
+ return Object.freeze({
+  schema:'reality-chat-operational-time-horizon-v1',
+  past:{independent_original_settlements:past,not_current_shift_completion:true,
+   source_status:past.length?'VERIFIED_RECEIPTS_AVAILABLE':'NO_VERIFIED_RECEIPT_RETURNED'},
+  present:{status:!available?'CURRENT_READBACK_UNKNOWN':
+    c.unverified_guard_count>0||entries.length!==c.observations.length?
+     'CURRENT_READBACK_PARTIAL':'CURRENT_READBACK_VERIFIED',
+   observed_at:available?c.observed_at:null,
+   active_shift_count:available?c.active_shift_count:null,
+   unverified_guard_count:available?c.unverified_guard_count:null,obligations,
+   missing_evidence_is_unknown_not_absence:true},
+  future:{status:available?'EVIDENCE_SCOPED_NEXT_ACTIONS':'CURRENT_EVIDENCE_REQUIRED',
+   obligations:obligations.map(o=>({original_work_id:o.original_work_id,
+    shift_id:o.shift_id,revision:o.continuity_revision,
+    next_action:o.operational_next_action,qualifier_next_action:o.qualifier_next_action,
+    pending_signals:o.current_events.filter(e=>e.state==='SHADOW_PENDING'),
+    unresolved_proof_gates:o.unresolved_proof_gates})),
+   next_action_is_not_execution_authority:true},
+  read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false
+ });
+}
+
 // Composition of already-existing, independently scoped owner readbacks.
  // An admitted source record is not automatically a current-state verdict:
  // a terminal, exact-original independent receipt supersedes that earlier

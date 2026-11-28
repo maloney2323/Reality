@@ -211,3 +211,25 @@ test('conversation persistence works with operational flags disabled and cannot 
  return {ok:true,json:async()=>request};}});
  assert.equal(reply.conversational_reply_persisted,true);assert.equal(reply.execution_authorized,false);
 });
+
+test('read-only intelligence receives the same operational temporal projection at top level',async()=>{
+ const horizon={schema:'reality-chat-operational-time-horizon-v1',
+  present:{status:'CURRENT_READBACK_PARTIAL',obligations:[{shift_id:'11111111-2222-4333-8444-555555555555',
+   existing_shift_authorized:true,original_work_id:'work:'+'a'.repeat(32),continuity_revision:3,
+   operational_next_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY',
+   current_events:[{interpretation:'WORKER_FINISHED_EVIDENCE_NOT_ACCEPTED'}],
+   active_release_observation:{release_sha:'b'.repeat(40),approval_receipt_sha256:'sha256:'+'c'.repeat(64)}}]},
+  past:{independent_original_settlements:[]},future:{next_action_is_not_execution_authority:true},
+  read_only:true,execution_authorized:false,installation_authorized:false};
+ const reply=await generateProportionalReadOnlyReply({...args,operationalTimeHorizon:horizon,
+  runtime:async params=>{
+   assert.equal(params.systemContext.operational_time_horizon,horizon);
+   return {mode:'FAST',authority_granted:false,execution_authorized:false,
+    answer:'No authorized active shift exists; you must formally start an authorized shift.'};
+  }});
+ assert.match(reply.answer,/existing owner-authorized shift/);
+ assert.match(reply.answer,/Continuity revision 3/);
+ assert.match(reply.answer,/worker invocation finished but its evidence is not yet accepted/);
+ assert.match(reply.answer,/approval receipt sha256:/);
+ assert.equal(reply.execution_authorized,false);
+});
