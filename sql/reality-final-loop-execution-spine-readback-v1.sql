@@ -24,7 +24,7 @@ DECLARE
  v_fenced_count integer;v_observations jsonb;v_observation_count integer;
  v_invocation_observation_hash text;v_return_event uuid;v_return_head text;
 BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_SHARED_CONTINUITY_SERVICE_ONLY';END IF;
+ IF current_user NOT IN ('service_role','postgres') THEN RAISE EXCEPTION 'FINAL_LOOP_SHARED_CONTINUITY_SERVICE_ONLY';END IF;
  IF p_shift_id IS NULL THEN RETURN pg_catalog.jsonb_build_object(
   'status','FINAL_LOOP_SHARED_CONTINUITY_SHIFT_REQUIRED',
   'read_only',true,'execution_authorized',false);END IF;
@@ -387,9 +387,15 @@ BEGIN
         WHEN v_return_event IS NOT NULL THEN 'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'
         ELSE 'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN' END,
        'fenced_count',v_fenced_count,'signed_observation_count',v_observation_count,
-       'observations',v_observations,'canonical_return_committed',v_return_event IS NOT NULL,
-       'observation_sha256',v_invocation_observation_hash,'canonical_return_event_id',v_return_event,
-       'canonical_return_head_sha256',v_return_head,
+       'observations',v_observations,
+        -- A receipt for a completed subset is historical proof, not proof
+        -- that the CURRENT set of fenced invocations has returned.
+        'canonical_return_committed',v_return_event IS NOT NULL AND v_fenced_count=v_observation_count AND v_fenced_count>0,
+        'observation_sha256',v_invocation_observation_hash,
+        'canonical_return_event_id',CASE WHEN v_fenced_count=v_observation_count AND v_fenced_count>0 THEN v_return_event END,
+        'canonical_return_head_sha256',CASE WHEN v_fenced_count=v_observation_count AND v_fenced_count>0 THEN v_return_head END,
+        'historical_subset_return_event_id',CASE WHEN v_fenced_count<>v_observation_count THEN v_return_event END,
+        'historical_subset_return_head_sha256',CASE WHEN v_fenced_count<>v_observation_count THEN v_return_head END,
        'execution_authorized',false,'provider_outcome_verified',false,
        'original_job_completed',false,'replay_authorized',false),
      'same_head_evidence_checkpoint_observed',has_checkpoint,
