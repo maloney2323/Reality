@@ -656,7 +656,10 @@ test('canonical claim, isolated computation and independent return preserve one 
  const prepared=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:viaSignedTransport});
  assert.equal(prepared.status,'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED');
  assert.equal(prepared.canonical_continuity_head_sha256,h.continuity_head_sha256);
- assert.equal(claims,1);assert.equal(prepares,1);assert.equal(modelCalls,1);assert.ok(reads>=4);
+ assert.equal(claims,1);assert.equal(prepares,1);assert.equal(modelCalls,1);
+ // The signed transport performs its two authority reads via the canonical
+ // fence RPC, rather than the direct callback used by the earlier fixture.
+ assert.ok(reads>=2);assert.equal(transportBegins,1);assert.equal(transportChecks,1);
  verificationMode=true;
  const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,runIsolatedAdvisory:viaSignedTransport});
  assert.equal(verified.status,'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN');
