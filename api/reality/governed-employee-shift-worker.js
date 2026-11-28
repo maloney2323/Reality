@@ -324,6 +324,7 @@ export default async function handler(req,res){
      realRun.production_changed!==false)
     throw Error('SIGNED_WORKER_REAL_PROCESS_START_NOT_DURABLE');
   let claimedEvidenceCapability=null;
+  let claimedEvidenceReceipt=null;
   if(governedWakeScope&&canonicalEventRuntime){
    const receipt=await shiftRpc(db,'reality_claim_canonical_governed_wake_v1',{
     p_owner_id:governedWakeScope.owner_id,p_shift_id:governedWakeScope.shift_id,p_plan_fingerprint:governedWakeScope.plan_fingerprint,
@@ -332,6 +333,7 @@ export default async function handler(req,res){
    claimedEvidenceCapability=selectClaimedEvidenceCapability({
     receipt,delivery:governedWakeScope,workerRunId:actualWorkerRunId
    });
+   if(claimedEvidenceCapability)claimedEvidenceReceipt=receipt;
   }
   // Explicitly authenticated, preview-only source staging for the SAME
   // signed worker and its durable lease/run. This is NOT a second worker
@@ -497,6 +499,44 @@ export default async function handler(req,res){
       process.env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED==='true')
     throw Error(mode.fenceError);
    const evidenceHandlers=new Map([
+    ['RETURN_VERIFIED_INVOCATION_OBSERVATIONS_NO_REPLAY',async()=>{
+     workerStage='LEDGER_RETURN_EXACT_CONTEXT';
+     const scope=claimedEvidenceReceipt;
+     const guard=await shiftRpc(db,'reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:wakeReceipt.shift_id});
+     const matches=guard?.obligations?.filter(x=>x.original_work_id===scope.original_work_id&&x.source_ref===scope.source_ref);
+     const observation=matches?.[0]?.execution_spine_readback;
+     if(scope.ledger_return_only!==true||guard?.status!=='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'||
+      guard.owner_id!==governedWakeScope.owner_id||guard.shift_id!==wakeReceipt.shift_id||
+      guard.continuity_head_sha256!==scope.continuity_head_sha256||guard.revision!==scope.continuity_revision||
+      guard.execution_authorized!==false||matches?.length!==1||
+      matches[0].continuity_identity_verified!==true||matches[0].qualifier_digest_verified!==true||
+      matches[0].source_proof_verified!==true||matches[0].independent_original_outcome_verified!==false||
+      observation?.status!=='SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'||
+      observation.observation_sha256!==scope.observation_sha256||
+      observation.provider_outcome_verified!==false||observation.replay_authorized!==false)
+      throw Error('LEDGER_RETURN_CURRENT_EVIDENCE_UNVERIFIED');
+     workerStage='LEDGER_RETURN_CANONICAL_WRITE';
+     const written=await shiftRpc(db,'reality_return_final_loop_invocation_observations_v1',{
+      p_shift_id:wakeReceipt.shift_id,p_original_work_id:scope.original_work_id,p_worker_run_id:actualWorkerRunId,
+      p_expected_head_sha256:scope.continuity_head_sha256,p_expected_revision:scope.continuity_revision});
+     if(written?.status!=='FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'||
+      written.canonical_return_committed!==true||written.revision!==scope.continuity_revision+1||
+      written.observation_sha256!==scope.observation_sha256||written.execution_authorized!==false||
+      written.replay_authorized!==false||written.original_job_completed!==false)
+      return {safeResult:'LEDGER_RETURN_UNVERIFIED_NO_REPLAY',body:{status:'LEDGER_RETURN_UNVERIFIED_NO_REPLAY',ledger_return_only:true}};
+     const after=await shiftRpc(db,'reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:wakeReceipt.shift_id});
+     const returned=after?.obligations?.filter(x=>x.original_work_id===scope.original_work_id&&x.source_ref===scope.source_ref);
+     const readback=returned?.[0]?.execution_spine_readback;
+     const verified=after?.status==='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'&&after.owner_id===guard.owner_id&&
+      after.shift_id===guard.shift_id&&after.continuity_root_id===guard.continuity_root_id&&
+      after.continuity_head_sha256===written.continuity_head_sha256&&after.revision===written.revision&&
+      after.execution_authorized===false&&returned?.length===1&&
+      readback?.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'&&
+      readback.canonical_return_committed===true&&readback.canonical_return_event_id===written.event_id&&
+      readback.canonical_return_head_sha256===written.continuity_head_sha256&&readback.observation_sha256===written.observation_sha256;
+     const status=verified?'LEDGER_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN':'LEDGER_RETURN_UNVERIFIED_NO_REPLAY';
+     return {safeResult:status,body:{status,ledger_return_only:true,continuity_return:written}};
+    }],
     ['READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY',async()=>{
      workerStage='TERMINAL_TECHNICAL_EXACT_CONTEXT';
      const context=await shiftRpc(db,'reality_read_final_loop_terminal_technical_context_v1',{
