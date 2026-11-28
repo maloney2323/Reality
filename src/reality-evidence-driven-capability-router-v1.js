@@ -268,3 +268,58 @@ export function planCategorizedContinuityRecovery({
  }
  return result('CONTINUITY_REGISTERED_ACTION_ROUTES_CLASSIFIED',items);
 }
+
+
+// Select a registered capability from the independently categorized, claimed
+// event, not a worker's procedural order. Selection is not execution authority;
+// the existing canonical claim/transport and verifier still own every effect.
+// The first migrated lane is the exact accepted read-only review. Other
+// event kinds remain on their existing paths until independently qualified.
+export function selectRegisteredSignedEventCapability({
+ trigger,delivery,wake,graph,release,workerRunId,registeredActionKeys=[],env=process.env
+}={}){
+ const key=trigger?.next_action, h=trigger?.canonical_claim_handoff;
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+    env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='true'||
+    trigger?.status!=='FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY'||
+    trigger.review_claim_route_ready!==true||trigger.dispatch_permitted!==false||
+    trigger.execution_authorized_by_trigger!==false||trigger.canonical_claim_required!==true||
+    trigger.new_attempt_authorized!==false||trigger.previous_attempt_budget_preserved!==true||
+    trigger.original_job_completed!==false||trigger.production_changed!==false||
+    !KEY.test(key||'')||key!==env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY||
+    !Array.isArray(registeredActionKeys)||!registeredActionKeys.includes(key)||
+    delivery?.kind!=='RESUME'||!UUID.test(delivery.event_id||'')||
+    trigger.event_id!==delivery.event_id||trigger.owner_id!==delivery.owner_id||
+    trigger.shift_id!==delivery.shift_id||
+    graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||graph.owner_id!==delivery.owner_id||
+    graph.shift_id!==delivery.shift_id||graph.installation_authorized!==false||
+    graph.production_changed!==false||graph.plan_fingerprint!==delivery.plan_fingerprint||
+    wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||wake.shift_id!==graph.shift_id||
+    !UUID.test(workerRunId||'')||release?.status!=='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'||
+    release.worker_run_id!==workerRunId||release.shift_id!==graph.shift_id||
+    release.release_sha!==delivery.release_sha||
+    h?.schema!=='reality-canonical-approved-review-scope-v1'||
+    h.owner_id!==graph.owner_id||h.shift_id!==graph.shift_id||
+    h.parent_original_work_id!==trigger.original_work_id||h.source_ref!==trigger.source_ref||
+    h.continuity_root_id!==trigger.continuity_root_id||
+    h.continuity_head_sha256!==trigger.continuity_head_sha256||h.revision!==trigger.continuity_revision||
+    h.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||h.canonical_claim_required!==true||
+    h.read_only!==true||h.execution_authorized!==false||h.original_job_completed!==false||
+    h.production_changed!==false)
+  return null;
+ return key;
+}
+
+// Keep bounded, source-independent diagnostics when a later worker projection
+// fails. Never publish prompts, model content, provider error text or secrets.
+export function boundedRegisteredCapabilityCheckpoint(action,result){
+ const code=v=>typeof v==='string'&&/^[A-Z0-9_]{3,100}$/.test(v)?v:null;
+ if(!KEY.test(action||'')||!code(result?.status))return null;
+ return Object.freeze({capability_key:action,status:code(result.status),
+  provider_failure_reason:code(result.provider_failure_reason),
+  continuity_blocker_code:code(result.continuity_blocker_code),
+  isolated_authority_read_attempts:[0,1,2].includes(result.isolated_authority_read_attempts)?
+   result.isolated_authority_read_attempts:null,
+  original_job_completed:false,production_changed:false});
+}
