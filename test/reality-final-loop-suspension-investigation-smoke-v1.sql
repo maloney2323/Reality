@@ -783,3 +783,81 @@ BEGIN
   (snapshot->'recovery_terminal_history'->>'remaining_attempts')<>'0'
  THEN RAISE EXCEPTION 'RECOVERY_HANDOFF_INVENTED_OUTCOME_OR_BUDGET';END IF;
 END $$;
+
+-- A consumed wake failed at the pre-execution fence before release
+-- attestation. Exercise the real continuation function in disposable CI only.
+BEGIN;
+DO $$
+DECLARE o uuid:=gen_random_uuid(); s uuid:=gen_random_uuid(); run uuid:=gen_random_uuid();
+ req uuid:=gen_random_uuid(); claim uuid:=gen_random_uuid(); ev uuid:=gen_random_uuid();
+ packet uuid:=gen_random_uuid(); child uuid:=gen_random_uuid(); nonce uuid:=gen_random_uuid();
+ work text:='work:'||repeat('e',32); src text:='https://github.com/fixture/repository/pull/9';
+ plan text:='sha256:'||repeat('a',64); head text:='sha256:'||repeat('b',64);
+ prev text:='sha256:'||repeat('c',64); q text; snap jsonb; scope jsonb; causal text;
+ at_time timestamptz:=clock_timestamp(); fresh uuid; oldrow record; newrow record; old_requests bigint;
+BEGIN
+ UPDATE reality_internal.governed_employee_shifts_v1 SET closed_at=at_time;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1
+  SET lease_expires_at=at_time+interval '2 minutes',released_at=NULL;
+ SELECT count(*) INTO old_requests FROM net.fake_requests;
+ INSERT INTO reality_internal.governed_employee_shifts_v1 VALUES(s,o,plan,'AWAITING_EXACT_ORIGINAL_WORK',at_time,at_time-interval '1 hour','infinity',NULL,at_time);
+ INSERT INTO reality_internal.governed_employee_completion_warrants_v1(shift_id,owner_id,plan_fingerprint,source_scope,mode,state)
+  VALUES(s,o,plan,jsonb_build_array(jsonb_build_object('source_ref',src)),'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS','ACTIVE');
+ INSERT INTO reality_internal.final_loop_child_approval_packets_v1 VALUES(packet,src,'EFFECT_RESERVED_RECONCILE_ONLY');
+ INSERT INTO reality_internal.final_loop_child_review_work_v1(child_work_id,packet_id,owner_id,shift_id,parent_original_work_id,phase)
+  VALUES(child,packet,o,s,work,'ADMITTED');
+ snap:=jsonb_build_object('shift_id',s,'original_candidate_work_id',work,'source_proof_bound',true,
+  'review_scope_qualified',true,'exact_goal_event_verified',true,'exact_acceptance_approval_verified',true);
+ q:='sha256:'||encode(sha256(convert_to(snap::text,'UTF8')),'hex');
+ INSERT INTO reality_internal.owner_continuity_qualification_routes_v1 VALUES(o,src,q,snap,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',at_time);
+ INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,subscribed_receipt_sha256,
+ continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
+ VALUES(s,o,work,src,'QUALIFIER_PROOF_CHANGED',prev,head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','[]','RECOVER','SHADOW_SIGNALED');
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,finished_at,worker_stage)
+ VALUES(run,'FAILED',at_time-interval '2 minutes',at_time-interval '1 minute','SHARED_CONTINUITY_VERIFIER_PREEXECUTION_FENCE');
+ causal:='sha256:'||encode(sha256(convert_to(s::text||'|'||work||'|'||head||'|4|'||prev||'|'||q,'UTF8')),'hex');
+ INSERT INTO reality_internal.final_loop_resume_events_v1(event_id,shift_id,owner_id,original_work_id,source_ref,signal_kind,
+  source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,signal_next_action,state,
+  governed_wake_request_id,governed_wake_queued_at,governed_wake_nonce,governed_wake_worker_run_id)
+ VALUES(ev,s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,prev,causal,head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','SHADOW_PENDING',
+  90001,at_time-interval '121 seconds',nonce,run);
+ scope:=jsonb_build_object('target_deployment_id','dpl_fixture_prefence_recovery','runtime_database_project_ref','hvkfreoagbrphwghjajw',
+  'target_environment','CANONICAL_BENCHMARK_PREVIEW','exact_runtime_database_contract_verified',true,'independent_gateway_ci_verified',true,
+  'independent_qualification_branch_verified',true,'independent_transport_proof_sha256',prev,'child_execution_enabled',false,
+  'parent_delivery_enabled',false,'production_changed',false,'plan_fingerprint',plan,'source_ref',src,'original_work_id',work,
+  'continuity_head_sha256',head,'continuity_revision',4,'qualifier_receipt_sha256',q);
+ INSERT INTO reality_internal.governed_worker_release_approvals_v1(request_id,owner_id,shift_id,claim_id,capability_key,state,approval_receipt_sha256,
+  claimed_at,provider_alias_observed_at,provider_alias_observed_deployment_id,runtime_scope,release_sha,release_ref,scheduled_alias,independent_isolation_proof_sha256)
+ VALUES(req,o,s,claim,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','CLAIMED_ONCE',prev,
+  at_time-interval '1 second',at_time,'dpl_fixture_prefence_recovery',scope,repeat('8',40),'fixture-prefence',
+  'reality-signed-worker-maloney2323-5310s-projects.vercel.app',prev);
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET worker_stage='WORKER_RESPONSE_PUBLICATION' WHERE run_id=run;
+ IF reality_internal.stage_final_loop_release_continuation_v1(req) IS NOT NULL THEN RAISE EXCEPTION 'POST_EFFECT_FAILURE_REPLAYED';END IF;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET worker_stage='SHARED_CONTINUITY_VERIFIER_PREEXECUTION_FENCE' WHERE run_id=run;
+ UPDATE reality_internal.owner_continuity_qualification_routes_v1 SET reconciliation_checked_at=at_time-interval '11 minutes' WHERE owner_id=o;
+ IF reality_internal.stage_final_loop_release_continuation_v1(req) IS NOT NULL THEN RAISE EXCEPTION 'STALE_QUALIFIER_ACCEPTED';END IF;
+ UPDATE reality_internal.owner_continuity_qualification_routes_v1 SET reconciliation_checked_at=at_time WHERE owner_id=o;
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET claimant_worker_run_id=run WHERE child_work_id=child;
+ IF reality_internal.stage_final_loop_release_continuation_v1(req) IS NOT NULL THEN RAISE EXCEPTION 'CLAIMED_EFFECT_REPLAYED';END IF;
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET claimant_worker_run_id=NULL WHERE child_work_id=child;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET event_causality_sha256='sha256:'||repeat('0',64) WHERE event_id=ev;
+ IF reality_internal.stage_final_loop_release_continuation_v1(req) IS NOT NULL THEN RAISE EXCEPTION 'FORGED_CAUSALITY_ACCEPTED';END IF;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET event_causality_sha256=causal WHERE event_id=ev;
+ fresh:=reality_internal.stage_final_loop_release_continuation_v1(req);
+ IF fresh IS NULL OR fresh=ev THEN RAISE EXCEPTION 'PRE_FENCE_FAILURE_DISTINCT_EVENT_NOT_STAGED';END IF;
+ SELECT * INTO STRICT oldrow FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=ev;
+ SELECT * INTO STRICT newrow FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=fresh;
+ IF oldrow.state<>'SHADOW_STALE' OR oldrow.governed_wake_request_id<>90001
+  OR oldrow.governed_wake_nonce<>nonce OR oldrow.governed_wake_worker_run_id<>run
+  OR newrow.release_continuation_claim_id<>claim OR newrow.original_work_id<>work
+  OR newrow.continuity_revision<>4 OR newrow.continuity_head_sha256<>head
+  OR newrow.source_receipt_sha256<>q OR newrow.event_causality_sha256<>causal
+  OR newrow.governed_wake_worker_run_id IS NOT NULL OR newrow.governed_wake_request_id IS NOT NULL
+  OR (SELECT count(*) FROM net.fake_requests)<>old_requests
+  OR reality_internal.stage_final_loop_release_continuation_v1(req) IS NOT NULL
+ THEN RAISE EXCEPTION 'PREFENCE_HISTORY_SCOPE_OR_DEDUPE_FAILED';END IF;
+ IF EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE original_work_id=work)
+  OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE child_work_id=child AND (canonical_prepare_invocation_id IS NOT NULL OR claimant_worker_run_id IS NOT NULL))
+ THEN RAISE EXCEPTION 'PREFENCE_CONTINUATION_INVENTED_EFFECT';END IF;
+END $$;
+ROLLBACK;
