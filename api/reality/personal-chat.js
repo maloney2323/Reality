@@ -38,7 +38,7 @@ import {readOwnerOriginalWorkForChat,originalWorkObservation,
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
-import {assertFinalChatPublicationProof,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment}
+import {assertFinalChatPublicationProof,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment,requiresSourceRenderedOperationalReply}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
 import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
@@ -768,6 +768,7 @@ export default async function handler(req,res){
   const finalPublicationProof=assertFinalChatPublicationProof({
    answer,reliability:result?.reliability,
    atomicGoalPublicationEnabled:true,
+   sourceRenderedOperationalRequired:requiresSourceRenderedOperationalReply(text),
   });
   if(result?.reliability?.canonical_epistemic_state?.status!=='PERSISTED_AND_READBACK_VERIFIED'||
      result?.reliability?.readback_verified!==true)
