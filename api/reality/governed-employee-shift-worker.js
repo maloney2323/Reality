@@ -3207,9 +3207,16 @@ export default async function handler(req,res){
    finalLoopChildReview.next_governed_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
    finalLoopChildReview.child_claimed===false&&finalLoopChildReview.model_invoked===false&&
    finalLoopChildReview.original_job_completed===false;
+  // An already-returned observation can still lack the provider artifact.
+  // Route that distinct verified state to the existing incident detector.
+  const unresolvedInvocationInvestigationDue=
+   finalLoopChildReview.status==='FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM'&&
+   finalLoopChildReview.next_governed_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+   finalLoopChildReview.parent_original_completed===false&&
+   finalLoopChildReview.external_effect_performed===false;
   // Record the exact transition before worker completion.
   let finalLoopBlockerIncident={status:'NO_FINAL_LOOP_TRANSITION_BLOCKER_OBSERVED'};
-  if(canonicalEventRuntime&&(verifiedSuspensionInvestigationDue||[
+  if(canonicalEventRuntime&&(verifiedSuspensionInvestigationDue||unresolvedInvocationInvestigationDue||[
    'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED',
    'FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED'
   ].includes(finalLoopChildReview.continuity_blocker_code))){
@@ -3217,7 +3224,8 @@ export default async function handler(req,res){
     finalLoopBlockerIncident=await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
      p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
      p_safe_result:verifiedSuspensionInvestigationDue?
-      'FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED':finalLoopChildReview.continuity_blocker_code});
+      'FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED':unresolvedInvocationInvestigationDue?
+      'FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED':finalLoopChildReview.continuity_blocker_code});
     if(finalLoopBlockerIncident?.status==='SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED'&&
        shiftContinuityInvestigation?.status==='NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'){
      shiftContinuityInvestigation=await investigateOneSignedShiftContinuityIncident({
