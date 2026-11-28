@@ -107,6 +107,43 @@ export function isProportionalReadOnlyChat({message,goalCommand=null,publicResea
   !ACTION.test(message.trim())&&
   !SIGNED_EXISTING_SHIFT_ACTION.test(message.trim());
 }
+// Only the acknowledgement uses this lane. The saved authenticated user
+// turn still enters the original signed work inbox; no worker authority is added.
+export function isExistingWorkContinuationReply({message,goalCommand=null,publicResearch=false}={}){
+ return goalCommand==null&&publicResearch!==true&&typeof message==='string'&&
+  SIGNED_EXISTING_SHIFT_ACTION.test(message.trim());
+}
+export function prepareExistingWorkContinuationReply({ownerId,conversationId,requestId,sourceRef,handoff=null,shift=null}={}){
+ if(!UUID.test(ownerId||'')||!UUID.test(conversationId||'')||
+    !UUID.test(requestId||'')||!SOURCE.test(sourceRef||''))fail('TRUSTED_CURRENT_TURN_REQUIRED');
+ const valid=handoff?.status==='OWNER_CHAT_WORK_INTAKE_READBACK'&&
+  handoff.source==='AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK'&&
+  handoff.owner_id===ownerId&&handoff.conversation_id===conversationId&&
+  handoff.new_shift_started===false&&handoff.installation_authorized===false&&
+  handoff.production_changed===false&&Array.isArray(handoff.items);
+ const matches=valid?handoff.items.filter(x=>x.request_id===requestId&&x.source_ref===sourceRef&&
+  x.execution_authorized_by_chat===false&&x.installation_authorized===false&&x.production_changed===false):[];
+ const item=matches.length===1?matches[0]:null;
+ const descriptions={
+  PENDING:'Your instruction is in the existing work inbox, waiting for the worker to claim it.',
+  CLAIMED:'The existing worker has claimed your instruction. Its result is not verified yet.',
+  INVESTIGATED_SCOPED:'The worker has recorded a scoped investigation. That is not a completed repair.',
+  NEEDS_AUTHORIZED_SCOPE:'The worker recorded a scope restriction. The exact missing permission has not been established by this reply.',
+  CONVERSATION_ONLY:'The saved instruction was classified as conversation, not executable work.',
+  PROVIDER_UNVERIFIED:'The worker could not verify its provider evidence. No completed work is established.'
+ };
+ const current=item&&Object.prototype.hasOwnProperty.call(descriptions,item.status)?item:null;
+ let answer=current?descriptions[current.status]:'Your instruction is saved. I could not confirm its worker handoff yet.';
+ if(shift?.owner_shift_authorization_recorded===true&&UUID.test(shift.active_owner_shift_id||'')&&
+  ['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(shift.shift_status))
+  answer+=' Your existing shift remains authorized; this instruction does not require starting it again.';
+ answer+=' This reply does not install anything or certify a completed job.';
+ return Object.freeze({answer,output_claim_assessment:null,work_handoff:current?{
+  status:current.status,source_ref:sourceRef,request_id:requestId,
+  shift_id:UUID.test(current.shift_id||'')?current.shift_id:null,
+  execution_authorized_by_chat:false,installation_authorized:false,production_changed:false
+ }:null,execution_authorized:false,installation_authorized:false,external_actions_authorized:false});
+}
 // The existing owner-scoped fallback is also the deterministic publication
 // renderer for operational requests. No model-authored bytes are appended.
 function renderSourceBoundOperationalReply({snapshot,operationalTimeHorizon,claimAssessment}){
@@ -267,7 +304,11 @@ export async function generateProportionalReadOnlyReply({
     fail('CLAIM_LEDGER_READBACK_REQUIRED');
    claimAssessment=receipt;
   }catch{
-   released='I cannot verify the operational output receipt right now. I have withheld the draft; the underlying outcome remains unverified.';
+   // An unavailable secondary audit write must not silence authenticated
+   // source facts. Do not release the unverified model draft.
+   const snapshot=operationalClaimSnapshot({worldId:worldlineId,ownerContext,horizon:operationalTimeHorizon});
+   ({released,claimAssessment}=renderSourceBoundOperationalReply({snapshot,operationalTimeHorizon,claimAssessment}));
+   released+=' The separate output-audit receipt is unavailable.';
   }
  }
  return Object.freeze({
