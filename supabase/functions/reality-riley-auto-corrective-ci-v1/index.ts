@@ -540,10 +540,10 @@ Deno.serve(async req=>{
      req.headers.get('authorization')!=='Bearer '+secret)
    return response('SERVICE_AUTH_REQUIRED_NO_GITHUB_EFFECT',403);
   const raw=await req.text();
-  if(raw.length>400)refuse('ENVELOPE_TOO_LARGE');
+  if(raw.length>1200)refuse('ENVELOPE_TOO_LARGE');
   const body=JSON.parse(raw);
-  if(!body||Array.isArray(body)||Object.keys(body).sort().join(',')!==
-     'action,base_branch,base_sha,version'||![1,2].includes(body.version)||
+  if(!body||Array.isArray(body)||!['action,base_branch,base_sha,version',
+     'action,base_branch,base_sha,expected_scope,version'].includes(Object.keys(body).sort().join(','))||![1,2].includes(body.version)||
      body.action!=='stage_or_check'||!SHA.test(body.base_sha||'')||
      !/^reality\/[a-zA-Z0-9/_-]{10,130}$/.test(body.base_branch||'')||
      body.base_branch.includes('..')||body.base_branch.includes('//')||
@@ -561,6 +561,17 @@ Deno.serve(async req=>{
     'NO_CURRENT_OWNER_WARRANTED_CORRECTIVE_CI'].includes(c.status)))
     return response(c.status);
   validClaim(c,recovery);
+  // Selection is not authority. Reject a stale selection before any provider
+  // work, then keep the existing source and atomic staging/CI receipt fences.
+  if(Object.hasOwn(body,'expected_scope')){
+   const expected=body.expected_scope;
+   const fields=['owner_id','shift_id','original_work_id','source_commit_sha',
+    'proposed_sha256','model_response_id',...(recovery?['attempt_id','attempt_number']:[])];
+   if(!expected||typeof expected!=='object'||Array.isArray(expected)||
+      Object.keys(expected).length!==fields.length||
+      fields.some(k=>!Object.hasOwn(expected,k)||expected[k]!==c[k]))
+    refuse('SELECTED_SCOPE_CHANGED_NO_PROVIDER_EFFECT');
+  }
   const token=Deno.env.get('REALITY_GITHUB_BROKER_TOKEN')||'';
   if(token.length<25)
    return response('ISOLATED_GITHUB_CANDIDATE_WRITER_NOT_CONFIGURED',503);
