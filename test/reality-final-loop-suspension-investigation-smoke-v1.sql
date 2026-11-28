@@ -1075,7 +1075,7 @@ END $$;
 SELECT 'VERIFIED_SUCCESSOR_REUSES_IMMUTABLE_RELEASE_NO_REPLAY' AS result;
 -- Separate prepared-artifact variant of the successor fixture. All changes
 -- below are disposable test data, never production or benchmark effects.
-DO $
+DO $$
 DECLARE a record; sub record; child record; u record; prep record; packet uuid;
  obs jsonb; new_payload jsonb; snapshot jsonb; q text; digest text; saved_guard jsonb;
  prior_scope jsonb; next_event uuid; inv uuid:=gen_random_uuid(); artifact text:='sha256:'||repeat('a',64);
@@ -1136,7 +1136,7 @@ BEGIN
  OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE child_work_id=child.child_work_id AND (phase<>'PREPARED' OR canonical_prepare_invocation_id<>inv OR canonical_verify_invocation_id IS NOT NULL))
  OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=a.shift_id)
  THEN RAISE EXCEPTION 'PREPARED_VERIFIER_REPLAY_OR_AUTHORITY_DRIFT';END IF;
-END $;
+END $$;
 SELECT 'PREPARED_ARTIFACT_CONTINUES_TO_EXISTING_VERIFIER_ONCE' AS result;
 ROLLBACK;
 
