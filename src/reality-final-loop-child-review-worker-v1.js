@@ -137,45 +137,35 @@ async function readPinnedScope(c,{fetchImpl,githubToken,env}){
   !SHA.test(meta.base?.sha||'')||
   !Number.isInteger(meta.changed_files)||meta.changed_files<=8||
   meta.changed_files>500)deny('FROZEN_PARENT_PR_HEAD_OR_METADATA_CHANGED');
+ const wanted=new Set(c.scope.files.map(f=>f.path));
  const plan=await inspectLargePrSourceForBoundedReview({
   job:{source_ref:c.source_ref,source_proof_sha256:c.source_proof_sha256,
    original_work_id:c.parent_original_work_id,phase:'BLOCKED'},
   ownerId:c.owner_id,shiftId:c.shift_id,
-  metadata:meta,env,fetchImpl,githubToken
+  metadata:meta,env,fetchImpl,githubToken,capturePatchPaths:[...wanted]
  });
  if(plan.source_manifest_complete!==true||
   plan.source_manifest_sha256!==c.source_manifest_sha256||
   plan.live_head_sha!==c.source_head_sha||
-  plan.bounded_scopes[c.scope.index]?.proposed_scope_sha256!==c.scope_sha256)
+  plan.bounded_scopes[c.scope.index]?.proposed_scope_sha256!==c.scope_sha256||
+  !Array.isArray(plan.captured_scope_patches))
   deny('FULL_SOURCE_MANIFEST_CHANGED_OR_SCOPE_MISMATCH');
- const wanted=new Set(c.scope.files.map(f=>f.path));
+ // The qualifier independently checked base/head/draft/file count before
+ // returning the same provider pages. Validate the complete approved patches
+ // against the frozen scope, without fetching those pages a second time.
  const observed=new Map();
- const pages=Math.ceil(meta.changed_files/100);
- for(let page=1;page<=pages;page++){
-  const files=await gh('/pulls/'+number+'/files?per_page=100&page='+page,{
-   fetchImpl,token:githubToken
-  });
-  if(!Array.isArray(files)||files.length<1||
-     (page<pages&&files.length!==100))deny('CURRENT_PATCH_PAGE_MISSING');
-  for(const f of files){
-   if(!wanted.has(f.filename))continue;
-   const pinned=c.scope.files.find(x=>x.path===f.filename);
-   if(observed.has(f.filename)||!pinned||pinned.blob_sha!==f.sha||
-    pinned.status!==f.status||pinned.additions!==f.additions||
-    pinned.deletions!==f.deletions||!verifyFinalLoopChildPatch(f.patch,pinned))
-    deny('INDEPENDENT_SCOPE_PATCH_NOT_AVAILABLE');
-   observed.set(f.filename,{path:f.filename,
-    sha:f.sha,status:f.status,patch:f.patch});
-  }
+ for(const f of plan.captured_scope_patches){
+  const pinned=c.scope.files.find(x=>x.path===f.filename);
+  if(!wanted.has(f.filename)||observed.has(f.filename)||!pinned||
+    pinned.blob_sha!==f.sha||pinned.status!==f.status||
+    pinned.additions!==f.additions||pinned.deletions!==f.deletions||
+    !verifyFinalLoopChildPatch(f.patch,pinned))
+   deny('INDEPENDENT_SCOPE_PATCH_NOT_AVAILABLE');
+  observed.set(f.filename,{path:f.filename,
+   sha:f.sha,status:f.status,patch:f.patch});
  }
  if(observed.size!==wanted.size)
   deny('SCOPE_FILES_NOT_ALL_COVERED_BY_CURRENT_PATCH');
- const end=await gh('/pulls/'+number,{fetchImpl,token:githubToken});
- if(end?.head?.sha!==meta.head.sha||
-    end.base?.sha!==meta.base.sha||
-    end.changed_files!==meta.changed_files||
-    end.draft!==meta.draft||end.state!=='open')
-  deny('SOURCE_MOVED_DURING_PATCH_READ');
  const patches=c.scope.files.map(f=>observed.get(f.path));
  const providerEvidence=digest(JSON.stringify({
   manifest:c.source_manifest_sha256,head:c.source_head_sha,
