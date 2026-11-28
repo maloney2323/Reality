@@ -587,13 +587,81 @@ test('canonical claim, isolated computation and independent return preserve one 
  const missing=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:null});
  assert.equal(missing.status,'FINAL_LOOP_CANONICAL_ISOLATED_EXECUTOR_CONNECTION_REQUIRED');
  assert.equal(claims,0);
- const prepared=await advanceCanonicalFinalLoopChildReview(base);
+ // Run the existing canonical worker through the actual HMAC transport
+ // and isolated gateway in one fixture. Only DB/provider I/O is simulated.
+ const transportCanonDb={strictSecrets:true,project:'canonicalfixtureproject'};
+ const transportIsoDb={strictSecrets:true,project:'isolatedfixtureproject'};
+ const commonTransport={...env,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'true',
+  REALITY_FINAL_LOOP_REVIEW_CANONICAL_HOST:'canonical-fixture-deploy.vercel.app',
+  REALITY_SIGNED_WORKER_STABLE_ALIAS:'canonical-fixture-deploy.vercel.app',
+  REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST:'isolated-fixture-deploy.vercel.app',
+  REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID:'dpl_fixtureisolated123',
+  REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF:transportCanonDb.project,
+  REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:transportIsoDb.project,
+  REALITY_FINAL_LOOP_REVIEW_TRANSPORT_KEY:'a'.repeat(64),
+  REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED:'false',VERCEL_GIT_COMMIT_SHA:'f'.repeat(40)};
+ const transportCanonEnv={...commonTransport,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'CANONICAL',
+  REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'false',
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:transportCanonDb.project,
+  VERCEL_URL:'canonical-fixture-build.vercel.app',VERCEL_DEPLOYMENT_ID:'dpl_fixturecanonical123'};
+ const transportIsoEnv={...commonTransport,REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE:'ISOLATED',
+  REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED:'true',
+  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:transportIsoDb.project,
+  VERCEL_URL:commonTransport.REALITY_FINAL_LOOP_REVIEW_ISOLATED_HOST,
+  VERCEL_DEPLOYMENT_ID:commonTransport.REALITY_FINAL_LOOP_REVIEW_ISOLATED_DEPLOYMENT_ID};
+ const transportFences=new Map();let transportBegins=0,transportChecks=0;
+ const transportCall=async(d,name,args)=>{
+  if(name==='reality_read_final_loop_governed_start_v1')return {status:'GOVERNED_START_SCOPE_UNVERIFIED'};
+  if(name==='reality_read_current_shift_execution_graph_v1'){
+   assert.equal(d,transportIsoDb);return {status:'NO_CURRENT_OWNER_SHIFT_EXECUTION_GRAPH'};
+  }
+  assert.equal(name,'reality_fence_final_loop_child_transport_v1');
+  if(args.p_child_work_id===null)return {status:'FINAL_LOOP_CHILD_TRANSPORT_SCOPE_INVALID'};
+  assert.equal(d,transportCanonDb);assert.deepEqual(args.p_canonical_handoff,h);
+  assert.equal(args.p_child_work_id,child);
+  const m=args.p_mode,key=m+'|'+args.p_worker_run_id;
+  assert.equal(args.p_worker_run_id,m==='PREPARE'?run:other);
+  assert.equal(args.p_claim_id,m==='PREPARE'?claimId:null);
+  if(args.p_begin){
+   transportBegins++;
+   if(transportFences.has(key))return {status:'FINAL_LOOP_CHILD_TRANSPORT_ALREADY_FENCED_NO_REPLAY'};
+   transportFences.set(key,args.p_invocation_id);
+  }else{
+   transportChecks++;
+   if(transportFences.get(key)!==args.p_invocation_id)return {status:'STALE'};
+  }
+  return m==='PREPARE'?current:verify;
+ };
+ const now=()=>1234567890000;
+ let transportProviderMode='PREPARE';
+ const transportFetch=async(url,options)=>{
+  if(url.startsWith('https://api.github.com/')||url.startsWith('https://api.openai.com/'))
+   return provider({id:transportProviderMode==='VERIFY'?'resp_verifier1234':'resp_prepared1234',
+    text:transportProviderMode==='VERIFY'?JSON.stringify({verdict:'PASS',supported_paths:paths}):raw},files,()=>modelCalls++)(url,options);
+  const toCanonical=url==='https://'+transportCanonEnv.REALITY_SIGNED_WORKER_STABLE_ALIAS+'/api/reality/governed-final-loop-child-transport';
+  assert.ok(toCanonical||url==='https://'+transportIsoEnv.VERCEL_URL+'/api/reality/governed-final-loop-child-transport');
+  const request=JSON.parse(options.body);
+  if(!toCanonical){const p=JSON.parse(request.payload);if(p.action==='COMPUTE')transportProviderMode=p.mode;}
+  const out=await handleExistingChildTransport({db:toCanonical?transportCanonDb:transportIsoDb,
+   body:request,env:toCanonical?transportCanonEnv:transportIsoEnv,call:transportCall,fetchImpl:transportFetch,now});
+  return {ok:out.http===200,status:out.http,json:async()=>out.body};
+ };
+ const viaSignedTransport=async(args)=>{
+  const conn=await connectExistingIsolatedChildTransport({db:transportCanonDb,handoff:h,env:transportCanonEnv,
+   fetchImpl:transportFetch,call:transportCall,now});
+  assert.equal(conn.ready,true);
+  return conn.runIsolatedAdvisory(args);
+ };
+ const prepared=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:viaSignedTransport});
  assert.equal(prepared.status,'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED');
  assert.equal(prepared.canonical_continuity_head_sha256,h.continuity_head_sha256);
  assert.equal(claims,1);assert.equal(prepares,1);assert.equal(modelCalls,1);assert.ok(reads>=4);
  verificationMode=true;
- const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other});
+ const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,runIsolatedAdvisory:viaSignedTransport});
  assert.equal(verified.status,'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN');
+ assert.equal(transportBegins,2);assert.equal(transportChecks,2);assert.equal(transportFences.size,2);
+ assert.notEqual(transportFences.get('PREPARE|'+run),transportFences.get('VERIFY|'+other));
  assert.equal(verified.parent_obligation_remains_open,true);assert.equal(verified.canonical_continuity_head_sha256,h.continuity_head_sha256);
  assert.equal(verified.canonical_verifier_receipt_readback_verified,true);
  assert.equal(claims,1);assert.equal(verifies,1);assert.equal(modelCalls,2);
