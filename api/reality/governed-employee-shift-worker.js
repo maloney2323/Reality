@@ -195,7 +195,7 @@ import {executeOneRegisteredMaintenanceCiWake}
 import {planGovernedCapabilitiesFromOwnerReceipts,
  planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability,
  selectRegisteredSignedEventCapability,boundedRegisteredCapabilityCheckpoint,
- selectClaimedEvidenceCapability}
+ selectClaimedEvidenceCapability,selectEngineeringDispatchScope}
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
@@ -1438,6 +1438,17 @@ export default async function handler(req,res){
      },{timeoutMs:6000}),wakeReceipt.shift_id);
    }catch{/* Legacy verifier independently rechecks its warrant. */}
   }
+  const engineeringDispatchScope=selectEngineeringDispatchScope({
+   trigger:finalLoopGovernedResumeTrigger,continuity:lastFinalLoopContinuity,
+   delivery:governedWakeScope,wake:wakeReceipt,canonicalEventRuntime,strictContinuityCycle
+  });
+  const legacyEngineeringDeferred=engineeringDispatchScope==='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY';
+  const deferredEngineeringOutcome=()=>({
+   status:'ENGINEERING_CAPABILITY_DEFERRED_DIFFERENT_CLAIMED_EVENT',
+   original_job_completed:false,installation_authorized:false,
+   production_changed:false,new_shift_started:false,source_installed:false,
+   independently_tested:false,external_retry_authorized:false
+  });
   const signedMaintenanceCaseCiReconciliation=
    wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
     (!strictContinuityCycle||finalLoopGovernedResumeTrigger?.dispatch_permitted===true)?
@@ -2089,7 +2100,7 @@ export default async function handler(req,res){
   // If this optional fast-lane readback is unavailable, the normal governed
   // shift pipeline still runs; the corrective broker independently authorizes.
   workerStage='CORRECTIVE_CI_WORK_READBACK';
-  const boundedCorrectiveScope=await shiftRpc(db,
+  const boundedCorrectiveScope=legacyEngineeringDeferred?null:await shiftRpc(db,
    'reality_read_next_riley_auto_corrective_ci_v1',{})
    .catch(()=>null);
   // A completed bounded check is not a completed customer job; every lane
@@ -2124,7 +2135,7 @@ export default async function handler(req,res){
    original_job_completed:false,installation_authorized:false,
    production_changed:false,new_shift_started:false
   };
-  if(wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
+  if(!legacyEngineeringDeferred&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'){
    workerStage='SAME_ORIGINAL_RECOVERY_ELIGIBILITY';
    sameOriginalRecovery=
     await continueSameOriginalRecoveryAfterVerifiedFailure({
@@ -2156,7 +2167,7 @@ export default async function handler(req,res){
   // independent frozen CI and the SAME original work ID. Model output alone
   // cannot stage, install or settle anything.
   workerStage='SAME_ORIGINAL_RECOVERY_CI_ELIGIBILITY';
-  const recoveryCiScope=await shiftRpc(db,
+  const recoveryCiScope=legacyEngineeringDeferred?null:await shiftRpc(db,
    'reality_read_next_same_original_recovery_candidate_v2',{})
    .catch(()=>null);
   let sameOriginalRecoveryCiCheckpoint=null;
@@ -2213,7 +2224,7 @@ export default async function handler(req,res){
    await advanceSignedChatFullGoalAcceptance({db,env:process.env,shiftId:wakeReceipt.shift_id,
     workerRunId:actualWorkerRunId,fetchImpl:fetch}):{status:'NO_CURRENT_SIGNED_GOAL_ACCEPTANCE_SCOPE'};
   workerStage='GENERALIZED_ORIGINAL_INSTALL_REVIEW_PREFLIGHT';
-  const generalizedInstallReview=
+  const generalizedInstallReview=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await stageGeneralizedVerifiedOriginalInstallReview({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2224,7 +2235,7 @@ export default async function handler(req,res){
   // The preapproved transport canary is not a capability installation:
   // it is durably fenced by the private DB and can only write inert evidence.
   workerStage='GENERALIZED_ORIGINAL_SOURCE_WRITE_PERMISSION_PROBE';
-  const generalizedSourceWriteTransport=
+  const generalizedSourceWriteTransport=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await verifyGeneralizedOriginalSourceWriteTransport({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2238,7 +2249,7 @@ export default async function handler(req,res){
   // broker limits this preapproval test to an inert source-path .txt write,
   // and subsequently reads independent push-triggered GitHub Actions evidence.
   workerStage='GENERAL_ORIGINAL_PUSH_CI_PREFLIGHT';
-  const generalOriginalAcceptancePush=
+  const generalOriginalAcceptancePush=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await verifyGeneralOriginalAcceptancePushTransport({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2251,7 +2262,7 @@ export default async function handler(req,res){
   // the earlier one-use inert canary commit. No client-reported deployment
   // and no green generic CI can satisfy this release transport readback.
   workerStage='GENERALIZED_ORIGINAL_PREVIEW_AUTO_DEPLOY_EVIDENCE';
-  const generalizedPreviewDeployment=
+  const generalizedPreviewDeployment=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await verifyGeneralizedOriginalPreviewAutoDeploy({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2264,7 +2275,7 @@ export default async function handler(req,res){
   // to installation and independent settlement without a third confirmation.
   // These brokers cannot create consent and continue only DB-current work.
   workerStage='GENERAL_ORIGINAL_OWNER_APPROVED_INSTALL_CONTINUATION';
-  const generalOriginalInstall=
+  const generalOriginalInstall=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await continueGeneralOwnerApprovedOriginalInstall({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2276,7 +2287,7 @@ export default async function handler(req,res){
   // independently tested exact recovery decision may publish once; all
   // subsequent wakes are read-only reconciliations, not retry permissions.
   workerStage='GENERAL_ORIGINAL_ONE_USE_RECOVERY_PUBLICATION';
-  const generalOriginalRecoveryPublication=
+  const generalOriginalRecoveryPublication=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await continueGeneralOriginalOwnerApprovedRecovery({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2286,7 +2297,7 @@ export default async function handler(req,res){
    }));
   // A fenced original is a one-time source-backed engineering diagnosis.
   // The model cannot authorize another write, installation or settlement.
-  const fencedOriginalInvestigationPromise=
+  const fencedOriginalInvestigationPromise=legacyEngineeringDeferred?Promise.resolve(deferredEngineeringOutcome()):
    investigateGeneralOriginalFencedRecovery({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2295,7 +2306,7 @@ export default async function handler(req,res){
     original_job_completed:false,production_changed:false
    }));
   workerStage='GENERAL_ORIGINAL_INDEPENDENT_FINAL_SETTLEMENT';
-  const generalOriginalSettlement=
+  const generalOriginalSettlement=legacyEngineeringDeferred?deferredEngineeringOutcome():
    await settleGeneralOwnerApprovedOriginal({
     db,env:process.env,fetchImpl:fetch
    }).catch(()=>({
@@ -2336,7 +2347,8 @@ export default async function handler(req,res){
   // a protected isolated candidate branch and a real GitHub frozen CI run.
   // This work is service-only, can be reconciled after uncertainty, and runs
   // concurrently with already-authorized work, without a second Start.
-  const correctiveCiPromise=boundedCorrectiveCheckpoint?
+  const correctiveCiPromise=legacyEngineeringDeferred?Promise.resolve(deferredEngineeringOutcome()):
+   boundedCorrectiveCheckpoint?
    Promise.resolve(boundedCorrectiveCheckpoint.corrective_ci_result):
    sameOriginalRecoveryCiCheckpoint?
    Promise.resolve(sameOriginalRecoveryCiCheckpoint.corrective_ci_result):
@@ -3815,7 +3827,7 @@ export default async function handler(req,res){
   const fencedOriginalInvestigation=await fencedOriginalInvestigationPromise;
   // A model result belongs to the same original across all later wakes,
   // even after its one-time model lease has been consumed.
-  const fencedOriginalInvestigationState=await shiftRpc(db,
+  const fencedOriginalInvestigationState=legacyEngineeringDeferred?deferredEngineeringOutcome():await shiftRpc(db,
    'reality_read_general_original_fenced_investigation_state_v1',{})
    .catch(()=>({status:'FENCED_ORIGINAL_READBACK_UNVERIFIED',
      independently_tested:false,external_retry_authorized:false,
@@ -4484,6 +4496,7 @@ export default async function handler(req,res){
     signed_chat_fenced_provider_requalification:fencedProviderRequalification,
     signed_chat_recovery_quarantine:signedRecoveryQuarantine,
     corrective_ci_checkpoint:boundedCorrectiveCheckpoint,
+    engineering_dispatch_scope:engineeringDispatchScope,
     generalized_original_install_review:generalizedInstallReview,
     generalized_original_source_write_transport:generalizedSourceWriteTransport,
     generalized_original_acceptance_push_preflight:generalOriginalAcceptancePush,
