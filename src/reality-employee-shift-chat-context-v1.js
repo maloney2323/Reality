@@ -36,7 +36,9 @@ export async function readVerifiedEmployeeShiftForChat({
   const read=assertShiftReadback(await shiftRpc(db,
    'reality_read_owner_employee_shifts_v1',
    {p_owner_id:session.user_id},{fetchImpl}));
-  const brief=buildRealityShiftConversationBrief(read.shifts,[],now);
+  // The presentation helper accepts at most five rows. Keep the complete
+  // authenticated ledger for authority and maintenance reconciliation below.
+  const brief=buildRealityShiftConversationBrief(read.shifts.slice(0,5),[],now);
   const alreadyAuthorized=['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
    .includes(brief.status);
   const currentShift=read.shifts[0]||null;
