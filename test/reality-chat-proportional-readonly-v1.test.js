@@ -286,3 +286,27 @@ test('assessed operational output requires server-provided receipt before public
  const ordinary=await generateProportionalReadOnlyReply({...args,runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:'Hello!'}),recordClaimAssessment});
  assert.equal(ordinary.answer,'Hello!');assert.equal(calls,1);
 });
+
+
+test('shift cognition bounds presentation history without truncating the authenticated authority ledger',()=>{
+ const source=readFileSync(new URL('../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
+ assert.match(source,/buildRealityShiftConversationBrief\(read\.shifts\.slice\(0,5\),\[\],now\)/);
+ assert.match(source,/ownerId:session\.user_id,shifts:read\.shifts/);
+ const api=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
+ assert.match(api,/try\{recovery_diagnosis=diagnoseRealityEmployeeRecovery/);
+});
+test('failed extraction retains exact authenticated shift status but never releases model draft',async()=>{
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const draft='The supplier credited our account yesterday.';let recorded;
+ const result=await generateProportionalReadOnlyReply({...args,ownerContext:{currently_authorized_shift:shift},
+  runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:draft}),
+  fetchImpl:async()=>{const e=Error('provider private body');e.name='TimeoutError';throw e;},
+  recordClaimAssessment:async a=>{recorded=a;return {...a.assessment,readback_verified:true,ledger_receipt_id:'receipt'};}});
+ assert.match(result.answer,/awaiting exact original work/);assert.match(result.answer,/withheld/);
+ assert.equal(result.answer.includes(draft),false);assert.equal(recorded.assessment.extraction_failure_code,'RELIABILITY_EXTRACTION_TIMEOUT');
+ assert.equal(recorded.assessment.extraction_completeness_verified,false);
+ assert.equal(recorded.assessment.released_source_facts.length,2);
+ assert.equal(recorded.answer,result.answer);assert.equal(JSON.stringify(recorded).includes('provider private body'),false);
+ assert.equal(result.execution_authorized,false);
+});
