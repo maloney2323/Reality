@@ -54,21 +54,25 @@ export async function ownerFinalLoopChildApproval(req,res,{
    });
   if(req.method==='GET'){
    const query=req.query||{};
-   if(Object.keys(query).length!==1||!UUID.test(query.shift_id||''))
+   // The signed benchmark owner may read the server-pinned existing shift
+   // directly. No client-selected owner, new shift or execution authority.
+   const implicit=Object.keys(query).length===0&&canonicalPreview;
+   const shiftId=implicit?env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID:query.shift_id;
+   if((!implicit&&Object.keys(query).length!==1)||!UUID.test(shiftId||''))
     return res.status(400).json({ok:false,error:'EXACT_OWNER_SHIFT_REQUIRED'});
-   if(canonicalPreview&&query.shift_id!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID)
+   if(canonicalPreview&&shiftId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID)
     return res.status(403).json({ok:false,error:'EXACT_BENCHMARK_SHIFT_REQUIRED'});
    const p=await call(db,
     'reality_read_owner_final_loop_child_approvals_v1',{
-     p_owner_id:session.user_id,p_shift_id:query.shift_id
+     p_owner_id:session.user_id,p_shift_id:shiftId
     },{timeoutMs:6000});
    if(p?.status!=='FINAL_LOOP_OWNER_EXACT_CHILD_APPROVALS_READ_ONLY'||
-     p.owner_id!==session.user_id||p.shift_id!==query.shift_id||
+     p.owner_id!==session.user_id||p.shift_id!==shiftId||
      p.read_only!==true||p.execution_authorized!==false||
      p.original_job_completed!==false||
      !Array.isArray(p.packets)||p.packets.length>20)
     return res.status(503).json({ok:false,error:'FINAL_LOOP_OWNER_PACKET_READBACK_UNVERIFIED'});
-   return res.status(200).json({ok:true,packets:p.packets,
+   return res.status(200).json({ok:true,shift_id:shiftId,packets:p.packets,
     owner_scope_verified:true,read_only:true,execution_authorized:false});
   }
   if(Object.keys(req.query||{}).length)
