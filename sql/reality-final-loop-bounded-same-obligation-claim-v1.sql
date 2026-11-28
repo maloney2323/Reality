@@ -36,6 +36,10 @@ BEGIN
    OR (OLD.claimant_worker_run_id IS NOT NULL AND NEW.claimant_worker_run_id IS DISTINCT FROM OLD.claimant_worker_run_id)
    OR NEW.phase='ADMITTED')
  THEN RAISE EXCEPTION 'FINAL_LOOP_HISTORICAL_INVOCATION_OR_CONTINUATION_IMMUTABLE';END IF;
+ IF OLD.historical_prepare_fence IS NULL AND NEW.historical_prepare_fence IS NULL
+  AND OLD.canonical_prepare_invocation_id IS NOT NULL
+  AND NEW.canonical_prepare_invocation_id IS DISTINCT FROM OLD.canonical_prepare_invocation_id
+ THEN RAISE EXCEPTION 'FINAL_LOOP_CONSUMED_PREPARATION_FENCE_IMMUTABLE';END IF;
  IF OLD.historical_prepare_fence IS NULL AND NEW.historical_prepare_fence IS NOT NULL THEN
   IF OLD.phase<>'CLAIMED' OR OLD.canonical_prepare_invocation_id IS NULL
     OR OLD.model_response_id IS NOT NULL OR OLD.review_body IS NOT NULL OR OLD.review_sha256 IS NOT NULL
@@ -477,6 +481,7 @@ BEGIN
     ELSE 'ADMITTED' END,
    'invocation_disposition',disposition.state,
    'historical_prepare_fence',c.historical_prepare_fence,
+   'active_claim_id',c.claim_id,
    'canonical_prepare_invocation_id',c.canonical_prepare_invocation_id,
    'canonical_verify_invocation_id',c.canonical_verify_invocation_id,
    'preparation_worker_run_id',c.claimant_worker_run_id,
@@ -714,6 +719,7 @@ BEGIN
   'provider_effect_uncertain',v_uncertain>0,
   'historical_provider_outcome_uncertain',EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 c WHERE c.plan_id=v_plan.plan_id AND c.historical_prepare_fence IS NOT NULL),
   'approved_recovery_candidate',reality_internal.read_final_loop_approved_recovery_candidate_v1(p_shift_id,p_plan_id),
+  'approved_recovery_receipt_sha256',v_packet.same_obligation_recovery_approval->>'approval_receipt_sha256',
   'recovery_qualification',pg_catalog.jsonb_build_object(
    'status',v_recovery_status,'unfinished_scope_count',v_missing,'uncertain_scope_count',v_uncertain,
    'proposal',v_recovery_proposal,'proposal_sha256',v_proposal_sha256,
