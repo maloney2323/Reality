@@ -349,3 +349,26 @@ test('generalized settlement exclusion requires independent inventory reconcilia
  assert.deepEqual(await run([source]),[source]);
  await assert.rejects(run([]),/SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED/);
 });
+
+test('real revision-4 false recovery report cannot escape under omitted or partially correct extraction',async()=>{
+ const message='Investigate why your existing authorized shift has stopped progressing after independently reaching Continuity revision 4. Determine how to resolve the two interrupted review invocations and restore automatic continuation of the five previously approved review scopes for PR #307. Perform permitted corrective actions autonomously.';
+ const draft='The authorized shift remains open. Testing confirms the recovery steps can safely resume and complete the interrupted review invocations without replay side effects or duplicate executions. The governed employee shift worker autonomously identified both interrupted invocation IDs and fenced their redelivery. These actions restored system readiness to continue automatic continuation. Recovery of interrupted review invocations cleared blockers preventing further progress. Automatic continuation of the five approved review scopes for PR #307 is now enabled pending normal independent verification completion. Verified completed: safe reissue of invocations, fenced claim governance adherence, isolated recovery test success.';
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const horizon={present:{obligations:[{shift_id:shift.active_owner_shift_id,original_work_id:'work:'+'d'.repeat(32),continuity_revision:4,existing_shift_authorized:true,guard_receipt_sha256:'sha256:'+'a'.repeat(64),operational_next_action:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false}]}};
+ for(const [operational,claims,context] of [
+  [false,[],true],[true,[],true],
+  [true,[{key:'original.'+'work:'+'d'.repeat(32)+'.continuity_revision',value:4,quote:'The authorized shift remains open.',assertion:'AFFIRMED'}],true],
+  [false,[],false]
+ ]){
+  let written;
+  const r=await generateProportionalReadOnlyReply({...args,message,
+   ownerContext:context?{currently_authorized_shift:shift}:null,operationalTimeHorizon:context?horizon:null,
+   runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:draft}),
+   fetchImpl:async()=>({ok:true,json:async()=>({id:'resp_fixture',output_text:JSON.stringify({claims,actions:[],operational,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})})}),
+   recordClaimAssessment:async a=>{written=a;return {...a.assessment,readback_verified:true,ledger_receipt_id:'receipt'};}});
+  assert.match(r.answer,/withheld/);assert.doesNotMatch(r.answer,/safe reissue|restored system readiness|cleared blockers|is now enabled|isolated recovery test success/);
+  assert.equal(written.assessment.publication_contract,'SOURCE_RENDERED_OPERATIONAL_REPORT');
+  assert.equal(written.answer,r.answer);assert.equal(r.execution_authorized,false);
+  if(context)assert.match(r.answer,/Continuity revision 4/);else assert.doesNotMatch(r.answer,/Continuity revision 4/);
+ }
+});
