@@ -739,22 +739,53 @@ BEGIN
   ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
   RETURN fresh_id;
  END IF;
- SELECT e.* INTO old_event FROM reality_internal.final_loop_resume_events_v1 e
+ SELECT e.*,run.status AS prior_run_status INTO old_event FROM reality_internal.final_loop_resume_events_v1 e
  JOIN reality_internal.final_loop_resume_conditions_v1 c
   ON c.shift_id=e.shift_id AND c.owner_id=e.owner_id AND c.original_work_id=e.original_work_id
    AND c.condition_kind=e.signal_kind AND c.source_ref=e.source_ref
    AND c.continuity_head_sha256=e.continuity_head_sha256 AND c.continuity_revision=e.continuity_revision
    AND c.subscribed_receipt_sha256=e.previous_receipt_sha256
- JOIN reality_internal.governed_signed_worker_release_wakes_v1 prev ON prev.worker_run_id=e.governed_wake_worker_run_id
- JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=prev.worker_run_id
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=e.governed_wake_worker_run_id
+ LEFT JOIN reality_internal.governed_signed_worker_release_wakes_v1 prev ON prev.worker_run_id=run.run_id
  WHERE e.shift_id=a.shift_id AND e.owner_id=a.owner_id AND e.original_work_id=a.runtime_scope->>'original_work_id'
   AND e.source_ref=a.runtime_scope->>'source_ref' AND e.signal_kind='QUALIFIER_PROOF_CHANGED'
   AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
   AND e.continuity_head_sha256=a.runtime_scope->>'continuity_head_sha256'
   AND e.continuity_revision::text=a.runtime_scope->>'continuity_revision'
   AND e.source_receipt_sha256=a.runtime_scope->>'qualifier_receipt_sha256'
-  AND e.governed_wake_request_id IS NOT NULL AND run.status='COMPLETED' AND run.finished_at IS NOT NULL
-  AND prev.running_release_sha<>a.release_sha AND prev.owner_id=a.owner_id AND prev.shift_id=a.shift_id
+  AND e.governed_wake_request_id IS NOT NULL AND run.finished_at IS NOT NULL
+  AND (
+   (run.status='COMPLETED' AND prev.running_release_sha<>a.release_sha
+    AND prev.owner_id=a.owner_id AND prev.shift_id=a.shift_id)
+   OR (
+    -- A durably claimed wake may fail before its release witness and before
+    -- any business/model executor. Never infer successful provider effects.
+    run.status='FAILED'
+    AND run.worker_stage='SHARED_CONTINUITY_VERIFIER_PREEXECUTION_FENCE'
+    AND e.state='SHADOW_PENDING' AND e.observed_at IS NULL
+    AND e.governed_wake_nonce IS NOT NULL AND e.governed_wake_queued_at IS NOT NULL
+    AND run.started_at>=e.governed_wake_queued_at
+    AND run.started_at<e.governed_wake_queued_at+interval '5 minutes'
+    AND run.finished_at>=run.started_at AND run.finished_at<a.claimed_at
+    AND (prev.worker_run_id IS NULL OR (prev.owner_id=a.owner_id
+     AND prev.shift_id=a.shift_id AND prev.running_release_sha<>a.release_sha))
+    AND (e.release_continuation_claim_id IS NULL OR EXISTS(
+      SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 prior
+      WHERE prior.claim_id=e.release_continuation_claim_id AND prior.owner_id=a.owner_id
+      AND prior.shift_id=a.shift_id AND prior.state='CLAIMED_ONCE'
+      AND prior.release_sha<>a.release_sha AND prior.provider_alias_observed_at<=run.started_at
+      AND prior.runtime_scope->>'original_work_id'=e.original_work_id
+      AND prior.runtime_scope->>'source_ref'=e.source_ref))
+    AND c.state IN ('SUSPENDED','SHADOW_SIGNALED')
+    AND c.next_qualified_action=e.signal_next_action
+    AND e.event_causality_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+      e.shift_id::text||'|'||e.original_work_id||'|'||e.continuity_head_sha256||'|'||
+      e.continuity_revision::text||'|'||e.previous_receipt_sha256||'|'||e.source_receipt_sha256,'UTF8')),'hex')
+    AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 child
+      WHERE child.claimant_worker_run_id=run.run_id OR child.canonical_verify_invocation_run_id=run.run_id)
+    AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_transition_receipts_v1 receipt
+      WHERE receipt.worker_run_id=run.run_id)
+   ))
   AND NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 pending
    WHERE pending.shift_id=e.shift_id AND pending.original_work_id=e.original_work_id
     AND pending.signal_kind=e.signal_kind AND pending.source_receipt_sha256=e.source_receipt_sha256
@@ -770,7 +801,7 @@ BEGIN
     AND q.reconciliation_snapshot->>'shift_id'=e.shift_id::text
     AND q.reconciliation_snapshot->>'original_candidate_work_id'=e.original_work_id
     AND q.reconciliation_checked_at>=pg_catalog.clock_timestamp()-interval '10 minutes')
- ORDER BY run.finished_at DESC LIMIT 1;
+ ORDER BY run.finished_at DESC LIMIT 1 FOR UPDATE OF e;
  IF NOT FOUND THEN RETURN NULL; END IF;
  -- The source digest and causality still identify the exact independently
  -- qualified obligation. The additional FK is the distinct operational condition.
@@ -783,6 +814,12 @@ BEGIN
   old_event.event_causality_sha256,old_event.continuity_head_sha256,old_event.continuity_revision,
   old_event.signal_next_action,a.claim_id)
  ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+ IF fresh_id IS NOT NULL AND old_event.prior_run_status='FAILED' THEN
+  -- The old request, consumed nonce, run and proof remain historical.
+  UPDATE reality_internal.final_loop_resume_events_v1
+  SET state='SHADOW_STALE' WHERE event_id=old_event.event_id
+   AND state='SHADOW_PENDING' AND governed_wake_worker_run_id=old_event.governed_wake_worker_run_id;
+ END IF;
  RETURN fresh_id;
 END $fn$;
 REVOKE ALL ON FUNCTION reality_internal.stage_final_loop_release_continuation_v1(uuid)
