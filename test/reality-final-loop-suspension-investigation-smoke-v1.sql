@@ -793,6 +793,7 @@ ALTER TABLE reality_internal.final_loop_resume_events_v1 DISABLE TRIGGER USER;
 ALTER TABLE reality_internal.governed_worker_release_approvals_v1 DISABLE TRIGGER USER;
 ALTER TABLE reality_internal.signed_worker_actual_runs_v1 DISABLE TRIGGER USER;
 ALTER TABLE reality_internal.final_loop_transition_receipts_v1 ALTER COLUMN receipt_id SET DEFAULT gen_random_uuid();
+ALTER TABLE reality_internal.owner_continuity_qualification_routes_v1 ADD COLUMN intake_family text DEFAULT 'SIGNED_SHIFT_SOURCE';
 \ir ../sql/reality-final-loop-execution-spine-return-v1.sql
 CREATE FUNCTION public.fixture_invocation_return_head() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $fixture$
 BEGIN
