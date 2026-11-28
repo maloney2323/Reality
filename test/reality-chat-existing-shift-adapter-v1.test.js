@@ -201,3 +201,15 @@ test('reload timeline renders persisted signed shift receipt, not a second work 
  assert.match(sql,/revoke all on function/);
  assert.doesNotMatch(sql,/net\.http_post|insert into|update reality_internal/);
 });
+
+test('saved continuation intent is not mislabeled as a worker wake or an execution receipt',async()=>{
+ const receipt={...verifiedReceipt('CHAT_EXISTING_SHIFT_CONTINUATION_INTENT_RECORDED'),
+  network_request_id:undefined,intent_recorded:true,wake_enqueued:false,execution_authorized:false};
+ const result=await continueSignedExistingEmployeeShift({...args,env,dbFactory:()=>db,callRpc:async()=>receipt});
+ assert.equal(result.intent_recorded,true);assert.equal(result.wake_enqueued,false);
+ assert.equal(result.execution_started,false);assert.equal(result.execution_authorized,false);
+ assert.equal(result.shift_id,shiftId);assert.equal(result.original_job_completed,false);
+ for(const bad of [{owner_id:messageId},{request_id:messageId},{source_ref:'foreign'},{wake_enqueued:true},{execution_authorized:true}]){
+  await assert.rejects(()=>continueSignedExistingEmployeeShift({...args,env,dbFactory:()=>db,callRpc:async()=>({...receipt,...bad})}),/CHAT_WORK_EXISTING_SHIFT_INTENT_RECEIPT_UNVERIFIED/);
+ }
+});
