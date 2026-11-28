@@ -1071,3 +1071,106 @@ BEGIN
 END $$;
 SELECT 'VERIFIED_SUCCESSOR_REUSES_IMMUTABLE_RELEASE_NO_REPLAY' AS result;
 ROLLBACK;
+
+-- Separate disposable fixture for the technical-return -> approved review
+-- handoff. The earlier test exercises the real technical return writer.
+-- Here, frozen writer outputs are reconstructed from the exact receipt
+-- formula, and the independent guard/preflight are fixture adapters.
+BEGIN;
+ALTER TABLE reality_internal.final_loop_resume_events_v1 DISABLE TRIGGER USER;
+ALTER TABLE reality_internal.governed_worker_release_approvals_v1 DISABLE TRIGGER USER;
+ALTER TABLE reality_internal.final_loop_child_review_work_v1 ADD COLUMN IF NOT EXISTS scope_sha256 text;
+CREATE FUNCTION reality_internal.read_final_loop_child_approval_preflight_v1(p_shift_id uuid) RETURNS jsonb
+ LANGUAGE sql AS $fixture$
+ SELECT jsonb_build_object('plans',jsonb_build_array(jsonb_build_object('parent_original_work_id',reconciliation_snapshot->>'original_candidate_work_id',
+ 'source_ref',source_ref,'independent_goal_acceptance_verified',true,'owner_approval_claim_window_current',true,
+ 'canonical_review_handoff',reconciliation_snapshot->'accepted_review_scope')))
+ FROM reality_internal.owner_continuity_qualification_routes_v1 WHERE reconciliation_snapshot->>'shift_id'=p_shift_id::text
+ $fixture$;
+CREATE FUNCTION reality_internal.reconcile_current_qualification_proofs_v1(p_shift_id uuid) RETURNS jsonb
+ LANGUAGE sql AS $$SELECT jsonb_build_object('scope','EVIDENCE_ONLY_NO_AUTHORITY_CHANGE')$$;
+\ir ../sql/reality-final-loop-verified-successor-authority-v1.sql
+\ir ../sql/reality-final-loop-return-to-approved-review-v1.sql
+DO $$
+DECLARE o uuid:=gen_random_uuid(); s uuid:=gen_random_uuid(); root uuid:=gen_random_uuid(); world uuid:=gen_random_uuid();
+ prior uuid:=gen_random_uuid(); obs uuid:=gen_random_uuid(); ev uuid:=gen_random_uuid(); run uuid:=gen_random_uuid();
+ req uuid:=gen_random_uuid(); cl uuid:=gen_random_uuid(); pkt uuid:=gen_random_uuid(); newevent uuid;
+ work text:='work:'||repeat('a',32); src text:='https://github.com/fixture/review-return/pull/1';
+ plan text:='sha256:'||repeat('b',64); scope_hash text:='sha256:'||repeat('c',64); oldhead text:='sha256:'||repeat('d',64);
+ head text:='sha256:'||repeat('e',64); review_hash text:='sha256:'||repeat('f',64);
+ investigation_hash text:='sha256:'||repeat('1',64); q text; observed_hash text; checkpoint jsonb; receipt text; accepted jsonb; snap jsonb; payload jsonb; runtime jsonb; g jsonb; proof jsonb;
+BEGIN
+ accepted:=jsonb_build_object('packet_id',pkt,'parent_original_work_id',work,'source_ref',src,'effect_type','READ_ONLY_INTERNAL_PR_REVIEW',
+ 'execution_authorized',false,'scope_fingerprints',jsonb_build_array(jsonb_build_object('scope_sha256',scope_hash)));
+ snap:=jsonb_build_object('shift_id',s,'original_candidate_work_id',work,'review_scope_qualified',true,
+ 'exact_goal_event_verified',true,'exact_acceptance_approval_verified',true,'accepted_review_scope',accepted);
+ q:='sha256:'||encode(sha256(convert_to(snap::text,'UTF8')),'hex');
+ runtime:=jsonb_build_object('continuity_root_id',root,'plan_fingerprint',plan,'original_work_id',work,'source_ref',src,
+ 'target_environment','CANONICAL_BENCHMARK_PREVIEW','runtime_database_project_ref','hvkfreoagbrphwghjajw','target_deployment_id','dpl_fixture_review_return',
+ 'exact_runtime_database_contract_verified',true,'independent_gateway_ci_verified',true,'independent_qualification_branch_verified',true,
+ 'child_execution_enabled',false,'parent_delivery_enabled',false,'production_changed',false);
+ INSERT INTO reality_internal.governed_employee_shifts_v1 VALUES(s,o,plan,'AWAITING_EXACT_ORIGINAL_WORK',now(),now()-interval '1 minute','infinity',NULL,now());
+ INSERT INTO reality_internal.governed_employee_completion_warrants_v1(shift_id,owner_id,plan_fingerprint,source_scope,mode,state)
+ VALUES(s,o,plan,jsonb_build_array(jsonb_build_object('source_ref',src)),'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS','ACTIVE');
+ INSERT INTO reality_internal.governed_worker_release_approvals_v1(request_id,owner_id,shift_id,claim_id,capability_key,state,
+ approval_receipt_sha256,claimed_at,provider_alias_observed_at,provider_alias_observed_deployment_id,runtime_scope,release_sha,release_ref,independent_isolation_proof_sha256)
+ VALUES(req,o,s,cl,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','CLAIMED_ONCE',scope_hash,now()-interval '2 minutes',now()-interval '1 minute',
+ 'dpl_fixture_review_return',runtime,repeat('9',40),'fixture-return',scope_hash);
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,finished_at,worker_stage)
+ VALUES(run,'STARTED',now()-interval '1 minute',NULL,'TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1 VALUES(run,o,s,cl,repeat('9',40),'fixture-return','NORMAL_SIGNED_SHIFT',scope_hash);
+ INSERT INTO reality_internal.owner_continuity_qualification_routes_v1 VALUES(o,src,q,snap,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',clock_timestamp());
+ INSERT INTO reality_internal.final_loop_child_review_work_v1(child_work_id,packet_id,owner_id,shift_id,parent_original_work_id,phase,scope_sha256)
+ VALUES(gen_random_uuid(),pkt,o,s,work,'ADMITTED',scope_hash);
+ INSERT INTO reality_internal.final_loop_resume_events_v1(event_id,shift_id,owner_id,original_work_id,source_ref,signal_kind,
+ source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,signal_next_action,state,
+ observed_at,governed_wake_nonce,governed_wake_worker_run_id,release_continuation_claim_id)
+ VALUES(ev,s,o,work,src,'VERIFIED_REVIEW_TECHNICAL_EVIDENCE',review_hash,investigation_hash,scope_hash,oldhead,5,
+ 'READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY','SHADOW_OBSERVED',clock_timestamp(),gen_random_uuid(),run,cl);
+ INSERT INTO public.universe_events(event_id,continuity_root_id,worldline_id,entity_type,epistemic_status,lineage_hash,content_hash,payload,provenance,assertion_time)
+ VALUES(prior,root,world,'fixture_prior','OBSERVED',substring(oldhead from 8),repeat('2',64),'{}','{}',now()-interval '1 minute');
+ payload:=jsonb_build_object('owner_id',o,'shift_id',s,'original_work_id',work,'source_ref',src,'prior_revision',5,'prior_head_sha256',oldhead,
+ 'review_receipt_sha256',review_hash,'investigation_receipt_sha256',investigation_hash,'qualifier_receipt_sha256',q,
+ 'previous_attempt_budget_preserved',true,'terminal_recovery_history',jsonb_build_object('remaining_attempts',0),
+ 'technical_evidence_only',true,'new_attempt_authorized',false,'original_business_red_verified',false,'original_job_completed',false,
+ 'execution_authorized',false,'replay_authorized',false,'production_changed',false,
+ 'technical_provider_proof',jsonb_build_object('independent_technical_ci_verified',true,'github_release_sha',repeat('9',40)));
+ observed_hash:='sha256:'||encode(sha256(convert_to(payload::text,'UTF8')),'hex');
+ INSERT INTO public.universe_events(event_id,continuity_root_id,worldline_id,parent_event_id,entity_type,epistemic_status,lineage_hash,content_hash,payload,provenance,assertion_time,evidence_refs)
+ VALUES(obs,root,world,prior,'reality_final_loop_terminal_technical_observation_v1','OBSERVED',substring(head from 8),
+ encode(sha256(convert_to(public.reality_continuity_canonical_json_v1(payload),'UTF8')),'hex'),payload,jsonb_build_object('worker_run_id',run),now(),jsonb_build_array(observed_hash));
+ checkpoint:=jsonb_build_object('shift_id',s,'owner_id',o,'original_work_id',work,'source_ref',src,'plan_fingerprint',plan,
+ 'frozen_shift_scope_sha256',scope_hash,'continuity_root_id',root,'continuity_head_sha256',oldhead,'expected_revision',5,
+ 'worker_run_id',run,'decision','REFRESH','reason_code','BLOCKER_ATTESTATION_PENDING');
+ receipt:='sha256:'||encode(sha256(convert_to(checkpoint::text,'UTF8')),'hex');
+ INSERT INTO reality_internal.final_loop_transition_receipts_v1(receipt_id,owner_id,shift_id,original_work_id,source_ref,continuity_root_id,
+ continuity_head_sha256,expected_revision,decision,reason_code,worker_run_id,receipt_sha256,plan_fingerprint,frozen_shift_scope_sha256)
+ VALUES(gen_random_uuid(),o,s,work,src,root,oldhead,5,'REFRESH','BLOCKER_ATTESTATION_PENDING',run,receipt,plan,scope_hash);
+ g:=jsonb_build_object('status','FINAL_LOOP_SHARED_CONTINUITY_CHECKED','owner_id',o,'shift_id',s,'continuity_root_id',root,
+ 'revision',6,'continuity_head_sha256',head,'no_new_executable_authority',true,'unverified_handoffs',0,'worldline_parent_links_verified',true,
+ 'execution_authorized',false,'original_job_completed',false,'production_changed',false,'frozen_shift_scope_sha256',scope_hash,
+ 'obligations',jsonb_build_array(jsonb_build_object('original_work_id',work,'source_ref',src,'continuity_identity_verified',true,
+ 'qualifier_digest_verified',true,'source_proof_verified',true,'independent_original_outcome_verified',false,'next_qualified_action','VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM')));
+ proof:=jsonb_build_object('status','FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING','revision',6,
+ 'continuity_head_sha256',head,'plan_fingerprint',plan,'frozen_shift_scope_sha256',scope_hash);
+ INSERT INTO public.suspension_fixture_proof VALUES(s,proof,g);
+ INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,subscribed_receipt_sha256,
+ continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
+ VALUES(s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,head,6,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','[]','RECOVER','SUSPENDED');
+ IF reality_internal.stage_final_loop_verified_review_return_v1(run) IS NOT NULL THEN RAISE EXCEPTION 'ACTIVE_WORKER_RETURN_ACCEPTED';END IF;
+ -- Deliberately mutate the proof only inside the disposable test. Both
+ -- false-success and no-untouched-scope cases must fail closed.
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp() WHERE run_id=run;
+ SELECT event_id INTO newevent FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND continuity_revision=6 AND signal_kind='QUALIFIER_PROOF_CHANGED';
+ IF newevent IS NULL OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1
+ WHERE event_id=newevent AND release_continuation_claim_id=cl AND source_receipt_sha256=q AND previous_receipt_sha256=observed_hash
+ AND signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM' AND state='SHADOW_PENDING')
+ THEN RAISE EXCEPTION 'VERIFIED_TECHNICAL_RETURN_NOT_CONNECTED_TO_APPROVED_REVIEW';END IF;
+ IF reality_internal.stage_final_loop_verified_review_return_v1(run) IS NOT NULL
+ OR (SELECT runtime_scope FROM reality_internal.governed_worker_release_approvals_v1 WHERE claim_id=cl) IS DISTINCT FROM runtime
+ OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE shift_id=s AND phase<>'ADMITTED')
+ OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=s)
+ THEN RAISE EXCEPTION 'REVIEW_RETURN_REPLAY_OR_AUTHORITY_DRIFT';END IF;
+END $$;
+SELECT 'VERIFIED_TECHNICAL_RETURN_STAGES_SAME_APPROVED_READ_ONLY_REVIEW' AS result;
+ROLLBACK;
