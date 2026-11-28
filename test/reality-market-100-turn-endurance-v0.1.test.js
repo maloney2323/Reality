@@ -28,8 +28,17 @@ function freshMock(){
    if(id)rows=rows.filter(e=>e.event_id===id);
    if(root)rows=rows.filter(e=>e.continuity_root_id===root);
    if(world)rows=rows.filter(e=>e.worldline_id===world);
-   if(q.has('select')){
+   // Model the provider's paging contract for both tail and full-history reads.
+   // The old mock ignored reconstruction offsets and returned the same rows
+   // again once the continuous history exceeded a page.
+   if(q.has('offset')||q.has('select')){
      const offset=Number(q.get('offset')||0),limit=Number(q.get('limit')||400);
+     const cutoff=q.get('assertion_time')?.replace(/^lte\./,'');
+     if(cutoff)rows=rows.filter(e=>Date.parse(e.assertion_time)<=Date.parse(cutoff));
+     if(q.get('order')?.startsWith('assertion_time.asc'))
+       rows.sort((a,b)=>Date.parse(a.assertion_time)-Date.parse(b.assertion_time)||
+         String(a.created_at||'').localeCompare(String(b.created_at||''))||
+         a.event_id.localeCompare(b.event_id));
      return new Response(JSON.stringify(rows.slice(offset,offset+limit)),{status:200});
    }
    return new Response(JSON.stringify(q.get('limit')==='1'?rows.slice(-1):rows.reverse()),

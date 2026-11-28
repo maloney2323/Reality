@@ -110,7 +110,10 @@ test('the Chat passes the SAME Universe projection into both existing model lane
  const api=get('api/reality/personal-chat.js');
  const projector=get('src/reality-chat-universe-cognitive-projection-v1.js');
  assert.match(api,/const makeOwnerUniverseReadModel=/);
- assert.match(api,/makeOwnerUniverseReadModel\(priorGoals\)/);
+ assert.equal((api.match(/const makeOwnerUniverseReadModel=/g)||[]).length,1);
+ assert.match(api,/makeOwnerUniverseReadModel\(\{observations\}\)/);
+ assert.match(api,/makeOwnerUniverseReadModel\(\{\s*observations:ownerCurrentUniverseObservations,reconciledOriginals\s*\}\)/);
+ assert.match(api,/projectOwnerRealityUniverseForChat\(\{[\s\S]*?currentObservations:observations,reconciledOriginals/);
  assert.match(api,/verifiedUniverseObservations:ownerUniverse\.observations/);
  assert.match(api,/connected_world_observations:ownerUniverse\.observations/);
  assert.match(projector,/createUniverseSnapshot/);

@@ -329,12 +329,18 @@ BEGIN
  WHERE a.shift_id=p_shift_id
   AND a.state IN ('APPROVED_ONCE','EFFECT_RESERVED_RECONCILE_ONLY')
   AND a.owner_approval_receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'
-  AND a.approved_at>=pg_catalog.clock_timestamp()-interval '12 hours'
+  -- Owner intent is durable for the exact active signed shift. The separate
+  -- actual worker lease above remains short-lived and must be current.
+  AND a.approved_at IS NOT NULL
+  AND a.approved_at<=pg_catalog.clock_timestamp()
+  AND a.owner_approval_request_id IS NOT NULL
   AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL
   AND s.planned_end_at='infinity'::timestamptz
   AND s.status IN ('RUNNING','AWAITING_EXACT_ORIGINAL_WORK')
   AND w.state='ACTIVE' AND w.mode IN ('UNTIL_ALL_INDEPENDENT_FINAL_RECEIPTS',
    'UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS')
+  AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(w.source_scope) scope(entry)
+   WHERE scope.entry->>'source_ref'=a.source_ref)
   AND EXISTS(SELECT 1 FROM reality_internal.riley_pr_review_originals_v1 r
    WHERE r.shift_id=a.shift_id AND r.owner_id=a.owner_id
     AND r.original_work_id=a.parent_original_work_id
@@ -357,6 +363,17 @@ BEGIN
   AND p.state='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION';
  IF NOT FOUND THEN
   RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_PARENT_PLAN_DRIFT',
+   'child_claimed',false,'original_job_completed',false);END IF;
+ -- Revalidate the exact frozen contract and independently recorded goal
+ -- before reserving any child. Durable consent does not permit scope drift.
+ IF v_packet.acceptance_contract_sha256 IS DISTINCT FROM
+   reality_internal.final_loop_pr_review_acceptance_digest_v1(v_plan.plan_id)
+   OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(
+    public.reality_read_final_loop_child_approval_preflight_v1(p_shift_id)->'plans') p(value)
+    WHERE p.value->>'plan_id'=v_plan.plan_id::text
+     AND p.value->>'independent_goal_acceptance_verified'='true'
+     AND p.value->>'owner_approval_claim_window_current'='true') THEN
+  RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_OWNER_ACCEPTANCE_SCOPE_NOT_CURRENT',
    'child_claimed',false,'original_job_completed',false);END IF;
  IF pg_catalog.jsonb_array_length(v_plan.source_plan->'bounded_scopes')
     <>v_plan.proposed_scope_count THEN
@@ -692,7 +709,7 @@ BEGIN
    'status','FINAL_LOOP_CHILD_PREPARED_REVIEW_DIGEST_MISMATCH',
    'independently_verified',false,'original_job_completed',false); END IF;
  v_receipt:='sha256:'||pg_catalog.encode(
-  pg_catalog.sha256(pg_catalog.convert_to(pg_catalog.jsonb_build_object(
+  pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
     'child_work_id',v_child.child_work_id,
     'parent_original_work_id',v_child.parent_original_work_id,
     'review_sha256',v_child.review_sha256,
@@ -700,7 +717,13 @@ BEGIN
     'independent_verifier_run_id',p_verifier_run_id,
     'provider_evidence_sha256',p_evidence->>'provider_evidence_sha256',
     'verifier_verdict_sha256',p_evidence->>'verifier_verdict_sha256'
-  )::text,'UTF8')),'hex');
+  ) || CASE WHEN p_evidence ? 'canonical_continuity_root_id' THEN
+   pg_catalog.jsonb_build_object(
+    'canonical_continuity_root_id',p_evidence->'canonical_continuity_root_id',
+    'canonical_continuity_head_sha256',p_evidence->'canonical_continuity_head_sha256',
+    'canonical_continuity_revision',p_evidence->'canonical_continuity_revision',
+    'canonical_owner_approval_receipt_sha256',p_evidence->'canonical_owner_approval_receipt_sha256')
+   ELSE '{}'::jsonb END)::text,'UTF8')),'hex');
  UPDATE reality_internal.final_loop_child_review_work_v1 SET
   phase='INDEPENDENTLY_VERIFIED',
   independent_verifier_run_id=p_verifier_run_id,
@@ -764,7 +787,15 @@ BEGIN
    'independently_verified',c.phase='INDEPENDENTLY_VERIFIED',
    'verifier_independent',c.phase='INDEPENDENTLY_VERIFIED'
     AND c.independent_verifier_run_id<>c.claimant_worker_run_id,
-   'independent_receipt_sha256',c.independent_review_receipt_sha256
+   'independent_receipt_sha256',c.independent_review_receipt_sha256,
+   'canonical_continuity_binding',CASE WHEN c.phase='INDEPENDENTLY_VERIFIED'
+    AND c.verifier_evidence ? 'canonical_continuity_root_id'
+    THEN pg_catalog.jsonb_build_object(
+     'continuity_root_id',c.verifier_evidence->'canonical_continuity_root_id',
+     'continuity_head_sha256',c.verifier_evidence->'canonical_continuity_head_sha256',
+     'revision',c.verifier_evidence->'canonical_continuity_revision',
+     'owner_approval_receipt_sha256',c.verifier_evidence->'canonical_owner_approval_receipt_sha256')
+    ELSE NULL END
   ) ORDER BY c.scope_index),'[]'::jsonb)
  INTO v_count,v_children FROM reality_internal.final_loop_child_review_work_v1 c
  WHERE c.plan_id=v_plan.plan_id AND c.packet_id=v_packet.packet_id
@@ -861,6 +892,7 @@ BEGIN
    'requested_effects',pg_catalog.jsonb_build_array('READ')),
   'capacity',pg_catalog.jsonb_build_object(
    'independently_attested',v_capacity,
+   'signed_worker_observed',v_capacity,
    'scheduled_worker_observed',v_capacity,
    'receipt_sha256',v_capacity_receipt),
   'provider_effect_uncertain',EXISTS(SELECT 1 FROM
@@ -929,12 +961,36 @@ BEGIN
     u.acceptance_hash,
    'verified_signed_source_goal_contract_prepared',
     u.acceptance_hash IS NOT NULL,
-   'owner_goal_acceptance_pending',u.acceptance_hash IS NOT NULL,
-   'independent_goal_acceptance_verified',false,
+   'owner_goal_acceptance_pending',u.acceptance_hash IS NOT NULL AND NOT proof.accepted,
+   'independent_goal_acceptance_verified',proof.accepted,
+   'owner_approval_claim_window_current',proof.current_window,
+   'owner_approval_expired',proof.accepted AND NOT proof.current_window,
    'pending_exact_owner_approval',u.acceptance_hash IS NOT NULL AND NOT EXISTS(
     SELECT 1 FROM reality_internal.final_loop_child_approval_packets_v1 a
     WHERE a.plan_id=p.plan_id AND
      a.acceptance_contract_sha256=u.acceptance_hash),
+   'canonical_review_handoff',CASE WHEN proof.accepted AND proof.current_window
+    THEN pg_catalog.jsonb_build_object(
+     'schema','reality-canonical-approved-review-scope-v1',
+     'packet_id',proof.packet_id,'approval_request_id',proof.approval_request_id,
+     'owner_approval_receipt_sha256',proof.approval_receipt,
+     'acceptance_event_id',proof.event_id,'acceptance_event_content_hash',proof.event_hash,
+     'owner_id',p.owner_id,'shift_id',p.shift_id,'plan_id',p.plan_id,
+     'plan_fingerprint',p.plan_fingerprint,'parent_original_work_id',p.parent_original_work_id,
+     'source_ref',p.source_ref,'source_head_sha',p.source_head_sha,
+     'source_proof_sha256',p.source_proof_sha256,
+     'source_manifest_sha256',p.source_manifest_sha256,
+     'acceptance_contract_sha256',u.acceptance_hash,
+     'scope_count',p.proposed_scope_count,
+     'scope_fingerprints',(SELECT pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object('index',(item.value->>'index')::integer,
+       'scope_sha256',item.value->>'proposed_scope_sha256')
+      ORDER BY (item.value->>'index')::integer)
+      FROM pg_catalog.jsonb_array_elements(p.source_plan->'bounded_scopes') item(value)),
+     'effect_type','READ_ONLY_INTERNAL_PR_REVIEW',
+     'canonical_claim_required',true,'execution_authorized',false,
+     'original_job_completed',false,'production_changed',false)
+    ELSE NULL END,
    'child_review_automatically_authorized',false
   ) ORDER BY p.staged_at),'[]'::jsonb) INTO v_plans
  FROM reality_internal.final_loop_pr_source_plans_v1 p
@@ -942,6 +998,40 @@ BEGIN
   SELECT reality_internal.final_loop_pr_review_acceptance_digest_v1(p.plan_id)
    AS acceptance_hash
  ) u
+ CROSS JOIN LATERAL (
+  SELECT count(e.event_id)=1 AS accepted,
+   min(a.packet_id::text) AS packet_id,
+   min(a.owner_approval_request_id::text) AS approval_request_id,
+   min(a.owner_approval_receipt_sha256) AS approval_receipt,
+   min(e.event_id::text) AS event_id,min(e.content_hash) AS event_hash,
+   -- Compatibility field: current means exact accepted scope on an active
+   -- signed shift, not time elapsed since the owner accepted the goal.
+   count(e.event_id)=1 AND coalesce(bool_and(a.approved_at IS NOT NULL
+    AND a.approved_at<=pg_catalog.clock_timestamp()
+    AND a.owner_approval_request_id IS NOT NULL),false) AS current_window
+  FROM reality_internal.final_loop_child_approval_packets_v1 a
+  JOIN public.universe_events e ON e.continuity_root_id=p.shift_id AND e.worldline_id=p.plan_id AND e.entity_id=p.plan_id
+  WHERE a.plan_id=p.plan_id AND a.shift_id=p.shift_id AND a.owner_id=p.owner_id
+   AND a.source_manifest_sha256=p.source_manifest_sha256 AND a.parent_original_work_id=p.parent_original_work_id AND a.source_ref=p.source_ref
+   AND a.acceptance_contract_sha256=u.acceptance_hash
+   AND a.state IN ('APPROVED_ONCE','EFFECT_RESERVED_RECONCILE_ONLY')
+   AND a.authority_effect='READ_ONLY_INTERNAL_PR_REVIEW'
+   AND e.entity_type='reality_final_loop_owner_accepted_goal_v1'
+   AND e.epistemic_status='VERIFIED' AND e.event_kind='WORK'
+   AND e.payload->>'owner_approval_receipt_sha256'=a.owner_approval_receipt_sha256
+   AND e.payload->>'owner_approval_request_id'=a.owner_approval_request_id::text
+   AND e.payload->>'acceptance_contract_sha256'=a.acceptance_contract_sha256
+   AND e.payload->>'goal_accepted'='true'
+   AND e.payload->>'original_job_completed'='false'
+   AND e.payload->>'production_changed'='false'
+   AND e.payload->>'source_head_sha'=p.source_head_sha
+   AND e.payload->>'source_manifest_sha256'=p.source_manifest_sha256
+   AND e.payload->>'owner_id'=p.owner_id::text
+   AND e.payload->>'shift_id'=p.shift_id::text
+   AND e.payload->>'original_work_id'=p.parent_original_work_id
+   AND e.payload->>'source_ref'=p.source_ref
+   AND e.content_hash=pg_catalog.encode(extensions.digest(pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(e.payload),'UTF8'),'sha256'),'hex')
+ ) proof
  WHERE p.shift_id=p_shift_id AND p.owner_id=v_shift.owner_id
   AND p.parent_original_work_id IS NOT NULL;
  RETURN pg_catalog.jsonb_build_object(
@@ -951,6 +1041,300 @@ BEGIN
   'plans',v_plans,'read_only',true,
   'execution_authorized',false,'original_job_completed',false);
 END $fn$;
+
+-- Canonical scope-bound overload of the SAME atomic child admission.
+-- No copied warrant, no alternative claim table and no model invocation.
+-- Release qualification must separately admit this exact existing handler;
+-- a source-read/packet-preparation release is not execution capacity.
+CREATE OR REPLACE FUNCTION reality_internal.check_final_loop_canonical_child_scope_v1(
+ p_shift_id uuid,p_worker_run_id uuid,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE h jsonb; g jsonb; p jsonb; current_scope jsonb; n int;
+BEGIN
+ IF current_user<>'service_role' THEN
+  RAISE EXCEPTION 'FINAL_LOOP_CHILD_CLAIM_SERVICE_ONLY';END IF;
+ h:=p_canonical_handoff;
+ IF p_shift_id IS NULL OR p_worker_run_id IS NULL
+  OR pg_catalog.jsonb_typeof(h) IS DISTINCT FROM 'object'
+  OR pg_catalog.length(h::text)>20000
+  OR h->>'schema' IS DISTINCT FROM 'reality-canonical-approved-review-scope-v1'
+  OR h->>'status' IS DISTINCT FROM 'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED'
+  OR h->>'shift_id' IS DISTINCT FROM p_shift_id::text
+  OR h->>'effect_type' IS DISTINCT FROM 'READ_ONLY_INTERNAL_PR_REVIEW'
+  OR h->>'next_governed_action' IS DISTINCT FROM 'CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER'
+  OR h->'canonical_claim_required' IS DISTINCT FROM 'true'::jsonb
+  OR h->'read_only' IS DISTINCT FROM 'true'::jsonb
+  OR h->'execution_authorized' IS DISTINCT FROM 'false'::jsonb
+  OR h->'original_job_completed' IS DISTINCT FROM 'false'::jsonb
+  OR h->'production_changed' IS DISTINCT FROM 'false'::jsonb
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_HANDOFF_INVALID','child_claimed',false,
+  'original_job_completed',false,'production_changed',false);END IF;
+ -- Serialize with the existing shift checkpoint/claim writers. The helper
+ -- validates the current shared verifier and authority, not a model verdict.
+ PERFORM 1 FROM reality_internal.governed_employee_shifts_v1 s
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w
+  ON w.shift_id=s.shift_id AND w.owner_id=s.owner_id AND w.plan_fingerprint=s.plan_fingerprint
+ WHERE s.shift_id=p_shift_id AND s.owner_id::text=h->>'owner_id'
+  AND s.closed_at IS NULL AND s.authorized_at IS NOT NULL AND w.state='ACTIVE'
+ FOR UPDATE OF s,w;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_ACTIVE_WARRANT_REQUIRED',
+  'child_claimed',false,'original_job_completed',false,'production_changed',false);END IF;
+ -- Re-read the exact accepted scope, not a copied approval or client hash.
+ SELECT count(*), (pg_catalog.jsonb_agg(x.value->'canonical_review_handoff')->0)
+ INTO n,current_scope
+ FROM pg_catalog.jsonb_array_elements(
+  public.reality_read_final_loop_child_approval_preflight_v1(p_shift_id)->'plans') x(value)
+ WHERE x.value->>'plan_id'=h->>'plan_id'
+  AND x.value->>'independent_goal_acceptance_verified'='true'
+  AND x.value->>'owner_approval_claim_window_current'='true'
+  AND x.value->'canonical_review_handoff' IS NOT NULL;
+ IF n<>1 OR current_scope IS DISTINCT FROM
+  (h - ARRAY['status','continuity_root_id','continuity_head_sha256','revision','next_governed_action','read_only']::text[])
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_ACCEPTANCE_SCOPE_DRIFT','child_claimed',false,
+  'original_job_completed',false,'production_changed',false);END IF;
+ g:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+ p:=public.reality_read_current_final_loop_proof_envelope_v1(p_shift_id);
+ IF g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+  OR p->>'status' IS DISTINCT FROM 'FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'
+  OR g->>'owner_id' IS DISTINCT FROM h->>'owner_id'
+  OR p->>'owner_id' IS DISTINCT FROM h->>'owner_id'
+  OR g->>'shift_id' IS DISTINCT FROM p_shift_id::text
+  OR p->>'shift_id' IS DISTINCT FROM p_shift_id::text
+  OR p->>'plan_fingerprint' IS DISTINCT FROM h->>'plan_fingerprint'
+  OR g->>'continuity_root_id' IS DISTINCT FROM h->>'continuity_root_id'
+  OR p->>'continuity_root_id' IS DISTINCT FROM h->>'continuity_root_id'
+  OR g->>'continuity_head_sha256' IS DISTINCT FROM h->>'continuity_head_sha256'
+  OR p->>'continuity_head_sha256' IS DISTINCT FROM h->>'continuity_head_sha256'
+  OR g->>'revision' IS DISTINCT FROM h->>'revision'
+  OR p->>'revision' IS DISTINCT FROM h->>'revision'
+  OR g->>'frozen_shift_scope_sha256' IS DISTINCT FROM p->>'frozen_shift_scope_sha256'
+  OR g->>'unverified_handoffs' IS DISTINCT FROM '0'
+  OR g->>'first_signal_anchor_verified' IS DISTINCT FROM 'true'
+  OR g->>'worldline_parent_links_verified' IS DISTINCT FROM 'true'
+  OR g->>'shift_scope_authority_event_present' IS DISTINCT FROM 'true'
+  OR g->>'no_new_executable_authority' IS DISTINCT FROM 'true'
+  OR g->>'execution_authorized' IS DISTINCT FROM 'false'
+  OR g->>'original_job_completed' IS DISTINCT FROM 'false'
+  OR g->>'production_changed' IS DISTINCT FROM 'false'
+  OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(g->'obligations') o
+   WHERE o->>'original_work_id'=h->>'parent_original_work_id'
+    AND o->>'source_ref'=h->>'source_ref'
+    AND o->>'continuity_identity_verified'='true'
+    AND o->>'qualifier_digest_verified'='true'
+    AND o->>'next_qualified_action'='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND o->>'independent_original_outcome_verified'='false')
+  OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(p->'jobs') j
+   WHERE j->>'original_work_id'=h->>'parent_original_work_id'
+    AND j->>'source_ref'=h->>'source_ref'
+    AND j->>'source_proof_sha256'=h->>'source_proof_sha256'
+    AND j->>'source_phase'='BLOCKED'
+    AND j->>'independent_source_proof_verified'='true'
+    AND j->>'final_outcome_verified'='false')
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_CONTINUITY_HEAD_DRIFT','child_claimed',false,
+  'original_job_completed',false,'production_changed',false);END IF;
+ -- The existing canonical release witness must be exact for this handler.
+ -- An independent isolated-execution capacity proof must be carried by the
+ -- consumed release. Existing diagnostic-only releases cannot reserve work.
+ IF NOT EXISTS(SELECT 1
+  FROM reality_internal.governed_signed_worker_release_wakes_v1 w
+  JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
+  JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=w.worker_run_id
+  JOIN reality_internal.governed_preview_shift_worker_leases_v1 l
+   ON l.worker_key='preview-governed-employee-shift-worker'
+  WHERE w.worker_run_id=p_worker_run_id AND w.shift_id=p_shift_id
+   AND w.owner_id::text=h->>'owner_id'
+   AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+   AND w.release_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+   AND w.running_release_sha=a.release_sha AND w.running_release_ref=a.release_ref
+   AND a.owner_id=w.owner_id AND a.shift_id=w.shift_id AND a.state='CLAIMED_ONCE'
+   AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+   AND a.capability_key=ANY(w.registered_capabilities)
+   AND a.runtime_scope->>'target_environment'='CANONICAL_BENCHMARK_PREVIEW'
+   AND a.runtime_scope->>'original_work_id'=h->>'parent_original_work_id'
+   AND a.runtime_scope->>'source_ref'=h->>'source_ref'
+   AND a.runtime_scope->>'plan_fingerprint'=h->>'plan_fingerprint'
+   AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
+   AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+   AND a.runtime_scope->>'child_execution_enabled'='false'
+   AND a.runtime_scope->>'parent_delivery_enabled'='false'
+   AND a.runtime_scope->>'production_changed'='false'
+   AND a.independent_isolation_proof_sha256~'^sha256:[a-f0-9]{64}$'
+   AND r.status='STARTED' AND r.finished_at IS NULL
+   AND r.started_at>=l.claimed_at AND l.released_at IS NULL
+   AND l.lease_expires_at>pg_catalog.clock_timestamp()
+   AND r.started_at>pg_catalog.clock_timestamp()-interval '3 minutes'
+   AND EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+    WHERE e.governed_wake_worker_run_id=r.run_id AND e.shift_id=w.shift_id
+     AND e.owner_id=w.owner_id AND e.original_work_id=h->>'parent_original_work_id'
+     AND e.source_ref=h->>'source_ref'
+     AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+     AND e.continuity_head_sha256=h->>'continuity_head_sha256'
+     AND e.continuity_revision=(h->>'revision')::bigint
+     AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(g->'obligations') o
+      WHERE o->>'original_work_id'=e.original_work_id AND o->>'source_ref'=e.source_ref
+       AND o->>'qualifier_receipt_sha256'=e.source_receipt_sha256)))
+ THEN RETURN pg_catalog.jsonb_build_object(
+  'status','FINAL_LOOP_CANONICAL_CHILD_QUALIFIED_EXECUTION_RELEASE_REQUIRED',
+  'child_claimed',false,'original_job_completed',false,'production_changed',false);END IF;
+ RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_CANONICAL_CHILD_SCOPE_CURRENT',
+  'execution_authorized',false,'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION reality_internal.check_final_loop_canonical_child_scope_v1(uuid,uuid,jsonb)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION reality_internal.check_final_loop_canonical_child_scope_v1(uuid,uuid,jsonb)
+ TO service_role;
+
+CREATE OR REPLACE FUNCTION public.reality_claim_final_loop_child_review_v1(
+ p_shift_id uuid,p_worker_run_id uuid,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE h jsonb:=p_canonical_handoff; scope_check jsonb; c jsonb;
+BEGIN
+ scope_check:=reality_internal.check_final_loop_canonical_child_scope_v1(p_shift_id,p_worker_run_id,h);
+ IF scope_check->>'status' IS DISTINCT FROM 'FINAL_LOOP_CANONICAL_CHILD_SCOPE_CURRENT'
+ THEN RETURN scope_check;END IF;
+ -- Reuse the existing transactional allocator. If its selection differs,
+ -- raise and roll back ALL changes; no other parent can be reserved.
+ c:=public.reality_claim_final_loop_child_review_v1(p_shift_id,p_worker_run_id);
+ IF c->>'status' IS DISTINCT FROM 'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE'
+  OR c->>'owner_id' IS DISTINCT FROM h->>'owner_id'
+  OR c->>'shift_id' IS DISTINCT FROM h->>'shift_id'
+  OR c->>'parent_original_work_id' IS DISTINCT FROM h->>'parent_original_work_id'
+  OR c->>'source_ref' IS DISTINCT FROM h->>'source_ref'
+  OR c->>'source_head_sha' IS DISTINCT FROM h->>'source_head_sha'
+  OR c->>'source_proof_sha256' IS DISTINCT FROM h->>'source_proof_sha256'
+  OR c->>'source_manifest_sha256' IS DISTINCT FROM h->>'source_manifest_sha256'
+  OR c->>'acceptance_contract_sha256' IS DISTINCT FROM h->>'acceptance_contract_sha256'
+  OR c->>'approval_receipt_sha256' IS DISTINCT FROM h->>'owner_approval_receipt_sha256'
+  OR c->>'claimant_worker_run_id' IS DISTINCT FROM p_worker_run_id::text
+  OR c->>'original_job_completed' IS DISTINCT FROM 'false'
+  OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(h->'scope_fingerprints') s
+    WHERE s->>'index'=c->>'scope_index' AND s->>'scope_sha256'=c->>'scope_sha256')
+  OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 x
+    WHERE x.child_work_id=c->>'child_work_id' AND x.packet_id::text=h->>'packet_id'
+     AND x.plan_id::text=h->>'plan_id' AND x.claim_id::text=c->>'claim_id'
+     AND x.claimant_worker_run_id=p_worker_run_id AND x.phase='CLAIMED')
+ THEN RAISE EXCEPTION 'FINAL_LOOP_CANONICAL_CHILD_ATOMIC_CLAIM_SCOPE_MISMATCH';END IF;
+ -- Carry a reference to the SAME claim. It is not a bearer token or
+ -- a permission to invoke a model without fresh canonical readback.
+ RETURN c||pg_catalog.jsonb_build_object(
+  'canonical_scope_bound',true,'canonical_claim_required',true,
+  'continuity_root_id',h->'continuity_root_id',
+  'continuity_head_sha256',h->'continuity_head_sha256','revision',h->'revision',
+  'packet_id',h->'packet_id','plan_id',h->'plan_id',
+  'execution_authorized',false,'isolated_model_invoked',false,
+  'original_job_completed',false,'production_changed',false);
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_claim_final_loop_child_review_v1(uuid,uuid,jsonb)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_claim_final_loop_child_review_v1(uuid,uuid,jsonb)
+ TO service_role;
+
+-- All canonical child readbacks and evidence writes share the exact same
+-- scope/lease/Continuity guard as the atomic claim. No second ledger.
+CREATE OR REPLACE FUNCTION reality_internal.final_loop_canonical_child_matches_v1(
+ p_child_work_id text,h jsonb)
+RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER SET search_path TO '' AS $fn$
+ SELECT EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 c
+  JOIN reality_internal.final_loop_pr_source_plans_v1 p ON p.plan_id=c.plan_id
+  WHERE c.child_work_id=p_child_work_id AND c.owner_id::text=h->>'owner_id'
+   AND c.shift_id::text=h->>'shift_id' AND c.packet_id::text=h->>'packet_id'
+   AND c.plan_id::text=h->>'plan_id' AND c.parent_original_work_id=h->>'parent_original_work_id'
+   AND c.source_manifest_sha256=h->>'source_manifest_sha256'
+   AND c.source_head_sha=h->>'source_head_sha'
+   AND c.acceptance_contract_sha256=h->>'acceptance_contract_sha256'
+   AND p.source_ref=h->>'source_ref' AND p.source_proof_sha256=h->>'source_proof_sha256'
+   AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(h->'scope_fingerprints') x
+    WHERE x->>'index'=c.scope_index::text AND x->>'scope_sha256'=c.scope_sha256))
+$fn$;
+REVOKE ALL ON FUNCTION reality_internal.final_loop_canonical_child_matches_v1(text,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION reality_internal.final_loop_canonical_child_matches_v1(text,jsonb) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_verify_v1(
+ p_shift_id uuid,p_verifier_run_id uuid,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE a jsonb; v jsonb;
+BEGIN
+ a:=reality_internal.check_final_loop_canonical_child_scope_v1(p_shift_id,p_verifier_run_id,p_canonical_handoff);
+ IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_CANONICAL_CHILD_SCOPE_CURRENT' THEN RETURN a;END IF;
+ v:=public.reality_read_final_loop_child_verify_v1(p_shift_id,p_verifier_run_id);
+ IF v->>'status'='FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE'
+  AND NOT reality_internal.final_loop_canonical_child_matches_v1(v->>'child_work_id',p_canonical_handoff)
+ THEN RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_CANONICAL_VERIFIER_ORIGINAL_SCOPE_DRIFT',
+  'original_job_completed',false,'production_changed',false);END IF;
+ RETURN v;
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.reality_read_final_loop_child_model_scope_v1(
+ p_child_work_id text,p_claim_id uuid,p_worker_run_id uuid,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE a jsonb;
+BEGIN
+ a:=reality_internal.check_final_loop_canonical_child_scope_v1(
+  (p_canonical_handoff->>'shift_id')::uuid,p_worker_run_id,p_canonical_handoff);
+ IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_CANONICAL_CHILD_SCOPE_CURRENT' THEN RETURN a;END IF;
+ IF NOT reality_internal.final_loop_canonical_child_matches_v1(p_child_work_id,p_canonical_handoff)
+ THEN RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_CANONICAL_MODEL_ORIGINAL_SCOPE_DRIFT','model_authorized',false);END IF;
+ RETURN public.reality_read_final_loop_child_model_scope_v1(p_child_work_id,p_claim_id,p_worker_run_id);
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.reality_prepare_final_loop_child_review_v1(
+ p_child_work_id text,p_claim_id uuid,p_worker_run_id uuid,
+ p_head_sha text,p_model_response_id text,p_review_body text,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE a jsonb; v jsonb;
+BEGIN
+ a:=public.reality_read_final_loop_child_model_scope_v1(
+  p_child_work_id,p_claim_id,p_worker_run_id,p_canonical_handoff);
+ IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK'
+  OR a->>'model_authorized' IS DISTINCT FROM 'true'
+ THEN RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_CANONICAL_PREPARE_CONTINUITY_DRIFT_NO_REPLAY',
+  'original_job_completed',false,'production_changed',false);END IF;
+ v:=public.reality_prepare_final_loop_child_review_v1(p_child_work_id,p_claim_id,p_worker_run_id,
+  p_head_sha,p_model_response_id,p_review_body);
+ RETURN v;
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.reality_record_final_loop_child_verified_v1(
+ p_child_work_id text,p_verifier_run_id uuid,p_review_sha256 text,p_source_head_sha text,
+ p_source_manifest_sha256 text,p_evidence jsonb,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE a jsonb; v jsonb; e jsonb;
+BEGIN
+ a:=public.reality_read_final_loop_child_verify_v1(
+  (p_canonical_handoff->>'shift_id')::uuid,p_verifier_run_id,p_canonical_handoff);
+ IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE'
+  OR a->>'child_work_id' IS DISTINCT FROM p_child_work_id
+  OR a->>'review_sha256' IS DISTINCT FROM p_review_sha256
+ THEN RETURN pg_catalog.jsonb_build_object('status','FINAL_LOOP_CANONICAL_VERIFIER_CONTINUITY_DRIFT_NO_REPLAY',
+  'original_job_completed',false,'production_changed',false);END IF;
+ -- The trusted canonical service, not the isolated model, stamps lineage
+ -- into the existing verifier evidence field. No independent outcome is
+ -- implied for the original until its own settlement/Universe return.
+ e:=p_evidence||pg_catalog.jsonb_build_object(
+  'canonical_continuity_root_id',p_canonical_handoff->'continuity_root_id',
+  'canonical_continuity_head_sha256',p_canonical_handoff->'continuity_head_sha256',
+  'canonical_continuity_revision',p_canonical_handoff->'revision',
+  'canonical_owner_approval_receipt_sha256',p_canonical_handoff->'owner_approval_receipt_sha256');
+ v:=public.reality_record_final_loop_child_verified_v1(p_child_work_id,p_verifier_run_id,
+  p_review_sha256,p_source_head_sha,p_source_manifest_sha256,e);
+ RETURN v;
+END $fn$;
+REVOKE ALL ON FUNCTION
+ public.reality_read_final_loop_child_verify_v1(uuid,uuid,jsonb),
+ public.reality_read_final_loop_child_model_scope_v1(text,uuid,uuid,jsonb),
+ public.reality_prepare_final_loop_child_review_v1(text,uuid,uuid,text,text,text,jsonb),
+ public.reality_record_final_loop_child_verified_v1(text,uuid,text,text,text,jsonb,jsonb)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION
+ public.reality_read_final_loop_child_verify_v1(uuid,uuid,jsonb),
+ public.reality_read_final_loop_child_model_scope_v1(text,uuid,uuid,jsonb),
+ public.reality_prepare_final_loop_child_review_v1(text,uuid,uuid,text,text,text,jsonb),
+ public.reality_record_final_loop_child_verified_v1(text,uuid,text,text,text,jsonb,jsonb)
+ TO service_role;
 
 -- Exact owner-facing packet readback; requires authenticated app session
 -- before the service proxy is allowed to call it.
@@ -1071,4 +1455,80 @@ REVOKE ALL ON FUNCTION
  FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION
  public.reality_reconcile_final_loop_child_premodel_v1(uuid,uuid)
+ TO service_role;
+
+-- One-use transport fence on the EXISTING child obligation, not a new ledger.
+-- A lost BEGIN response is uncertain, never permission to start another model.
+ALTER TABLE reality_internal.final_loop_child_review_work_v1
+ ADD COLUMN IF NOT EXISTS premodel_recovery_count integer NOT NULL DEFAULT 0,
+ ADD COLUMN IF NOT EXISTS canonical_prepare_invocation_id uuid,
+ ADD COLUMN IF NOT EXISTS canonical_verify_invocation_id uuid,
+ ADD COLUMN IF NOT EXISTS canonical_verify_invocation_run_id uuid;
+CREATE OR REPLACE FUNCTION public.reality_fence_final_loop_child_transport_v1(
+ p_child_work_id text,p_claim_id uuid,p_worker_run_id uuid,p_mode text,
+ p_invocation_id uuid,p_begin boolean,p_canonical_handoff jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $fn$
+DECLARE a jsonb; n integer; v reality_internal.final_loop_child_review_work_v1%rowtype;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_CHILD_TRANSPORT_SERVICE_ONLY';END IF;
+ IF p_begin IS NULL OR p_invocation_id IS NULL OR p_worker_run_id IS NULL
+  OR coalesce(p_child_work_id,'') !~ '^work:[a-f0-9]{32}$'
+  OR coalesce(p_mode,'') NOT IN ('PREPARE','VERIFY')
+  OR (p_mode='PREPARE' AND p_claim_id IS NULL)
+  OR (p_mode='VERIFY' AND p_claim_id IS NOT NULL)
+ THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_SCOPE_INVALID');END IF;
+ -- Existing canonical scope and release guard takes the shift/warrant lock.
+ IF p_mode='PREPARE' THEN
+  a:=public.reality_read_final_loop_child_model_scope_v1(
+   p_child_work_id,p_claim_id,p_worker_run_id,p_canonical_handoff);
+  IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_CHILD_CURRENT_SIGNED_MODEL_READBACK'
+   OR a->>'model_authorized' IS DISTINCT FROM 'true'
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_AUTHORITY_UNVERIFIED');END IF;
+ ELSE
+  a:=public.reality_read_final_loop_child_verify_v1(
+   (p_canonical_handoff->>'shift_id')::uuid,p_worker_run_id,p_canonical_handoff);
+  IF a->>'status' IS DISTINCT FROM 'FINAL_LOOP_INDEPENDENT_CHILD_VERIFICATION_CANDIDATE'
+   OR a->>'child_work_id' IS DISTINCT FROM p_child_work_id
+   OR a->>'independent_verifier_run_id' IS DISTINCT FROM p_worker_run_id::text
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_VERIFIER_UNVERIFIED');END IF;
+ END IF;
+ SELECT * INTO v FROM reality_internal.final_loop_child_review_work_v1 c
+ WHERE c.child_work_id=p_child_work_id FOR UPDATE;
+ IF NOT FOUND OR NOT reality_internal.final_loop_canonical_child_matches_v1(p_child_work_id,p_canonical_handoff)
+ THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_ORIGINAL_DRIFT');END IF;
+ IF p_mode='PREPARE' THEN
+  IF v.phase<>'CLAIMED' OR v.claim_id IS DISTINCT FROM p_claim_id
+   OR v.claimant_worker_run_id IS DISTINCT FROM p_worker_run_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_CLAIM_DRIFT');END IF;
+  IF p_begin THEN
+   UPDATE reality_internal.final_loop_child_review_work_v1
+   SET canonical_prepare_invocation_id=p_invocation_id,
+    -- Existing premodel recovery must NOT readmit a possibly invoked model.
+    premodel_recovery_count=greatest(premodel_recovery_count,1)
+   WHERE child_work_id=p_child_work_id AND canonical_prepare_invocation_id IS NULL
+    AND phase='CLAIMED' AND claim_id=p_claim_id AND claimant_worker_run_id=p_worker_run_id;
+   GET DIAGNOSTICS n=ROW_COUNT;
+   IF n<>1 THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_ALREADY_FENCED_NO_REPLAY');END IF;
+  ELSIF v.canonical_prepare_invocation_id IS DISTINCT FROM p_invocation_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_INVOCATION_MISMATCH');END IF;
+ ELSE
+  IF v.phase<>'PREPARED' OR v.claimant_worker_run_id=p_worker_run_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_VERIFIER_DRIFT');END IF;
+  IF p_begin THEN
+   UPDATE reality_internal.final_loop_child_review_work_v1
+   SET canonical_verify_invocation_id=p_invocation_id,
+    canonical_verify_invocation_run_id=p_worker_run_id
+   WHERE child_work_id=p_child_work_id AND phase='PREPARED'
+    AND canonical_verify_invocation_id IS NULL AND claimant_worker_run_id<>p_worker_run_id;
+   GET DIAGNOSTICS n=ROW_COUNT;
+   IF n<>1 THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_ALREADY_FENCED_NO_REPLAY');END IF;
+  ELSIF v.canonical_verify_invocation_id IS DISTINCT FROM p_invocation_id
+   OR v.canonical_verify_invocation_run_id IS DISTINCT FROM p_worker_run_id
+  THEN RETURN jsonb_build_object('status','FINAL_LOOP_CHILD_TRANSPORT_INVOCATION_MISMATCH');END IF;
+ END IF;
+ RETURN a;
+END $fn$;
+REVOKE ALL ON FUNCTION public.reality_fence_final_loop_child_transport_v1(text,uuid,uuid,text,uuid,boolean,jsonb)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_fence_final_loop_child_transport_v1(text,uuid,uuid,text,uuid,boolean,jsonb)
  TO service_role;

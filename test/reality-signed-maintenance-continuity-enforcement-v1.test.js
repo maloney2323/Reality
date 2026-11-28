@@ -219,3 +219,38 @@ test('signed worker reconciles independent repair receipt into Universe after ve
  assert.match(worker,/signedMaintenanceIndependentPostinstall\.repair_verified===true/);
  assert.match(worker,/signed_maintenance_universe_postinstall_return:signedMaintenanceUniverseReconciliation/);
 });
+
+
+test('maintenance return reuses only the exact current original obligation and records a changed next action',async()=>{
+ const verified={...approved,decision_state:'VERIFIED',repair_installed:true,
+  installed_commit_sha:'d'.repeat(40),
+  independent_postinstall_receipt_sha256:HASH('5'),
+  independent_ci_run_id:44809001999,independent_vercel_check_id:981203};
+ const f=fixture(verified);
+ const first=await f.callLoop();
+ const changed={...gate,next_action:'RUN_CASE_SPECIFIC_INDEPENDENT_MAINTENANCE_CI_RED'};
+ const second=await f.callLoop(changed);
+ assert.equal(second.status,'CONTINUITY_INDEPENDENT_REPAIR_VERIFIED_SAME_SHIFT_RECONCILED');
+ assert.equal(second.continuity_root_id,first.continuity_root_id);
+ assert.equal(second.original_work_id,first.original_work_id);
+ assert.notEqual(second.latest_event_id,first.latest_event_id);
+ assert.equal(second.newly_recorded_events,1);
+ const recorded=f.events.find(e=>e.event_id===second.latest_event_id);
+ assert.equal(recorded.payload.original_work_id,changed.original_work_id);
+ assert.equal(recorded.payload.original_source_ref,changed.source_ref);
+ assert.equal(recorded.payload.next_required_action,changed.next_action);
+ assert.equal(recorded.parent_event_id,first.latest_event_id);
+ assert.equal(second.original_job_completed,false);
+ assert.equal(second.install_eligible_from_continuity,false);
+ const repeat=await f.callLoop(changed);
+ assert.equal(repeat.latest_event_id,second.latest_event_id);
+ assert.equal(repeat.newly_recorded_events,0);
+ const next={...changed,original_work_id:'work:'+'f'.repeat(32),
+  source_ref:'https://github.com/maloney2323/Reality/pull/999'};
+ const third=await f.callLoop(next);
+ assert.notEqual(third.latest_event_id,second.latest_event_id);
+ assert.equal(third.original_work_id,next.original_work_id);
+ assert.equal(third.original_job_completed,false);
+ assert.equal(orderContinuityHistory(f.events).length,7);
+ assert.equal(f.events.filter(e=>e.payload.signed_maintenance_step==='INDEPENDENT_POSTINSTALL_ACCEPTED').length,1);
+});

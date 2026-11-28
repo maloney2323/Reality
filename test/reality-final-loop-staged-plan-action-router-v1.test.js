@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {classifySignedFinalLoopStagedPlanActions as classify,
+ hasCurrentApprovedChildReviewRoute as canRoute,
+ selectCurrentApprovedChildReviewRoute as selectRoute,
+ selectStagedRegisteredCapabilities as selectCapabilities,
+ projectCanonicalApprovedReviewHandoff as handoff,
  reconcileReviewedRecoveryToFinalLoopSource as reconcile,
  inspectFinalLoopRecoveryContinuation as inspect,
  verifyFinalLoopRecoveryContinuityReadback as observe}
@@ -109,6 +113,9 @@ test('existing signed worker must publish route and keep child execution distinc
  assert.match(approval,/REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED/);
  assert.match(approval,/REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED/);
  assert.match(worker,/REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED/);
+ assert.match(worker,/const freshChildContinuity=await requireFreshFinalLoopContinuity\(\);[\s\S]*?finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions\(freshChildContinuity,freshChildGraph\)/);
+ assert.match(worker,/const stagedReviewCapability=selectStagedRegisteredCapabilities\(\{[\s\S]*?finalLoopChildReview=stagedReviewCapability\?await advanceOneFinalLoopChildReview/);
+ assert.match(worker,/selectedRoutes:stagedPacketCapability.routes/);
 });
 
 
@@ -209,6 +216,36 @@ test('real packet acknowledgement is a pending owner action, not recovery or set
   'FINAL_LOOP_REGISTERED_OWNER_PACKET_HANDLER_NOT_VERIFIED');
  assert.equal(missing.handler_dispatched,false);
 });
+
+test('shared benchmark packet preparation resolves recovery blocker without granting autonomous owner authority',()=>{
+ const r=inspect({
+  candidate:candidate(),
+  operatingLane:{
+   status:'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY',
+   operating_lane:'NORMAL_SIGNED_SHIFT'
+  },
+  approvalRequest:{
+   status:'FINAL_LOOP_CHILD_APPROVAL_GATED_BY_EXACT_OWNER_ACTION',
+   owner_id:owner,shift_id:shift,
+   approvals:[{
+    plan_id:admitted.plan_id,source_ref:admitted.source_ref,
+    status:'FINAL_LOOP_CHILD_EXACT_OWNER_APPROVAL_REQUIRED',
+    packet_id:'77777777-7777-4777-8777-777777777777',
+    proposal_fingerprint:hash('a')
+   }]
+  }
+ });
+ assert.equal(r.status,'FINAL_LOOP_EXACT_OWNER_APPROVAL_PACKET_DURABLY_PREPARED');
+ assert.equal(r.blocker_class,'EXACT_OWNER_AUTHORIZATION_REQUIRED');
+ assert.equal(r.next_governed_action,'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT');
+ assert.equal(r.handler_result_verified,true);
+ assert.equal(r.child_execution_authorized,false);
+ assert.equal(r.recovery_verified,false);
+ assert.equal(r.owner_approval_granted,false);
+ assert.equal(r.automatic_retry_without_new_evidence,false);
+ assert.equal(r.original_job_completed,false);
+});
+
 test('signed worker publishes recovery-to-source disposition separately from outcome receipts',()=>{
  const worker=readFileSync(new URL(
   '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
@@ -256,4 +293,142 @@ test('after-action Continuity readback detects real head revision but cannot sel
    'FINAL_LOOP_RECOVERY_CONTINUITY_NEW_REVISION_ORIGINAL_STILL_OPEN');
   assert.equal(r.recovery_verified,false);
  }
+});
+
+
+test('existing exact approved goal remains connected to reviewed recovery without preparing another approval',()=>{
+ const accepted={...preflight,plans:[{...preflight.plans[0],
+  independent_goal_acceptance_verified:true,owner_goal_acceptance_pending:false,
+  pending_exact_owner_approval:false,owner_approval_claim_window_current:true,
+  owner_approval_expired:false}]};
+ const routes=classify({graph,staged,preflight:accepted});
+ assert.equal(routes.status,'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED');
+ assert.equal(routes.prepared_owner_packet_candidate_count,0);
+ assert.equal(routes.routes[0].existing_owner_goal_acceptance_verified,true);
+ assert.equal(routes.routes[0].owner_action_required,false);
+ assert.equal(routes.routes[0].next_registered_handler,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
+ assert.equal(routes.routes[0].child_execution_authorized,false);
+ assert.equal(canRoute({routes,operatingLane}),true);
+ assert.equal(routes.routes[0].operation_category,'EXECUTION');
+ assert.equal(routes.routes[0].authority_scope,'EXACT_ACCEPTED_READ_ONLY_REVIEW');
+ assert.equal(routes.routes[1].operation_category,'QUALIFICATION');
+ assert.equal(selectRoute({routes,operatingLane}),routes.routes[0]);
+ const second={...routes.routes[0],plan_id:unadmitted.plan_id,source_ref:unadmitted.source_ref,
+  parent_original_work_id:'work:'+'2'.repeat(32)};
+ for(const competing of [second,{...second,child_execution_authorized:true}]){
+  assert.equal(selectRoute({routes:{...routes,routes:[...routes.routes,competing]},operatingLane}),null);
+ }
+ for(const drift of [{operation_category:'RECOVERY'},{authority_scope:'SIGNED_MAINTENANCE_WARRANT'},
+  {source_head_sha:null},{child_execution_authorized:true}]){
+  assert.equal(selectRoute({routes:{...routes,routes:[{...routes.routes[0],...drift},routes.routes[1]]},
+   operatingLane}),null);
+ }
+ const waiting=classify({graph,staged,preflight});
+ assert.equal(waiting.routes[0].operation_category,'AUTHORITY_REQUIRED');
+ assert.equal(waiting.routes[0].authority_scope,'EXACT_OWNER_APPROVAL_PENDING');
+ assert.equal(canRoute({routes,operatingLane:{...operatingLane,status:'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'}}),false);
+ assert.equal(canRoute({routes:{...routes,action_dispatched:true},operatingLane}),false);
+ assert.equal(canRoute({routes:{...routes,routes:[{...routes.routes[0],acceptance_contract_sha256:null}]},operatingLane}),false);
+ assert.equal(canRoute({routes:classify({graph,staged,preflight}),operatingLane}),false);
+ const c=reconcile({graph,stagedActions:routes,
+  continuityClassification:classification,registeredRouting:recoveryRouting});
+ assert.equal(c.status,'FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL');
+ assert.equal(c.original_work_id,work);
+ assert.equal(c.execution_authorized,false);
+ const r=inspect({candidate:c,operatingLane});
+ assert.equal(r.status,'FINAL_LOOP_EXISTING_ACCEPTED_GOAL_REQUIRES_VERIFIED_CHILD_CLAIM');
+ assert.equal(r.owner_action_required,false);
+ assert.equal(r.child_execution_authorized,false);
+ assert.equal(r.original_job_completed,false);
+ for(const change of [{owner_approval_claim_window_current:false},
+  {owner_approval_expired:true},{source_manifest_sha256:hash('0')},
+  {owner_goal_acceptance_pending:true},{pending_exact_owner_approval:true}]){
+  const rejected=classify({graph,staged,preflight:{...accepted,
+   plans:[{...accepted.plans[0],...change}]}});
+  assert.notEqual(rejected.status,'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED');
+  assert.equal(rejected.action_dispatched,false);
+ }
+});
+
+test('canonical approved scope binds exact receipt and five scopes to the shared head, without authority transfer',()=>{
+ const p={...preflight.plans[0],independent_goal_acceptance_verified:true,
+  owner_goal_acceptance_pending:false,pending_exact_owner_approval:false,
+  owner_approval_claim_window_current:true,owner_approval_expired:false};
+ const h={schema:'reality-canonical-approved-review-scope-v1',
+  packet_id:'44444444-4444-4444-8444-444444444444',
+  approval_request_id:'55555555-5555-4555-8555-555555555555',
+  acceptance_event_id:'66666666-6666-4666-8666-666666666666',
+  owner_approval_receipt_sha256:hash('1'),acceptance_event_content_hash:'2'.repeat(64),
+  owner_id:owner,shift_id:shift,plan_id:admitted.plan_id,plan_fingerprint:graph.plan_fingerprint,
+  parent_original_work_id:work,source_ref:admitted.source_ref,source_head_sha:admitted.source_head_sha,
+  source_proof_sha256:hash('3'),source_manifest_sha256:admitted.source_manifest_sha256,
+  acceptance_contract_sha256:p.acceptance_contract_sha256,scope_count:5,
+  scope_fingerprints:Array.from({length:5},(_,i)=>({index:i,scope_sha256:hash(String(i+4))})),
+  effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',canonical_claim_required:true,
+  execution_authorized:false,original_job_completed:false,production_changed:false};
+ const guard={status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+  owner_id:owner,shift_id:shift,continuity_root_id:'77777777-7777-4777-8777-777777777777',
+  continuity_head_sha256:hash('9'),revision:2,read_only:true,
+  execution_authorized:false,original_job_completed:false};
+ const continuity={status:'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING',owner_id:owner,
+  shift_id:shift,continuity_head_sha256:guard.continuity_head_sha256,revision:2,
+  original_job_completed:false,shared_continuity_guard:guard,
+  canonical_continuity_handoff:{...guard,canonical_handoff_verified:true}};
+ const input={graph:{...graph,jobs:graph.jobs.map(j=>j.source_ref===admitted.source_ref?
+  {...j,source_proof_sha256:h.source_proof_sha256}:j)},plan:admitted,
+  approval:{...p,canonical_review_handoff:h},continuity};
+ const result=handoff(input);
+ assert.equal(result.status,'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED');
+ assert.equal(result.scope_count,5);
+ assert.equal(result.canonical_claim_required,true);
+ assert.equal(result.execution_authorized,false);
+ assert.equal(result.original_job_completed,false);
+ for(const drift of [{owner_id:shift},{source_head_sha:'0'.repeat(40)},{effect_type:'PUBLISH'},
+  {execution_authorized:true},{scope_fingerprints:h.scope_fingerprints.slice(1)},
+  {acceptance_contract_sha256:hash('0')},{owner_approval_receipt_sha256:null}]){
+  assert.equal(handoff({...input,approval:{...input.approval,canonical_review_handoff:{...h,...drift}}}),null);
+ }
+ assert.equal(handoff({...input,continuity:{...continuity,revision:3}}),null);
+ assert.equal(handoff({...input,approval:{...input.approval,owner_approval_expired:true}}),null);
+ const routes=classify({graph:input.graph,staged,preflight:{...preflight,plans:[input.approval]},continuity});
+ assert.equal(routes.routes[0].canonical_execution_handoff.status,result.status);
+ assert.equal(routes.routes[1].canonical_execution_handoff,null);
+});
+
+
+test('exact claimed review uses fresh staged route read instead of speculative duplicate',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const start=worker.indexOf("workerStage='EXACT_CLAIMED_EVENT_CAPABILITY_SELECTION'");
+ const end=worker.indexOf('// Existing signed worker performs ONLY independent readback',start);
+ assert.ok(start>=0&&end>start);
+ const route=worker.slice(start,end);
+ assert.match(route,/requireFreshFinalLoopContinuity\(\)[\s\S]*?reality_read_final_loop_pr_source_plans_v1[\s\S]*?reality_read_final_loop_child_approval_preflight_v1[\s\S]*?classifySignedFinalLoopStagedPlanActions\(/);
+ for(const rpc of ['reality_read_final_loop_pr_source_plans_v1','reality_read_final_loop_child_approval_preflight_v1'])
+  assert.equal(route.split(rpc).length-1,1);
+ assert.match(route,/claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes/);
+ assert.match(route,/return res.status\(200\).json/);
+ assert.ok(route.indexOf('return res.status(200).json')>route.indexOf('await selectedEventHandler()'));
+ assert.doesNotMatch(route,/readCurrentFinalLoopStagedActions\(lastFinalLoopContinuity/);
+});
+
+
+test('classified source plans select installed packet capability without granting consent',()=>{
+ const routes=classify({graph,staged,preflight});
+ const key='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET';
+ const input={routes,graph,operatingLane,registeredActionKeys:[key]};
+ const selected=selectCapabilities(input);
+ assert.equal(selected.length,1);
+ assert.equal(selected[0].key,key);
+ assert.equal(selected[0].routes[0].plan_id,admitted.plan_id);
+ assert.equal(selected[0].routes[0].owner_action_required,true);
+ assert.equal(selected[0].routes[0].child_execution_authorized,false);
+ for(const invalid of [
+  {registeredActionKeys:[]},{registeredActionKeys:[key,key]},
+  {graph:{...graph,jobs:[]}},
+  {operatingLane:{...operatingLane,operating_lane:'STAGING_ONLY'}},
+  {routes:{...routes,action_dispatched:true}},
+  {routes:{...routes,routes:[{...routes.routes[0],authority_scope:'EXACT_ACCEPTED_READ_ONLY_REVIEW'}]}},
+  {routes:{...routes,routes:[{...routes.routes[0],child_execution_authorized:true}]}},
+  {routes:{...routes,routes:[routes.routes[0],routes.routes[0]]}}
+ ])assert.deepEqual(selectCapabilities({...input,...invalid}),[]);
 });

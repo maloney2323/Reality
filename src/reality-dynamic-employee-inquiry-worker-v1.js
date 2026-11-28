@@ -44,7 +44,7 @@ export function validateDynamicInquiryOutput(response,claim){
   fail('MODEL_OUTPUT_NOT_GROUNDED_OR_BOUNDED');
  return Object.freeze({...value,model_response_id:response.id});
 }
-export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=null,includeRecentComments=false}={}){
+export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=null,includeRecentComments=false,requireFrozenPrHead=false}={}){
  const match=SOURCE.exec(ref||'');
  if(!match||typeof fetchImpl!=='function')fail('PROVIDER_SOURCE_NOT_SUPPORTED');
  const [,owner,repo,kind,n]=match;
@@ -140,6 +140,7 @@ export async function readFreshEmployeeInquirySource(ref,{fetchImpl=fetch,token=
  return Object.freeze({
   ...evidence,checked_at:checkedAt,
   provider_proof_sha256:hash(JSON.stringify(evidence)),
+  ...(requireFrozenPrHead?{source_head_sha:kind==='pull'&&/^[a-f0-9]{40}$/.test(x.head?.sha||'')?x.head.sha:null}:{}),
   body_truncated:String(x.body||'').length>9000
  });
 }

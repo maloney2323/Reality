@@ -5,6 +5,7 @@ import {runInNewContext} from 'node:vm';
 
 const code=readFileSync(new URL('../reality-chat-existing-shift-status-v1.js',import.meta.url),'utf8');
 const source=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const workspace=readFileSync(new URL('../reality-chat-workspace-v1.js',import.meta.url),'utf8');
 const shiftId='ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce';
 const requestId='e1111111-2222-4333-8444-555555555555';
 const convoId='d1111111-2222-4333-8444-555555555555';
@@ -40,15 +41,16 @@ function instance({storage=new Map(),decisionPresent=false}={}){
   click(){this.events.get('click')?.()}
   scrollIntoView(){}
  }
- const composer=new Element(),thread=new Element();
+ const composer=new Element(),thread=new Element(),workPanel=new Element();
+ workPanel.id='realityChatPanelWork';
  const ready=new Element(),existing=new Element();
  ready.append(composer);
- const elements={realityChatComposer:composer,privateTranscript:thread};
+ const elements={realityChatComposer:composer,privateTranscript:thread,realityChatPanelWork:workPanel};
  if(decisionPresent){existing.hidden=false;
   elements.realityChatMaintenanceNudge=existing}
  const document={readyState:'complete',
   createElement:tag=>new Element(tag),
-  getElementById:id=>elements[id]||thread.children.find(x=>x.id===id)||null,
+  getElementById:id=>elements[id]||workPanel.children.find(x=>x.id===id)||thread.children.find(x=>x.id===id)||null,
   addEventListener(){}};
  const events=new Map();
  const window={sessionStorage:{
@@ -65,15 +67,18 @@ function instance({storage=new Map(),decisionPresent=false}={}){
   AbortSignal,MutationObserver:class{observe(){} disconnect(){}},
   localStorage:{getItem:()=>null,setItem:()=>{}}});
  const flush=async()=>{for(let i=0;i<4;i++)await new Promise(r=>setImmediate(r))};
- return {storage,calls,thread,composer,flush,events};
+ return {storage,calls,thread,workPanel,composer,flush,events};
 }
 test('the real signed shift receipt is never mounted above the composer',async()=>{
  assert.match(source,/reality-chat-existing-shift-status-v1\.js/);
  assert.doesNotMatch(code,/composer\.insertBefore\(box/);
+ assert.match(workspace,/panel\.id='realityChatPanel'\+label/);
+ assert.match(workspace,/\['work','Work'\]/);
  const x=instance();await x.flush();
  assert.equal(x.composer.children.length,0);
- assert.equal(x.thread.children.length,1);
- const box=x.thread.children[0];
+ assert.equal(x.thread.children.length,0,'no historical receipt in the conversation');
+ assert.equal(x.workPanel.children.length,1);
+ const box=x.workPanel.children[0];
  assert.equal(box.id,'realityChatExistingShiftHandoff');
  const close=box.children[0].children[1];
  assert.equal(close.textContent,'×');
@@ -82,6 +87,7 @@ test('the real signed shift receipt is never mounted above the composer',async()
  assert.ok(x.calls.every(r=>r.options.method==='GET'));
  close.click();
  assert.equal(box.hidden,true);
+ assert.equal(x.workPanel.children.length,0);
  assert.equal(x.thread.children.length,0);
  assert.equal(x.storage.get('reality.dismissed.latest.shift.handoff.v1'),requestId);
  assert.ok(x.calls.every(r=>r.options.method==='GET'),'the close button cannot approve or restart work');
@@ -89,15 +95,17 @@ test('the real signed shift receipt is never mounted above the composer',async()
 test('dismissing the status survives a reload while preserving its saved ledger receipt',async()=>{
  const storage=new Map();
  const x=instance({storage});await x.flush();
- x.thread.children[0].children[0].children[1].click();
+ x.workPanel.children[0].children[0].children[1].click();
  const y=instance({storage});await y.flush();
  assert.equal(y.thread.children.length,0);
+ assert.equal(y.workPanel.children.length,0);
  assert.equal(y.composer.children.length,0);
  assert.equal(y.calls.length,1,'receipt source remains independently readable');
 });
 test('the old shift receipt is suppressed when Reality already shows the maintenance decision',async()=>{
  const x=instance({decisionPresent:true});await x.flush();
  assert.equal(x.thread.children.length,0);
+ assert.equal(x.workPanel.children.length,0);
  assert.equal(x.composer.children.length,0);
  assert.equal(x.calls.length,1);
 });

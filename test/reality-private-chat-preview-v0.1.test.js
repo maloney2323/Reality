@@ -51,6 +51,25 @@ function provider(){
      latest_user_request_id:ownerTurns.at(-1).request_id
     }]),{status:200});
    }
+   if(u.pathname==='/rest/v1/rpc/reality_publish_conversational_reply_v1'){
+    const params=JSON.parse(opts.body||'{}');
+    if(opts.headers?.authorization!=='Bearer test-only-preview-service-key')
+     return new Response('{}',{status:403});
+    const matching=messages.find(m=>m.id===params.p_user_message_id&&m.user_id===params.p_user_id&&
+      m.conversation_id===params.p_conversation_id&&m.request_id===params.p_request_id&&m.role==='user');
+    if(!matching||params.p_user_id!==user)return new Response(JSON.stringify({message:'CHAT_CONVERSATION_USER_MESSAGE_NOT_COMMITTED'}),{status:400});
+    const existing=messages.find(m=>m.user_id===user&&m.conversation_id===params.p_conversation_id&&m.request_id===params.p_request_id&&m.role==='assistant');
+    if(existing)return existing.content===params.p_content?
+     new Response(JSON.stringify(existing.id),{status:200}):
+     new Response(JSON.stringify({message:'CHAT_ATOMIC_ASSISTANT_ALREADY_PUBLISHED'}),{status:409});
+    const latest=messages.filter(m=>m.user_id===user&&m.conversation_id===params.p_conversation_id&&m.role==='user').at(-1);
+    if(latest?.request_id!==params.p_request_id)return new Response(JSON.stringify({message:'CHAT_NEWER_USER_MESSAGE_DURING_COGNITION_RETRY_NEW_TURN'}),{status:409});
+    assert.equal(Object.hasOwn(params,'p_expected_goal_revision'),false);
+    const id=crypto.randomUUID();
+    messages.push({id,user_id:user,conversation_id:params.p_conversation_id,
+     request_id:params.p_request_id,role:'assistant',content:params.p_content,created_at:new Date().toISOString()});
+    return new Response(JSON.stringify(id),{status:200});
+   }
    if(u.pathname==='/rest/v1/rpc/reality_publish_assistant_if_goal_current'){
     const params=JSON.parse(opts.body||'{}');
     // Matches the signed-in user's saved request and atomically stores exactly
@@ -184,8 +203,9 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
   assert.doesNotMatch(signed.headers['Set-Cookie'],/access-token-fixture|refresh-token-fixture/);
   const cookie=signed.headers['Set-Cookie'].split(';')[0];
   assert.equal((await call(sessionApi,'GET',null,cookie)).payload.authenticated,true);
+  const firstRequest=crypto.randomUUID();
   const first=await call(chatApi,'POST',{
-   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'First question about the estimate.'},cookie);
+   conversation_id:p.conversation,request_id:firstRequest,message:'First question about the estimate.'},cookie);
   assert.equal(first.status,200,JSON.stringify(first.payload));
   assert.equal(first.payload.answer,'First answer saved.');
   assert.equal(first.payload.continuity.current_answer_persisted,true);
@@ -199,6 +219,15 @@ test('sign in, recover signed-in session, persist two real chat turns, restore h
    conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'What did we ask first?'},cookie);
   assert.equal(second.status,200,JSON.stringify(second.payload));
   assert.match(second.payload.answer,/recall the first question/i);
+  assert.equal(p.messages.length,4);
+  assert.equal(p.calls.filter(x=>x.path==='/rest/v1/rpc/reality_publish_conversational_reply_v1').length,2);
+  assert.equal(p.calls.some(x=>x.path==='/rest/v1/rpc/reality_publish_assistant_if_goal_current'),false);
+  const exact=await call(chatApi,'GET',null,cookie,{conversation_id:p.conversation,request_id:firstRequest,reply_readback:'1'});
+  assert.equal(exact.status,200);
+  assert.equal(exact.payload.messages.length,2);
+  assert.ok(exact.payload.messages.every(m=>m.request_id===firstRequest));
+  const replay=await call(chatApi,'POST',{conversation_id:p.conversation,request_id:firstRequest,message:'First question about the estimate.'},cookie);
+  assert.equal(replay.status,200);assert.equal(replay.payload.replayed,true);
   assert.equal(p.messages.length,4);
   const restored=await call(chatApi,'GET',null,cookie);
   assert.equal(restored.status,200);
@@ -235,22 +264,41 @@ test('production feature remains hidden and disabled',async()=>{
   assert.equal((await call(chatApi,'GET')).status,404);
  });
 });
-test('isolated database or missing reliability never silently downgrades the personal chat to unmonitored mode',async()=>{
+test('consequential work never silently downgrades to unmonitored mode',async()=>{
  await runFixture(async({call,provider:p})=>{
   const login=await call(sessionApi,'POST',{email:'test@example.com',password:'correct'});
   const cookie=login.headers['Set-Cookie'].split(';')[0];
   process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='wrongprojectwrongpr';
   const response=await call(chatApi,'POST',{
-   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Do not lose this context.'},cookie);
+   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Build the employee dashboard now.'},cookie);
   assert.equal(response.status,503);
   assert.match(response.payload.error,/RELIABILITY_BENCHMARK_PROJECT_NOT_ALLOWLISTED/);
   process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='hvkfreoagbrphwghjajw';
   process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED='false';
   const downgraded=await call(chatApi,'POST',{
-   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Do not lose this context.'},cookie);
+   conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Build the employee dashboard now.'},cookie);
   assert.equal(downgraded.status,503);
   assert.equal(downgraded.payload.error,'CHAT_UNIFIED_RELIABILITY_REQUIRED');
   assert.equal(p.messages.length,0);
+  assert.equal(p.calls.some(x=>x.path==='/v1/responses'),false);
+ });
+});
+test('read-only replies remain saved with operational reliability disabled; mismatched storage is explicitly transient',async()=>{
+ await runFixture(async({call,provider:p})=>{
+  const login=await call(sessionApi,'POST',{email:'test@example.com',password:'correct'});
+  const cookie=login.headers['Set-Cookie'].split(';')[0];
+  process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED='false';
+  const saved=await call(chatApi,'POST',{conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Hello'},cookie);
+  assert.equal(saved.status,200,JSON.stringify(saved.payload));
+  assert.equal(saved.payload.continuity.current_answer_persisted,true);
+  assert.equal(saved.payload.execution.external_actions_authorized,false);
+  process.env.REALITY_RELIABILITY_ALLOWED_BENCHMARK_REF='wrongprojectwrongpr';
+  const unsaved=await call(chatApi,'POST',{conversation_id:p.conversation,request_id:crypto.randomUUID(),message:'Thank you'},cookie);
+  assert.equal(unsaved.status,200);
+  assert.equal(unsaved.payload.transient_answer_only,true);
+  assert.equal(unsaved.payload.continuity.current_answer_persisted,false);
+  assert.equal(unsaved.payload.execution.external_actions_authorized,false);
+  assert.equal(p.messages.filter(m=>m.role==='assistant').length,1);
  });
 });
 test('preview UI is wired to authenticated chat routes, not client-side access token storage',async()=>{

@@ -28,8 +28,28 @@ const exact=(r,ownerId,shiftId,workId,sourceRef)=>r&&
  r.original_job_completed===false&&r.installation_authorized===false&&
  r.production_changed===false&&r.new_shift_started===false;
 
+// Both first-time staging and subsequent wakes use the SAME readback.
+// Never create a second packet simply because the next layer is blocked.
+const reconciled=(read,staged)=>safe(
+ staged?'SIGNED_ORIGINAL_LINEAGE_EVIDENCE_STAGED_INDEPENDENTLY_READ':
+  'SIGNED_ORIGINAL_LINEAGE_EXISTING_EVIDENCE_INDEPENDENTLY_READ',{
+  packet_staged:staged,source_reconciled:true,
+  existing_packet_reused:!staged,
+  owner_id:read.owner_id,shift_id:read.shift_id,
+  original_work_id:read.original_work_id,source_ref:read.source_ref,
+  maintenance_id:read.maintenance_id,
+  source_claim_id:read.source_claim_id,packet_id:read.packet_id,
+  evidence_sha256:read.evidence_sha256,
+  continuity_event_id:read.continuity_event_id,
+  continuity_root_id:read.continuity_root_id,
+  continuity_fact:read.continuity_fact,
+  next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
+  missing_evidence:'CANONICAL_CUSTOMER_BUSINESS_ORIGINAL_AND_ACCEPTANCE',
+  executor_invoked:false,independent_final_receipt_verified:false,
+  independent_review_required:true
+ });
 export async function stageVerifiedSignedOriginalLineagePacket({
- db,env=process.env,gate,shiftId,workerRunId,
+ db,env=process.env,gate,shiftId,workerRunId,expectedContinuityRootId=null,
  call=shiftRpc,fetchImpl=fetch
 }={}){
  if(!isSignedMaintenanceOriginalLineageMissing(gate))
@@ -40,8 +60,30 @@ export async function stageVerifiedSignedOriginalLineagePacket({
    !UUID.test(shiftId||'')||!UUID.test(workerRunId||'')||
    gate.shift_id!==shiftId||!UUID.test(gate.owner_id||'')||
    !WORK.test(gate.original_work_id||'')||
+   (expectedContinuityRootId!==null&&!UUID.test(expectedContinuityRootId))||
    typeof call!=='function'||typeof fetchImpl!=='function')
   return safe('SIGNED_ORIGINAL_LINEAGE_TRUSTED_WORKER_REQUIRED',{
+   packet_staged:false,source_reconciled:false});
+ // Resolve the durable read first, including the current canonical root.
+ // A read failure is NOT permission to replay a possibly committed write.
+ let prior;
+ try{prior=await call(db,'reality_read_owner_original_lineage_packet_v1',{
+  p_owner_id:gate.owner_id},{fetchImpl});}
+ catch{return safe('SIGNED_ORIGINAL_LINEAGE_READ_UNAVAILABLE_NO_REPLAY',{
+  packet_staged:false,source_reconciled:false});}
+ if(exact(prior,gate.owner_id,shiftId,gate.original_work_id,gate.source_ref)){
+  if((expectedContinuityRootId!==null&&prior.continuity_root_id!==expectedContinuityRootId)||
+     prior.next_action!=='VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'||
+     prior.independent_review_required!==true)
+   return safe('SIGNED_ORIGINAL_LINEAGE_CANONICAL_ROOT_OR_ACTION_MISMATCH',{
+    packet_staged:false,source_reconciled:false});
+  return reconciled(prior,false);
+ }
+ if(prior?.status!=='NO_SIGNED_ORIGINAL_LINEAGE_PACKET'||
+    prior.owner_id!==gate.owner_id||prior.packet_verified!==false||
+    prior.original_job_completed!==false||prior.installation_authorized!==false||
+    prior.production_changed!==false)
+  return safe('SIGNED_ORIGINAL_LINEAGE_EXISTING_READ_RECONCILIATION_REQUIRED',{
    packet_staged:false,source_reconciled:false});
  // Exactly one existing service-role write, idempotently keyed to the
  // actual source claim. Do not retry if the provider response is lost.
@@ -83,23 +125,14 @@ export async function stageVerifiedSignedOriginalLineagePacket({
    read.packet_id!==result.packet_id||
    read.source_claim_id!==result.source_claim_id||
    read.maintenance_id!==result.maintenance_id||
-   read.evidence_sha256!==result.evidence_sha256)
+   read.evidence_sha256!==result.evidence_sha256||
+   (expectedContinuityRootId!==null&&read.continuity_root_id!==expectedContinuityRootId)||
+   read.next_action!=='VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI'||
+   read.independent_review_required!==true)
   return safe('SIGNED_ORIGINAL_LINEAGE_INDEPENDENT_READ_UNVERIFIED',{
    packet_staged:true,source_reconciled:false,
    packet_id:result.packet_id});
- return safe('SIGNED_ORIGINAL_LINEAGE_EVIDENCE_STAGED_INDEPENDENTLY_READ',{
-  packet_staged:true,source_reconciled:true,
-  original_work_id:gate.original_work_id,source_ref:gate.source_ref,
-  source_claim_id:read.source_claim_id,packet_id:read.packet_id,
-  evidence_sha256:read.evidence_sha256,
-  continuity_event_id:read.continuity_event_id,
-  continuity_root_id:read.continuity_root_id,
-  continuity_fact:read.continuity_fact,
-  next_action:'VERIFY_CANONICAL_OWNER_BUSINESS_WORK_LINEAGE_BEFORE_CI',
-  missing_evidence:'CANONICAL_CUSTOMER_BUSINESS_ORIGINAL_AND_ACCEPTANCE',
-  executor_invoked:false,independent_final_receipt_verified:false,
-  independent_review_required:true
- });
+ return reconciled(read,true);
 }
 export function verifyOwnerOriginalLineagePacket(value,ownerId,shiftId){
  if(value?.status==='NO_SIGNED_ORIGINAL_LINEAGE_PACKET'&&

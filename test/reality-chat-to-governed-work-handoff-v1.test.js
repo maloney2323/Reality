@@ -50,7 +50,7 @@ test('real signed worker automatically qualifies saved Chat turn under current o
   db,env,
   callRpc:async(db,name,args)=>{
    if(name==='reality_claim_chat_work_for_shift_v1'){work++;return claim}
-   if(name==='reality_read_current_shift_execution_graph_v1')return graph;
+   if(name==='reality_read_owner_shift_execution_graph_v1'){assert.deepEqual(args,{p_owner_id:owner,p_shift_id:shift});return graph;}
    if(name==='reality_record_chat_work_diagnosis_v1'){
     records++;
     assert.equal(args.p_message_id,messageId);
@@ -116,7 +116,7 @@ test('existing exact owner maintenance Chat is admitted for model advice only, n
     return {status:'NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT'};
    if(name==='reality_claim_signed_maintenance_chat_investigation_v1')
     return {...claim,investigation_only:true};
-   if(name==='reality_read_current_shift_execution_graph_v1')return graph;
+   if(name==='reality_read_owner_shift_execution_graph_v1'){assert.deepEqual(args,{p_owner_id:owner,p_shift_id:shift});return graph;}
    if(name==='reality_record_chat_work_diagnosis_v1'){
     diagnoses++;
     assert.equal(args.p_message_id,messageId);
@@ -166,9 +166,9 @@ test('model cannot smuggle an unapproved source, new issue or installation',asyn
  let accepted=0,failed=0;
  const result=await investigateAuthenticatedChatUnderExistingShift({
   db,env,
-  callRpc:async(_,name)=>{
+  callRpc:async(_,name,args)=>{
    if(name==='reality_claim_chat_work_for_shift_v1')return claim;
-   if(name==='reality_read_current_shift_execution_graph_v1')return graph;
+   if(name==='reality_read_owner_shift_execution_graph_v1'){assert.deepEqual(args,{p_owner_id:owner,p_shift_id:shift});return graph;}
    if(name==='reality_fail_chat_work_claim_v1'){
     failed++;return {status:'CHAT_WORK_FAILURE_DURABLY_RECORDED'}
    }
@@ -292,4 +292,35 @@ test('saved Chat status projects real source-linked draft, failed independent CI
  assert.match(html,/a\.rel='noopener noreferrer'/);
  assert.doesNotMatch(sql,/insert into reality_internal\.riley_unattended_repair_originals_v1/);
  assert.doesNotMatch(sql,/update reality_internal\.governed_employee_shifts_v1/);
+});
+
+test('foreign shift graph cannot authorize a model call or select any source',async()=>{
+ let model=0,failed=0;
+ const result=await investigateAuthenticatedChatUnderExistingShift({db,env,
+  callRpc:async(_,name,args)=>{
+   if(name==='reality_claim_chat_work_for_shift_v1')return claim;
+   if(name==='reality_read_owner_shift_execution_graph_v1'){
+    assert.deepEqual(args,{p_owner_id:owner,p_shift_id:shift});return {...graph,shift_id:uuid(99)};}
+   if(name==='reality_fail_chat_work_claim_v1'){failed++;return {status:'CHAT_WORK_FAILURE_DURABLY_RECORDED'};}
+   throw Error('UNAUTHORIZED_RPC');
+  },fetchImpl:async()=>{model++;throw Error('FORBIDDEN');}});
+ assert.equal(result.reason,'OWNER_SHIFT_GRAPH_AND_CLAIM_DO_NOT_MATCH');
+ assert.equal(result.execution_authorized,false);assert.equal(model,0);assert.equal(failed,1);
+});
+
+test('replacement maintenance allocator accepts normal saved owner language but retains frozen scope and invoker-only lease',()=>{
+ const sql=readFileSync(new URL('../sql/reality-maintenance-chat-operational-eligibility-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/current_user <> 'service_role'/);
+ assert.match(sql,/i.created_at>=sh.authorized_at/);
+ assert.match(sql,/i.message_sha256=pg_catalog.encode/);
+ assert.match(sql,/incident.independent_review_receipt_sha256=/);
+ assert.match(sql,/incident.production_changed IS FALSE/);
+ assert.match(sql,/other.shift_id<>sh.shift_id/);
+ assert.match(sql,/FOR UPDATE OF i SKIP LOCKED/);
+ assert.match(sql,/'investigation_only',true/);
+ assert.match(sql,/'execution_authorized',false/);
+ assert.doesNotMatch(sql,/strpos\(m.content,sh.shift_id/);
+ assert.doesNotMatch(sql,/m.content ~\*/);
+ assert.doesNotMatch(sql,/\bSECURITY DEFINER\b/i);
+ assert.doesNotMatch(sql,/\bUPDATE reality_internal[.]governed_employee_shifts_v1\b/i);
 });

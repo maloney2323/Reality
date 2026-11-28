@@ -1,7 +1,11 @@
 // Trusted service-side Supabase/Vercel adapters for the independent release
 // control plane. No LLM callbacks, browser credentials, arbitrary endpoints,
 // automatic alias retries or owner-approval fabrication.
+import {assertRealityUnifiedShiftGraph} from './reality-shift-unified-execution-controller-v1.js';
+import {qualifiedWorkerRuntime,matchesWorkerReleaseAuthority} from './reality-signed-worker-capability-delivery-v1.js';
+import {verifySharedFinalLoopContinuityGuard} from './reality-final-loop-signed-worker-bridge-v1.js';
 const SHA=/^[a-f0-9]{40}$/;
+const HASH=/^sha256:[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const BRANCH=/^[A-Za-z0-9][A-Za-z0-9/_-]{3,145}$/;
 const HOST=/^[a-z0-9-]{6,145}\.vercel\.app$/;
@@ -17,10 +21,8 @@ const projectRef=url=>{
    !u.search&&!u.hash?m?.[1]??null:null;
  }catch{return null}
 };
-function validEnv(env,db){
+function validObservationEnv(env,db){
  return env.VERCEL_ENV==='preview'&&
-  env.REALITY_GOVERNED_RELEASE_SWITCH_TRIGGER_ENABLED==='true'&&
-  env.REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED==='true'&&
   db?.strictSecrets===true&&
   typeof db.secretKey==='string'&&db.secretKey.length>=20&&
   db.project===projectRef(db.url)&&
@@ -33,36 +35,233 @@ function validEnv(env,db){
   Number.isSafeInteger(Number(env.REALITY_SIGNED_WORKER_CRON_JOB_ID))&&
   Number(env.REALITY_SIGNED_WORKER_CRON_JOB_ID)>0&&
   HOST.test(env.REALITY_SIGNED_WORKER_STABLE_ALIAS||'')&&
-  !env.REALITY_SIGNED_WORKER_STABLE_ALIAS.startsWith('reality-git-')&&
+  !env.REALITY_SIGNED_WORKER_STABLE_ALIAS.startsWith('reality-git-');
+}
+function validEnv(env,db){
+ return validObservationEnv(env,db)&&
+  env.REALITY_GOVERNED_RELEASE_SWITCH_TRIGGER_ENABLED==='true'&&
+  env.REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED==='true'&&
   ID.test(env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||'')&&
   SHA.test(env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||'')&&
   BRANCH.test(env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||'')&&
   !env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF.includes('..');
 }
-async function requestJson(fetchImpl,url,init,timeout=7000){
+// Bounded provider evidence, never provider body, raw exception, URL or headers.
+const httpCodes=new WeakMap();
+const operations=new Set(['VERCEL_ALIAS_READ','VERCEL_DEPLOYMENT_READ','VERCEL_ALIAS_ASSIGN',
+ 'SUPABASE_BRANCH_READ','GITHUB_PUBLIC_REPOSITORY_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ',
+ 'VERCEL_CANDIDATE_READ','VERCEL_ISOLATED_PEER_READ',
+ 'reality_read_governed_worker_release_schedule_v1','reality_read_current_shift_execution_graph_v1',
+ 'reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1',
+ 'reality_record_governed_provider_checkpoint_v1','reality_read_governed_provider_checkpoint_v1',
+ 'reality_claim_governed_signed_worker_release_v1','reality_read_governed_signed_worker_release_approval_v1',
+ 'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
+const identityFields=new Set(['alias','project_id','deployment_id','repository','release_sha','release_ref',
+ 'ready_state','preview_target','schedule_contract','branch_ancestry','ci_identity','ci_result','peer_host']);
+const writeOps=new Set(['VERCEL_ALIAS_ASSIGN','reality_record_governed_provider_checkpoint_v1','reality_claim_governed_signed_worker_release_v1',
+ 'reality_prepare_governed_signed_worker_release_v1','reality_record_review_release_alias_observation_v1']);
+// Vercel GET /v13/deployments documents readyState; state is the
+// legacy compatible shape. Never accept missing or contradictory evidence.
+export function verifiedVercelDeploymentReadiness(deployment){
+ if(!deployment||typeof deployment!=='object'||Array.isArray(deployment))return null;
+ const modern=Object.hasOwn(deployment,'readyState'),legacy=Object.hasOwn(deployment,'state');
+ if(!modern&&!legacy)return null;
+ if(modern&&legacy&&deployment.readyState!==deployment.state)return null;
+ const observed=modern?deployment.readyState:deployment.state;
+ return ['READY','BUILDING','ERROR','QUEUED','INITIALIZING','CANCELED'].includes(observed)?observed:null;
+}
+const numericHttp=n=>Number.isInteger(n)&&n>=100&&n<=599?n:null;
+export const observedReleaseHttpStatus=value=>value&&typeof value==='object'?httpCodes.get(value)??null:null;
+// Classify only bounded facts supplied by the direct provider response.
+// A 401 cannot distinguish expiration, revocation, rotation or bad credentials.
+// No token material, raw response headers or authorization URL leave this boundary.
+function githubReadRecovery(operation,response,authenticated){
+ if(!['GITHUB_PUBLIC_REPOSITORY_READ','GITHUB_LIFECYCLE_CI_READ','GITHUB_GATEWAY_CI_READ'].includes(operation))return null;
+ const header=name=>{try{return response?.headers?.get?.(name)??null}catch{return null}};
+ const status=numericHttp(response?.status);
+ const sso=header('x-github-sso');
+ const rate=header('x-ratelimit-remaining');
+ const retry=header('retry-after');
+ let cause='PROVIDER_READ_CAUSE_UNVERIFIED',route='QUARANTINE_AND_INVESTIGATE';
+ let signal='HTTP_STATUS',eligibility='NOT_ESTABLISHED';
+ if(status===403&&typeof sso==='string'&&/^required(?:;|$)/i.test(sso)){
+  cause='ORGANIZATION_SSO_AUTHORIZATION_REQUIRED';route='REQUEST_EXACT_REAUTHORIZATION';
+  signal='HTTP_STATUS_AND_SSO_REQUIRED_HEADER';eligibility='REAUTHORIZATION_ONLY';
+ }else if(status===429||(status===403&&(rate==='0'||(typeof retry==='string'&&/^\d{1,8}$/.test(retry))))){
+  cause='PROVIDER_RATE_LIMIT_OBSERVED';route='SUSPEND_UNTIL_PROVIDER_RECHECK';
+  signal=status===429?'HTTP_STATUS':rate==='0'?'HTTP_STATUS_AND_RATE_LIMIT_REMAINING_ZERO':'HTTP_STATUS_AND_RETRY_AFTER_PRESENT';
+  eligibility='NO_CREDENTIAL_REPLACEMENT';
+ }else if(status===401&&authenticated){
+  cause='BOUND_CREDENTIAL_REJECTED_CAUSE_UNVERIFIED';route='VERIFY_ISSUER_SCOPE_AND_RENEWAL_AUTHORITY';
+  eligibility='REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY';
+ }else if(status===401){
+  cause='ANONYMOUS_READ_REJECTED';route='VERIFY_EXPLICIT_READ_POLICY';eligibility='NO_CREDENTIAL_REPLACEMENT';
+ }else if(status===403||status===404){
+  cause='RESOURCE_ACCESS_OR_SCOPE_UNVERIFIED';route='VERIFY_REPOSITORY_PERMISSION_AND_SSO';eligibility='SCOPE_OR_AUTHORITY_REVIEW_ONLY';
+ }else if(status!==null&&status>=500){
+  cause='PROVIDER_SERVER_FAILURE';route='SUSPEND_UNTIL_PROVIDER_RECHECK';eligibility='NO_CREDENTIAL_REPLACEMENT';
+ }
+ return Object.freeze({policy_id:'GOVERNED_GITHUB_READ_RECOVERY_V1',cause,route,
+  credential_mode:authenticated?'AUTHENTICATED':'PUBLIC_ONLY',
+  renewal_eligibility:eligibility,evidence_signal:signal,
+  renewal_authority_verified:false,renewal_permitted:false,
+  automatic_retry_permitted:false,preserve_current_binding:true,
+  require_independent_shadow_lease_verification:true,
+  effect_replay_permitted:false,raw_secret_material_recorded:false});
+}
+// One recovery progression, consumed only inside the existing release controller.
+// Inputs are internal, independently read receipts, NOT client/model assertions.
+// This read model never creates authority, a lease, a pointer, a claim or a receipt.
+export function decideProviderRecoveryContinuation({checkpoint,authority,lease,verification,activation,trigger,settlement,now=Date.now()}={}){
+ const safe=(status,next,more={})=>Object.freeze({status,next_governed_action:next,...more,
+  read_only:true,credential_mutation_authorized:false,renewal_executed:false,
+  execution_authorized:false,dispatch_permitted:false,original_job_completed:false,
+  production_changed:false,new_shift_started:false});
+ if(checkpoint?.status!=='PROVIDER_CHECKPOINT_DURABLE_READBACK'||checkpoint.current_revision_matches!==true||
+  !UUID.test(checkpoint.checkpoint_id||'')||!HASH.test(checkpoint.receipt_sha256||'')||
+  !HASH.test(checkpoint.idempotency_key||'')||!/^work:[a-f0-9]{32}$/.test(checkpoint.original_work_id||'')||
+  !UUID.test(checkpoint.owner_id||'')||!UUID.test(checkpoint.shift_id||'')||!UUID.test(checkpoint.continuity_root_id||'')||
+  !HASH.test(checkpoint.continuity_head_sha256||'')||!Number.isSafeInteger(checkpoint.continuity_revision)||
+  checkpoint.continuity_revision<1||!/^GITHUB_RELEASE_CI_READ:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(checkpoint.connection_id||'')||
+  !Number.isSafeInteger(now)||now<=0)
+  return safe('PROVIDER_RECOVERY_CHECKPOINT_NOT_CURRENT','RECONCILE_EXISTING_CHECKPOINT_WITHOUT_REPLAY');
+ const scope={checkpoint_id:checkpoint.checkpoint_id,checkpoint_receipt_sha256:checkpoint.receipt_sha256,
+  idempotency_key:checkpoint.idempotency_key,connection_id:checkpoint.connection_id,
+  owner_id:checkpoint.owner_id,shift_id:checkpoint.shift_id,original_work_id:checkpoint.original_work_id,
+  continuity_root_id:checkpoint.continuity_root_id,continuity_revision:checkpoint.continuity_revision,
+  continuity_head_sha256:checkpoint.continuity_head_sha256};
+ const stop=(status,next)=>safe(status,next,scope);
+ const same=r=>r&&Object.keys(scope).every(k=>r[k]===scope[k]);
+ const proof=(r,source)=>same(r)&&r.source===source&&r.independently_verified===true&&HASH.test(r.receipt_sha256||'')&&
+  Number.isSafeInteger(r.observed_at_ms)&&r.observed_at_ms<=now&&now-r.observed_at_ms<=300000;
+ if(checkpoint.renewal_eligibility!=='REQUIRES_VERIFIED_ISSUER_CAUSE_AND_AUTHORITY')
+  return stop('PROVIDER_RECOVERY_NON_RENEWABLE_ROUTE','PRESERVE_CHECKPOINT_AND_FOLLOW_CLASSIFIED_POLICY');
+ if(!proof(authority,'INDEPENDENT_PROVIDER_RENEWAL_AUTHORITY_READBACK')||
+  authority.cause!=='EXPIRED_RENEWABLE_CREDENTIAL'||authority.issuer_kind!=='GITHUB_APP_INSTALLATION'||
+  !/^[1-9][0-9]{0,15}$/.test(String(authority.installation_id??''))||
+  authority.scope!=='EXACT_REPOSITORY_ACTIONS_READ_ONLY'||authority.scope_escalation!==false||
+  authority.provider_managed_binding_verified!==true||authority.atomic_pointer_capability_verified!==true||
+  authority.obligation_freeze_verified!==true||authority.recovery_budget_preserved!==true||
+  authority.circuit_state!=='CLOSED'||authority.renewal_attempt_available!==true||
+  !HASH.test(authority.active_binding_id_sha256||''))
+  return stop('PROVIDER_RECOVERY_EXACT_AUTHORITY_REQUIRED','QUALIFY_EXISTING_PROVIDER_NATIVE_RENEWAL_AND_ATOMIC_BINDING');
+ if(!proof(lease,'INDEPENDENT_PROVIDER_SHADOW_LEASE_READBACK')||
+  lease.authority_receipt_sha256!==authority.receipt_sha256||lease.scope!==authority.scope||
+  lease.installation_id!==authority.installation_id||lease.shadow_only!==true||
+  lease.active_binding_id_sha256!==authority.active_binding_id_sha256||
+  !UUID.test(lease.lease_id||'')||!HASH.test(lease.shadow_binding_id_sha256||'')||
+  lease.shadow_binding_id_sha256===authority.active_binding_id_sha256||
+  !Number.isSafeInteger(lease.expires_at_ms)||lease.expires_at_ms<=now||
+  lease.expires_at_ms-lease.observed_at_ms>600000)
+  return stop('PROVIDER_RECOVERY_SHADOW_LEASE_REQUIRED','QUALIFY_SHORT_LIVED_SHADOW_LEASE_UNDER_EXISTING_AUTHORITY');
+ if(!proof(verification,'INDEPENDENT_PROVIDER_SHADOW_VERIFIER_READBACK')||
+  verification.lease_id!==lease.lease_id||verification.lease_receipt_sha256!==lease.receipt_sha256||
+  verification.shadow_binding_id_sha256!==lease.shadow_binding_id_sha256||
+  verification.observed_at_ms<lease.observed_at_ms||verification.observed_at_ms>=lease.expires_at_ms||
+  verification.exact_repository_and_ci_access_verified!==true||verification.no_write_scope_verified!==true||
+  !UUID.test(verification.verifier_run_id||'')||!UUID.test(lease.issuer_run_id||'')||
+  verification.verifier_run_id===lease.issuer_run_id)
+  return stop('PROVIDER_RECOVERY_INDEPENDENT_VERIFICATION_REQUIRED','VERIFY_SHADOW_BINDING_WITH_EXISTING_EXACT_PROVIDER_VERIFIER');
+ if(!proof(activation,'INDEPENDENT_PROVIDER_ACTIVE_BINDING_READBACK')||
+  activation.lease_id!==lease.lease_id||activation.verification_receipt_sha256!==verification.receipt_sha256||
+  activation.previous_binding_id_sha256!==authority.active_binding_id_sha256||
+  activation.active_binding_id_sha256!==lease.shadow_binding_id_sha256||
+  activation.atomic_compare_and_swap_verified!==true||activation.observed_at_ms<verification.observed_at_ms||
+  activation.observed_at_ms>=lease.expires_at_ms)
+  return stop('PROVIDER_RECOVERY_ATOMIC_ACTIVATION_REQUIRED','RECONCILE_VERIFIED_SHADOW_POINTER_WITHOUT_REPLAY');
+ if(!proof(trigger,'INDEPENDENT_EXISTING_GOVERNED_TRIGGER_READBACK')||
+  trigger.activation_receipt_sha256!==activation.receipt_sha256||
+  trigger.observed_at_ms<activation.observed_at_ms||trigger.observed_at_ms>=lease.expires_at_ms||
+  trigger.atomic_claim_verified!==true||trigger.same_original_obligation!==true||
+  trigger.recovery_budget_preserved!==true||!UUID.test(trigger.claim_id||''))
+  return stop('PROVIDER_RECOVERY_EXISTING_TRIGGER_CLAIM_REQUIRED','QUALIFY_EXISTING_ATOMIC_RESUME_CLAIM_NO_REPLAY');
+ if(!proof(settlement,'INDEPENDENT_CONTINUITY_RECOVERY_RECONCILIATION')||
+  settlement.trigger_receipt_sha256!==trigger.receipt_sha256||settlement.claim_id!==trigger.claim_id||
+  settlement.observed_at_ms<trigger.observed_at_ms||settlement.lifecycle_reconciled!==true||
+  settlement.same_original_continuation_observed!==true||settlement.duplicate_effect_absent!==true||
+  settlement.original_job_completed!==false)
+  return stop('PROVIDER_RECOVERY_RECONCILIATION_REQUIRED','READ_EXISTING_LEDGER_AND_VERIFIER_NO_DUPLICATE_CLAIM');
+ return stop('PROVIDER_RECOVERY_CONTINUATION_RECEIPTS_RECONCILED','VERIFY_ORIGINAL_BUSINESS_OUTCOME_SEPARATELY');
+}
+class ReleaseProviderError extends Error{
+ constructor(code,operation,kind,httpStatus=null,mismatches=[],recovery=null){
+  super(code);
+  const op=operations.has(operation)?operation:'UNKNOWN_RELEASE_OPERATION';
+  const effect=writeOps.has(op);
+  const status=numericHttp(httpStatus);
+  const next=effect?'RECONCILE_EXACT_EFFECT_WITHOUT_REPLAY':
+   kind==='AUTHENTICATION_REJECTED'?'VERIFY_BOUND_PROVIDER_CREDENTIAL':
+   kind==='ACCESS_DENIED'?'VERIFY_PROVIDER_TOKEN_SCOPE_AND_RESOURCE_ACCESS':
+   kind==='RESOURCE_NOT_FOUND_OR_HIDDEN'?'VERIFY_RESOURCE_ID_AND_PROVIDER_ACCESS':
+   kind==='RATE_LIMITED'?'WAIT_FOR_PROVIDER_RATE_LIMIT_RESET':
+   kind==='IDENTITY_MISMATCH'?'RECONCILE_EXPECTED_PROVIDER_IDENTITY':
+   kind==='INVALID_RESPONSE'?'VERIFY_PROVIDER_RESPONSE_CONTRACT':
+   'RECHECK_PROVIDER_READ_CONNECTIVITY';
+  this.receipt=Object.freeze({operation:op,provider:op.startsWith('VERCEL_')?'VERCEL':
+   op.startsWith('GITHUB_')?'GITHUB':op==='UNKNOWN_RELEASE_OPERATION'?'UNKNOWN':'SUPABASE',
+   classification:kind,http_status:status,
+   credential_rejected:kind==='AUTHENTICATION_REJECTED',
+   access_denied:kind==='ACCESS_DENIED',
+   identity_matches:kind==='IDENTITY_MISMATCH'?false:null,
+   mismatched_fields:Object.freeze(mismatches.filter(f=>identityFields.has(f))),
+   next_governed_action:next,automatic_replay_permitted:false,
+   effect_reconciliation_required:effect,credential_values_exposed:false,
+   ...(recovery&&!effect?{connection_recovery:recovery}:{})});
+ }
+}
+export function releaseFailureReceipt(error){
+ return error instanceof ReleaseProviderError?error.receipt:null;
+}
+export function releaseIdentityFailure(code,operation,value,fields){
+ return new ReleaseProviderError(code,operation,'IDENTITY_MISMATCH',observedReleaseHttpStatus(value),fields);
+}
+export async function requestReleaseProviderJson(fetchImpl,url,init,operation,timeout=7000){
  const controller=new AbortController();
  const t=setTimeout(()=>controller.abort(),timeout);
+ let status=null;
  try{
-  const response=await fetchImpl(url,{
-   ...init,signal:controller.signal,redirect:'error',
-   cache:'no-store'
-  });
-  if(!response?.ok)throw Error('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK');
-  const data=await response.json();
-  if(!data||typeof data!=='object'||Array.isArray(data))
-   throw Error('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID');
+  const response=await fetchImpl(url,{...init,signal:controller.signal,redirect:'error',cache:'no-store'});
+  status=numericHttp(response?.status);
+  if(!response?.ok){
+   const kind=status===401?'AUTHENTICATION_REJECTED':status===403?'ACCESS_DENIED':
+    status===404?'RESOURCE_NOT_FOUND_OR_HIDDEN':status===429?'RATE_LIMITED':
+    status!==null&&status>=500?'PROVIDER_SERVER_ERROR':'HTTP_REQUEST_REJECTED';
+   const authenticated=typeof init?.headers?.Authorization==='string'||typeof init?.headers?.authorization==='string';
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_REQUEST_NOT_OK',operation,kind,status,[],
+    githubReadRecovery(operation,response,authenticated));
+  }
+  let data;
+  try{data=await response.json()}catch{
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID',operation,'INVALID_RESPONSE',status);
+  }
+  if(!data||typeof data!=='object')
+   throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID',operation,'INVALID_RESPONSE',status);
+  httpCodes.set(data,status);
   return data;
+ }catch(error){
+  if(error instanceof ReleaseProviderError)throw error;
+  throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_READ_OR_EFFECT_UNAVAILABLE',operation,
+   controller.signal.aborted||error?.name==='AbortError'||error?.name==='TimeoutError'?'TIMEOUT':'NETWORK_OR_TRANSPORT_ERROR',status);
  }finally{clearTimeout(t)}
 }
 export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
- env=process.env,db,fetchImpl=fetch
+ env=process.env,db,fetchImpl=fetch,inspectionOnly=false
 }={}){
- if(typeof fetchImpl!=='function'||!validEnv(env,db))
+ if(typeof fetchImpl!=='function'||!(inspectionOnly===true?validObservationEnv(env,db):validEnv(env,db)))
   return Object.freeze({
    status:'RELEASE_CONTROL_TRUSTED_PROVIDER_CONFIG_NOT_READY',
    ready:false,read_only:true,owner_approval_granted:false,
    provider_assignment_attempted:false
   });
+ let lastFailure=null;
+ const fail=error=>{lastFailure=releaseFailureReceipt(error);throw error;};
+ const requestJson=async(fetcher,url,init,operation)=>{
+  try{
+   const data=await requestReleaseProviderJson(fetcher,url,init,operation);
+   if(Array.isArray(data))throw new ReleaseProviderError('RELEASE_CONTROL_PROVIDER_RESPONSE_INVALID',operation,'INVALID_RESPONSE',observedReleaseHttpStatus(data));
+   return data;
+  }catch(error){return fail(error)}
+ };
  const team=encodeURIComponent(env.REALITY_VERIFIED_VERCEL_TEAM_ID);
  const api='https://api.vercel.com';
  const providerHeaders={
@@ -75,40 +274,46 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
  };
  const serviceRpc=async(name,payload)=>{
   // Static allowlist: never put caller input into an RPC pathname.
-  if(!['reality_read_governed_worker_release_schedule_v1',
+  const readRpcs=['reality_read_governed_worker_release_schedule_v1',
+   'reality_read_current_shift_execution_graph_v1','reality_read_current_final_loop_proof_envelope_v1','reality_read_final_loop_shared_continuity_guard_v1'];
+  if(inspectionOnly===true&&!readRpcs.includes(name))throw Error('RELEASE_INSPECTION_MUTATION_FORBIDDEN');
+  if(![...readRpcs,'reality_record_governed_provider_checkpoint_v1','reality_read_governed_provider_checkpoint_v1',
     'reality_claim_governed_signed_worker_release_v1',
-    'reality_read_governed_signed_worker_release_approval_v1'].includes(name))
+    'reality_read_governed_signed_worker_release_approval_v1',
+    'reality_prepare_governed_signed_worker_release_v1',
+    'reality_record_review_release_alias_observation_v1'].includes(name))
    throw Error('RELEASE_CONTROL_RPC_NOT_ALLOWLISTED');
   return requestJson(fetchImpl,db.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{
    method:'POST',headers:dbHeaders,body:JSON.stringify(payload)
-  });
+  },name);
  };
  const deployment=async id=>{
   if(!ID.test(id||''))throw Error('RELEASE_DEPLOYMENT_ID_UNVERIFIED');
   const d=await requestJson(fetchImpl,
    api+'/v13/deployments/'+encodeURIComponent(id)+'?teamId='+team,
-   {method:'GET',headers:providerHeaders});
+   {method:'GET',headers:providerHeaders},'VERCEL_DEPLOYMENT_READ');
   const info=d.deployment??d;
   const expectedRepo=env.REALITY_VERIFIED_GITHUB_REPOSITORY.split('/');
-  if(info.id!==id||
-    (info.project?.id??info.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
-    info.meta?.githubOrg!==expectedRepo[0]||
-    info.meta?.githubRepo!==expectedRepo[1]||
-    !SHA.test(info.meta?.githubCommitSha||'')||
-    !BRANCH.test(info.meta?.githubCommitRef||'')||
-    info.state!=='READY'||info.target==='production')
-   throw Error('RELEASE_PROVIDER_PROJECT_OR_COMMIT_UNVERIFIED');
+  const mismatches=[
+   ...(info.id!==id?['deployment_id']:[]),
+   ...((info.project?.id??info.projectId)!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),
+   ...(info.meta?.githubOrg!==expectedRepo[0]||info.meta?.githubRepo!==expectedRepo[1]?['repository']:[]),
+   ...(!SHA.test(info.meta?.githubCommitSha||'')?['release_sha']:[]),
+   ...(!BRANCH.test(info.meta?.githubCommitRef||'')?['release_ref']:[]),
+   ...(verifiedVercelDeploymentReadiness(info)!=='READY'?['ready_state']:[]),
+   ...(info.target==='production'?['preview_target']:[])];
+  if(mismatches.length)fail(releaseIdentityFailure('RELEASE_PROVIDER_PROJECT_OR_COMMIT_UNVERIFIED','VERCEL_DEPLOYMENT_READ',d,mismatches));
   return info;
  };
  async function observeAlias(host){
   if(!HOST.test(host||''))throw Error('RELEASE_ALIAS_HOST_UNVERIFIED');
   const a=await requestJson(fetchImpl,
    api+'/v4/aliases/'+encodeURIComponent(host)+'?teamId='+team,
-   {method:'GET',headers:providerHeaders});
-  if(a.alias!==host||
-    a.projectId!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID||
-    !ID.test(a.deploymentId||''))
-   throw Error('RELEASE_ALIAS_PROJECT_BINDING_UNVERIFIED');
+   {method:'GET',headers:providerHeaders},'VERCEL_ALIAS_READ');
+  const mismatches=[...(a.alias!==host?['alias']:[]),
+   ...(a.projectId!==env.REALITY_VERIFIED_VERCEL_PROJECT_ID?['project_id']:[]),
+   ...(!ID.test(a.deploymentId||'')?['deployment_id']:[])];
+  if(mismatches.length)fail(releaseIdentityFailure('RELEASE_ALIAS_PROJECT_BINDING_UNVERIFIED','VERCEL_ALIAS_READ',a,mismatches));
   const d=await deployment(a.deploymentId);
   return Object.freeze({
    provider:'VERCEL',independently_observed:true,
@@ -128,7 +333,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    info.endpoint_path!==ROUTE||!HOST.test(info.host||'')||
    typeof info.schedule!=='string'||
    info.credential_values_exposed!==false)
-   throw Error('RELEASE_SCHEDULE_INDEPENDENT_DB_READBACK_UNVERIFIED');
+   fail(releaseIdentityFailure('RELEASE_SCHEDULE_INDEPENDENT_DB_READBACK_UNVERIFIED','reality_read_governed_worker_release_schedule_v1',info,['schedule_contract']));
   // A parsed DB hostname is not sufficient: verify the actual provider
   // alias resolves to the configured project and a READY preview commit.
   const alias=await observeAlias(info.host);
@@ -144,6 +349,96 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    dedicated_stable_release_alias:
     info.host===env.REALITY_SIGNED_WORKER_STABLE_ALIAS
   });
+ }
+ // Observe the actual authoritative shift and scheduler, even when no
+ // eligible target or release authority exists. No approval/claim/provider write.
+ async function readDirection({ownerId,shiftId,runningReleaseSha=null}={}){
+  const safe=(status,extra={})=>Object.freeze({status,read_only:true,
+   release_activated:false,owner_approval_granted:false,original_job_completed:false,
+   production_changed:false,provider_assignment_attempted:false,...extra});
+  if(!UUID.test(ownerId||'')||!UUID.test(shiftId||'')||
+   db.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF||
+   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
+   ownerId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||
+   shiftId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID)
+   return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_SCOPE_REQUIRED');
+  const rawGraph=await serviceRpc('reality_read_current_shift_execution_graph_v1',{});
+  let graph;
+  try{graph=assertRealityUnifiedShiftGraph(rawGraph,{expectedShiftId:shiftId})}
+  catch{return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_NOT_VERIFIED')}
+  if(graph.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||graph.owner_id!==ownerId||graph.shift_id!==shiftId)
+   return safe('GOVERNED_RELEASE_AUTHORITATIVE_SHIFT_NOT_VERIFIED');
+  const p=await serviceRpc('reality_read_current_final_loop_proof_envelope_v1',{p_shift_id:shiftId});
+  if(p?.schema!=='reality-final-loop-canonical-proof-readback-v1'||
+   p.status!=='FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING'||
+   p.read_only!==true||p.independent_owner_scope_verified!==true||
+   p.owner_acceptance_verified!==false||p.execution_authorized!==false||
+   p.installation_authorized!==false||p.original_job_completed!==false||p.production_changed!==false)
+   return safe('GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED');
+  const g=await serviceRpc('reality_read_final_loop_shared_continuity_guard_v1',{p_shift_id:shiftId});
+  const guard=verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId});
+  if(guard.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY')
+   return safe('GOVERNED_RELEASE_CONTINUITY_SCOPE_NOT_VERIFIED',{proof_status:guard.status});
+  const schedule=await readSchedule();
+  const alias=await observeAlias(schedule.host);
+  const target=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA;
+  const targetRef=env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF;
+  const targetPinned=SHA.test(target||'')&&BRANCH.test(targetRef||'');
+  const unfinished=guard.handoffs.filter(h=>/^work:[a-f0-9]{32}$/.test(h.original_work_id||'')&&h.qualifier_digest_verified===true&&
+   h.independent_original_outcome_verified===false&&h.original_job_completed===false);
+  const exact=unfinished.length===1?unfinished[0]:null;
+  const current={original_work_id:exact?.original_work_id??null,source_ref:exact?.source_ref??null,
+   qualifier_receipt_sha256:exact?.qualifier_receipt_sha256??null,next_qualified_action:exact?.next_qualified_action??null,owner_id:ownerId,shift_id:shiftId,authoritative_database:db.project,
+   plan_fingerprint:graph.plan_fingerprint,continuity_root_id:guard.continuity_root_id,
+   continuity_head_sha256:guard.continuity_head_sha256,continuity_revision:guard.revision,
+   scheduled_host:schedule.host,cron_job_id:schedule.job_id,
+   observed_alias_release_sha:alias.resolved_release_sha,observed_alias_release_ref:alias.resolved_branch,
+   running_release_sha:SHA.test(runningReleaseSha||'')?runningReleaseSha:null,
+   configured_target_release_sha:targetPinned?target:null,configured_target_release_ref:targetPinned?targetRef:null,
+   target_runtime_database_independently_verified:false};
+  if(!schedule.dedicated_stable_release_alias||schedule.branch_automanaged)
+   return safe('GOVERNED_RELEASE_SCHEDULER_DIRECTION_NOT_STABLE',{...current,
+    next_governed_action:'QUALIFY_EXISTING_STABLE_WORKER_ALIAS_WITH_EXACT_AUTHORITY'});
+  if(!targetPinned)return safe('GOVERNED_RELEASE_TARGET_QUALIFICATION_REQUIRED',{...current,
+   next_governed_action:'QUALIFY_EXACT_REGISTERED_CAPABILITY_RELEASE_FOR_SAME_SHIFT'});
+  const drift=alias.resolved_release_sha!==target||alias.resolved_branch!==targetRef;
+  return safe(drift?'GOVERNED_RELEASE_DIRECTION_DRIFT_OBSERVED':'GOVERNED_RELEASE_DIRECTION_MATCHES_PIN_UNVERIFIED_ACTIVATION',{
+   ...current,release_direction_drift:drift,
+   next_governed_action:drift?'VERIFY_CANDIDATE_RUNTIME_DATABASE_AND_SAME_SHIFT_BEFORE_EXACT_APPROVAL':
+    'INDEPENDENTLY_VERIFY_ACTUAL_SIGNED_SCHEDULED_WAKE_AND_CAPABILITY'});
+ }
+ // Evidence-only checkpoint on the existing Continuity incident ledger.
+ // A failed/ambiguous write is never automatically repeated within this call.
+ async function persistProviderCheckpoint(checkpoint){
+  if(inspectionOnly||env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+   checkpoint?.state!=='CHECKPOINT_CANDIDATE_NOT_DURABLE'||
+   checkpoint.owner_id!==env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID||
+   checkpoint.shift_id!==env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID||
+   checkpoint.release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   checkpoint.release_ref!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||
+   checkpoint.connection_id!=='GITHUB_RELEASE_CI_READ:'+env.REALITY_VERIFIED_GITHUB_REPOSITORY||
+   !HASH.test(checkpoint.idempotency_key||'')||checkpoint.input_digest!==checkpoint.idempotency_key||
+   checkpoint.resume_permitted!==false||checkpoint.renewal_authority_verified!==false)
+   throw Error('PROVIDER_CHECKPOINT_SCOPE_UNVERIFIED');
+  const written=await serviceRpc('reality_record_governed_provider_checkpoint_v1',{p_checkpoint:checkpoint});
+  if(written?.status!=='PROVIDER_CHECKPOINT_RECORDED_OR_EXISTING'||
+   written.idempotency_key!==checkpoint.idempotency_key||!UUID.test(written.checkpoint_id||'')||
+   !HASH.test(written.receipt_sha256||'')||written.resume_permitted!==false)
+   return Object.freeze({status:'PROVIDER_CHECKPOINT_NOT_VERIFIED',resume_permitted:false});
+  const observed=await serviceRpc('reality_read_governed_provider_checkpoint_v1',{
+   p_owner_id:checkpoint.owner_id,p_shift_id:checkpoint.shift_id,p_checkpoint_id:written.checkpoint_id});
+  if(observed?.status!=='PROVIDER_CHECKPOINT_DURABLE_READBACK'||
+   observed.checkpoint_id!==written.checkpoint_id||observed.receipt_sha256!==written.receipt_sha256||
+   observed.idempotency_key!==checkpoint.idempotency_key||
+   observed.original_work_id!==checkpoint.original_work_id||
+   observed.continuity_revision!==checkpoint.continuity_revision||
+   observed.continuity_head_sha256!==checkpoint.continuity_head_sha256||
+   observed.resume_permitted!==false||observed.renewal_authority_verified!==false||
+   observed.execution_freeze_verified!==false||observed.recovery_budget_changed!==false||
+   observed.current_revision_matches!==true)
+   return Object.freeze({status:'PROVIDER_CHECKPOINT_READBACK_UNVERIFIED',resume_permitted:false});
+  return Object.freeze({...observed,lease_created:false,credential_changed:false,
+   recovery_progress:decideProviderRecoveryContinuation({checkpoint:observed})});
  }
  async function readApprovedRelease({
   owner_id,shift_id,release_sha,scheduled_alias,capability_key
@@ -161,11 +456,76 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    });
   return approval;
  }
+ // Reuse the existing durable preparation RPC. This does not grant consent,
+ // consume the one-use claim, change an alias, or start another shift.
+ async function prepareExactRelease({qualification,schedule,currentAlias}={}){
+  const c=qualification?.candidate,ci=qualification?.ci;
+  const owner=env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID;
+  const shift=env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID;
+  const cap=env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY;
+  const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+  if(!UUID.test(owner||'')||!UUID.test(shift||'')||!KEY.test(cap||'')||
+   qualification?.status!==(canonical?'QUALIFIED_EXACT_CANONICAL_SIGNED_WORKER_RELEASE_READ_ONLY':'QUALIFIED_EXACT_ISOLATED_SIGNED_WORKER_RELEASE_READ_ONLY')||
+   qualification.read_only!==true||qualification.owner_approval_granted!==false||
+   qualification.release_activated!==false||qualification.production_changed!==false||
+   qualification.branch_project_ref!==(canonical?env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:db.project)||
+   qualification.provider_deployment_id!==env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||
+   c?.sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   c.branch!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||c.shift_id!==shift||
+   c.capability_key!==cap||c.scheduled_alias!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
+   c.operating_lane!=='NORMAL_SIGNED_SHIFT'||c.source_staging_only!==false||
+   !qualifiedWorkerRuntime(c,env)||c.preview_only!==true||
+   (canonical&&(c.runtime_scope?.owner_id!==owner||c.runtime_scope?.runtime_database_project_ref!==db.project||
+    c.runtime_scope?.provider_release_proof_sha256!==qualification.provider_release_proof_sha256||
+    c.runtime_scope?.independent_isolation_proof_sha256!==qualification.independent_isolation_proof_sha256))||c.production_changed!==false||
+   ci?.status!=='INDEPENDENT_FROZEN_CI_PASSED'||ci.release_sha!==c.sha||
+   ci.independently_verified!==true||ci.test_source_pinned!==true||
+   !Number.isSafeInteger(ci.run_id)||ci.run_id<1||
+   !HASH.test(qualification.provider_release_proof_sha256||'')||
+   !HASH.test(qualification.independent_isolation_proof_sha256||'')||
+   schedule?.status!=='GOVERNED_SCHEDULE_INDEPENDENTLY_READ'||
+   schedule.job_id!==Number(env.REALITY_SIGNED_WORKER_CRON_JOB_ID)||
+   schedule.host!==c.scheduled_alias||schedule.dedicated_stable_release_alias!==true||
+   schedule.branch_automanaged!==false||schedule.signed_worker_target_verified!==true||
+   currentAlias?.provider!=='VERCEL'||currentAlias.independently_observed!==true||
+   currentAlias.project_verified!==true||currentAlias.preview_only!==true||
+   currentAlias.alias!==schedule.host||!SHA.test(currentAlias.resolved_release_sha||'')||
+   !BRANCH.test(currentAlias.resolved_branch||''))
+   throw Error('RELEASE_PREPARATION_EXACT_INDEPENDENT_SCOPE_UNVERIFIED');
+  if(currentAlias.resolved_release_sha===c.sha&&currentAlias.resolved_branch===c.branch)
+   return Object.freeze({status:'SIGNED_RELEASE_ALREADY_AT_TARGET_NO_PREPARATION',
+    owner_approval_granted:false,release_changed:false,original_job_completed:false});
+  const packet=await serviceRpc('reality_prepare_governed_signed_worker_release_v1',{
+   p_owner_id:owner,p_shift_id:shift,p_scheduled_alias:schedule.host,
+   p_release_sha:c.sha,p_release_ref:c.branch,p_capability_key:cap,
+   p_previous_release_sha:currentAlias.resolved_release_sha,
+   p_previous_release_ref:currentAlias.resolved_branch,p_independent_ci_run_id:ci.run_id,
+   p_provider_release_proof_sha256:qualification.provider_release_proof_sha256,
+   p_independent_isolation_proof_sha256:qualification.independent_isolation_proof_sha256,
+   ...(canonical?{p_runtime_scope:c.runtime_scope}:{})
+  });
+  if(packet.status==='SIGNED_RELEASE_STALE_OR_DIFFERENT_PACKET_NO_REPLAY')
+   return Object.freeze({status:packet.status,owner_approval_granted:false,
+    release_changed:false,original_job_completed:false});
+  if(packet.status!=='SIGNED_RELEASE_EXACT_OWNER_PACKET_PREPARED'||
+   packet.owner_id!==owner||packet.shift_id!==shift||packet.release_sha!==c.sha||
+   packet.release_ref!==c.branch||packet.scheduled_alias!==schedule.host||
+   packet.capability_key!==cap||!UUID.test(packet.request_id||'')||
+   !HASH.test(packet.proposal_fingerprint||'')||
+   (canonical&&!matchesWorkerReleaseAuthority(c,packet))||
+   packet.owner_approval_granted!==false||packet.release_changed!==false||
+   packet.original_job_completed!==false)
+   throw Error('RELEASE_PREPARATION_DURABLE_PACKET_UNVERIFIED');
+  return Object.freeze(packet);
+ }
  async function claimApprovedRelease({
   owner_id,shift_id,release_sha,release_ref,capability_key,
   scheduled_alias,previous_release_sha,previous_release_ref,
-  independent_ci_run_id
+  independent_ci_run_id,runtime_scope
  }={}){
+  const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+  if(canonical&&(!runtime_scope||runtime_scope.owner_id!==owner_id||runtime_scope.shift_id!==shift_id||runtime_scope.release_sha!==release_sha||runtime_scope.release_ref!==release_ref||runtime_scope.capability_key!==capability_key||runtime_scope.scheduled_alias!==scheduled_alias||runtime_scope.runtime_database_project_ref!==db.project))
+   throw Error('RELEASE_CANONICAL_RUNTIME_CLAIM_SCOPE_UNVERIFIED');
   if(!UUID.test(owner_id||'')||!UUID.test(shift_id||'')||
    !SHA.test(release_sha||'')||!BRANCH.test(release_ref||'')||
    !SHA.test(previous_release_sha||'')||
@@ -183,12 +543,14 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
    p_scheduled_alias:scheduled_alias,
    p_previous_release_sha:previous_release_sha,
    p_previous_release_ref:previous_release_ref,
-   p_independent_ci_run_id:independent_ci_run_id
+   p_independent_ci_run_id:independent_ci_run_id,
+   ...(canonical?{p_runtime_scope:runtime_scope}:{})
   });
  }
  async function assignAlias({
   alias,release_sha,release_ref,owner_id,shift_id,capability_key,claim_id
  }={}){
+  if(inspectionOnly===true)throw Error('RELEASE_INSPECTION_MUTATION_FORBIDDEN');
   if(alias!==env.REALITY_SIGNED_WORKER_STABLE_ALIAS||
    release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
    release_ref!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF||
@@ -199,7 +561,7 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
   const target=await deployment(id);
   if(target.meta.githubCommitSha!==release_sha||
    target.meta.githubCommitRef!==release_ref)
-   throw Error('RELEASE_PROVIDER_PINNED_DEPLOYMENT_DRIFT');
+   fail(releaseIdentityFailure('RELEASE_PROVIDER_PINNED_DEPLOYMENT_DRIFT','VERCEL_DEPLOYMENT_READ',target,[...(target.meta.githubCommitSha!==release_sha?['release_sha']:[]),...(target.meta.githubCommitRef!==release_ref?['release_ref']:[])]));
   // Exactly one provider POST after the caller consumed a database-backed
   // one-use approval. No retry here, including on timeout.
   const result=await requestJson(fetchImpl,
@@ -207,14 +569,32 @@ export function createTrustedSignedWorkerReleaseControlPlaneAdapters({
     method:'POST',headers:{...providerHeaders,
      'Content-Type':'application/json'},
     body:JSON.stringify({alias})
-   });
-  if(result.alias!==alias)throw Error('RELEASE_PROVIDER_ASSIGNMENT_ACK_UNVERIFIED');
+   },'VERCEL_ALIAS_ASSIGN');
+  if(result.alias!==alias)fail(releaseIdentityFailure('RELEASE_PROVIDER_ASSIGNMENT_ACK_UNVERIFIED','VERCEL_ALIAS_ASSIGN',result,['alias']));
   return Object.freeze({provider:'VERCEL',alias,release_sha,claim_id});
+ }
+ async function recordObservedReviewDelivery(){
+  if(inspectionOnly===true||env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+   env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+   env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_PROBE_ONLY==='true')
+   throw Error('REVIEW_RELEASE_OBSERVATION_SCOPE_UNVERIFIED');
+  const a=await observeAlias(env.REALITY_SIGNED_WORKER_STABLE_ALIAS);
+  if(a.deployment_id!==env.REALITY_SIGNED_WORKER_TARGET_DEPLOYMENT_ID||
+   a.resolved_release_sha!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_SHA||
+   a.resolved_branch!==env.REALITY_SIGNED_WORKER_TARGET_RELEASE_REF)
+   throw Error('REVIEW_RELEASE_ALIAS_DRIFT_NO_REPLAY');
+  return serviceRpc('reality_record_review_release_alias_observation_v1',{
+   p_owner_id:env.REALITY_SIGNED_WORKER_RELEASE_OWNER_ID,
+   p_shift_id:env.REALITY_SIGNED_WORKER_RELEASE_SHIFT_ID,
+   p_release_sha:a.resolved_release_sha,p_release_ref:a.resolved_branch,
+   p_scheduled_alias:a.alias,p_deployment_id:a.deployment_id
+  });
  }
  return Object.freeze({
   status:'TRUSTED_SIGNED_WORKER_RELEASE_ADAPTERS_CONFIGURED',
-  ready:true,read_only:false,
-  readSchedule,observeAlias,readApprovedRelease,claimApprovedRelease,assignAlias,
+  ready:true,read_only:inspectionOnly===true,
+  readSchedule,observeAlias,readDirection,readApprovedRelease,prepareExactRelease,claimApprovedRelease,assignAlias,recordObservedReviewDelivery,persistProviderCheckpoint,
+  readLastProviderFailure:()=>lastFailure,
   owner_approval_granted:false,provider_assignment_attempted:false
  });
 }

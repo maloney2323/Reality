@@ -48,13 +48,16 @@ const db={strictSecrets:true,project:'test',
 const env={VERCEL_ENV:'preview',
  REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF:'test'};
 const runner='e6cb61d9-a919-423c-8dd1-30b788af4b46';
+const empty={status:'NO_SIGNED_ORIGINAL_LINEAGE_PACKET',owner_id:owner,
+ packet_verified:false,original_job_completed:false,installation_authorized:false,
+ production_changed:false};
 test('same-shift #307 source/claim independent read, no business original admission',async()=>{
  const calls=[];
  const r=await stageVerifiedSignedOriginalLineagePacket({
   db,env,gate,shiftId:shift,workerRunId:runner,
   fetchImpl:async()=>{},call:async(_db,method,args)=>{
    calls.push({method,args});
-   return method==='reality_stage_signed_original_lineage_packet_v1'?
+   return calls.length===1?empty:method==='reality_stage_signed_original_lineage_packet_v1'?
     stage:read;
   }});
  assert.equal(r.status,'SIGNED_ORIGINAL_LINEAGE_EVIDENCE_STAGED_INDEPENDENTLY_READ');
@@ -69,21 +72,24 @@ test('same-shift #307 source/claim independent read, no business original admiss
  assert.equal(r.original_job_completed,false);
  assert.equal(r.installation_authorized,false);
  assert.deepEqual(calls.map(c=>c.method),[
+  'reality_read_owner_original_lineage_packet_v1',
   'reality_stage_signed_original_lineage_packet_v1',
   'reality_read_owner_original_lineage_packet_v1'
  ]);
- assert.deepEqual(calls[0].args,{
-  p_shift_id:shift,p_original_work_id:work});
- assert.deepEqual(calls[1].args,{p_owner_id:owner});
+ assert.deepEqual(calls[0].args,{p_owner_id:owner});
+ assert.deepEqual(calls[1].args,{p_shift_id:shift,p_original_work_id:work});
+ assert.deepEqual(calls[2].args,{p_owner_id:owner});
 });
 test('the same algorithm works for any source PR number and original identity',async()=>{
  const alt={...gate,source_ref:'https://github.com/maloney2323/Reality/pull/77314',
   original_work_id:'work:'+'b'.repeat(32)};
  const alteredStage={...stage,source_ref:alt.source_ref,
   original_work_id:alt.original_work_id};
+ let calls=0;
  const r=await stageVerifiedSignedOriginalLineagePacket({
   db,env,gate:alt,shiftId:shift,workerRunId:runner,
   fetchImpl:async()=>{},call:async(_db,method)=>{
+   if(++calls===1)return empty;
    return method==='reality_stage_signed_original_lineage_packet_v1'?
     alteredStage:{...read,source_ref:alt.source_ref,
       original_work_id:alt.original_work_id};
@@ -97,10 +103,11 @@ test('never confuse incident #211 claim with the #307 PR-review claim',async()=>
   db,env,gate,shiftId:shift,workerRunId:runner,
   fetchImpl:async()=>{},call:async(_db,method)=>{
    calls++;
+   if(calls===1)return empty;
    if(method==='reality_stage_signed_original_lineage_packet_v1')return stage;
    return {...read,source_claim_id:'1a311d37-9f8a-4301-ac11-585fc7ef14df'};
   }});
- assert.equal(calls,2);
+ assert.equal(calls,3);
  assert.equal(r.status,'SIGNED_ORIGINAL_LINEAGE_INDEPENDENT_READ_UNVERIFIED');
  assert.equal(r.source_reconciled,false);
  assert.equal(r.original_job_completed,false);
@@ -129,9 +136,10 @@ test('a source change, role drift or unsigned worker cannot stage packets',async
 test('service source returned missing business proof cannot be presented as verified',async()=>{
  const r=await stageVerifiedSignedOriginalLineagePacket({
   db,env,gate,shiftId:shift,workerRunId:runner,
-  fetchImpl:async()=>{},call:async()=>({
+  fetchImpl:async()=>{},call:async(_db,method)=>method===
+   'reality_read_owner_original_lineage_packet_v1'?empty:{
    status:'ORIGINAL_LINEAGE_INDEPENDENT_SOURCE_JOIN_NOT_VERIFIED'
-  })});
+  }});
  assert.equal(r.packet_staged,false);
  assert.equal(r.source_reconciled,false);
 });
@@ -202,4 +210,34 @@ test('two narrow service RPCs are allowlisted, unregistered operations blocked',
   'reality_read_owner_original_lineage_packet_v1_unverified_install',
   {p_owner_id:owner},{fetchImpl:f}),/SHIFT_RPC_NOT_ALLOWLISTED/);
  assert.equal(calls,1);
+});
+
+
+test('a verified existing original packet is reused without a second write on later wakes',async()=>{
+ const calls=[];
+ const r=await stageVerifiedSignedOriginalLineagePacket({db,env,gate,shiftId:shift,
+  workerRunId:runner,expectedContinuityRootId:read.continuity_root_id,
+  fetchImpl:async()=>{},call:async(_db,method)=>{calls.push(method);return read;}});
+ assert.deepEqual(calls,['reality_read_owner_original_lineage_packet_v1']);
+ assert.equal(r.status,'SIGNED_ORIGINAL_LINEAGE_EXISTING_EVIDENCE_INDEPENDENTLY_READ');
+ assert.equal(r.existing_packet_reused,true);
+ assert.equal(r.packet_staged,false);
+ assert.equal(r.source_reconciled,true);
+ assert.equal(r.owner_id,owner);
+ assert.equal(r.shift_id,shift);
+ assert.equal(r.continuity_root_id,read.continuity_root_id);
+ assert.equal(r.evidence_sha256,hash);
+ assert.equal(r.original_claim_admitted,false);
+});
+test('foreign packet, changed canonical root and unavailable read never trigger restaging',async()=>{
+ for(const invalid of [{...read,original_work_id:'work:'+'f'.repeat(32)},
+  {...read,continuity_root_id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'},null]){
+  let calls=0;
+  const r=await stageVerifiedSignedOriginalLineagePacket({db,env,gate,shiftId:shift,
+   workerRunId:runner,expectedContinuityRootId:read.continuity_root_id,
+   fetchImpl:async()=>{},call:async()=>{calls++;if(invalid===null)throw Error('READ_DOWN');return invalid;}});
+  assert.equal(calls,1);
+  assert.equal(r.packet_staged,false);
+  assert.equal(r.source_reconciled,false);
+ }
 });

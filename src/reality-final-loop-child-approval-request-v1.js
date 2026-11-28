@@ -12,24 +12,50 @@ const fail=(status,extra={})=>Object.freeze({
  owner_approval_granted:false,child_originals_admitted:0,
  execution_authorized:false,original_job_completed:false,...extra
 });
+// The existing shared benchmark may prepare exact READ-ONLY owner review
+// packets only. Actual child execution remains separately gated and isolated.
+function permittedPacketStorage(db,graph,env){
+ const exact=db?.strictSecrets===true&&
+  db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF;
+ const isolated=exact&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&
+  db.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF;
+ const shared=exact&&
+  env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'&&
+  env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'&&
+  env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='true'&&
+  db.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+  graph?.owner_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&
+  graph?.shift_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID;
+ return isolated||shared;
+}
 export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
- db,graph,workerRunId,env=process.env,fetchImpl=fetch,call=shiftRpc
+ db,graph,workerRunId,selectedRoutes=null,env=process.env,fetchImpl=fetch,call=shiftRpc
 }={}){
  if(env.VERCEL_ENV!=='preview'||
   env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED!=='true'||
   env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED!=='true'||
   (env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED!=='true'&&
    env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true')||
-  env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+  !permittedPacketStorage(db,graph,env)||
   db?.strictSecrets!==true||
   db.project!==env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF||
-  db.project!==env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF||
   graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
   !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
   !HASH.test(graph.plan_fingerprint||'')||
   !UUID.test(workerRunId||'')||
   !Array.isArray(graph.jobs)||typeof call!=='function')
   return fail('FINAL_LOOP_CHILD_APPROVAL_GOVERNED_SCOPE_NOT_ENABLED');
+ // Optional router scope: packet preparation must not expand beyond the
+ // selected source plans, even when the fresh preflight contains new work.
+ if(selectedRoutes!==null&&(!Array.isArray(selectedRoutes)||selectedRoutes.length<1||
+    selectedRoutes.length>10||new Set(selectedRoutes.map(r=>r?.plan_id)).size!==selectedRoutes.length||
+    selectedRoutes.some(r=>!UUID.test(r?.plan_id||'')||!WORK.test(r.parent_original_work_id||'')||
+     !HASH.test(r.source_manifest_sha256||'')||!HASH.test(r.acceptance_contract_sha256||'')||
+     r.next_registered_handler!=='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'||
+     r.owner_action_required!==true||r.child_execution_authorized!==false||r.handler_dispatched!==false)))
+  return fail('FINAL_LOOP_CHILD_SELECTED_PACKET_SCOPE_UNVERIFIED');
  let current;
  try{
   current=await call(db,'reality_read_final_loop_child_approval_preflight_v1',{
@@ -45,6 +71,14 @@ export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
   current.read_only!==true||current.execution_authorized!==false||
   !Array.isArray(current.plans)||current.plans.length>10)
   return fail('FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_SCOPE_MISMATCH');
+ if(selectedRoutes!==null&&selectedRoutes.some(r=>current.plans.filter(p=>
+  p.plan_id===r.plan_id&&p.source_ref===r.source_ref&&
+  p.parent_original_work_id===r.parent_original_work_id&&
+  p.source_manifest_sha256===r.source_manifest_sha256&&
+  p.acceptance_contract_sha256===r.acceptance_contract_sha256&&
+  p.pending_exact_owner_approval===true&&p.owner_goal_acceptance_pending===true&&
+  p.independent_goal_acceptance_verified===false&&p.verified_signed_source_goal_contract_prepared===true).length!==1))
+  return fail('FINAL_LOOP_CHILD_SELECTED_PACKET_SCOPE_CHANGED');
  const seen=new Set(),status=[];
  for(const plan of current.plans){
   if(!UUID.test(plan?.plan_id||'')||
@@ -58,6 +92,7 @@ export async function requestFinalLoopChildApprovalFromAcceptedOriginal({
     j.independent_source_proof_verified===true))
    return fail('FINAL_LOOP_CHILD_PARENT_OR_PLAN_SCOPE_DRIFT');
   seen.add(plan.plan_id);
+  if(selectedRoutes!==null&&!selectedRoutes.some(r=>r.plan_id===plan.plan_id))continue;
   if(plan.verified_signed_source_goal_contract_prepared!==true||
      plan.owner_goal_acceptance_pending!==true||
      plan.independent_goal_acceptance_verified!==false||

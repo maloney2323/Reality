@@ -69,7 +69,7 @@
   quickWork.type='button';
   quickWork.addEventListener('click',()=>{
     selectTab('work');
-    if(window.matchMedia('(max-width:950px)').matches)openPanel('work');
+    openPanel('work');
   });
   quickNav.insertBefore(quickWork,quickNav.lastChild);
   sidebar.append(quickNav);
@@ -121,14 +121,14 @@
   threadTitle.append(node('span','reality-chat-premium-eyebrow',
     'REALITY · CONTINUITY-AWARE CHAT'));
   threadTitle.append(node('strong', '', 'Reality'));
-  threadTitle.append(node('small', '', 'Chat · Your workspace'));
+  threadTitle.append(node('small', '', 'Tell Reality what you need.'));
   const threadButtons = node('div', 'reality-chat-thread-buttons');
   // Redundant direct navigation is intentional: a signed-in user should
   // never depend on scrolling past an operational card to leave the chat.
   const homeLink = node('a', 'reality-chat-home-link', '← Home');
   homeLink.href = '/';
   homeLink.setAttribute('aria-label','Return to Reality Home');
-  const historyToggle = node('button', 'reality-chat-mobile-tool', 'Chats');
+  const historyToggle = node('button', 'reality-chat-mobile-tool', '☰ Menu');
   historyToggle.type = 'button';
   historyToggle.id = 'realityChatOpenConversations';
   historyToggle.setAttribute('aria-controls','realityChatSidebar');
@@ -154,7 +154,7 @@
   });
   const smallScreen = () => window.matchMedia('(max-width:600px)').matches;
   function updateFocusLabel(){
-    inspectorToggle.textContent = smallScreen() ? 'Work' : 'Work & approvals';
+    inspectorToggle.textContent = 'Work';
     if(smallScreen()){
       const expanded = !document.body.classList.contains('reality-chat-compact');
       focusToggle.textContent = expanded ? 'Minimize' : 'Expand chat';
@@ -180,9 +180,25 @@
   window.addEventListener('resize', updateFocusLabel);
   // On mobile Chat is ALWAYS fullscreen; no confusing "Minimize" path.
   // Preserve the desktop focus toggle for larger screens.
-  threadButtons.append(homeLink, historyToggle, inspectorToggle, newChatHeader, focusToggle);
-  threadHeader.append(threadTitle, threadButtons);
+  const planShift=node('button','reality-chat-plan-action','Plan a shift');
+  planShift.type='button';
+  planShift.addEventListener('click',()=>{closePanel();window.dispatchEvent(new Event('reality:open-shift-plan'));});
+  const decisionAction=node('button','reality-chat-plan-action','Review decision');
+  decisionAction.type='button';decisionAction.id='realityChatDecisionAction';decisionAction.hidden=true;
+  decisionAction.addEventListener('click',()=>{const target=decisionAction.dataset.tab||'approvals';selectTab(target);closePanel();openPanel('work');});
+  // Each existing control mounts once in its final navigation container.
+  // Preserve the actual DOM/handlers; append() would otherwise move history and planShift again.
+  threadButtons.append(homeLink, inspectorToggle, newChatHeader, decisionAction, focusToggle);
+  quickNav.append(planShift);
+  threadHeader.append(historyToggle, threadTitle, threadButtons);
   conversation.append(threadHeader, transcript, composer);
+  // Preserve the same live evidence node inside the scrollable conversation,
+  // not as a sibling above its header. No extra API calls or worker actions.
+  const liveActivity=get('realityChatContinuityActivity');
+  function mountLiveActivity(){
+    if(liveActivity&&!transcript.contains(liveActivity))transcript.append(liveActivity);
+  }
+  mountLiveActivity();
 
   // Keep original goal-command selector functional, but move its explanatory
   // controls behind an optional disclosure so ordinary chat stays uncluttered.
@@ -208,7 +224,7 @@
   // Project genuine delivery/verification feedback as a plain in-thread
   // message, reattached after saved-history rerenders. This read-only
   // projection never triggers a work request, approval or second API call.
-  const statusBar = node('article','bubble reality-chat-status-bar');
+  const statusBar = node('div','reality-chat-status-bar');
   statusBar.id='realityChatInlineStatus';
   statusBar.hidden=true;
   statusBar.setAttribute('role','status');
@@ -222,13 +238,12 @@
   inlinePanels.hidden=true;
   inlinePanels.setAttribute('aria-label','Conversation controls and verified work');
   const attachInlineStatus=()=>{
-    if(!statusBar.hidden&&!transcript.contains(statusBar))
-      transcript.append(statusBar);
+    if(!composer.contains(statusBar)) composer.prepend(statusBar);
   };
   if(originalStatus){
     const syncStatus=()=>{
       const raw=String(originalStatus.textContent??'').trim();
-      const valid=raw&& !/^(?:null)+$|^(?:undefined|nan|\[object object\])$/i.test(raw);
+      const valid=raw&& !/^(?:null\s*)+$|^(?:undefined|nan|\[object object\])$/i.test(raw);
       statusCopy.textContent=valid?raw:'';
       statusBar.hidden=!valid;
       attachInlineStatus();
@@ -293,6 +308,10 @@
     });
   }
   panels.work.append(get('realityChatShiftBrief'),get('realityChatActivity'),get('realityChatAutomationDiagnostics'));
+  // Per-conversation technical projections live here, not in the saved transcript.
+  const savedWork=node('section','reality-chat-saved-work-readback');
+  savedWork.id='realityChatSavedWorkReadback';
+  panels.work.append(savedWork);
   // These large intake and shift-launch cards previously preceded the conversation,
   // trapping it below the fold on mobile (especially during session recovery).
   // They remain accessible in Work, but the actual conversation is the first view.
@@ -326,6 +345,20 @@
   // All original controls and handlers remain intact. The page rearranges DOM
   // nodes instead of copying or recreating an approval form or worker action.
   ready.append(workspace);
+  // Show a single navigation action only when existing exact decision controls are ready.
+  // No action or approval is submitted here; real handlers remain unchanged.
+  function syncDecisionAction(){
+    const exactIn=p=>[...p.querySelectorAll('button')].some(b=>{
+      if(b.disabled||b.hidden||!/^(?:Approve exact|Approve investigation and testing|Continue \d+ unfinished repair)/i.test(b.textContent.trim()))return false;
+      for(let n=b;n&&n!==p;n=n.parentElement)if(n.hidden)return false;
+      return true;
+    });
+    const tab=exactIn(panels.approvals)?'approvals':exactIn(panels.work)?'work':'';
+    decisionAction.dataset.tab=tab;decisionAction.hidden=!tab;
+  }
+  const decisionObserver=new MutationObserver(syncDecisionAction);
+  for(const p of [panels.approvals,panels.work])decisionObserver.observe(p,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','disabled']});
+  syncDecisionAction();
   // Home may open Chat to discuss a gap. Prefill an owner-editable question,
   // but NEVER submit it or grant work authority from a navigation link.
   if(window.location.hash==='#weekly-workload'){
@@ -393,10 +426,9 @@
     syncKeyboardViewport();
   }
 
-  // Small-screen Chats and Work are expandable IN the transcript. Never
-  // display a fixed overlay, scrim, modal or mid-chat pop-up. Move the
-  // original nodes, keeping every authenticated handler and approval intact.
-  const inlineScreen=()=>window.matchMedia('(max-width:950px)').matches;
+  // Keep the original authenticated panels in their own on-demand drawers.
+  // Never insert an entire operational dashboard into the conversation.
+  const inlineScreen=()=>false;
   function restorePanelNodes(){
     if(sidebar.parentElement===inlinePanels)
       workspace.insertBefore(sidebar,conversation);
@@ -416,6 +448,7 @@
     closePanel();
     if(!next)return;
     document.body.dataset.realityChatPanel=next;
+    if(next==='work')window.dispatchEvent(new CustomEvent('reality:chat-work-opened'));
     historyToggle.setAttribute('aria-expanded',String(next==='history'));
     inspectorToggle.setAttribute('aria-expanded',String(next==='work'));
     if(inlineScreen()){
@@ -425,16 +458,13 @@
       inlinePanels.scrollIntoView({behavior:'smooth',block:'nearest'});
     }else{
       // Desktop retains original sidebar/inspector columns.
-      (next==='history'?sidebar:inspector).scrollIntoView({
-        behavior:'smooth',block:'nearest'
-      });
+      const opened=next==='history'?sidebar:inspector;
+      opened.querySelector('.reality-chat-panel-close')?.focus({preventScroll:true});
     }
   }
   historyToggle.addEventListener('click',()=>openPanel('history'));
   inspectorToggle.addEventListener('click',()=>openPanel('work'));
-  window.addEventListener('resize',()=>{
-    if(document.body.dataset.realityChatPanel&&!inlineScreen())closePanel();
-  });
+  // A keyboard/viewport resize must not close a user-requested panel.
   closeSidebar.addEventListener('click',closePanel);
   closeInspector.addEventListener('click',closePanel);
   scrim.addEventListener('click',closePanel);
@@ -446,7 +476,7 @@
 
   // Empty conversation is explicitly an invitation, never fabricated history.
   function renderEmpty() {
-    const hasMessage=[...transcript.children].some(el=>el.classList.contains('bubble'));
+    const hasMessage=[...transcript.children].some(el=>el!==liveActivity&&el.classList.contains('bubble'));
     let empty=transcript.querySelector('.reality-chat-empty');
     if(hasMessage){if(empty)empty.remove();return;}
     if(empty)return;
@@ -454,7 +484,7 @@
     const symbol=node('div','reality-chat-empty-mark','✦');
     const h=node('h3','','Work with Reality');
     const p=node('p','',
-      'Ask about your business, investigate a problem, or prepare a governed development task. Reality will distinguish evidence from suggestions and ask for exact approval before consequential actions.');
+      'Ask Reality a question, discuss your goals, or plan work.');
     empty.append(symbol,h,p);
     transcript.append(empty);
   }
@@ -470,6 +500,7 @@
   // any owner-requested inline work card in their conversation, not a layer
   // above it. This is a projection, not a new persisted customer message.
   const inlineRerender=new MutationObserver(()=>{
+    mountLiveActivity();
     attachInlineStatus();
     if(inlineScreen()&&!inlinePanels.hidden&&!transcript.contains(inlinePanels))
       transcript.append(inlinePanels);

@@ -6,7 +6,11 @@ test('owner Chat uses one exact source-bound approval on the existing shift',()=
  const ui=source('reality-chat-final-loop-child-approval-v1.js');
  const index=source('index.html');
  assert.match(index,/<script defer src="\/reality-chat-final-loop-child-approval-v1\.js"><\/script>/);
- assert.match(ui,/realityChatPanelWork/);
+ assert.match(ui,/privateTranscript/);
+ assert.match(ui,/composer\.parentNode\.insertBefore\(card,composer\)/);
+ assert.match(ui,/Check review decision/);
+ assert.match(ui,/readPackets\(null\)/);
+ assert.doesNotMatch(ui,/realityChatPanelWork/);
  assert.match(ui,/APPROVE_READ_ONLY_INTERNAL_PR_REVIEW/);
  assert.match(ui,/source_manifest_sha256/);
  assert.match(ui,/proposal_fingerprint/);

@@ -4,7 +4,7 @@
  'use strict';
  if(!/^\/chat\/?$/.test(location.pathname))return;
  const composer=document.getElementById('realityChatComposer');
- const transcript=document.getElementById('privateTranscript');
+ const transcript=document.getElementById('realityChatPanelWork');
  if(!composer||!transcript||
     document.getElementById('realityChatExistingShiftHandoff'))return;
  const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;

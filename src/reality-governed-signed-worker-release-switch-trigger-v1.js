@@ -2,7 +2,7 @@
 // This is never invoked by an LLM or by the worker being replaced.
 // The actual provider write is delegated to the established one-use,
 // owner-approved signed-worker capability delivery executor.
-import {deliverOnceApprovedSignedWorkerCapability}
+import {deliverOnceApprovedSignedWorkerCapability,qualifiedWorkerRuntime,matchesWorkerReleaseAuthority}
  from './reality-signed-worker-capability-delivery-v1.js';
 
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
@@ -83,9 +83,8 @@ export async function triggerOneGovernedSignedWorkerReleaseSwitch({
   releaseCandidate.scheduled_alias!==scheduled.host||
   releaseCandidate.operating_lane!=='NORMAL_SIGNED_SHIFT'||
   releaseCandidate.source_staging_only!==false||
-  releaseCandidate.isolated_database_independently_verified!==true||
+  !qualifiedWorkerRuntime(releaseCandidate,env)||
   releaseCandidate.owner_packet_handler_registered!==true||
-  releaseCandidate.environment!=='ISOLATED_PREVIEW'||
   releaseCandidate.preview_only!==true||
   releaseCandidate.provider_deployment_ready!==true||
   releaseCandidate.production_changed!==false)
@@ -106,7 +105,7 @@ export async function triggerOneGovernedSignedWorkerReleaseSwitch({
   ownerApproval.release_sha!==releaseCandidate.sha||
   ownerApproval.capability_key!==capabilityKey||
   ownerApproval.scheduled_alias!==scheduled.host||
-  ownerApproval.target_environment!=='ISOLATED_PREVIEW'||
+  !matchesWorkerReleaseAuthority(releaseCandidate,ownerApproval)||
   !HASH.test(ownerApproval.receipt_sha256||'')||
   ownerApproval.production_change_permitted!==false)
   return response('GOVERNED_RELEASE_SWITCH_EXACT_OWNER_APPROVAL_REQUIRED',{

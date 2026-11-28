@@ -1,6 +1,7 @@
 // Existing signed Final Loop: durable source plans -> classified next handler.
 // This is a read model, never a substitute for an original admission, owner
 // approval, one-use service-role claim, executor, or independent final receipt.
+import {selectRegisteredCapabilityKey} from './reality-evidence-driven-capability-router-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -22,7 +23,7 @@ const result=(status,routes=[])=>Object.freeze({
   x.next_governed_action==='QUALIFY_AND_ADMIT_EXACT_PARENT_ORIGINAL').length
 });
 export function classifySignedFinalLoopStagedPlanActions({
- graph,staged,preflight
+ graph,staged,preflight,continuity
 }={}){
  if(graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
   !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
@@ -81,6 +82,14 @@ export function classifySignedFinalLoopStagedPlanActions({
   if(matching.length>1)
    return result('FINAL_LOOP_STAGED_GOAL_PREFLIGHT_DUPLICATED');
   const p=matching[0];
+  const accepted=p?.independent_goal_acceptance_verified===true&&
+   p.owner_goal_acceptance_pending===false&&
+   p.pending_exact_owner_approval===false&&
+   p.owner_approval_claim_window_current===true&&
+   p.owner_approval_expired===false;
+  const pending=p?.independent_goal_acceptance_verified===false&&
+   p.owner_goal_acceptance_pending===true&&
+   p.pending_exact_owner_approval===true;
   if(p){
    if(plan.parent_source_phase!=='BLOCKED'||
     p.source_ref!==plan.source_ref||
@@ -88,15 +97,14 @@ export function classifySignedFinalLoopStagedPlanActions({
     p.source_manifest_sha256!==plan.source_manifest_sha256||
     !HASH.test(p.acceptance_contract_sha256||'')||
     p.verified_signed_source_goal_contract_prepared!==true||
-    p.owner_goal_acceptance_pending!==true||
-    p.independent_goal_acceptance_verified!==false||
-    p.pending_exact_owner_approval!==true||
+    (!pending&&!accepted)||
     p.child_review_automatically_authorized!==false)
     return result('FINAL_LOOP_STAGED_GOAL_CONTRACT_OR_SOURCE_DRIFT');
    matched.add(p.plan_id);
   }
   const next=plan.parent_source_phase==='NOT_ADMITTED'?
    'QUALIFY_AND_ADMIT_EXACT_PARENT_ORIGINAL':
+   accepted?'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':
    p?'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET':
     'PREPARE_VERIFIED_PARENT_GOAL_ACCEPTANCE_CONTRACT';
   routes.push(Object.freeze({
@@ -107,11 +115,22 @@ export function classifySignedFinalLoopStagedPlanActions({
    parent_source_phase:plan.parent_source_phase,
    proposed_scope_count:plan.proposed_scope_count,
    acceptance_contract_sha256:p?.acceptance_contract_sha256??null,
+   // Keep review execution distinct from repair/recovery and owner consent.
+   // Classification does not assert readiness of a live executor or a warrant.
+   operation_category:plan.parent_source_phase==='NOT_ADMITTED'?'QUALIFICATION':
+    accepted?'EXECUTION':pending?'AUTHORITY_REQUIRED':'QUALIFICATION',
+   authority_scope:accepted?'EXACT_ACCEPTED_READ_ONLY_REVIEW':
+    pending?'EXACT_OWNER_APPROVAL_PENDING':'NO_EXECUTION_AUTHORITY',
    next_governed_action:next,
-   next_registered_handler:p?
-    'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':null,
+   next_registered_handler:pending?
+    'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET':
+    accepted?'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':null,
    handler_requires_isolated_service_claim:Boolean(p),
-   source_plan_only:true,owner_action_required:Boolean(p),
+   existing_owner_goal_acceptance_verified:accepted,
+   canonical_execution_handoff:accepted?projectCanonicalApprovedReviewHandoff({
+    graph,plan,approval:p,continuity
+   }):null,
+   source_plan_only:true,owner_action_required:pending,
    handler_dispatched:false,owner_approval_granted:false,
    child_execution_authorized:false,original_job_completed:false
   }));
@@ -121,6 +140,150 @@ export function classifySignedFinalLoopStagedPlanActions({
  return result('FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED',routes);
 }
 
+
+// Exact portable scope description from the existing canonical preflight and
+// shared Continuity verifier. It is not a bearer grant, lease or new ledger.
+// The canonical service must independently re-read and atomically claim work
+// before any isolated model invocation. Never import this as an owner approval.
+export function projectCanonicalApprovedReviewHandoff({graph,plan,approval,continuity}={}){
+ const h=approval?.canonical_review_handoff,g=continuity?.shared_continuity_guard;
+ const root=continuity?.canonical_continuity_handoff;
+ if(!h||h.schema!=='reality-canonical-approved-review-scope-v1'||
+  h.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||h.canonical_claim_required!==true||
+  h.execution_authorized!==false||h.original_job_completed!==false||h.production_changed!==false||
+  approval.independent_goal_acceptance_verified!==true||
+  approval.owner_approval_claim_window_current!==true||approval.owner_approval_expired!==false||
+  approval.owner_goal_acceptance_pending!==false||approval.pending_exact_owner_approval!==false||
+  approval.child_review_automatically_authorized!==false||
+  !UUID.test(h.packet_id||'')||!UUID.test(h.approval_request_id||'')||
+  !UUID.test(h.acceptance_event_id||'')||!HASH.test(h.owner_approval_receipt_sha256||'')||
+  !/^[a-f0-9]{64}$/.test(h.acceptance_event_content_hash||'')||
+  graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+  !UUID.test(graph.owner_id||'')||!UUID.test(graph.shift_id||'')||
+  !HASH.test(graph.plan_fingerprint||'')||
+  h.owner_id!==graph.owner_id||h.shift_id!==graph.shift_id||
+  h.plan_fingerprint!==graph.plan_fingerprint||
+  !UUID.test(h.plan_id||'')||h.plan_id!==plan?.plan_id||h.plan_id!==approval.plan_id||
+  !WORK.test(h.parent_original_work_id||'')||
+  h.parent_original_work_id!==plan.parent_original_work_id||h.parent_original_work_id!==approval.parent_original_work_id||
+  !PR.test(h.source_ref||'')||h.source_ref!==plan.source_ref||h.source_ref!==approval.source_ref||
+  !SHA.test(h.source_head_sha||'')||h.source_head_sha!==plan.source_head_sha||
+  !HASH.test(h.source_manifest_sha256||'')||h.source_manifest_sha256!==plan.source_manifest_sha256||
+  h.source_manifest_sha256!==approval.source_manifest_sha256||
+  !HASH.test(h.acceptance_contract_sha256||'')||h.acceptance_contract_sha256!==approval.acceptance_contract_sha256||
+  !HASH.test(h.source_proof_sha256||'')||
+  !Array.isArray(graph.jobs)||graph.jobs.filter(j=>j.source_ref===h.source_ref&&
+   j.original_work_id===h.parent_original_work_id&&j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&
+   j.phase==='BLOCKED'&&j.independent_source_proof_verified===true&&
+   j.source_proof_sha256===h.source_proof_sha256).length!==1||
+  !Number.isSafeInteger(h.scope_count)||h.scope_count<2||h.scope_count>63||
+  h.scope_count!==plan.proposed_scope_count||!Array.isArray(h.scope_fingerprints)||
+  h.scope_fingerprints.length!==h.scope_count||
+  !h.scope_fingerprints.every((s,i)=>s?.index===i&&HASH.test(s.scope_sha256||''))||
+  new Set(h.scope_fingerprints.map(s=>s.scope_sha256)).size!==h.scope_count||
+  continuity?.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+  continuity.owner_id!==h.owner_id||continuity.shift_id!==h.shift_id||
+  continuity.original_job_completed!==false||
+  g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+  g.owner_id!==h.owner_id||g.shift_id!==h.shift_id||g.read_only!==true||
+  g.execution_authorized!==false||g.original_job_completed!==false||
+  root?.canonical_handoff_verified!==true||root.execution_authorized!==false||
+  !UUID.test(g.continuity_root_id||'')||g.continuity_root_id!==root.continuity_root_id||
+  !HASH.test(g.continuity_head_sha256||'')||g.continuity_head_sha256!==root.continuity_head_sha256||
+  g.continuity_head_sha256!==continuity.continuity_head_sha256||
+  !Number.isSafeInteger(g.revision)||g.revision<1||g.revision!==root.revision||g.revision!==continuity.revision)
+  return null;
+ return Object.freeze({
+  schema:h.schema,status:'CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED',
+  packet_id:h.packet_id,approval_request_id:h.approval_request_id,
+  owner_approval_receipt_sha256:h.owner_approval_receipt_sha256,
+  acceptance_event_id:h.acceptance_event_id,acceptance_event_content_hash:h.acceptance_event_content_hash,
+  owner_id:h.owner_id,shift_id:h.shift_id,plan_id:h.plan_id,plan_fingerprint:h.plan_fingerprint,
+  parent_original_work_id:h.parent_original_work_id,source_ref:h.source_ref,
+  source_head_sha:h.source_head_sha,source_proof_sha256:h.source_proof_sha256,
+  source_manifest_sha256:h.source_manifest_sha256,acceptance_contract_sha256:h.acceptance_contract_sha256,
+  scope_count:h.scope_count,scope_fingerprints:Object.freeze(h.scope_fingerprints.map(s=>
+   Object.freeze({index:s.index,scope_sha256:s.scope_sha256}))),
+  continuity_root_id:g.continuity_root_id,continuity_head_sha256:g.continuity_head_sha256,revision:g.revision,
+  effect_type:h.effect_type,canonical_claim_required:true,
+  next_governed_action:'CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER',
+  read_only:true,execution_authorized:false,original_job_completed:false,production_changed:false
+ });
+}
+
+// The accepted route selects the existing child worker, not its authority.
+// The current isolated worker and the service-role claim still independently
+// enforce the same signed shift, accepted source, model scope and lease.
+export function selectCurrentApprovedChildReviewRoute({routes,operatingLane}={}){
+ if(routes?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+  routes.read_only!==true||routes.action_dispatched!==false||
+  routes.model_execution_authorized!==false||routes.original_job_completed!==false||
+  operatingLane?.status!=='FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
+  operatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||!Array.isArray(routes.routes))
+  return null;
+ const candidates=routes.routes.filter(r=>
+   r.next_registered_handler==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
+   r.next_governed_action==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
+ // Do not silently discard a competing candidate, select the first route,
+ // or use an accepted review as authorization for maintenance/installation.
+ if(candidates.length!==1)return null;
+ const r=candidates[0];
+ if(r.operation_category!=='EXECUTION'||
+   r.authority_scope!=='EXACT_ACCEPTED_READ_ONLY_REVIEW'||
+   r.existing_owner_goal_acceptance_verified!==true||
+   r.owner_action_required!==false||r.handler_requires_isolated_service_claim!==true||
+   r.parent_source_phase!=='BLOCKED'||!WORK.test(r.parent_original_work_id||'')||
+   !UUID.test(r.plan_id||'')||!PR.test(r.source_ref||'')||
+   !SHA.test(r.source_head_sha||'')||
+   !HASH.test(r.source_manifest_sha256||'')||!HASH.test(r.acceptance_contract_sha256||'')||
+   r.handler_dispatched!==false||r.child_execution_authorized!==false||
+   r.original_job_completed!==false)return null;
+ return r;
+}
+// Resolve the installed adapter from classified source evidence. The
+// existing adapter still independently rereads and atomically claims its work.
+// Approval packet preparation can select multiple exact pending plans as one
+// capability; the review adapter requires a unique independently scoped route.
+export function selectStagedRegisteredCapabilities({routes,operatingLane,graph,
+ registeredActionKeys=[]}={}){
+ if(routes?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+    routes.read_only!==true||routes.action_dispatched!==false||
+    routes.model_execution_authorized!==false||routes.original_job_completed!==false||
+    operatingLane?.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+    graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+    graph.installation_authorized!==false||graph.production_changed!==false||
+    !Array.isArray(graph.jobs)||!Array.isArray(routes.routes))return Object.freeze([]);
+ const candidates=routes.routes.filter(r=>
+  selectRegisteredCapabilityKey({key:r.next_registered_handler,registeredActionKeys})!==null&&
+  r.handler_dispatched===false&&r.child_execution_authorized===false&&
+  r.original_job_completed===false&&r.handler_requires_isolated_service_claim===true&&
+  UUID.test(r.plan_id||'')&&WORK.test(r.parent_original_work_id||'')&&
+  PR.test(r.source_ref||'')&&SHA.test(r.source_head_sha||'')&&
+  HASH.test(r.source_manifest_sha256||'')&&HASH.test(r.acceptance_contract_sha256||'')&&
+  graph.jobs.filter(j=>j.source_ref===r.source_ref&&
+   j.original_work_id===r.parent_original_work_id&&j.phase==='BLOCKED'&&
+   j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&j.independent_source_proof_verified===true).length===1);
+ if(new Set(candidates.map(r=>r.plan_id)).size!==candidates.length)return Object.freeze([]);
+ const selected=[];
+ const packetKey='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET';
+ const packetRoutes=candidates.filter(r=>r.next_registered_handler===packetKey&&
+  r.next_governed_action==='PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'&&
+  r.operation_category==='AUTHORITY_REQUIRED'&&r.authority_scope==='EXACT_OWNER_APPROVAL_PENDING'&&
+  r.parent_source_phase==='BLOCKED'&&r.owner_action_required===true&&
+  r.existing_owner_goal_acceptance_verified===false);
+ if(packetRoutes.length&&['FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED',
+  'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'].includes(operatingLane.status))
+  selected.push(Object.freeze({key:packetKey,routes:Object.freeze(packetRoutes)}));
+ const review=selectCurrentApprovedChildReviewRoute({routes,operatingLane});
+ if(review&&candidates.includes(review))
+  selected.push(Object.freeze({key:review.next_registered_handler,routes:Object.freeze([review])}));
+ return Object.freeze(selected);
+}
+// Keep the original boolean consumer compatible; the existing worker can
+// now consume the precise route rather than rediscovering its category.
+export function hasCurrentApprovedChildReviewRoute(input={}){
+ return selectCurrentApprovedChildReviewRoute(input)!==null;
+}
 
 // Join the independently reviewed Continuity recovery with the SAME frozen
 // shift's qualified source-plan routes. This is a read model in the existing
@@ -180,7 +343,8 @@ export function reconcileReviewedRecoveryToFinalLoopSource({
   return result('FINAL_LOOP_MULTIPLE_REVIEWED_RECOVERIES_REQUIRE_EXACT_LINEAGE',{
    reviewed_incident_count:independentlyReviewed.length});
  const eligible=stagedActions.routes.filter(route=>
-  route.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'&&
+  (route.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET'||
+   route.existing_owner_goal_acceptance_verified===true)&&
   route.parent_source_phase==='BLOCKED'&&
   WORK.test(route.parent_original_work_id||'')&&
   HASH.test(route.source_manifest_sha256||'')&&
@@ -199,20 +363,25 @@ export function reconcileReviewedRecoveryToFinalLoopSource({
    eligible_original_count:eligible.length,
    next_governed_action:'REQUEST_EXACT_ORIGINAL_SCOPE_SELECTION'});
  const p=eligible[0];
- return result('FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE',{
+ return result(p.existing_owner_goal_acceptance_verified===true?
+  'FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL':
+  'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE',{
   incident_id:independentlyReviewed[0].incident_id,
   owner_id:graph.owner_id,shift_id:graph.shift_id,
   original_work_id:p.parent_original_work_id,
   source_ref:p.source_ref,plan_id:p.plan_id,
   source_manifest_sha256:p.source_manifest_sha256,
   acceptance_contract_sha256:p.acceptance_contract_sha256,
-  next_registered_handler:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET',
+  next_registered_handler:p.next_registered_handler,
+  existing_owner_goal_acceptance_verified:p.existing_owner_goal_acceptance_verified===true,
   // A shift-wide diagnosis may lack a source_claim_id. The independent
   // source/goal contract can justify displaying a packet, but not settle the
   // incident's causal source attribution or authorize effects.
   incident_causal_lineage_independently_verified:false,
   original_source_and_goal_verified_for_owner_proposal:true,
-  next_governed_action:'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'
+  next_governed_action:p.existing_owner_goal_acceptance_verified===true?
+   'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM':
+   'PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'
  });
 }
 
@@ -229,15 +398,55 @@ export function inspectFinalLoopRecoveryContinuation({
   production_changed:false,continuation_settled:false
  };
  const result=(status,more={})=>Object.freeze({...base,status,...more});
+ // Acceptance is an already-observed fact, not a fresh grant. The
+ // existing isolated child worker and atomic claim still control execution.
+ if(candidate?.status==='FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL'&&
+    candidate.existing_owner_goal_acceptance_verified===true&&childReview?.advisory_reconciliation_evidence){
+  const e=childReview.advisory_reconciliation_evidence;
+  const retained=childReview.advisory_rejection_readback_verified===true&&
+   HASH.test(childReview.advisory_rejection_receipt_sha256||'')&&
+   UUID.test(childReview.advisory_rejection_invocation_id||'')&&
+   e.parent_original_work_id===candidate.original_work_id&&
+   e.provider_effect_replay_authorized===false&&e.accepted_artifact===false;
+  return result(retained?'FINAL_LOOP_EXISTING_CHILD_REJECTION_REQUIRES_RECONCILIATION':
+   'FINAL_LOOP_EXISTING_CHILD_REJECTION_EVIDENCE_READBACK_REQUIRED',{
+   incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
+   source_ref:candidate.source_ref,plan_id:candidate.plan_id,
+   existing_owner_goal_acceptance_verified:true,owner_action_required:false,
+   original_obligation_remains_open:true,child_execution_authorized:false,
+   handler_dispatched:false,advisory_rejection_readback_verified:retained,
+   ...(retained?{advisory_rejection_receipt_sha256:childReview.advisory_rejection_receipt_sha256,
+    advisory_rejection_reason:e.reason}:{}),
+   provider_effect_replay_authorized:false,
+   next_governed_action:retained?'RECONCILE_EXISTING_CHILD_ADVISORY_REJECTION_NO_REPLAY':
+    'READ_CANONICAL_CHILD_REJECTION_OBSERVATION_NO_REPLAY'
+  });
+ }
+ if(candidate?.status==='FINAL_LOOP_REVIEWED_RECOVERY_HAS_EXISTING_ACCEPTED_GOAL'&&
+    candidate.existing_owner_goal_acceptance_verified===true)
+  return result('FINAL_LOOP_EXISTING_ACCEPTED_GOAL_REQUIRES_VERIFIED_CHILD_CLAIM',{
+   incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
+   source_ref:candidate.source_ref,plan_id:candidate.plan_id,
+   existing_owner_goal_acceptance_verified:true,
+   owner_action_required:false,handler_dispatched:false,
+   child_execution_authorized:false,original_obligation_remains_open:true,
+   next_governed_action:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  });
  if(candidate?.status!==
     'FINAL_LOOP_REVIEWED_RECOVERY_HAS_ONE_ELIGIBLE_OWNER_PACKET_SOURCE')
   return result('FINAL_LOOP_REENTRY_REQUIRES_INDEPENDENT_SOURCE_QUALIFICATION',{
    candidate_status:candidate?.status||'NOT_READ',
    next_governed_action:candidate?.next_governed_action||
     'READ_CANONICAL_RECOVERY_AND_SOURCE_REENTRY_EVIDENCE'});
+ // The existing shared benchmark may PREPARE a strictly read-only
+ // owner packet. It cannot execute child work or claim isolated capacity.
+ // Treat it as an observed prepared packet, not a release-isolation failure.
+ const packetLane=new Set([
+  'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED',
+  'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'
+ ]);
  if(operatingLane?.operating_lane!=='NORMAL_SIGNED_SHIFT'||
-    operatingLane.status!==
-      'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED')
+    !packetLane.has(operatingLane.status))
   return result('FINAL_LOOP_REENTRY_BLOCKED_WORKER_RELEASE_OR_ISOLATION',{
    incident_id:candidate.incident_id,original_work_id:candidate.original_work_id,
    source_ref:candidate.source_ref,
@@ -259,6 +468,10 @@ export function inspectFinalLoopRecoveryContinuation({
    source_ref:candidate.source_ref,packet_id:matched[0].packet_id,
    next_governed_action:'PRESENT_EXACT_OWNER_PACKET_IN_REALITY_CHAT',
    handler_dispatched:true,handler_result_verified:true,
+   blocker_class:'EXACT_OWNER_AUTHORIZATION_REQUIRED',
+   safe_self_recovery_exhausted:false,
+   automatic_retry_without_new_evidence:false,
+   child_execution_authorized:false,
    original_obligation_remains_open:true
   });
  }

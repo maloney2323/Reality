@@ -170,13 +170,37 @@ export function createUniversePostgresPersistence({
   }
 
   async function reconstruct({ continuityRootId, worldlineId, assertionTime = new Date().toISOString() }) {
-    const params = new URLSearchParams({
-      continuity_root_id: 'eq.' + required('CONTINUITY_ROOT_ID', continuityRootId),
-      worldline_id: 'eq.' + required('WORLDLINE_ID', worldlineId),
-      assertion_time: 'lte.' + assertionTime,
-      order: 'assertion_time.asc,created_at.asc,event_id.asc',
-    });
-    return request('universe_events?' + params.toString());
+    // Full canonical history, not the first PostgREST page. Freeze the
+    // assertion-time cutoff and keep a deterministic, unique sort order
+    // across pages. The runtime's existing integrity verifier checks the
+    // reconstructed parent chain and hashes before using it for cognition.
+    const root = required('CONTINUITY_ROOT_ID', continuityRootId);
+    const worldline = required('WORLDLINE_ID', worldlineId);
+    const history = [], seen = new Set();
+    const pageSize = 400;
+    for (let offset = 0;; offset += pageSize) {
+      const params = new URLSearchParams({
+        continuity_root_id: 'eq.' + root,
+        worldline_id: 'eq.' + worldline,
+        assertion_time: 'lte.' + assertionTime,
+        order: 'assertion_time.asc,created_at.asc,event_id.asc',
+        limit: String(pageSize),
+        offset: String(offset),
+      });
+      const page = await request('universe_events?' + params.toString());
+      if (!Array.isArray(page) || page.length > pageSize)
+        throw Error('CONTINUITY_RECONSTRUCTION_PAGE_INVALID');
+      for (const row of page) {
+        if (!row?.event_id || seen.has(row.event_id))
+          throw Error('CONTINUITY_RECONSTRUCTION_DUPLICATE_OR_INVALID');
+        if (row.continuity_root_id !== root || row.worldline_id !== worldline)
+          throw Error('CONTINUITY_RECONSTRUCTION_SCOPE_MISMATCH');
+        seen.add(row.event_id);
+        history.push(row);
+      }
+      if (page.length < pageSize) break;
+    }
+    return history;
   }
 
   async function getCapability(capabilityId, version) {

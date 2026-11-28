@@ -34,7 +34,7 @@ function harness(payload=receipt,httpStatus=200){
   readyState:'complete',
   createElement:el,
   getElementById:id=>id==='realityChatComposer'?composer:
-   id==='privateTranscript'?transcript:null,
+   id==='realityChatPanelWork'?transcript:null,
   addEventListener(){}
  };
  const store=new Map();

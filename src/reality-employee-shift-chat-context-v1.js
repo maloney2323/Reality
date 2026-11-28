@@ -25,7 +25,7 @@ const teamRequested=text=>/(?:\b(?:shift|workday|work day)\b.{0,80}\b(?:staff|st
 const companyRequested=text=>/(?:\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b.{0,120}\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b|\b(?:reality|company|business|launch|market|build|operate|startup|successful)\b.{0,120}\b(?:employee|employees|staff|staffing|headcount|roles|jobs|workers|team|hires|hiring|workforce)\b)/i.test(String(text||''));
 export async function readVerifiedEmployeeShiftForChat({
  session,message,env=process.env,
- db=resolveReliabilityBenchmarkDb(env),fetchImpl=fetch,now=new Date()
+ db=resolveReliabilityBenchmarkDb(env),fetchImpl=fetch,now=new Date(),briefOnly=false
 }={}){
  if(!relevant(message)||env.VERCEL_ENV!=='preview'||
   !UUID.test(session?.user_id)||!db?.strictSecrets||!db.secretKey||
@@ -36,7 +36,9 @@ export async function readVerifiedEmployeeShiftForChat({
   const read=assertShiftReadback(await shiftRpc(db,
    'reality_read_owner_employee_shifts_v1',
    {p_owner_id:session.user_id},{fetchImpl}));
-  const brief=buildRealityShiftConversationBrief(read.shifts,[],now);
+  // The presentation helper accepts at most five rows. Keep the complete
+  // authenticated ledger for authority and maintenance reconciliation below.
+  const brief=buildRealityShiftConversationBrief(read.shifts.slice(0,5),[],now);
   const alreadyAuthorized=['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK']
    .includes(brief.status);
   const currentShift=read.shifts[0]||null;
@@ -77,6 +79,9 @@ export async function readVerifiedEmployeeShiftForChat({
    installation_authorized:false,external_execution_authorized:false,
    production_changed:false
   })];
+  // The bounded fast Chat lane needs the independently read primary shift
+  // now, not the serial optional audit, staffing, and maintenance reads.
+  if(briefOnly===true)return observations;
   // Operational Chat is a real dialogue about the SAME independently
   // reviewed maintenance obligations. The prior owner authorization is a
   // durable ledger fact; never instruct the owner to repeat it, and never

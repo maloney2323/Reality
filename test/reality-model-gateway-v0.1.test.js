@@ -191,3 +191,22 @@ test('the final model input is the EXACT current saved owner draft request, not 
  assert.match(last,/do not repeat a capability inventory/);
  assert(!last.includes(prior),'old model advice must not become latest instruction');
 });
+
+test('natural conversation instructions distinguish operational evidence from permission without adding calls',async()=>{
+ let payload,calls=0;
+ const result=await invokeRealityModel({governedSignal:signal,apiKey:'fixture',model:'fixture',
+  fetchImpl:async(_url,options)=>{
+   calls++;payload=JSON.parse(options.body);
+   return {ok:true,json:async()=>({id:'resp_natural_123',status:'completed',output_text:'Hello! How can I help?'})};
+  }});
+ const instructions=payload.input[0].content[0].text;
+ for(const phrase of ['natural fluency, breadth, and helpfulness','semantic goals, not mandatory headings',
+  'whether the customer needs to do anything','queued wake, actual worker execution',
+  'do not ask for a duplicate approval','ordinary cognition remains unobstructed'])
+  assert.ok(instructions.includes(phrase),phrase);
+ assert.equal(calls,1);
+ assert.equal(result.answer,'Hello! How can I help?');
+ assert.equal(result.authority_granted,false);
+ assert.equal(result.execution_authorized,false);
+ assert.equal(payload.tools,undefined);
+});

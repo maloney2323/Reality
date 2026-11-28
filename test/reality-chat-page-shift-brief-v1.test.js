@@ -127,3 +127,14 @@ test('signed-in Reality Chat receives owner-scoped shift status without instruct
  assert.match(chat,/readVerifiedEmployeeShiftForChat/);
  assert.match(api,/buildRealityShiftConversationBrief/);
 });
+
+test('Chat projects a final receipt only from exact completion-bound source proof',()=>{
+ const record={...shift('ENDED_WITH_VERIFIED_JOB'),planned_end_at:'infinity',close_report:{status:'EMPLOYEE_SHIFT_EVIDENCE_REPORT',shift_id:uuid,completion_bound:true,completion_reason:'ALL_AUTHORIZED_ORIGINAL_JOBS_INDEPENDENTLY_SETTLED',original_jobs_independently_settled_in_this_shift:1,authorized_source_job_count:1,verified_original_receipts:[{original_work_id:'work:'+'a'.repeat(32),source_proof_sha256:sha,independent_final_receipt_verified:true}],production_changed:false}};
+ const brief=buildRealityShiftConversationBrief([record]);
+ assert.equal(brief.complete_shift_proven,true);
+ assert.equal(brief.verified_final_original_job_count,1);
+ assert.match(page,/finalReceiptValid\(b,s\)/);
+ assert.match(page,/if\(!b.complete_shift_proven\)/);
+ assert.match(page,/realityChatFinalShiftReceipt/);
+ assert.equal(buildRealityShiftConversationBrief([{...record,close_report:{...record.close_report,authorized_source_job_count:2}}]).complete_shift_proven,false);
+});

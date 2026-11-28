@@ -9,7 +9,7 @@
  if(!/^\/chat\/?$/.test(window.location.pathname))return;
  const get=id=>document.getElementById(id);
  const ready=get('privateReady'),inbox=get('realityChatApprovalInbox'),
-  thread=get('privateTranscript');
+  thread=get('realityChatPanelApprovals')||get('privateTranscript');
  // Require only actual signed-in Chat anchors; a removed container id must not hide approval.
  if(!ready||!inbox||!thread||get('realityChatMaintenanceContinuation'))return;
  const URL='/api/reality/personal-governed-employee-shift';
@@ -1038,9 +1038,7 @@
  document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&signedIn()&&!authorizing)void refresh();
  });
- window.setInterval(()=>{
-  if(document.visibilityState==='visible'&&signedIn()&&!authorizing)void refresh();
- },120000);
+ window.addEventListener('reality:chat-work-opened',()=>{if(signedIn()&&!authorizing)void refresh()});
  // While the owner is watching, poll independently verified readback only.
  // No additional execution POST, new shift, model work or permission is minted.
  window.setInterval(()=>{

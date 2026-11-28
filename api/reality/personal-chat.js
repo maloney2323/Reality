@@ -1,11 +1,12 @@
 // Isolated, authenticated Personal Reality conversation. No customer actions.
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
-import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,readPrivateChatGoalPublicationEpoch,listPrivateConversations,validUuid} from '../../src/reality-private-chat-store-v0.1.js';
+import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,readPrivateChatGoalPublicationEpoch,listPrivateConversations,validUuid,resolvePrivateConversationDatabase,publishPrivateConversationReply} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
-import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
+import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply,isExistingWorkContinuationReply,prepareExistingWorkContinuationReply}
  from '../../src/reality-chat-proportional-readonly-v1.js';
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
-import {readRealitySelfVisibilityForChat,reconcileOwnerOriginalStatesForChat}
+import {readOperationalSelfVisibilityForChat,projectChatOperationalHorizon,
+ needsRealityCapabilityInspection,reconcileOwnerOriginalStatesForChat}
  from '../../src/reality-chat-self-visibility-v1.js';
 import {projectOwnerRealityUniverseForChat}
  from '../../src/reality-chat-universe-cognitive-projection-v1.js';
@@ -37,7 +38,7 @@ import {readOwnerOriginalWorkForChat,originalWorkObservation,
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
-import {assertFinalChatPublicationProof}
+import {assertFinalChatPublicationProof,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment,requiresSourceRenderedOperationalReply}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
 import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
@@ -179,21 +180,6 @@ export default async function handler(req,res){
      coverage:history.history_status,older_messages_may_be_missing:history.older_missing
     }});
   }
-  // The isolated preview has the database's shared goal/user publication
-  // lock installed. Never permit the older non-atomic assistant insert path.
-  if(process.env.REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED!=='true')
-   fail('CHAT_ATOMIC_GOAL_PUBLICATION_REQUIRED',503);
-  // Use the SAME canonical Continuity + Reliability pipeline as benchmarks,
-  // but only on a configuration independently restricted to this signed-in
-  // user's isolated preview project. Never silently fall back to unmonitored chat.
-  if(process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
-     process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED!=='true'||
-     process.env.REALITY_SEMANTIC_REVIEW_ENABLED!=='true')
-   fail('CHAT_UNIFIED_RELIABILITY_REQUIRED',503);
-  const isolated=resolveReliabilityBenchmarkDb();
-  if(!isolated||isolated.url!==session.config.url||
-     isolated.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
-    fail('CHAT_PRIVATE_LEDGER_SCOPE_MISMATCH',503);
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    fail('CHAT_JSON_REQUIRED',415);
   const requestId=String(req.body?.request_id||''),text=String(req.body?.message||'').trim();
@@ -231,9 +217,35 @@ export default async function handler(req,res){
   // message. Only a fully hash-verified non-consequential terminal fork may
   // start a new, explicitly linked read-only recovery segment.
   const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
-  const readOnlyTurn=isProportionalReadOnlyChat({
+  const continuationReply=isExistingWorkContinuationReply({
    message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
   });
+  const readOnlyTurn=isProportionalReadOnlyChat({
+   message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
+  })||continuationReply;
+  // Read-only conversational identity and storage are independent of work
+  // configuration; action and goal mutation still require every old gate.
+  let isolated=null;
+  if(readOnlyTurn){
+   isolated=resolvePrivateConversationDatabase(session);
+  }else{
+  // The isolated preview has the database's shared goal/user publication
+  // lock installed. Never permit the older non-atomic assistant insert path.
+  if(process.env.REALITY_ATOMIC_GOAL_PUBLICATION_ENABLED!=='true')
+   fail('CHAT_ATOMIC_GOAL_PUBLICATION_REQUIRED',503);
+  // Use the SAME canonical Continuity + Reliability pipeline as benchmarks,
+  // but only on a configuration independently restricted to this signed-in
+  // user's isolated preview project. Never silently fall back to unmonitored chat.
+  if(process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true'||
+     process.env.REALITY_CONTINUOUS_RELIABILITY_ENABLED!=='true'||
+     process.env.REALITY_SEMANTIC_REVIEW_ENABLED!=='true')
+   fail('CHAT_UNIFIED_RELIABILITY_REQUIRED',503);
+  isolated=resolveReliabilityBenchmarkDb();
+  if(!isolated||isolated.url!==session.config.url||
+     isolated.project!==process.env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF)
+    fail('CHAT_PRIVATE_LEDGER_SCOPE_MISMATCH',503);
+
+  }
   stage=readOnlyTurn?'READ_ONLY_OWNER_ATOMIC_EPOCH':
    'CONTINUITY_RECONSTRUCTION';
   // The existing atomic owner-epoch database RPC already protects read-only
@@ -249,10 +261,23 @@ export default async function handler(req,res){
    scopedRoot:'personal:chat:'+scope,principalId:session.user_id,db:isolated
   });
   const scopedRoot=continuity.scopedRoot;
+  // Both model lanes use the existing Universe projector. A bounded
+  // conversation passes only its available owner-scoped observations; the
+  // operational pipeline still reconstructs and verifies its durable spine.
+  const makeOwnerUniverseReadModel=({observations,reconciledOriginals=null}={})=>{
+   const spine=createContinuitySpine({
+    continuityRootId:scopedRoot,worldlineId:scopedRoot,
+    subjectId:session.user_id
+   });
+   return projectOwnerRealityUniverseForChat({
+    rootId:spine.continuity_root_id,worldlineId:spine.worldline_id,
+    worldId:scopedRoot,continuityHistory:null,
+    currentObservations:observations,reconciledOriginals
+   });
+  };
   if(continuity.fork_recovery&&goalCommand)
    fail('CHAT_FORK_GOAL_MUTATION_REQUIRES_INDEPENDENT_RECONCILIATION',409);
   const key=String(process.env.REALITY_STANDALONE_OPENAI_API_KEY||process.env.OPENAI_API_KEY||'');
-  if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
   // Save the human utterance BEFORE any cognition, and do not hallucinate
   // continuity success when source persistence fails.
   const recordedUser=previouslySavedUser?
@@ -260,6 +285,110 @@ export default async function handler(req,res){
    await recordPrivateMessage(session,{
     conversationId,requestId,role:'user',text,
    });
+  if(!key&&!continuationReply)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
+  // Conversation: use recent authenticated history and selectively collect
+  // existing evidence. No work qualification, goal epoch, or full spine replay.
+  if(readOnlyTurn){
+   stage='READ_ONLY_BOUNDED_CONTEXT';
+   const recent=history.messages.filter(x=>x.request_id!==requestId).slice(-18);
+   // This selects read-only context, NEVER action authority. Even a mistaken
+   // relevance decision cannot create work. Greetings need only conversation.
+   const wantsContext=text.length>35||needsRealityCapabilityInspection(text,recent)||/\b(past|present|future|universe|ceo|reality|work|job|shift|goal|history|yesterday|today|tomorrow|remember|progress|status|done|next|it|that|this|revision|release|receipt|approval|worker|continuity|recovery|blocker|capability|capabilities)\b/i.test(text);
+   const ctx=(wantsContext||continuationReply)&&isolated?await collectOptionalChatEvidence([
+    ...(continuationReply?[{id:'continuation_handoff',
+     read:()=>readOwnerChatWorkHandoff({session,conversationId}),
+     validate:v=>v?.source==='AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK',fallback:null}]:[]),
+    {id:'time_horizon',read:()=>readOwnerTimeHorizonEvidence({ownerId:session.user_id,db:isolated,env:process.env}),
+     validate:v=>v?.status==='REALITY_OWNER_TIME_HORIZON_READ_ONLY'&&v.owner_scope_verified===true&&v.read_only===true&&v.approved_new_work_by_read===false,
+     fallback:null},
+    {id:'owner_handoff',read:()=>readOwnerOperationalIncidentChatBriefing({session,db:isolated}),
+     validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false,fallback:null},
+    {id:'verified_work',read:()=>readVerifiedOwnerCompletedWorkForChat({session,db:isolated}),validate:Array.isArray,fallback:[]},
+    {id:'self_visibility',timeoutMs:5000,read:()=>readOperationalSelfVisibilityForChat({session,message:text,priorTurns:recent,db:isolated}),validate:v=>Array.isArray(v?.observations),fallback:null},
+    {id:'active_shift',timeoutMs:5000,read:()=>readVerifiedEmployeeShiftForChat({session,message:text,db:isolated,briefOnly:true}),validate:Array.isArray,fallback:[]},
+    {id:'worker_observation',read:()=>readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+    {id:'mission',read:()=>readFreshPersonalAccountMissionState({session}),
+     validate:v=>v?.principal_id===session.user_id&&v.source==='OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY'&&v.execution_authorized===false&&v.state?.assistant_can_mutate_goals===false,fallback:null}
+   ],{timeoutMs:1800}):{values:{},unavailable:wantsContext?['owner_context']:[],status:wantsContext?'OPTIONAL_EVIDENCE_PARTIALLY_UNAVAILABLE':'CONVERSATION_ONLY_CONTEXT'};
+   const t=ctx.values.time_horizon;
+   const shift=ctx.values.active_shift?.find(x=>x?.source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'&&x.owner_shift_authorization_recorded===true)||null;
+   const selfVisibilityObservations=ctx.values.self_visibility?.observations||[];
+   // Reuse the full lane's authenticated incident projection, not a second
+   // read, detector, or authority path. Keep current incidents in the bounded
+   // context; unavailable evidence stays unknown.
+   const incidentObservations=incidentChatUniverseObservations(ctx.values.owner_handoff);
+   const observations=[...incidentObservations,...selfVisibilityObservations,...(ctx.values.verified_work||[]),...(ctx.values.active_shift||[]),...(ctx.values.worker_observation||[])].slice(0,90);
+   const operationalHorizon=wantsContext?projectChatOperationalHorizon({visibility:ctx.values.self_visibility,settlements:ctx.values.verified_work||[]}):null;
+   const mission=ctx.values.mission?.state?.active_goal;
+   const ownerUniverse=makeOwnerUniverseReadModel({observations});
+   stage='READ_ONLY_MODEL_COGNITION';
+   const quickStart=Date.now();
+   const advisory=continuationReply?prepareExistingWorkContinuationReply({
+    ownerId:session.user_id,conversationId,requestId,sourceRef:recordedUser.source_ref,
+    handoff:ctx.values.continuation_handoff,shift
+   }):await generateProportionalReadOnlyReply({
+    message:text,conversationId,requestId,ownerId:session.user_id,sourceRef:recordedUser.source_ref,
+    verifiedPriorTurns:recent,worldlineId:scopedRoot,apiKey:key,
+    operationalTimeHorizon:operationalHorizon,
+    model:process.env.REALITY_CHAT_OPENAI_MODEL||'gpt-4.1-mini',
+    ownerContext:{source_status:ctx.status,unavailable_sources:ctx.unavailable,
+     currently_authorized_shift:shift,
+      current_operational_self_visibility:selfVisibilityObservations.filter(x=>x.event_kind==='reality_current_verified_operational_self_visibility').slice(0,12).map(x=>x.current_operational_facts),
+      current_operational_receipts_take_precedence_over_legacy_audit_or_prior_conversation:true,
+     temporal_intelligence:t?{past:t.past,present:t.present,future:t.future,
+      final_loop:t.final_loop_owner,ceo:t.final_loop_owner?.executive||null,
+      recovery:t.final_loop_recovery_guidance,universe_feedback:t.final_loop_universe_feedback,
+      expected_outcomes_are_not_verified_facts:true}:null,
+     active_owner_mission:mission?.user_confirmed===true&&mission.status==='ACTIVE'?{title:mission.title,source_user_message_ref:mission.source_user_message_ref,grants_execution_authority:false}:null,
+     owner_operational_incidents:ctx.values.owner_handoff?.items?.slice(0,3)||null,
+     owner_incident_evidence_status:ctx.values.owner_handoff?'OWNER_SCOPED_READBACK':'UNAVAILABLE_NOT_ABSENCE',
+     owner_shift_continuity_incidents:ctx.values.owner_handoff?.shift_continuity_incidents?.slice(0,3)||null,
+     conversation_never_grants_execution_authority:true},
+    verifiedUniverseObservations:ownerUniverse.observations,
+    recordClaimAssessment:async({answer,assessment})=>{
+     // Only assessed operational replies use the canonical writer. Ordinary
+     // Chat never waits on a history reconstruction. Enforce a shared time
+     // budget and exact preview credentials; never fall back to production.
+     const ledgerDb=resolveReliabilityBenchmarkDb();
+     if(!isolated||!ledgerDb||ledgerDb.url!==isolated.url||
+        process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')throw Error('CHAT_READ_ONLY_CLAIM_LEDGER_UNAVAILABLE');
+     const deadline=AbortSignal.timeout(5000);
+     const observedAt=new Date().toISOString();
+     const runtime=await startContinuityRuntime({
+      continuityRootSource:scopedRoot,worldlineSource:scopedRoot,subjectId:conversationId,
+      signal:buildGovernedChatSignal({message:text,observedAt}),observedAt,
+      fetchImpl:(url,options={})=>fetch(url,{...options,signal:options.signal?
+       AbortSignal.any([deadline,options.signal]):deadline})
+     });
+     return recordReadOnlyOutputClaimAssessment({runtime,requestId,sourceRef:recordedUser.source_ref,answer,assessment});
+    }
+   });
+   governedCognitionMs=Date.now()-quickStart;
+   stage='READ_ONLY_CONVERSATION_PUBLICATION';
+   let publication=null;
+   try{
+    if(isolated)publication=await publishPrivateConversationReply(session,{
+     conversationId,requestId,sourceRef:recordedUser.source_ref,text:advisory.answer,db:isolated});
+   }catch(e){if(Number(e?.status)!==503)throw e;}
+   // The exact committed INSERT receipt is the save acknowledgement.
+   // A failed write is not called saved; the current request remains recoverable.
+   return res.status(200).json({ok:true,conversation_id:conversationId,answer:advisory.answer,
+    read_only_conversation:true,transient_answer_only:!publication,
+    ...(continuationReply?{work_handoff:advisory.work_handoff}:{}),
+    original_request_id:requestId,replayed:false,
+    continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',current_answer_persisted:Boolean(publication),
+     coverage:history.history_status,recovered_messages:history.messages.length,
+     older_messages_may_be_missing:history.older_missing,
+     goal_publication_atomicity:publication?'CONVERSATIONAL_EXACT_REQUEST_ATOMIC_INSERT':'UNAVAILABLE',
+     reply_recovery_requires_exact_saved_request:!publication},
+    reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',transient_answer_not_a_receipt:!publication,
+     canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
+     output_claim_assessment:advisory.output_claim_assessment,
+     independently_verified_semantic_correctness:false,business_outcome_verified:false,external_actions_authorized:false},
+    contextual_readback_status:{evidence:ctx.status,unavailable_sources:ctx.unavailable,grants_execution_authority:false},
+    execution:{status:'NOT_EXECUTED',external_actions_authorized:false,installation_authorized:false},
+    response_timing:{total_ms:Date.now()-chatStartedAt,governed_cognition_ms:governedCognitionMs}});
+  }
   // The signed human message entered the governed durable work inbox via
   // AFTER INSERT, independently of Chat cognition or assistant publication.
   stage='SIGNED_CHAT_WORK_READBACK';
@@ -292,10 +421,10 @@ export default async function handler(req,res){
    // Existing self-audit + exact pinned GitHub source tree. Fast and
    // independent of the employee-shift dashboard's readback success.
    // A model MUST NOT infer "missing engine" from absent optional evidence.
-   {id:'self_visibility',read:()=>readRealitySelfVisibilityForChat({
+   {id:'self_visibility',timeoutMs:5000,read:()=>readOperationalSelfVisibilityForChat({
       session,message:text,
       priorTurns:history.messages.filter(x=>x.request_id!==requestId),
-      db:isolated}),validate:Array.isArray,fallback:[]},
+      db:isolated}),validate:v=>Array.isArray(v?.observations),fallback:null},
    {id:'market',read:()=>readVerifiedMarketStageForChat({
       session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
    {id:'upgrade',read:()=>readVerifiedResearchUpgradeForChat({
@@ -336,7 +465,11 @@ export default async function handler(req,res){
      x.final_loop_universe_feedback.owner_id===session.user_id&&
      x.final_loop_universe_feedback.read_only===true&&
      x.final_loop_universe_feedback.execution_authorized===false&&
-     x.final_loop_universe_feedback.original_job_completed===false,
+     x.final_loop_universe_feedback.original_job_completed===false&&
+     (process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED!=='true'||
+       (x.final_loop_shared_continuity_guard?.status===
+        'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'&&
+        x.final_loop_universe_feedback.shared_continuity_guard_crosschecked===true)),
     fallback:null},
    {id:'weekly_queue',read:()=>readOwnerWeeklyCandidateQueueForChat({session}),
       validate:v=>typeof v?.status==='string'&&
@@ -396,8 +529,10 @@ export default async function handler(req,res){
    weekly_workload:weeklyWorkloadObservations,
    workforce:companyWorkforceObservations,riley_sources:rileySourceWorkObservations,
    native263:native263TemporalObservations,settlements:ownerCompletedWorkObservations,
-   self_visibility:selfVisibilityObservations
+   self_visibility:selfVisibilityReadback
   }=optionalContext.values;
+  const selfVisibilityObservations=selfVisibilityReadback?.observations||[];
+  const operationalHorizon=projectChatOperationalHorizon({visibility:selfVisibilityReadback,settlements:ownerCompletedWorkObservations});
   const signedIntake=chatWorkReadback?.items?.find(x=>
    x.request_id===requestId&&x.source_ref===recordedUser.source_ref)||null;
   const evidence=optionalContext;
@@ -482,6 +617,8 @@ export default async function handler(req,res){
   const finalLoopUniverseObservations=
    feedback?.status===
      'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY'&&
+   (process.env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED!=='true'||
+    feedback.shared_continuity_guard_crosschecked===true)&&
    feedback.owner_id===session.user_id&&
    feedback.shift_id===verifiedOwnerShift?.active_owner_shift_id&&
    feedback.read_only===true&&feedback.execution_authorized===false&&
@@ -499,6 +636,7 @@ export default async function handler(req,res){
    feedback.observations:[];
   const ownerCurrentUniverseObservations=[
    ...(primaryMissionObservation?[primaryMissionObservation]:[]),
+   ...selfVisibilityObservations,
    ...finalLoopUniverseObservations,
    buildRealityProposedEmployeeRoleDiscussionContext(),
    ...native263TemporalObservations,...ownerCompletedWorkObservations,
@@ -506,217 +644,18 @@ export default async function handler(req,res){
    ...employeeShiftObservations,...workerWakeObservations,
    ...companyWorkforceObservations,...rileySourceWorkObservations,
    ...weeklyWorkloadObservations,
-   ...selfVisibilityObservations,
    ...incidentChatUniverseObservations(operationalIncidentsReadback),
    ...originalWorkObservation(ownerOriginalWork),
    ...reconciliationObservation,...weeklyQueueObservation(ownerWeeklyQueue)
   ];
-  const makeOwnerUniverseReadModel=(priorHistory=null)=>{
-   const spine=createContinuitySpine({
-    continuityRootId:scopedRoot,worldlineId:scopedRoot,
-    subjectId:session.user_id
-   });
-   return projectOwnerRealityUniverseForChat({
-    rootId:spine.continuity_root_id,
-    worldlineId:spine.worldline_id,
-    worldId:scopedRoot,continuityHistory:priorHistory,
-    currentObservations:ownerCurrentUniverseObservations,
-    reconciledOriginals
-   });
-  };
-  // Ordinary Chat needs no job settlement or installation proof to ANSWER.
-  // It still uses the existing Signal Cleaner, grounded cognitive gateway,
-  // owner-scoped history and atomic goal-revision compare-and-swap.
-  // Actual work commands, public research and goal mutations retain the
-  // full governed orchestration, independent testing and exact approvals.
-  if(readOnlyTurn){
-   stage='READ_ONLY_OWNER_GOAL_EPOCH';
-   // Single existing DB RPC (indexed per owner/conversation) provides the
-   // same atomic revision check used by the production execution engine.
-   // A temporarily unavailable goal-epoch provider must not silence an
-   // authenticated owner's ordinary question. Without the exact CAS epoch,
-   // no assistant message may be persisted and no work action is permitted.
-   // A transient, clearly non-durable advisory can still be shown in Chat.
-   // Never swallow a 409 (newer user turn / changed goal) as a provider outage.
-   let goalEpoch=null;
-   try{
-    goalEpoch=await readPrivateChatGoalPublicationEpoch(session,{
-     conversationId,requestId,isolatedDb:isolated
-    });
-   }catch(epochError){
-    if(Number(epochError?.status)!==503)throw epochError;
-   }
-   const expectedRevision=goalEpoch?.expected_revision;
-   const expectedLastGoalEventId=goalEpoch?.expected_last_goal_event_id;
-   stage='READ_ONLY_BOUNDED_UNIVERSE_HISTORY';
-   const authoritySpine=createContinuitySpine({
-    continuityRootId:scopedRoot,worldlineId:scopedRoot,
-    subjectId:session.user_id
-   });
-   // Read the existing Universe for extra grounded context if available
-   // promptly. Never equate an unavailable provider read with no history.
-   // The owner RLS Chat messages and exact goal epoch are independent and
-   // remain sufficient for ordinary advice, drafting and explanation.
-   let priorGoals=null;
-   try{
-    const boundedFetch=(url,options={})=>fetch(url,{
-     ...options,
-     signal:AbortSignal.any([
-      options.signal||AbortSignal.timeout(1400),
-      AbortSignal.timeout(1400)
-     ])
-    });
-    priorGoals=await createUniversePostgresPersistence({
-     ...isolated,fetchImpl:boundedFetch
-    }).reconstruct({
-     continuityRootId:authoritySpine.continuity_root_id,
-     worldlineId:authoritySpine.worldline_id
-    });
-   }catch{
-    // Missing optional history does not reset, revise or delete any
-    // Continuity, user goal, original job or installed capability.
-   }
-   const currentGoal=goalEpoch?{
-    status:'EXACT_OWNER_ATOMIC_GOAL_EPOCH_READBACK',
-    transition_count:goalEpoch.expected_revision,
-    last_transition_event_id:goalEpoch.expected_last_goal_event_id,
-    source:goalEpoch.source,
-    detailed_goal_history_available:Array.isArray(priorGoals)
-   }:{
-    status:'OWNER_GOAL_EPOCH_UNAVAILABLE_READ_ONLY_REPLY_NOT_DURABLE',
-    transition_count:null,last_transition_event_id:null,
-    source:'UNAVAILABLE_NOT_AUTHORITY',
-    detailed_goal_history_available:Array.isArray(priorGoals),
-    execution_authorized:false,installation_authorized:false
-   };
-   if(goalEpoch&&(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||
-      (expectedLastGoalEventId!==null&&!validUuid(expectedLastGoalEventId))))
-    fail('CHAT_READ_ONLY_OWNER_GOAL_SNAPSHOT_UNVERIFIED',503);
-   stage='READ_ONLY_UNIVERSE_COGNITIVE_PROJECTION';
-   let ownerUniverse;
-   try{ownerUniverse=makeOwnerUniverseReadModel(priorGoals)}
-   catch{
-    // A temporarily conflicting or unreadable optional Universe projection
-    // is an epistemic unknown, never a reason for Chat to go silent.
-    ownerUniverse=makeOwnerUniverseReadModel(null);
-   }
-   stage='READ_ONLY_MODEL_COGNITION';
-   const quickStart=Date.now();
-   const advisory=await generateProportionalReadOnlyReply({
-    message:text,conversationId,requestId,ownerId:session.user_id,
-    sourceRef:recordedUser.source_ref,
-    verifiedPriorTurns:history.messages.filter(x=>x.request_id!==requestId),
-    worldlineId:scopedRoot,apiKey:key,model:'gpt-4.1-mini',
-    ownerContext:{
-     current_work_intake_status:signedIntake?.status||'NOT_VERIFIED',
-     worker_scope_limits_external_execution_only:true,
-     currently_authorized_shift:verifiedOwnerShift||null,
-     owner_originals:reconciledOriginals||ownerOriginalWork||null,
-     weekly_queue:ownerWeeklyQueue||null,
-     weekly_workload_gap:weeklyWorkloadObservations[0]?.weekly_workload_insight||null,
-     verified_workforce:companyWorkforceObservations.slice(0,12),
-     owner_operational_incidents:operationalIncidentsReadback?.items?.slice(0,3)||null,
-     owner_operational_incident_source_available:
-      operationalIncidentsReadback?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY',
-     authoritative_goal_state:currentGoal,
-     verified_primary_business_mission:activePrimaryMission?Object.freeze({
-      goal_id:activePrimaryMission.goal_id,
-      owner_confirmed_text:activePrimaryMission.title,
-      source_user_message_ref:activePrimaryMission.source_user_message_ref,
-      grants_execution_authority:false
-     }):null,
-     universe_cognitive_state_id:ownerUniverse.state_id,
-     universe_read_model:'EXISTING_UNIVERSE_PLUS_CANONICAL_CONTINUITY',
-     source_status:ownerContext.status,
-     unavailable_sources:ownerContext.unavailable
-    },
-    verifiedUniverseObservations:ownerUniverse.observations
-   });
-   governedCognitionMs=Date.now()-quickStart;
-   if(!goalEpoch){
-    // Session + signed user turn were verified before model cognition.
-    // This is NOT saved, not an owner approval, not a verified outcome, and
-    // cannot stand in for the existing exact goal-CAS publication receipt.
-    // The original request stays pending for an idempotent saved-reply retry.
-    return res.status(200).json({
-     ok:true,conversation_id:conversationId,answer:advisory.answer,
-     read_only_conversation:true,transient_answer_only:true,
-     original_request_id:requestId,
-     continuity:{
-      history_source:'AUTHENTICATED_SUPABASE_RLS',
-      current_answer_persisted:false,goal_publication_atomicity:'UNAVAILABLE',
-      reply_recovery_requires_exact_saved_request:true,
-      recovered_messages:history.messages.length,
-      coverage:history.history_status,
-      older_messages_may_be_missing:history.older_missing
-     },
-     reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',
-      transient_answer_not_a_receipt:true,
-      owner_goal_epoch_independently_verified:false,
-      business_outcome_verified:false,
-      external_actions_authorized:false},
-     execution:{status:'NOT_EXECUTED',external_actions_authorized:false,
-      installation_authorized:false},
-     response_timing:{total_ms:Date.now()-chatStartedAt,
-      optional_context_wait_ms:optionalContextWaitMs,
-      governed_cognition_ms:governedCognitionMs}
-    });
-   }
-   // An answer is not independent evidence that an action happened.
-   stage='READ_ONLY_ATOMIC_ASSISTANT_PUBLICATION';
-   const publication=await publishPrivateAssistantAtomically(session,{
-    conversationId,requestId,text:advisory.answer,isolatedDb:isolated,
-    expectedRevision,expectedLastEventId:expectedLastGoalEventId
-   });
-   stage='READ_ONLY_EXACT_REPLY_RLS_READBACK';
-   const exact=await readPrivateChatRequest(session,{conversationId,requestId});
-   const saved=exact.messages.filter(x=>x.role==='assistant'&&
-    x.request_id===requestId&&x.text===advisory.answer&&
-    /^supabase:reality_chat_messages:[a-f0-9-]{36}$/i.test(x.source_ref||''));
-   const savedUser=exact.messages.filter(x=>x.role==='user'&&
-    x.request_id===requestId&&x.text===text&&
-    x.source_ref===recordedUser.source_ref);
-   if(saved.length!==1||savedUser.length!==1||
-      publication?.atomic_goal_revision_checked!==true)
-    fail('CHAT_READ_ONLY_ATOMIC_REPLY_READBACK_UNVERIFIED',503);
-   return res.status(200).json({
-    ok:true,conversation_id:conversationId,answer:advisory.answer,
-    replayed:false,read_only_conversation:true,
-    continuity:{
-     history_source:'AUTHENTICATED_SUPABASE_RLS',
-     recovered_messages:exact.messages.length,
-     coverage:'EXACT_SAVED_REQUEST',
-     older_messages_may_be_missing:history.older_missing,
-     current_answer_persisted:true,
-     goal_publication_atomicity:'ATOMIC_DATABASE_GOAL_REVISION_AND_ASSISTANT_INSERT'
-    },
-    reliability:{
-     chat_lane:'PROPORTIONAL_READ_ONLY',
-     canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
-     readback_verified:false,
-     semantic_review_status:'NOT_INDEPENDENTLY_ASSESSED',
-     independently_verified_semantic_correctness:false,
-     external_actions_authorized:false,
-     business_outcome_verified:false
-    },
-    contextual_readback_status:{
-     evidence:evidence.status,owner_job_queue:ownerContext.status,
-     unavailable_sources:[...evidence.unavailable,...ownerContext.unavailable],
-     missing_source_does_not_prove_no_work:true,
-     grants_execution_authority:false
-    },
-    execution:{status:'NOT_EXECUTED',external_actions_authorized:false},
-    response_timing:{total_ms:Date.now()-chatStartedAt,
-     optional_context_wait_ms:optionalContextWaitMs,
-     governed_cognition_ms:governedCognitionMs}
-   });
-  }
   stage='COGNITION_AND_RELIABILITY';
   const governedCognitionStart=Date.now();
   // The full operational pipeline already reconstructs durable Universe
   // history itself. Supply the SAME current owner cognitive read model,
   // without issuing another persistence query or creating a second ledger.
-  const ownerUniverse=makeOwnerUniverseReadModel();
+  const ownerUniverse=makeOwnerUniverseReadModel({
+   observations:ownerCurrentUniverseObservations,reconciledOriginals
+  });
   const result=await runLiveIntelligenceOrchestration({
    message:text,requestedBy:session.user_id,
    // The signed-in user's current request can permit read-only public search;
@@ -732,6 +671,7 @@ export default async function handler(req,res){
     // Signed-in owner Chat consumes the verified canonical Spine, not the
     // stale, independently stored legacy Universe entry collection.
     canonical_continuity_is_universe_source:true,
+    operational_time_horizon:operationalHorizon,
     fork_recovery_audit:continuity.fork_recovery,
     conversation_history_source:'AUTHENTICATED_SUPABASE_RLS',
     conversation_history_older_messages_may_be_missing:history.older_missing,
@@ -799,7 +739,9 @@ export default async function handler(req,res){
      work_authorized_by_read:false,
      required_truth:'These are existing weekly work candidates, not approved executable jobs. Proactively qualify current defects; never manufacture work or replay settled originals.'
     }:{status:'WEEKLY_QUEUE_READBACK_UNAVAILABLE_DO_NOT_CLAIM_NO_WORK'},
-    owner_original_work_current_state:ownerOriginalWork?{
+    current_operational_self_visibility:selfVisibilityObservations.filter(x=>x.event_kind==='reality_current_verified_operational_self_visibility').slice(0,12).map(x=>x.current_operational_facts),
+     current_operational_receipts_take_precedence_over_legacy_audit_or_prior_conversation:true,
+     owner_original_work_current_state:ownerOriginalWork?{
      source:'AUTHENTICATED_OWNER_SCOPED_DATABASE_READBACK',
      existing_authorized_shift_id:ownerOriginalWork.current_shift_id,
      unfinished_originals:reconciledOriginals?
@@ -836,6 +778,7 @@ export default async function handler(req,res){
   const finalPublicationProof=assertFinalChatPublicationProof({
    answer,reliability:result?.reliability,
    atomicGoalPublicationEnabled:true,
+   sourceRenderedOperationalRequired:requiresSourceRenderedOperationalReply(text),
   });
   if(result?.reliability?.canonical_epistemic_state?.status!=='PERSISTED_AND_READBACK_VERIFIED'||
      result?.reliability?.readback_verified!==true)
@@ -906,7 +849,10 @@ export default async function handler(req,res){
      user_goal_continuity:result.reliability.user_goal_continuity||null,
      assistant_goal_governance:result.reliability.goal_governance||null,
      final_answer_publication_proof:finalPublicationProof,
-     final_answer_direction_release:result.reliability.final_direction_release||{
+     final_answer_direction_release:result.reliability.final_direction_release?{
+       ...result.reliability.final_direction_release,
+       output_claim_assessment:summarizeOutputClaimAssessment(result.reliability.final_direction_release.output_claim_assessment)
+     }:{
        status:'NOT_ASSESSED_IN_THIS_RUNTIME',release_allowed:null,
        semantic_accuracy_independently_verified:false},
      three_contract_integrity:{
@@ -925,7 +871,7 @@ export default async function handler(req,res){
      semantic_review_status:result.reliability.semantic_review?.status||'NOT_ASSESSED',
      semantic_review_provenance_status:result.reliability.semantic_review?.provenance_review_status||'NOT_ASSESSED',
      semantic_issue_candidates:(result.reliability.semantic_review?.issues||[]).map(issue=>({
-       kind:issue.kind,quote:issue.quote,reason:issue.reason})),
+       kind:issue.kind})),
      conversational_drift_findings_count:result.reliability.conversational_assessment?.findings_count||0,
      goal_drift_coverage:result.reliability.conversational_assessment?.goal_drift_coverage||{
        status:'NOT_SEMANTICALLY_ASSESSED',candidate_count_zero_means_drift_free:false,
@@ -958,7 +904,23 @@ export default async function handler(req,res){
   const status=Number(e.status)||503;
   const underlying=String(e?.message||'');
   // Never reflect arbitrary provider/database errors or user content.
-  const code=/^[A-Z][A-Z0-9_]{3,119}$/.test(underlying)?underlying:'CHAT_RESPONSE_UNAVAILABLE';
+  // Only fixed categories are exposed; raw provider messages can contain secrets.
+  let code=/^[A-Z][A-Z0-9_]{3,119}$/.test(underlying)?underlying:'CHAT_RESPONSE_UNAVAILABLE';
+  if(stage==='READ_ONLY_MODEL_COGNITION' && code==='CHAT_RESPONSE_UNAVAILABLE'){
+   const providerCode=String(e?.provider_error||'');
+   if(providerCode==='insufficient_quota')code='CHAT_MODEL_INSUFFICIENT_QUOTA';
+   else if(providerCode==='model_not_found')code='CHAT_MODEL_NOT_AVAILABLE';
+   else if(status===401)code='CHAT_MODEL_AUTHENTICATION_FAILED';
+   else if(status===403)code='CHAT_MODEL_PERMISSION_DENIED';
+   else if(status===429)code='CHAT_MODEL_RATE_LIMITED';
+   else if(status===400||status===422)code='CHAT_MODEL_REQUEST_REJECTED';
+   else if(status===404)code='CHAT_MODEL_NOT_AVAILABLE';
+   else if(e?.name==='TimeoutError'||e?.name==='AbortError')code='CHAT_MODEL_REQUEST_TIMEOUT';
+   else if(Number(e?.status)>=500)code='CHAT_MODEL_PROVIDER_UNAVAILABLE';
+   else if(e?.name==='TypeError')code='CHAT_MODEL_TRANSPORT_OR_RUNTIME_FAILURE';
+   else if(e?.name==='SyntaxError')code='CHAT_MODEL_RESPONSE_PARSE_FAILED';
+   else code='CHAT_MODEL_UNCLASSIFIED_FAILURE';
+  }
   console.warn('REALITY_CHAT_STAGE_FAILURE',stage,code,
    'elapsed_ms',Date.now()-chatStartedAt);
   return res.status(status).json({ok:false,error:code,

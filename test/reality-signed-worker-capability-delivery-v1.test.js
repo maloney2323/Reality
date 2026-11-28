@@ -286,3 +286,36 @@ test('unverified database isolation or unregistered packet handler bars cutover'
   assert.equal(writes,0);
  }
 });
+
+test('canonical release delivery consumes only matching runtime scope and never accepts an isolated approval',async()=>{
+ const runtime='abcdefghijklmnopqrst',qualification='bcdefghijklmnopqrstu';
+ const scope={target_environment:'CANONICAL_BENCHMARK_PREVIEW',owner_id:owner,shift_id:shift,scheduled_alias:aliasName,
+  runtime_database_project_ref:runtime,qualification_database_project_ref:qualification,release_sha:next,release_ref:branch,capability_key:action,
+  runtime_same_shift_verified:true,independent_qualification_branch_verified:true,independent_gateway_ci_verified:true,
+  child_execution_enabled:false,parent_delivery_enabled:false,production_changed:false,
+  provider_release_proof_sha256:'sha256:'+'a'.repeat(64),independent_isolation_proof_sha256:'sha256:'+'b'.repeat(64),
+  plan_fingerprint:'sha256:'+'c'.repeat(64),continuity_head_sha256:'sha256:'+'d'.repeat(64),qualifier_receipt_sha256:'sha256:'+'e'.repeat(64),
+  continuity_root_id:shift,continuity_revision:2,cron_job_id:7,gateway_ci_run_id:2005,
+  original_work_id:'work:'+'a'.repeat(32),source_ref:'https://github.com/maloney2323/Reality/pull/307'};
+ const c={...candidate,scheduled_alias:aliasName,environment:scope.target_environment,isolated_database_independently_verified:false,runtime_scope:scope};
+ const e={...env(),REALITY_SIGNED_CAPABILITY_DELIVERY_ENABLED:'true',REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:scope.target_environment,
+  REALITY_RELEASE_CONTROL_DB_PROJECT_REF:runtime,REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF:qualification};
+ let reads=0,writes=0;
+ const args=deliveryArgs({env:e,releaseCandidate:c,observeAlias:async()=>++reads>=3?validNewAlias:validOldAlias,
+  assignAlias:async()=>{writes++;return {provider:'VERCEL',alias:aliasName,release_sha:next,claim_id:claimId}}});
+ const denied=await deliver(args);
+ assert.equal(denied.status,'SIGNED_CAPABILITY_DELIVERY_EXACT_OWNER_AUTHORITY_MISSING');
+ assert.equal(writes,0);
+ reads=0;
+ const mismatch=await deliver({...args,claimApprovedRelease:async()=>({...authorizedClaim,target_environment:scope.target_environment,runtime_scope:{...scope,original_work_id:'work:'+'f'.repeat(32)}})});
+ assert.equal(mismatch.status,'SIGNED_CAPABILITY_DELIVERY_EXACT_OWNER_AUTHORITY_MISSING');
+ assert.equal(writes,0);
+ reads=0;
+ const accepted=await deliver({...args,claimApprovedRelease:async payload=>{
+  assert.deepEqual(payload.runtime_scope,scope);
+  return {...authorizedClaim,target_environment:scope.target_environment,runtime_scope:scope};
+ }});
+ assert.equal(accepted.status,'SIGNED_CAPABILITY_DELIVERY_ALIAS_VERIFIED_AWAITING_WORKER_WAKE');
+ assert.equal(writes,1);
+ assert.equal(accepted.original_job_completed,false);
+});

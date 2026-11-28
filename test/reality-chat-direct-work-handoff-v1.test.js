@@ -769,12 +769,16 @@ test('existing signed shift notice has a real X; dismissal persists across saved
    }});
    for(let i=0;i<7;i++)await new Promise(resolve=>setImmediate(resolve));
   };
-  return {transcript,rehydrate};
+  return {transcript,work,rehydrate};
  };
  const first=makeFixture();
  await first.rehydrate();
- assert.equal(first.transcript.children.length,1);
- const card=first.transcript.children[0];
+ assert.equal(first.transcript.children.length,0);
+ // The Work panel also contains its persistent lookup control. Identify
+ // the exact saved request's receipt, not the number of unrelated children.
+ const receipts=host=>host.children.filter(n=>n.dataset?.realityBuildRequest===requestId);
+ assert.equal(receipts(first.work).length,1);
+ const card=receipts(first.work)[0];
  const close=card.children[0].children.at(-1);
  assert.equal(close.tagName,'BUTTON');
  assert.equal(close.textContent,'×');
@@ -784,12 +788,14 @@ test('existing signed shift notice has a real X; dismissal persists across saved
  const before=fetches.length;
  close.onclick();
  assert.equal(card.hidden,true);
+ assert.equal(receipts(first.work).length,0);
  assert.equal(first.transcript.children.length,0);
  assert.equal(fetches.length,before,'dismissal must not POST or start another shift');
  assert.equal(storage.get('reality:hide-signed-shift-note:'+requestId),'1');
  const reloaded=makeFixture();
  await reloaded.rehydrate();
- assert.equal(reloaded.transcript.children.length,0,'dismissed notice stays gone after browser reload');
+ assert.equal(receipts(reloaded.work).length,0,'dismissed notice stays gone after browser reload');
+ assert.equal(reloaded.transcript.children.length,0);
  assert.ok(fetches.every(x=>x.action==='READ_SIGNED_EXISTING_SHIFT_WAKE_STATUS'));
 });
 

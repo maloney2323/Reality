@@ -93,8 +93,10 @@ test('nonvisible pages do not trigger unrelated authenticated data readers',()=>
   const position=source.indexOf('Do not fetch hidden pages');
   assert.ok(position>0 && position<source.indexOf('fetch('),file+' must gate before networking');
  }
- assert.match(html,/if\(route==='work'\)\{void wcInvestigateMarket/);
- assert.match(html,/if\(route==='chat'\)void realityChatRefreshEvents/);
+ assert.match(html,/if\(route==='work'\)\{void wcEasyRefresh\(\);void wcInvestigateMarket/);
+ assert.doesNotMatch(html,/if\(route==='chat'\)void realityChatRefreshEvents/);
+ assert.match(html,/window.addEventListener\('reality:chat-work-opened',async/);
+ assert.match(html,/if\(!onRoute\('chat'\)\|\|chatWorkReading/);
 });
 
 class Node {

@@ -180,7 +180,15 @@ test('mobile Chat keeps its conversation and navigation outside the long #263 pr
  assert.match(proof,/realityChatTabProof/);
  assert.match(proof,/const ready=element\('privateReady'\)/);
  assert.match(workspace,/homeLink\.href = '\/'/);
- assert.match(workspace,/threadButtons\.append\(homeLink, historyToggle, inspectorToggle, (?:newChatHeader, )?focusToggle\)/);
+ // Check the final navigation containers, including the newer exact-decision
+ // control, rather than the obsolete order of transient DOM append calls.
+ assert.match(workspace,/threadButtons\.append\(homeLink, inspectorToggle, newChatHeader, decisionAction, focusToggle\)/);
+ assert.match(workspace,/quickNav\.append\(planShift\)/);
+ assert.match(workspace,/threadHeader\.append\(historyToggle, threadTitle, threadButtons\)/);
+ assert.match(workspace,/conversation\.append\(threadHeader, transcript, composer\)/);
+ assert.doesNotMatch(workspace,/panels\.proof\.append\([^;\n]*(?:threadHeader|threadButtons|composer|transcript)/);
+ assert.match(workspace,/decisionAction\.addEventListener\('click'/);
+ assert.match(workspace,/planShift\.addEventListener\('click'/);
  assert.match(workspace,/panels\.proof\.append\(native263Proof\)/);
  assert.match(css,/reality-chat-home-link/);
  assert.match(css,/reality-chat-inspector #native263InstallApprovalPanel/);

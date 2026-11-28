@@ -50,6 +50,7 @@
  if(workPanel)workPanel.append(panel);
  else container.insertBefore(panel,composer);
  const transcript=document.getElementById('privateTranscript');
+ const workNoticeHost=workPanel||transcript;
  // Dismissal only controls this old, already-saved shift handoff notice.
  // It cannot delete ledger evidence, stop the employee shift or affect an
  // exact installation decision. Remember it across a reload of this tab.
@@ -80,7 +81,7 @@
   if((result?.capability_id==='governed-existing-shift-continuation'||
       result?.status==='CHAT_EXISTING_SHIFT_WAKE_RECEIPT_VERIFIED')&&
      isNoticeDismissed(ref))return null;
-  const nodes=Array.from(transcript.children||[]);
+  const nodes=Array.from(workNoticeHost.children||[]);
   let card=nodes.find(n=>n.dataset?.realityBuildRequest===ref.request_id);
   if(!card){
    card=document.createElement('section');
@@ -92,7 +93,7 @@
    const source=nodes.find(n=>n.dataset?.requestId===ref.request_id&&
     n.classList?.contains('user'));
    if(source&&typeof source.after==='function')source.after(card);
-   else transcript.append(card);
+   else workNoticeHost.append(card);
   }
   card.replaceChildren();
   const head=document.createElement('div');

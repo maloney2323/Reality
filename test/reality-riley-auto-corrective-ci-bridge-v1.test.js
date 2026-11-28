@@ -77,7 +77,7 @@ test('exact source-bound Edge function has service-only access, frozen CI and se
  assert.match(sql,/w\.state='ACTIVE'/);
  assert.match(sql,/riley_auto_corrective_ci_proofs_v1 enable row level security/);
  assert.match(sql,/original_job_completed boolean not null default false check\(not original_job_completed\)/);
- assert.match(worker,/const correctiveCiPromise=continueRileyCorrectiveModelIntoIndependentCI/);
+ assert.match(worker,/const correctiveCiPromise=[\s\S]*?selectCorrectiveCiCapability\(\{[\s\S]*?expectedScope:selected.expectedScope/);
  assert.match(worker,/riley_auto_corrective_independent_ci:correctiveCiResult/);
  assert.doesNotMatch(source,/process\.env\.REALITY_GITHUB_TOKEN/);
 });
@@ -112,4 +112,51 @@ test('owner Chat status shows staged CI candidate separately from actual test ve
  assert.match(ui,/CORRECTIVE_CANDIDATE_STAGED_INDEPENDENT_CI_PENDING/);
  assert.match(ui,/View isolated candidate on GitHub/);
  assert.match(ui,/independent CI verdict pending/);
+});
+
+
+import {selectCorrectiveCiCapability} from '../src/reality-evidence-driven-capability-router-v1.js';
+test('same registered corrective CI capability selects exact original or retry evidence',async()=>{
+ const owner='11111111-1111-4111-8111-111111111111';
+ const shift='22222222-2222-4222-8222-222222222222';
+ const attempt='33333333-3333-4333-8333-333333333333';
+ const wake={status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',shift_id:shift,
+  installation_authorized:false,production_changed:false};
+ const base={owner_id:owner,shift_id:shift,original_work_id:'work:'+'a'.repeat(32),
+  source_commit_sha:'b'.repeat(40),proposed_sha256:'sha256:'+'c'.repeat(64),
+  model_response_id:'resp_fixture123',original_job_completed:false,
+  installation_authorized:false,production_changed:false};
+ const keys=['RUN_INDEPENDENT_CORRECTIVE_CI'];
+ for(const candidate of [
+  {...base,status:'EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI'},
+  {...base,status:'SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI',attempt_id:attempt,attempt_number:2}
+ ]){
+  const input={wake,candidate,registeredActionKeys:keys};
+  const selected=selectCorrectiveCiCapability(input);
+  assert.equal(selected.key,keys[0]);
+  assert.equal(selected.version,candidate.attempt_id?2:1);
+  assert.equal(selected.expectedScope.proposed_sha256,base.proposed_sha256);
+  for(const invalid of [
+   {registeredActionKeys:[]},{candidate:{...candidate,shift_id:owner}},
+   {candidate:{...candidate,proposed_sha256:'invalid'}},
+   {candidate:{...candidate,installation_authorized:true}},
+   {candidate:{...candidate,original_job_completed:true}}
+  ])assert.equal(selectCorrectiveCiCapability({...input,...invalid}),null);
+  let calls=0;
+  const result=await continueRileyCorrectiveModelIntoIndependentCI({db,env,
+   version:selected.version,expectedScope:selected.expectedScope,
+   fetchImpl:async(_url,request)=>{
+    calls++;
+    assert.deepEqual(JSON.parse(request.body).expected_scope,selected.expectedScope);
+    return {ok:true,json:async()=>({status:'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI',
+     original_work_id:base.original_work_id,original_job_completed:false,
+     installation_authorized:false,production_changed:false})};
+   }});
+  assert.equal(calls,1);
+  assert.equal(result.status,'CORRECTIVE_CANDIDATE_STAGED_AWAITING_INDEPENDENT_CI');
+ }
+ const source=readFileSync(new URL('../supabase/functions/reality-riley-auto-corrective-ci-v1/index.ts',import.meta.url),'utf8');
+ const fence=source.indexOf("refuse('SELECTED_SCOPE_CHANGED_NO_PROVIDER_EFFECT')");
+ assert.ok(fence>source.lastIndexOf('validClaim(c,recovery);')&&fence<source.lastIndexOf('return await stageOrObserve('));
+ assert.match(source,/fields.some\(k=>!Object.hasOwn\(expected,k\)\|\|expected\[k\]!==c\[k\]\)/);
 });

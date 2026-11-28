@@ -268,3 +268,222 @@ export function planCategorizedContinuityRecovery({
  }
  return result('CONTINUITY_REGISTERED_ACTION_ROUTES_CLASSIFIED',items);
 }
+
+
+// Select a registered capability from the independently categorized, claimed
+// event, not a worker's procedural order. Selection is not execution authority;
+// the existing canonical claim/transport and verifier still own every effect.
+// The first migrated lane is the exact accepted read-only review. Other
+// event kinds remain on their existing paths until independently qualified.
+export function selectRegisteredSignedEventCapability({
+ trigger,delivery,wake,graph,release,workerRunId,registeredActionKeys=[],env=process.env
+}={}){
+ const key=trigger?.next_action, h=trigger?.canonical_claim_handoff;
+ if(env.VERCEL_ENV!=='preview'||
+    env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY!=='CANONICAL_BENCHMARK_PREVIEW'||
+    env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED!=='true'||
+    trigger?.status!=='FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY'||
+    trigger.review_claim_route_ready!==true||trigger.dispatch_permitted!==false||
+    trigger.execution_authorized_by_trigger!==false||trigger.canonical_claim_required!==true||
+    trigger.new_attempt_authorized!==false||trigger.previous_attempt_budget_preserved!==true||
+    trigger.original_job_completed!==false||trigger.production_changed!==false||
+    !KEY.test(key||'')||key!==env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY||
+    !Array.isArray(registeredActionKeys)||!registeredActionKeys.includes(key)||
+    delivery?.kind!=='RESUME'||!UUID.test(delivery.event_id||'')||
+    trigger.event_id!==delivery.event_id||trigger.owner_id!==delivery.owner_id||
+    trigger.shift_id!==delivery.shift_id||
+    graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||graph.owner_id!==delivery.owner_id||
+    graph.shift_id!==delivery.shift_id||graph.installation_authorized!==false||
+    graph.production_changed!==false||graph.plan_fingerprint!==delivery.plan_fingerprint||
+    wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||wake.shift_id!==graph.shift_id||
+    !UUID.test(workerRunId||'')||release?.status!=='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'||
+    release.worker_run_id!==workerRunId||release.shift_id!==graph.shift_id||
+    release.release_sha!==delivery.release_sha||
+    h?.schema!=='reality-canonical-approved-review-scope-v1'||
+    h.owner_id!==graph.owner_id||h.shift_id!==graph.shift_id||
+    h.parent_original_work_id!==trigger.original_work_id||h.source_ref!==trigger.source_ref||
+    h.continuity_root_id!==trigger.continuity_root_id||
+    h.continuity_head_sha256!==trigger.continuity_head_sha256||h.revision!==trigger.continuity_revision||
+    h.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||h.canonical_claim_required!==true||
+    h.read_only!==true||h.execution_authorized!==false||h.original_job_completed!==false||
+    h.production_changed!==false)
+  return null;
+ return key;
+}
+
+// Keep bounded, source-independent diagnostics when a later worker projection
+// fails. Never publish prompts, model content, provider error text or secrets.
+export function boundedRegisteredCapabilityCheckpoint(action,result){
+ const code=v=>typeof v==='string'&&/^[A-Z0-9_]{3,100}$/.test(v)?v:null;
+ if(!KEY.test(action||'')||!code(result?.status)||
+    result.original_job_completed!==false||result.production_changed!==false)return null;
+ return Object.freeze({capability_key:action,status:code(result.status),
+  provider_failure_reason:code(result.provider_failure_reason),
+  continuity_blocker_code:code(result.continuity_blocker_code),
+  isolated_authority_read_attempts:[0,1,2].includes(result.isolated_authority_read_attempts)?
+   result.isolated_authority_read_attempts:null,
+  original_job_completed:false,production_changed:false});
+}
+
+
+// The durable canonical event claim selects one evidence-only capability.
+// These are installed capability types, not a hard-coded sequence of jobs.
+// An ordinary claim selects none; conflicting evidence modes fail closed.
+const evidenceModes=Object.freeze({
+ ledger_return_only:Object.freeze({
+  key:'RETURN_VERIFIED_INVOCATION_OBSERVATIONS_NO_REPLAY',
+  releaseStage:'LEDGER_RETURN_RELEASE_ATTESTATION',
+  publicationStage:'LEDGER_RETURN_RESPONSE_PUBLICATION',
+  errorPrefix:'LEDGER_RETURN',
+  fenceError:'LEDGER_RETURN_RUNTIME_FENCE_REJECTED',
+  witnessError:'LEDGER_RETURN_RELEASE_WITNESS_UNVERIFIED',
+  attestationError:'LEDGER_RETURN_ATTESTATION_UNVERIFIED'
+ }),
+ terminal_technical_evidence_only:Object.freeze({
+  key:'READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY',
+  releaseStage:'TERMINAL_TECHNICAL_EVIDENCE_RELEASE_ATTESTATION',
+  publicationStage:'TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION',
+  errorPrefix:'TERMINAL_TECHNICAL',
+  fenceError:'TERMINAL_TECHNICAL_EVIDENCE_RUNTIME_FENCE_REJECTED',
+  witnessError:'TERMINAL_TECHNICAL_EVIDENCE_WITNESS_UNVERIFIED',
+  attestationError:'TERMINAL_TECHNICAL_COMPLETION_ATTESTATION_UNVERIFIED'
+ }),
+ independent_review_only:Object.freeze({
+  key:'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',
+  releaseStage:'INDEPENDENT_INVESTIGATION_REVIEW_RELEASE_ATTESTATION',
+  publicationStage:'INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION',
+  errorPrefix:'INDEPENDENT_INVESTIGATION_REVIEW',
+  fenceError:'INDEPENDENT_INVESTIGATION_REVIEW_RUNTIME_FENCE_REJECTED',
+  witnessError:'INDEPENDENT_INVESTIGATION_REVIEW_RELEASE_WITNESS_UNVERIFIED',
+  attestationError:'INDEPENDENT_INVESTIGATION_REVIEW_ATTESTATION_UNVERIFIED'
+ }),
+ investigation_only:Object.freeze({
+  key:'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY',
+  releaseStage:'VERIFIED_SUSPENSION_INVESTIGATION_RELEASE_ATTESTATION',
+  publicationStage:'SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION',
+  errorPrefix:'SUSPENSION_INVESTIGATION',
+  fenceError:'SUSPENSION_INVESTIGATION_RUNTIME_FENCE_REJECTED',
+  witnessError:'SUSPENSION_INVESTIGATION_RELEASE_WITNESS_UNVERIFIED',
+  attestationError:'SUSPENSION_INVESTIGATION_ATTESTATION_UNVERIFIED'
+ })
+});
+export function selectClaimedEvidenceCapability({receipt,delivery,workerRunId}={}){
+ if(receipt?.status!=='CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED'||
+    !UUID.test(workerRunId||'')||!UUID.test(delivery?.event_id||'')||
+    !UUID.test(delivery?.shift_id||'')||
+    receipt.event_id!==delivery.event_id||receipt.shift_id!==delivery.shift_id||
+    receipt.worker_run_id!==workerRunId||receipt.execution_authorized!==false||
+    receipt.original_job_completed!==false||receipt.production_changed!==false)
+  throw Error('CANONICAL_GOVERNED_WAKE_NOT_DURABLY_CLAIMED');
+ const modes=Object.keys(evidenceModes).filter(k=>receipt[k]===true);
+ if(modes.length>1)throw Error('GOVERNED_WAKE_CONFLICTING_EVIDENCE_LANES');
+ if(modes.length===0)return null;
+ const mode=evidenceModes[modes[0]];
+ if(delivery.kind!=='RESUME')throw Error(mode.fenceError);
+ return mode;
+}
+
+
+// Scope the legacy engineering fan-out to its own work. An independently
+// identified exact review event needs review qualification/dispatch, not
+// unrelated corrective drafts, CI canaries, installation or settlement.
+// This is a scheduling decision ONLY: it grants no action, retry or approval.
+// All other event kinds retain the installed engineering path until their
+// own durable capability selection is independently established.
+export function selectEngineeringDispatchScope({
+ trigger,continuity,delivery,wake,canonicalEventRuntime,strictContinuityCycle
+}={}){
+ const legacy='EXISTING_SIGNED_SHIFT_ENGINEERING';
+ const guard=continuity?.shared_continuity_guard;
+ const events=continuity?.event_resume_shadow?.ready_event_refs;
+ if(canonicalEventRuntime!==true||strictContinuityCycle!==true||
+    delivery?.kind!=='RESUME'||!UUID.test(delivery.event_id||'')||
+    wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    wake.shift_id!==delivery.shift_id||
+    trigger?.status!=='FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED'||
+    trigger.reason!=='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'||
+    trigger.dispatch_permitted!==false||
+    trigger.execution_authorized_by_trigger!==false||
+    trigger.original_job_completed!==false||
+    continuity?.owner_id!==delivery.owner_id||continuity.shift_id!==delivery.shift_id||
+    guard?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+    guard.execution_authorized!==false||guard.original_job_completed!==false||
+    !Array.isArray(events))return legacy;
+ const matches=events.filter(e=>e?.event_id===delivery.event_id);
+ if(matches.length!==1)return legacy;
+ const event=matches[0];
+ if(event.event_kind!=='QUALIFIER_PROOF_CHANGED'||
+    event.next_qualified_action!=='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'||
+    event.continuity_revision!==guard.revision||
+    event.continuity_head_sha256!==guard.continuity_head_sha256||
+    event.executor_invoked!==false||event.execution_authorized!==false)
+  return legacy;
+ return 'EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY';
+}
+
+
+// Common selection rule for independently qualified proof-change events.
+// Capability names are data from Continuity, not a predetermined workflow.
+// Callers still validate the current signed event, revision, and runtime;
+// the selected adapter must enforce its own consequence-specific proof/claim.
+export function resolveQualifiedCapabilityKey({
+ event,handoff,qualifications,registeredActionKeys=[]
+}={}){
+ const key=event?.next_qualified_action;
+ if(event?.event_kind!=='QUALIFIER_PROOF_CHANGED'||
+    !KEY.test(key||'')||!UUID.test(event.event_id||'')||
+    !/^work:[a-f0-9]{32}$/.test(event.original_work_id||'')||
+    !safeRef(event.source_ref)||!SHA.test(event.source_receipt_sha256||'')||
+    event.executor_invoked!==false||event.execution_authorized!==false||
+    handoff?.continuity_identity_verified!==true||handoff.qualifier_digest_verified!==true||
+    handoff.source_ref!==event.source_ref||handoff.original_work_id!==event.original_work_id||
+    handoff.qualifier_receipt_sha256!==event.source_receipt_sha256||
+    (handoff.next_qualified_action!==undefined&&handoff.next_qualified_action!==key)||
+    handoff.execution_authorized!==false||handoff.original_job_completed!==false||
+    !Array.isArray(qualifications)||qualifications.length!==1||
+    qualifications[0]?.source_ref!==event.source_ref||
+    qualifications[0].original_work_id!==event.original_work_id||
+    qualifications[0].qualifier_receipt_sha256!==event.source_receipt_sha256||
+    qualifications[0].next_qualified_action!==key)
+  return null;
+ return selectRegisteredCapabilityKey({key,registeredActionKeys});
+}
+
+
+// Common registry lookup for all verified selector inputs. The registry
+// contains installed capability TYPES; this function never grants authority.
+export function selectRegisteredCapabilityKey({key,registeredActionKeys=[]}={}){
+ if(!KEY.test(key||'')||!Array.isArray(registeredActionKeys)||
+    registeredActionKeys.length>32||registeredActionKeys.some(k=>!KEY.test(k||''))||
+    new Set(registeredActionKeys).size!==registeredActionKeys.length)return null;
+ return registeredActionKeys.includes(key)?key:null;
+}
+
+
+// Existing service-only CI candidate selectors provide the current work,
+// not an instruction to run a procedural engineering chain. Both protocol
+// versions are one installed capability; the exact attempt is data.
+export function selectCorrectiveCiCapability({wake,candidate,registeredActionKeys=[]}={}){
+ const key=selectRegisteredCapabilityKey({key:'RUN_INDEPENDENT_CORRECTIVE_CI',registeredActionKeys});
+ const version=candidate?.status==='EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI'?1:
+  candidate?.status==='SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI'?2:null;
+ if(!key||!version||wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    !UUID.test(wake.shift_id||'')||wake.shift_id!==candidate.shift_id||
+    wake.installation_authorized!==false||wake.production_changed!==false||
+    !UUID.test(candidate.owner_id||'')||
+    !/^work:[a-f0-9]{32}$/.test(candidate.original_work_id||'')||
+    !/^[a-f0-9]{40}$/.test(candidate.source_commit_sha||'')||
+    !SHA.test(candidate.proposed_sha256||'')||
+    !/^resp_[A-Za-z0-9_-]{4,160}$/.test(candidate.model_response_id||'')||
+    candidate.installation_authorized!==false||candidate.original_job_completed!==false||
+    candidate.production_changed!==false||
+    (version===2&&(!UUID.test(candidate.attempt_id||'')||
+      !Number.isSafeInteger(candidate.attempt_number)||candidate.attempt_number<2||
+      candidate.attempt_number>8)))return null;
+ return Object.freeze({key,version,expectedScope:Object.freeze({
+  owner_id:candidate.owner_id,shift_id:candidate.shift_id,
+  original_work_id:candidate.original_work_id,source_commit_sha:candidate.source_commit_sha,
+  proposed_sha256:candidate.proposed_sha256,model_response_id:candidate.model_response_id,
+  ...(version===2?{attempt_id:candidate.attempt_id,attempt_number:candidate.attempt_number}:{})
+ })});
+}

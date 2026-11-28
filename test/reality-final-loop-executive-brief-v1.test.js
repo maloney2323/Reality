@@ -138,3 +138,33 @@ test('the worker and owner UI share one executive read model rather than new emp
  assert.match(matrix,/matrixPresentCount/);
  assert.match(matrix,/matrixFutureCount/);
 });
+
+
+test('CEO priorities cannot drift away from the shared continuity and independent verifier',()=>{
+ const h=horizon({engine:{...engine,continuity_root_id:root,revision:1}});
+ const guard={
+  status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+  owner_id:owner,shift_id:shift,continuity_root_id:root,
+  continuity_head_sha256:sha('a'),revision:1,
+  observation_sha256:sha('8'),read_only:true,
+  execution_authorized:false,transition_committed:false,
+  original_job_completed:false,
+  handoffs:[{source_ref:source,original_work_id:work,
+   continuity_identity_verified:true,execution_authorized:false}]
+ };
+ const good=brief({timeHorizon:h,supervisor,
+  sharedContinuityGuard:guard});
+ assert.equal(good.status,'EXECUTIVE_SIGNED_SHIFT_PRIORITIES_READY');
+ assert.equal(good.shared_continuity_guard_crosschecked,true);
+ assert.equal(good.execution_authorized,false);
+ const stale=brief({timeHorizon:h,supervisor,
+  sharedContinuityGuard:{...guard,revision:2}});
+ assert.equal(stale.status,'EXECUTIVE_SHARED_CONTINUITY_VERIFIER_DRIFT_FENCED');
+ const switched=brief({timeHorizon:h,supervisor,
+  sharedContinuityGuard:{...guard,handoffs:[{...guard.handoffs[0],
+    original_work_id:'work:'+'f'.repeat(32)}]}});
+ assert.equal(switched.status,'EXECUTIVE_SHARED_CONTINUITY_VERIFIER_DRIFT_FENCED');
+ const fake=brief({timeHorizon:h,supervisor,
+  sharedContinuityGuard:{...guard,execution_authorized:true}});
+ assert.equal(fake.status,'EXECUTIVE_SHARED_CONTINUITY_VERIFIER_DRIFT_FENCED');
+});

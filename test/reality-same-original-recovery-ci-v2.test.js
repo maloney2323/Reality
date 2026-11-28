@@ -96,7 +96,8 @@ test('service-only CI receipt is bound to same original and its staged SHA, not 
  assert.match(sql,/current_user<>'service_role'/);
  assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/gi);
  assert.doesNotMatch(sql,/issues\/185|issues\/263/);
- assert.match(worker,/version:2/);
+ assert.match(worker,/recoveryCiCapability\?\.version===2/);
+ assert.match(worker,/version:recoveryCiCapability.version,\s*expectedScope:recoveryCiCapability.expectedScope/);
  assert.match(worker,/SAME_ORIGINAL_RECOVERY_CI_ELIGIBILITY/);
  assert.match(worker,/classifyCorrectiveProofTick\(retryCi\)/);
  assert.match(worker,/independent_ci_verified:classification\.proof_verified/);

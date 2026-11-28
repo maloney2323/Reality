@@ -36,6 +36,7 @@ import {classifyRealityGovernedContinuityEvidence}
  from '../../src/reality-governed-continuity-evidence-classifier-v1.js';
 import {projectRileyExistingBacklog}
  from '../../src/reality-riley-existing-backlog-v1.js';
+import {readFinalLoopGovernedShiftStart,resolveFinalLoopShiftStart} from '../../src/reality-governed-auto-trigger-v1.0.js';
 export const maxDuration=60;
 // An owner-authorized shift must begin with the work Reality already knows.
 // These are read-only source priorities; no issue, legacy queue or model
@@ -146,10 +147,19 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
      j.code_repair_completed!==true||
      j.production_changed!==false||
      !/^work:[a-f0-9]{32}$/.test(j.original_work_id||'')||
-     j.source_ref!=='https://github.com/maloney2323/Reality/issues/263'||
-     !/^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||'')||
-     !/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(
-      j.original_settlement_receipt_ref||''))
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(j.source_ref||'')||
+     !/^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||''))
+   throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
+  // Generalized originals are excluded only through the existing additional
+  // independently joined settlement inventory, not by trusting this phase
+  // or accepting a new receipt namespace as sufficient proof.
+  if(/^supabase:governed_original_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(j.original_settlement_receipt_ref||'')){
+   if(!additional.source_refs.includes(j.source_ref))
+    throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
+   continue;
+  }
+  if(j.source_ref!=='https://github.com/maloney2323/Reality/issues/263'||
+     !/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(j.original_settlement_receipt_ref||''))
    throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
   refs.add(j.source_ref);
  }
@@ -617,7 +627,11 @@ export default async function handler(req,res){
    const presentationShifts=read.shifts.slice(0,5);
    const shift_briefing=buildRealityShiftConversationBrief(
     presentationShifts,handoffs,new Date(),shift_source_native_receipts);
-   const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:presentationShifts,handoffs});
+   // A legacy diagnostic must not erase a successfully verified primary
+   // shift readback. Fail closed on optional recovery advice only.
+   let recovery_diagnosis=null;
+   try{recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:presentationShifts,handoffs});}
+   catch{/* Unavailable diagnosis is not evidence of no existing work. */}
    let draft=null;
    if(hours!==null){
      const catalog=await buildRealityWorkCatalog();
@@ -640,7 +654,10 @@ export default async function handler(req,res){
        owner_backlog_coverage_complete:priority.source_coverage_complete,
        previously_settled_original_source_refs_excluded:settledRefs};
    }
-   return res.status(200).json({ok:true,...read,shift_briefing,
+   const activeShift=read.shifts.find(s=>['QUEUED','RUNNING','AWAITING_EXACT_ORIGINAL_WORK'].includes(s.status)&&!s.closed_at);
+   const governed_auto_trigger=activeShift?await readFinalLoopGovernedShiftStart({
+    db,ownerId:session.user_id,shift:activeShift}):null;
+   return res.status(200).json({ok:true,...read,shift_briefing,governed_auto_trigger,
     shift_activity,shift_activity_status,
     shift_source_native_receipts,shift_source_native_receipts_status,
     shift_automatic_supervisor,shift_automatic_supervisor_status,
@@ -667,13 +684,15 @@ export default async function handler(req,res){
   if(!String(req.headers?.['content-type']||'').includes('application/json'))
    return res.status(415).json({ok:false,error:'SHIFT_JSON_REQUIRED'});
   const b=req.body||{},keys=Object.keys(b);
+  const coreKeys=keys.filter(k=>k!=='start_mode');
   if(!b||typeof b!=='object'||Array.isArray(b)||
-   ![3,4,5].includes(keys.length)||
+   ![3,4,5].includes(coreKeys.length)||
    keys.some(x=>!['action','expected_fingerprint','planned_start_at',
-     'requested_hours','completion_bound'].includes(x))||
+     'requested_hours','completion_bound','start_mode'].includes(x))||
+   (b.start_mode!==undefined&&(!['START_NOW','SCHEDULE'].includes(b.start_mode)||b.completion_bound!==true))||
    (b.completion_bound!==undefined&&b.completion_bound!==true)||
    (b.completion_bound===true&&
-     (keys.length!==5||b.requested_hours!==8))||
+     (coreKeys.length!==5||!Number.isSafeInteger(b.requested_hours)))||
    (b.completion_bound!==true&&
      (keys.length!==3&&keys.length!==4||
       (keys.length===4&&!Object.hasOwn(b,'requested_hours'))||
@@ -686,11 +705,12 @@ export default async function handler(req,res){
     (b.completion_bound!==true||b.requested_hours!==8))||
    !SHA.test(b.expected_fingerprint||''))
    return res.status(400).json({ok:false,error:'SHIFT_EXACT_APPROVAL_REQUIRED'});
-  const start=new Date(b.planned_start_at);
-  if(typeof b.planned_start_at!=='string'||!/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ/.test(b.planned_start_at)||
-   !Number.isFinite(start.valueOf())||
-   start.getTime()<Date.now()-120000||start.getTime()>Date.now()+7*86400000)
-   return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});
+  let start;
+  try{
+   if(typeof b.planned_start_at!=='string'||!/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ/.test(b.planned_start_at))
+    throw Error('SHIFT_START_INVALID');
+   start=resolveFinalLoopShiftStart(b.start_mode,b.planned_start_at);
+  }catch{return res.status(400).json({ok:false,error:'SHIFT_START_NOT_IN_ALLOWED_WINDOW'});}
   if(b.action==='AUTHORIZE_EXACT_INTERNAL_MAINTENANCE_CONTINUATION'){
    // Never trust browser-supplied owner or incident IDs. Bind all selected
    // obligations to the authenticated owner and newly fingerprinted work.
@@ -731,8 +751,10 @@ export default async function handler(req,res){
     s.plan_fingerprint===drafted.expected_fingerprint&&
     s.planned_end_at==='infinity'&&s.steps.length===8);
    if(!exact)throw Error('SHIFT_MAINTENANCE_CONTINUATION_READBACK_UNVERIFIED');
+   const governed_auto_trigger=await readFinalLoopGovernedShiftStart({
+    db,ownerId:session.user_id,shift:exact});
    return res.status(202).json({
-    ok:true,...receipt,shift:exact,status:'SHIFT_DURABLY_AUTHORIZED',
+    ok:true,...receipt,shift:exact,status:'SHIFT_DURABLY_AUTHORIZED',governed_auto_trigger,
     original_shift_ids:drafted.originating_shift_ids,
     work_items:drafted.work_items,
     start_confirmation:{
@@ -798,8 +820,10 @@ export default async function handler(req,res){
    original_job_completed:false,installation_authorized:false,
    production_changed:false
   });
+  const governed_auto_trigger=await readFinalLoopGovernedShiftStart({
+   db,ownerId:session.user_id,shift:exact});
   return res.status(202).json({ok:true,...receipt,shift:exact,
-   start_confirmation,
+   start_confirmation,governed_auto_trigger,
    combined_employee_work_orders:combined,
    initial_authorization_recorded:true,
    completion_bound:b.completion_bound===true,

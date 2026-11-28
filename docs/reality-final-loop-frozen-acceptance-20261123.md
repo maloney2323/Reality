@@ -10,6 +10,46 @@ A completed PR review is evidence for a **PR-review goal** only. It is not evide
 
 No new scheduler, parallel controller, automatic owner consent, manual fabricated qualification, auto-changing draft PR status, duplicate external POST, or additional acceptance requirement may be introduced solely to make a test pass.
 
+
+## Architectural responsibility contract — Operational Convergence (2026-11-25)
+
+Owner-agreed architectural direction; this is not an execution grant, new gate, new controller or a change to the frozen acceptance objective. Restore the November 16 local-time successful original-work pathway, preserve later verified intelligence improvements, and remove competing ownership of operational decisions.
+
+| Existing component | Exclusive primary responsibility |
+| --- | --- |
+| Universe / Continuous Continuity | Canonical evidence, original identity, accepted intent, causal state and outcome reconciliation |
+| CEO / Past–Present–Future | Prioritize and project the same canonical operational state; never mint authority |
+| Governed Qualifier / Categorizer | Establish readiness and select an existing registered capability; no independent permission system |
+| Final Loop / unified shift controller | Decide ADVANCE, RECOVER, REFRESH, SUSPEND or SETTLE from current proofs; no provider calls |
+| Canonical authority and transactional claims | Enforce exact owner scope, current warrant, capability capacity and one-use claim; no duplicate isolated approval |
+| Governed Auto Trigger | Deliver qualified events to the existing signed worker; no unconditional periodic work by default |
+| Signed worker | Authenticate, dispatch one qualified capability for the same original, record observations and return evidence; no independent priority or consent decisions |
+| Governed LLM Gateway | Enforce current model scope, permitted tools, request boundaries and pre/post readback; model output is untrusted advisory data |
+| Existing capability adapters / isolated computation | Perform only the claimed work; no canonical authority minting or uncontrolled effects |
+| Strategy Memory / Proof-Carrying Recovery | Govern evidence-backed strategy selection, repair and resumption of the same unfinished original |
+| Independent verification / settlement | Check actual provider/source evidence independently, reconcile canonical state and settle only the original acceptance |
+
+Multiple checks at distinct trust boundaries are defense in depth, not automatically duplication. Reuse a common canonical contract rather than removing independent verification or weakening fail-closed checks. The LLM is a replaceable reasoning resource; the worker is not a second intelligence system.
+
+### Source-grounded convergence findings
+
+- Historical reference [issue #185 final receipt](https://github.com/maloney2323/Reality/issues/185#issuecomment-6933420104), source revision `eab7b32fc06956728c458d1ffcbc5990400a5908`. Verified original settlement, not full shift or Universe reconciliation.
+- Current source revision `a47207af10644f9aa40251b7a74fc80efb4aa674`: signed worker entrypoint grew from 1,439 to 4,366 lines. Size is not itself a root cause. The original trusted driver, governed model gateway, recovery publication and independent final settlement remain in source.
+- `api/reality/governed-employee-shift-worker.js`: staging-only mode returns before normal execution; preserve that fence, never turn staging into execution by changing a flag alone. The original tick, final-loop inspection, child routing and recovery reconciliation are separate code regions in the same handler; determine their exact transition ownership before consolidating.
+- `src/reality-shift-unified-execution-controller-v1.js`: existing pure proof-gated lifecycle decision function is the intended decision owner. `src/reality-governed-openai-gateway-v1.js` is already external to the model and checks scope around inference; preserve those boundary checks. `src/reality-governed-employee-shift-worker-v1.js` already accepts trusted execution adapters; reuse it.
+- Current canonical scope projection and SQL overload exist in source, but `advanceOneFinalLoopChildReview` still calls the two-argument claim using its isolated DB. The new three-argument overload was absent on both connected DBs at readback. Canonical PR #307 preflight had verified goal, current approval window and handoff; PR #308 remains unadmitted. Do not infer a child claim or isolated execution from this.
+- The existing independent parent return function is installed; cross-environment child execution and independently verified evidence return remain unproven. The isolated acceptance branch reports MIGRATIONS_FAILED; do not replay all migrations or copy live approvals to it.
+
+### Implementation sequence within existing phases 1–2
+
+1. Trace the same qualified event through the existing controller and registry to the canonical claim. Preserve old authorized paths, exact effect boundaries and consumed fences.
+2. Complete a narrowly scoped execution/return connection BEFORE consuming a live one-use claim. The isolated executor must obtain fresh canonical claim/lease readback through an exact allowlisted service boundary; it must never get broad canonical credentials, copy approval rows, or select a different original. Use the existing gateway and evidence schemas. Keep uncertain effects fenced.
+3. Route verified evidence to the canonical original and reuse existing independent verifier, settlement and Continuity/Universe return. Resume original work rather than close a maintenance objective in its place.
+4. Consolidate worker decision logic only where source comparison demonstrates duplicated operational authority. Preserve runtime safety guards, remove no capability solely to reduce line count, and add regression coverage for same-original continuation and old working paths.
+5. Qualify and activate only the exact existing release and existing database target after independent proof; then run the frozen nine operational acceptance checkpoints. No new infrastructure, acceptance goal, or competing engine.
+
+The current source/DB audit is a development checkpoint, not proof of live activation or completed original work.
+
 ## Confirmed source of truth
 
 - Existing frozen shift: `ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce`; status `AWAITING_EXACT_ORIGINAL_WORK`; not closed.

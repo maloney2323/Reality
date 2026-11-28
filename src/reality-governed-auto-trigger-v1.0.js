@@ -4,6 +4,8 @@
 import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
+import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {resolveQualifiedCapabilityKey} from './reality-evidence-driven-capability-router-v1.js';
 
 export const GOVERNED_AUTO_TRIGGER_VERSION='reality-governed-auto-trigger-v1.0';
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -286,4 +288,274 @@ export function routeSignedMaintenanceContinuityTrigger({
   original_job_completed:false,new_shift_started:false,
   production_changed:false
  });
+}
+
+
+// Existing governor: choose only an independently verified, current event.
+// The service broker remains responsible for its own atomic warrant and proof.
+export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claimedEventId=null,stagedActions=null}={}){
+ const safe=(status,extra={})=>Object.freeze({status,...extra,
+  execution_authorized_by_trigger:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false,new_shift_started:false});
+ const reject=reason=>safe('FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED',{
+  reason,dispatch_permitted:false,resume_event:null});
+ const g=c?.shared_continuity_guard,e=c?.event_resume_shadow;
+ if(c?.status!=='FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING'||
+    !signedShiftUUID.test(shiftId||'')||c.shift_id!==shiftId||
+    !signedShiftUUID.test(c.owner_id||'')||
+    c.read_only!==true||c.transition_committed!==false||
+    c.executor_invoked!==false||c.owner_approval_granted!==false||
+    c.installation_authorized!==false||c.production_changed!==false||
+    c.original_job_completed!==false||c.execution_authorized===true||
+    g?.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+    g.shift_id!==shiftId||g.owner_id!==c.owner_id||g.read_only!==true||
+    g.execution_authorized!==false||g.original_job_completed!==false||
+    !signedShiftUUID.test(g.continuity_root_id||'')||
+    !signedShiftSHA.test(g.continuity_head_sha256||'')||
+    g.continuity_head_sha256!==c.continuity_head_sha256||
+    !Number.isSafeInteger(g.revision)||g.revision<1||g.revision!==c.revision||
+    !Array.isArray(g.handoffs)||!Array.isArray(c.governed_qualification_handoffs))
+  return reject('FRESH_CANONICAL_CONTINUITY_REQUIRED');
+ if(e?.status!=='FINAL_LOOP_VERIFIED_EVENT_SHADOW_CONSUMED_NO_DISPATCH'||
+    e.event_dispatch_enabled!==false||e.execution_authorized!==false||
+    !Array.isArray(e.ready_event_refs)||
+    e.shadow_ready_event_count!==e.ready_event_refs.length)
+  return reject('INDEPENDENT_EVENT_READBACK_REQUIRED');
+ if(e.ready_event_refs.length===0)return reject('NO_CURRENT_VERIFIED_EVENT');
+ // A canonical RESUME delivery already owns one exact event. Unrelated
+ // qualified events remain queued rather than creating an ambiguous shift.
+ if(claimedEventId!==null&&!signedShiftUUID.test(claimedEventId||''))
+  return reject('CLAIMED_EVENT_ID_INVALID');
+ const selected=claimedEventId===null?e.ready_event_refs:
+  e.ready_event_refs.filter(item=>item?.event_id===claimedEventId);
+ if(selected.length!==1)return reject(claimedEventId===null?'AMBIGUOUS_EVENT_SCOPE':'CLAIMED_EVENT_NOT_CURRENT_OR_AMBIGUOUS');
+ const r=selected[0];
+ if(!r||!signedShiftUUID.test(r.event_id||'')||
+    !signedShiftWORK.test(r.original_work_id||'')||
+    !/^https:\/\/github\.com\/maloney2323\/Reality\/pull\/[1-9]\d*$/.test(r.source_ref||'')||
+    !signedShiftSHA.test(r.event_causality_sha256||'')||
+    !signedShiftSHA.test(r.source_receipt_sha256||'')||
+    r.continuity_revision!==g.revision||
+    r.continuity_head_sha256!==g.continuity_head_sha256||
+    r.would_resume_suspended_obligation!==true||
+    r.executor_invoked!==false||r.execution_authorized!==false)
+  return reject('EVENT_IDENTITY_OR_REVISION_UNVERIFIED');
+ const matches=g.handoffs.filter(h=>h?.source_ref===r.source_ref&&
+  h.original_work_id===r.original_work_id);
+ if(matches.length!==1||matches[0].continuity_identity_verified!==true||
+    matches[0].qualifier_digest_verified!==true||
+    matches[0].execution_authorized!==false||
+    matches[0].original_job_completed!==false)
+  return reject('ORIGINAL_HANDOFF_UNVERIFIED');
+ const h=matches[0],base={owner_id:c.owner_id,shift_id:shiftId,
+  original_work_id:r.original_work_id,source_ref:r.source_ref,
+  continuity_root_id:g.continuity_root_id,continuity_revision:g.revision,
+  continuity_head_sha256:g.continuity_head_sha256,event_id:r.event_id};
+ // A suspension receipt is routed only through the signed claim's exact
+ // investigation-only branch. Never reinterpret it as a review/CI event.
+ if(r.event_kind==='VERIFIED_REVIEW_TECHNICAL_EVIDENCE')
+  return reject('VERIFIED_REVIEW_REQUIRES_EXACT_TERMINAL_TECHNICAL_LANE');
+ if(r.event_kind==='VERIFIED_INVESTIGATION_REVIEW')
+  return reject('VERIFIED_INVESTIGATION_REQUIRES_EXACT_INDEPENDENT_REVIEW_LANE');
+ if(r.event_kind==='VERIFIED_SUSPENSION_INVESTIGATION')
+  return reject('VERIFIED_SUSPENSION_REQUIRES_EXACT_INVESTIGATION_LANE');
+ if(r.event_kind==='INDEPENDENT_FROZEN_CI_RECEIPT'){
+  if(h.independent_internal_ci_verified!==true)return reject('CI_PROOF_NOT_RECONCILED');
+  return safe('FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE',{
+   ...base,dispatch_permitted:false,resume_event:null,
+   next_action:'RECONCILE_SIGNED_RED_RECEIPT_WITH_DURABLE_RECOVERY_CONTRACT'});
+ }
+ const qualified=c.governed_qualification_handoffs.filter(q=>
+  q?.source_ref===r.source_ref&&q.original_work_id===r.original_work_id);
+ const reviewAction='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
+ const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
+ const action='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC';
+ // Existing installed capability types, not an execution sequence. The
+ // exact current qualifier and event select the type; each adapter below
+ // independently enforces its own effect/authority contract.
+ const selectedCapability=resolveQualifiedCapabilityKey({event:r,handoff:h,
+  qualifications:qualified,registeredActionKeys:[reviewAction,terminalAction,action]});
+ // An exact review route is independently accepted, READ-ONLY review scope.
+ // Its trigger is not the maintenance verifier and cannot renew repair budget.
+ if(r.event_kind==='QUALIFIER_PROOF_CHANGED'&&r.next_qualified_action===reviewAction){
+  if(claimedEventId===null||selectedCapability!==reviewAction||h.next_qualified_action!==reviewAction||
+     !Array.isArray(h.unresolved_proof_gates)||
+     h.unresolved_proof_gates.includes('OWNER_GOAL_ACCEPTANCE_EVENT_MISSING')||
+     h.unresolved_proof_gates.includes('EXACT_ACCEPTANCE_APPROVAL_MISSING'))
+   return reject('EXACT_REVIEW_EVENT_QUALIFICATION_REQUIRED');
+  if(stagedActions?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+     stagedActions.read_only!==true||stagedActions.action_dispatched!==false||
+     stagedActions.model_execution_authorized!==false||stagedActions.original_job_completed!==false||
+     !Array.isArray(stagedActions.routes))
+   return reject('CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED');
+  const routes=stagedActions.routes.filter(x=>x?.source_ref===r.source_ref&&
+   x.parent_original_work_id===r.original_work_id);
+  if(routes.length!==1)return reject('EXACT_CATEGORIZED_REVIEW_ROUTE_REQUIRED');
+  const route=routes[0],scope=route.canonical_execution_handoff;
+  if(route.operation_category!=='EXECUTION'||route.authority_scope!=='EXACT_ACCEPTED_READ_ONLY_REVIEW'||
+     route.next_governed_action!==reviewAction||route.next_registered_handler!==reviewAction||
+     route.existing_owner_goal_acceptance_verified!==true||route.owner_action_required!==false||
+     route.child_execution_authorized!==false||route.handler_dispatched!==false||
+     route.original_job_completed!==false||route.parent_source_phase!=='BLOCKED'||
+     scope?.status!=='CANONICAL_APPROVED_REVIEW_SCOPE_BOUND_CLAIM_REQUIRED'||
+     scope.schema!=='reality-canonical-approved-review-scope-v1'||
+     scope.owner_id!==c.owner_id||scope.shift_id!==shiftId||
+     scope.parent_original_work_id!==r.original_work_id||scope.source_ref!==r.source_ref||
+     !signedShiftUUID.test(scope.plan_id||'')||scope.plan_id!==route.plan_id||
+     !signedShiftUUID.test(scope.packet_id||'')||
+     !signedShiftSHA.test(scope.owner_approval_receipt_sha256||'')||
+     !signedShiftSHA.test(scope.plan_fingerprint||'')||
+     !/^[a-f0-9]{40}$/.test(scope.source_head_sha||'')||scope.source_head_sha!==route.source_head_sha||
+     !signedShiftSHA.test(scope.source_manifest_sha256||'')||
+     scope.source_manifest_sha256!==route.source_manifest_sha256||
+     !signedShiftSHA.test(scope.acceptance_contract_sha256||'')||
+     scope.acceptance_contract_sha256!==route.acceptance_contract_sha256||
+     scope.continuity_root_id!==g.continuity_root_id||
+     scope.continuity_head_sha256!==g.continuity_head_sha256||scope.revision!==g.revision||
+     scope.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||scope.canonical_claim_required!==true||
+     scope.next_governed_action!=='CLAIM_EXACT_CANONICAL_CHILD_REVIEW_THROUGH_EXISTING_SIGNED_WORKER'||
+     scope.read_only!==true||scope.execution_authorized!==false||
+     scope.original_job_completed!==false||scope.production_changed!==false)
+   return reject('CATEGORIZED_REVIEW_AUTHORITY_OR_CONTINUITY_DRIFT');
+  return safe('FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY',{
+   ...base,operation_category:'EXECUTION',authority_scope:'EXACT_ACCEPTED_READ_ONLY_REVIEW',
+   next_action:reviewAction,qualifier_receipt_sha256:r.source_receipt_sha256,
+   // This is permission to route to the existing canonical claim boundary,
+   // not a claim, live execution grant, or the maintenance CI resume event.
+   dispatch_permitted:false,resume_event:null,review_claim_route_ready:true,
+   canonical_claim_handoff:scope,canonical_claim_required:true,
+   previous_attempt_budget_preserved:true,new_attempt_authorized:false,
+   repeat_prior_ci_dispatch_permitted:false});
+ }
+ // The exhausted builder may qualify DISTINCT evidence, not replay CI or
+ // lease another build. The existing verifier is the only permitted reader.
+ if(r.event_kind==='QUALIFIER_PROOF_CHANGED'&&r.next_qualified_action===terminalAction){
+  if(selectedCapability!==terminalAction||h.next_qualified_action!==terminalAction||
+     !Array.isArray(h.unresolved_proof_gates)||
+     !h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')||
+     !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
+     h.independent_internal_ci_verified!==false)
+   return reject('TERMINAL_RECOVERY_CURRENT_EVIDENCE_UNVERIFIED');
+  return safe('FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE',{
+   ...base,operation_category:'RECOVERY',authority_scope:'DISTINCT_EVIDENCE_ONLY',
+   dispatch_permitted:false,resume_event:null,
+   evidence_readback_permitted:true,next_action:terminalAction,
+   qualifier_receipt_sha256:r.source_receipt_sha256,
+   previous_attempt_budget_preserved:true,new_attempt_authorized:false,
+   repeat_prior_ci_dispatch_permitted:false});
+ }
+ if(selectedCapability!==action||
+    !Array.isArray(h.unresolved_proof_gates)||
+    !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
+    h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')||
+    h.independent_internal_ci_verified!==false)
+  return reject('CURRENT_QUALIFIED_ACTION_OR_PROOF_MISMATCH');
+ return safe('FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY',{
+  ...base,dispatch_permitted:true,next_action:action,
+  resume_event:Object.freeze({event_id:r.event_id,source_ref:r.source_ref})});
+}
+
+
+// A transport receipt is not a worker, authority or outcome receipt.
+export function finalLoopEventTriggerEnabled(db,env=process.env){
+ const canonical=env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW';
+ const runtimeBound=canonical?
+  (env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'&&
+   env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_STAGING_ENABLED==='true'&&
+   env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED!=='true'&&env.REALITY_FINAL_LOOP_PARENT_DELIVERY_ENABLED!=='true'&&
+   signedShiftUUID.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID||'')&&signedShiftUUID.test(env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID||'')&&
+   db?.project===env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&db?.project===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+   db?.project!==env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF):
+  (env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED==='true'&&db?.project===env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF&&db?.project!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF);
+ return runtimeBound&& env.VERCEL_ENV==='preview'&&
+  env.REALITY_FINAL_LOOP_EVENT_TRIGGER_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_EVENT_RESUME_SHADOW_ENABLED==='true'&&
+  env.REALITY_FINAL_LOOP_PREVIEW_SOURCE_PLAN_WAKE_ONLY!=='true'&&
+  db?.strictSecrets===true&&typeof db.project==='string'&&
+  db.project===env.REALITY_PERSONAL_CHAT_EXPECTED_PROJECT_REF&&
+  typeof env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF==='string'&&
+  env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF.length>0&&
+  db.url==='https://'+db.project+'.supabase.co';
+}
+export function parseFinalLoopGovernedWake(headers={}){
+ const owner_id=headers['x-reality-governed-owner-id'];
+ const shift_id=headers['x-reality-governed-shift-id'];
+ const plan_fingerprint=headers['x-reality-governed-plan-fingerprint'];
+ if([owner_id,shift_id,plan_fingerprint].every(v=>v===undefined))return null;
+ if(typeof owner_id!=='string'||typeof shift_id!=='string'||
+    typeof plan_fingerprint!=='string'||!signedShiftUUID.test(owner_id)||
+    !signedShiftUUID.test(shift_id)||!signedShiftSHA.test(plan_fingerprint))
+  fail('WAKE_SCOPE_INVALID');
+ const event_id=headers['x-reality-governed-event-id'],nonce=headers['x-reality-governed-wake-nonce'],
+  kind=headers['x-reality-governed-wake-kind'],release_sha=headers['x-reality-governed-release-sha'];
+ if([event_id,nonce,kind,release_sha].every(v=>v===undefined))return Object.freeze({owner_id,shift_id,plan_fingerprint});
+ if(typeof event_id!=='string'||!signedShiftUUID.test(event_id)||typeof nonce!=='string'||!signedShiftUUID.test(nonce)||
+  !['START','RESUME'].includes(kind)||typeof release_sha!=='string'||!/^[a-f0-9]{40}$/.test(release_sha))fail('WAKE_EVENT_INVALID');
+ return Object.freeze({owner_id,shift_id,plan_fingerprint,event_id,nonce,kind,release_sha});
+}
+export function verifyCanonicalGovernedWakeDelivery(scope,env=process.env){
+ return env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW'&&!!scope&&
+  scope.owner_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&scope.shift_id===env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID&&
+  scope.release_sha===env.VERCEL_GIT_COMMIT_SHA&&/^[a-f0-9]{40}$/.test(scope.release_sha||'')&&
+  signedShiftUUID.test(scope.event_id||'')&&signedShiftUUID.test(scope.nonce||'')&&
+  (scope.kind==='RESUME'||(scope.kind==='START'&&scope.event_id===scope.shift_id));
+}
+export function verifyFinalLoopGovernedWakeScope(scope,graph){
+ return !!scope&&graph?.status==='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'&&
+  graph.owner_id===scope.owner_id&&graph.shift_id===scope.shift_id&&
+  graph.plan_fingerprint===scope.plan_fingerprint&&graph.completion_bound===true&&
+  graph.execution_scope_from_owner_warrant_only===true&&
+  graph.new_job_created===false&&graph.installation_authorized===false&&
+  graph.production_changed===false;
+}
+export async function readFinalLoopGovernedShiftStart({db,ownerId,shift,env=process.env,
+ invoke=shiftRpc}={}){
+ const safe=(status,extra={})=>Object.freeze({status,...extra,
+  execution_authorized_by_trigger:false,installation_authorized:false,
+  original_job_completed:false,production_changed:false});
+ if(!finalLoopEventTriggerEnabled(db,env))
+  return safe('GOVERNED_START_TRANSPORT_NOT_ENABLED');
+ if(!signedShiftUUID.test(ownerId||'')||!signedShiftUUID.test(shift?.shift_id||'')||
+    !signedShiftSHA.test(shift.plan_fingerprint||'')||shift.planned_end_at!=='infinity')
+  return safe('GOVERNED_START_SCOPE_UNVERIFIED');
+ try{
+  const r=await invoke(db,'reality_read_final_loop_governed_start_v1',{
+   p_owner_id:ownerId,p_shift_id:shift.shift_id,p_plan_fingerprint:shift.plan_fingerprint});
+  if(r?.owner_id!==ownerId||r.shift_id!==shift.shift_id||
+     r.plan_fingerprint!==shift.plan_fingerprint||r.read_only!==true||
+     r.execution_authorized!==false||r.installation_authorized!==false||
+     r.original_job_completed!==false||r.production_changed!==false||
+     !['GOVERNED_START_NOT_QUEUED','GOVERNED_START_WAKE_QUEUED',
+        'GOVERNED_START_WORKER_OBSERVED','GOVERNED_START_SCHEDULED'].includes(r.status))
+   return safe('GOVERNED_START_READBACK_UNVERIFIED');
+  if(r.status==='GOVERNED_START_WAKE_QUEUED'||r.status==='GOVERNED_START_WORKER_OBSERVED'){
+   if(!Number.isSafeInteger(r.network_request_id)||r.network_request_id<1||
+      !Number.isFinite(Date.parse(r.queued_at||'')))
+    return safe('GOVERNED_START_READBACK_UNVERIFIED');
+  }
+  if(r.status==='GOVERNED_START_WORKER_OBSERVED'&&
+     (!Number.isFinite(Date.parse(r.last_worker_seen_at||''))||
+      Date.parse(r.last_worker_seen_at)<Date.parse(r.queued_at)))
+   return safe('GOVERNED_START_READBACK_UNVERIFIED');
+  return safe(r.status,{shift_id:r.shift_id,
+   wake_queued:['GOVERNED_START_WAKE_QUEUED','GOVERNED_START_WORKER_OBSERVED'].includes(r.status),
+   worker_observed:r.status==='GOVERNED_START_WORKER_OBSERVED',
+   queued_at:r.queued_at||null,last_worker_seen_at:r.last_worker_seen_at||null});
+ }catch{return safe('GOVERNED_START_READBACK_UNAVAILABLE');}
+}
+
+// The server clock, not a phone's clock, defines an immediate start.
+// Legacy callers keep their supplied timestamp; scheduling remains explicit.
+export function resolveFinalLoopShiftStart(mode,plannedStart,nowMs=Date.now()){
+ if(![undefined,'START_NOW','SCHEDULE'].includes(mode)||
+    typeof plannedStart!=='string'||!Number.isFinite(nowMs))
+  fail('START_MODE_INVALID');
+ const chosen=new Date(mode==='START_NOW'?nowMs:plannedStart);
+ if(!Number.isFinite(chosen.valueOf())||
+    chosen.valueOf()<nowMs-120000||chosen.valueOf()>nowMs+7*86400000||
+    (mode==='SCHEDULE'&&chosen.valueOf()<=nowMs))
+  fail('START_TIME_INVALID');
+ return chosen;
 }

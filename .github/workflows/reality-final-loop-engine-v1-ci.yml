@@ -2,6 +2,11 @@ name: Reality Final Loop Engine lifecycle acceptance
 on:
   push:
     paths:
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql'
+      - 'src/reality-final-loop-technical-ci-evidence-verifier-v1.js'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js'
       - 'src/reality-shift-unified-execution-controller-v1.js'
       - 'src/reality-final-loop-time-horizon-v1.js'
       - 'src/reality-final-loop-executive-brief-v1.js'
@@ -22,6 +27,8 @@ on:
       - 'src/reality-signed-worker-capability-delivery-v1.js'
       - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
       - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'test/reality-governed-provider-continuity-checkpoint-v1.test.js'
       - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
       - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
       - 'sql/reality-governed-worker-release-schedule-read-v1.sql'
@@ -53,6 +60,21 @@ on:
       - 'test/sql/reality-final-loop-parent-delivery-smoke-v1.sql'
       - 'index.html'
       - 'reality-chat-final-loop-child-approval-v1.js'
+      - 'reality-chat-governed-release-v1.js'
+      - 'test/reality-home-owner-authorizations-v1.test.js'
+      - 'test/reality-unified-shell-v1.test.js'
+      - 'test/reality-verified-repair-progress-projection-v1.test.js'
+      - 'test/reality-continuous-qualification-inbox-v1.test.js'
+      - 'test/reality-work-center-owner-approval-ui-v1.test.js'
+      - 'reality-chat-workspace-v1.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'reality-chat-repair-scope-approval-v1.js'
+      - 'reality-chat-handoff-health-v1.js'
+      - 'reality-chat-operational-incident-briefing-v1.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'reality-generalized-install-review-ui-v1.js'
+      - 'reality-native263-install-approval-ui-v1.js'
+      - 'reality-shift-conversation-v1.js'
       - 'test/reality-chat-final-loop-child-approval-v1.test.js'
       - 'src/reality-governed-openai-gateway-v1.js'
       - 'sql/reality-final-loop-pr-source-plans-v1.sql'
@@ -77,6 +99,11 @@ on:
       - '.github/workflows/reality-final-loop-engine-v1-ci.yml'
   pull_request:
     paths:
+      - 'sql/reality-final-loop-release-continuation-v1.sql'
+      - 'sql/reality-final-loop-trigger-verifier-identity-repair-v1.sql'
+      - 'src/reality-final-loop-technical-ci-evidence-verifier-v1.js'
+      - 'test/reality-final-loop-suspension-investigation-smoke-v1.sql'
+      - 'test/reality-final-loop-technical-ci-evidence-verifier-v1.test.js'
       - 'src/reality-shift-unified-execution-controller-v1.js'
       - 'src/reality-final-loop-time-horizon-v1.js'
       - 'src/reality-final-loop-executive-brief-v1.js'
@@ -95,6 +122,8 @@ on:
       - 'src/reality-signed-worker-capability-delivery-v1.js'
       - 'src/reality-governed-signed-worker-release-switch-trigger-v1.js'
       - 'src/reality-governed-signed-worker-control-plane-adapters-v1.js'
+      - 'sql/reality-governed-provider-continuity-checkpoint-v1.sql'
+      - 'test/reality-governed-provider-continuity-checkpoint-v1.test.js'
       - 'test/reality-governed-signed-worker-control-plane-adapters-v1.test.js'
       - 'sql/reality-governed-signed-worker-release-control-plane-v1.sql'
       - 'sql/reality-governed-worker-release-schedule-read-v1.sql'
@@ -126,6 +155,21 @@ on:
       - 'test/sql/reality-final-loop-parent-delivery-smoke-v1.sql'
       - 'index.html'
       - 'reality-chat-final-loop-child-approval-v1.js'
+      - 'reality-chat-governed-release-v1.js'
+      - 'test/reality-home-owner-authorizations-v1.test.js'
+      - 'test/reality-unified-shell-v1.test.js'
+      - 'test/reality-verified-repair-progress-projection-v1.test.js'
+      - 'test/reality-continuous-qualification-inbox-v1.test.js'
+      - 'test/reality-work-center-owner-approval-ui-v1.test.js'
+      - 'reality-chat-workspace-v1.js'
+      - 'reality-chat-maintenance-continuation-v1.js'
+      - 'reality-chat-repair-scope-approval-v1.js'
+      - 'reality-chat-handoff-health-v1.js'
+      - 'reality-chat-operational-incident-briefing-v1.js'
+      - 'reality-chat-continuous-qualification-v1.js'
+      - 'reality-generalized-install-review-ui-v1.js'
+      - 'reality-native263-install-approval-ui-v1.js'
+      - 'reality-shift-conversation-v1.js'
       - 'test/reality-chat-final-loop-child-approval-v1.test.js'
       - 'src/reality-governed-openai-gateway-v1.js'
       - 'sql/reality-final-loop-pr-source-plans-v1.sql'
@@ -160,6 +204,8 @@ jobs:
       - name: Check complete controller and acceptance syntax
         run: |
           node --check src/reality-shift-unified-execution-controller-v1.js
+          node --check src/reality-final-loop-external-recovery-handoff-v1.js
+          node --check src/reality-shift-continuity-auto-investigation-v1.js
           node --check src/reality-final-loop-time-horizon-v1.js
           node --check src/reality-final-loop-executive-brief-v1.js
           node --check src/reality-final-loop-owner-time-bridge-v1.js
@@ -201,6 +247,16 @@ jobs:
           node --check reality-chat-final-loop-parent-delivery-v1.js
           node --check test/reality-final-loop-parent-delivery-v1.test.js
           node --check reality-chat-final-loop-child-approval-v1.js
+          node --check reality-chat-governed-release-v1.js
+          node --check reality-chat-workspace-v1.js
+          node --check reality-chat-maintenance-continuation-v1.js
+          node --check reality-chat-repair-scope-approval-v1.js
+          node --check reality-chat-handoff-health-v1.js
+          node --check reality-chat-operational-incident-briefing-v1.js
+          node --check reality-chat-continuous-qualification-v1.js
+          node --check reality-generalized-install-review-ui-v1.js
+          node --check reality-native263-install-approval-ui-v1.js
+          node --check reality-shift-conversation-v1.js
           node --check test/reality-chat-final-loop-child-approval-v1.test.js
           node --check test/reality-final-loop-pr-source-handoff-v1.test.js
           node --check src/reality-final-loop-signed-worker-bridge-v1.js
@@ -215,6 +271,8 @@ jobs:
           node --check test/reality-final-loop-governed-engineering-v1.test.js
       - name: Run existing controller and new Final Loop Engine invariants
         run: |
+          node --test test/reality-final-loop-external-recovery-handoff-v1.test.js
+          node --test test/reality-canonical-governed-auto-trigger-v1.test.js
           node --test test/reality-unified-shift-execution-controller-v1.test.js
           node --test test/reality-final-loop-engine-v1.test.js
           node --test test/reality-final-loop-time-horizon-v1.test.js
@@ -232,10 +290,12 @@ jobs:
           node --test test/reality-signed-worker-capability-delivery-v1.test.js
           node --test test/reality-governed-signed-worker-release-switch-trigger-v1.test.js
           node --test test/reality-governed-signed-worker-control-plane-adapters-v1.test.js
+          node --test test/reality-governed-provider-continuity-checkpoint-v1.test.js
           node --test test/reality-final-loop-signed-worker-release-wake-contract-v1.test.js
           node --test test/reality-signed-worker-scheduled-release-verifier-v1.test.js
           node --test test/reality-governed-release-independent-qualification-v1.test.js
           node --test test/reality-governed-worker-release-control-plane-v1.test.js
+          node --test test/reality-home-owner-authorizations-v1.test.js test/reality-unified-shell-v1.test.js test/reality-verified-repair-progress-projection-v1.test.js test/reality-continuous-qualification-inbox-v1.test.js test/reality-work-center-owner-approval-ui-v1.test.js
           node --test test/reality-final-loop-child-transactional-v1.test.js
           node --test test/reality-final-loop-parent-integration-v1.test.js
           node --test test/reality-final-loop-parent-delivery-v1.test.js

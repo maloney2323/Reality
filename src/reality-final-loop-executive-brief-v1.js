@@ -20,7 +20,7 @@ const wrap=(status,fields={})=>Object.freeze({
  shift_completed:false,production_changed:false
 });
 export function projectRealityFinalLoopExecutiveBrief({
- timeHorizon,supervisor=null
+ timeHorizon,supervisor=null,sharedContinuityGuard=null
 }={}){
  if(timeHorizon?.schema!=='reality-final-loop-time-horizon-v1'||
     timeHorizon.status!=='FINAL_LOOP_TIME_HORIZONS_PROJECTED_READ_ONLY'||
@@ -36,6 +36,27 @@ export function projectRealityFinalLoopExecutiveBrief({
     !UUID.test(timeHorizon.present.shift_id||''))
   return wrap('EXECUTIVE_FINAL_LOOP_EVIDENCE_NOT_CONNECTED');
  const p=timeHorizon.present;
+
+ if(sharedContinuityGuard!==null){
+  const g=sharedContinuityGuard;
+  if(g.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY'||
+     g.read_only!==true||g.execution_authorized!==false||
+     g.transition_committed!==false||g.original_job_completed!==false||
+     g.owner_id!==p.owner_id||g.shift_id!==p.shift_id||
+     g.continuity_root_id!==p.continuity_root_id||
+     g.continuity_head_sha256!==p.continuity_head_sha256||
+     g.revision!==p.revision||
+     !/^sha256:[a-f0-9]{64}$/.test(g.observation_sha256||'')||
+     !Array.isArray(g.handoffs)||
+     g.handoffs.length!==p.obligations.length||
+     p.obligations.some(o=>g.handoffs.filter(h=>
+       h.source_ref===o.source_ref&&
+       h.original_work_id===o.original_work_id&&
+       h.continuity_identity_verified===true&&
+       h.execution_authorized===false).length!==1))
+    return wrap('EXECUTIVE_SHARED_CONTINUITY_VERIFIER_DRIFT_FENCED');
+ }
+
  const allowedSupervisor=supervisor===null||(
   supervisor.version==='reality-automatic-shift-supervisor-v1'&&
   supervisor.status==='AUTOMATIC_SOURCE_TRIAGE_RECONCILED_NO_NEW_AUTHORITY'&&
@@ -114,6 +135,7 @@ export function projectRealityFinalLoopExecutiveBrief({
   priority_native_diagnostic:primary?.native_next_governed_action||null,
   priority_native_diagnostic_authorizes_nothing:true,
   existing_supervisor_cross_checked:supervisor!==null,
+  shared_continuity_guard_crosschecked:sharedContinuityGuard!==null,
   next_executive_message:primary===null?
    'No independently eligible active original in this readback.':
    primary.original_admission_pending?

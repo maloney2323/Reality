@@ -26,6 +26,210 @@ const safe=(status,details={})=>Object.freeze({
 const identity=graph=>graph?.jobs?.map(item=>[
  item.source_ref,item.original_work_id,item.source_proof_sha256
 ]);
+// Consume the Canonical Final Loop reader's source-bound qualifier handoff.
+// A qualified diagnosis describes an unresolved obligation; it never issues a
+// registered capability lease, grants authority, or certifies an outcome.
+function verifyCanonicalQualificationHandoffs(proof,graph){
+ const items=proof?.governed_qualification_handoffs;
+ if(items===undefined)return Object.freeze([]);
+ if(!Array.isArray(items)||items.length>graph.jobs.length)return null;
+ const seen=new Set(),out=[];
+ for(const h of items){
+  if(!h||typeof h!=='object'||Array.isArray(h)||
+     !/^work:[a-f0-9]{32}$/.test(h.original_work_id||'')||
+     !HASH.test(h.qualifier_receipt_sha256||'')||
+     !/^[A-Z][A-Z0-9_]{5,120}$/.test(h.qualifier_next_action||'')||
+     !Number.isFinite(Date.parse(h.qualifier_checked_at||''))||
+     !Number.isInteger(h.source_step_index)||h.source_step_index<1||
+     !['SUSPEND','RECOVER'].includes(h.proposed_transition)||
+     (h.proposed_transition==='RECOVER'&&
+       h.recovery_authority_scope!=='INTERNAL_MAINTENANCE_ONLY')||
+     (h.proposed_transition==='SUSPEND'&&
+       h.recovery_authority_scope!=='NO_DISPATCH')||
+     !['AUTHORITY_NOT_VERIFIED','BLOCKER_ATTESTATION_PENDING']
+       .includes(h.reason_code)||
+     h.diagnosis_consumable!==true||
+     h.independent_source_proof_verified!==true||
+     h.registered_capability_lease!==false||
+     h.execution_authorized!==false||
+     h.owner_approval_granted!==false||
+     h.original_job_completed!==false||
+     h.production_changed!==false||
+     !Array.isArray(h.unresolved_proof_gates)||
+     h.unresolved_proof_gates.length<1||
+     h.unresolved_proof_gates.length>20||
+     h.unresolved_proof_gates.some(x=>
+      typeof x!=='string'||!/^[A-Z][A-Z0-9_]{3,99}$/.test(x)))
+   return null;
+  const exact=graph.jobs.filter(j=>
+   j.source_ref===h.source_ref&&
+   j.original_work_id===h.original_work_id&&
+   j.source_step_index===h.source_step_index&&
+   j.independent_source_proof_verified===true);
+  const key=h.source_ref+'|'+h.original_work_id;
+  if(exact.length!==1||seen.has(key))return null;
+  seen.add(key);
+  out.push(Object.freeze({
+   source_ref:h.source_ref,original_work_id:h.original_work_id,
+   source_step_index:h.source_step_index,
+   qualifier_receipt_sha256:h.qualifier_receipt_sha256,
+   qualifier_checked_at:h.qualifier_checked_at,
+   next_qualified_action:h.qualifier_next_action,
+   unresolved_proof_gates:Object.freeze([...h.unresolved_proof_gates]),
+   decision:h.proposed_transition,reason_code:h.reason_code,
+   recovery_authority_scope:h.recovery_authority_scope,
+   registered_capability_lease:false,transition_committed:false,
+   executor_invoked:false,execution_authorized:false,
+   owner_approval_granted:false,original_job_completed:false
+  }));
+ }
+ return Object.freeze(out);
+}
+
+// Shared pure guard verifier: both read-only release inspection and the signed
+// worker consume the same database contract. This does not simulate a wake.
+export function verifySharedFinalLoopContinuityGuard({g,p,graph,shiftId}={}){
+ if(!p||!graph||!UUID.test(shiftId||'')||!Array.isArray(p.jobs)||!Array.isArray(graph.jobs)||
+    p.owner_id!==graph.owner_id||p.shift_id!==shiftId||
+    p.plan_fingerprint!==graph.plan_fingerprint||
+    !UUID.test(p.continuity_root_id||'')||!HASH.test(p.continuity_head_sha256||'')||
+    !HASH.test(p.frozen_shift_scope_sha256||'')||!Number.isSafeInteger(p.revision)||p.revision<1||
+    p.jobs.length!==graph.jobs.length||p.jobs.some(j=>graph.jobs.filter(x=>x.source_ref===j.source_ref&&
+     x.original_work_id===j.original_work_id&&x.source_proof_sha256===j.source_proof_sha256&&
+     x.independent_source_proof_verified===j.independent_source_proof_verified).length!==1))
+  return safe('FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID');
+   if(g?.schema!=='reality-shared-cross-layer-continuity-handoff-v1'||
+      g.status!=='FINAL_LOOP_SHARED_CONTINUITY_CHECKED'||
+      g.owner_id!==graph.owner_id||g.shift_id!==shiftId||
+      g.continuity_root_id!==p.continuity_root_id||
+      g.continuity_head_sha256!==p.continuity_head_sha256||
+      g.frozen_shift_scope_sha256!==p.frozen_shift_scope_sha256||
+      g.revision!==p.revision||
+      !HASH.test(g.handoff_observation_sha256||'')||
+      g.first_signal_anchor_verified!==true||
+      g.worldline_parent_links_verified!==true||
+      g.shift_scope_authority_event_present!==true||
+      !Number.isSafeInteger(g.verified_evidence_event_count)||
+      g.verified_evidence_event_count<1||
+
+      g.read_only!==true||g.execution_authorized!==false||
+      g.transition_committed!==false||g.executor_invoked!==false||
+      g.installation_authorized!==false||
+      g.original_job_completed!==false||g.production_changed!==false||
+      g.no_new_executable_authority!==true||
+      !Array.isArray(g.obligations)||
+      g.obligations.length!==p.jobs.length||
+      g.unverified_handoffs!==0)
+    return safe('FINAL_LOOP_SHARED_CONTINUITY_SCOPE_OR_PROOF_INVALID');
+   const verifiedHandoffs=[],observed=new Set();
+   for(const j of p.jobs){
+    const matches=g.obligations.filter(o=>
+      o?.source_ref===j.source_ref&&
+      o.original_work_id===j.original_work_id);
+    if(matches.length!==1||observed.has(j.source_ref))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_IDENTITY_MISMATCH');
+    observed.add(j.source_ref);
+    const o=matches[0];
+    if(o.continuity_identity_verified!==true||
+       o.execution_permitted_by_handoff!==false||
+       o.source_proof_verified!==j.independent_source_proof_verified||
+       o.universe_return_verified!==false&&
+        o.independent_original_outcome_verified!==true||
+       o.status==='INDEPENDENTLY_SETTLED_WITH_UNIVERSE'&&
+        (o.universe_return_verified!==true||
+         o.independent_original_outcome_verified!==true))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_VERIFIER_OR_AUTHORITY_CONFLICT');
+    if(j.original_work_id===null){
+      if(o.status!=='SOURCE_NOT_ADMITTED'||
+         o.execution_permitted_by_handoff!==false)
+       return safe('FINAL_LOOP_SHARED_CONTINUITY_UNADMITTED_SOURCE_NOT_FENCED');
+    }else if(!/^work:[a-f0-9]{32}$/.test(j.original_work_id)||
+       o.qualifier_digest_verified!==true||       o.original_work_universe_event_verified!==true||
+
+       !HASH.test(o.qualifier_receipt_sha256||'')||
+       !Array.isArray(o.unresolved_proof_gates)||
+       o.unresolved_proof_gates.length>20||
+       o.unresolved_proof_gates.some(x=>typeof x!=='string'||
+        !/^[A-Z][A-Z0-9_]{3,99}$/.test(x))||
+       new Set(o.unresolved_proof_gates).size!==o.unresolved_proof_gates.length||
+       o.executor_authorized_by_observation!==false||
+       typeof o.original_claim_admitted!=='boolean'||
+       typeof o.internal_maintenance_independent_frozen_ci_verified!=='boolean'||
+       typeof o.independent_original_outcome_verified!=='boolean'||
+       typeof o.universe_return_verified!=='boolean'||
+       (o.internal_maintenance_independent_frozen_ci_verified&&
+        !HASH.test(o.internal_maintenance_verifier_receipt_sha256||'')))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_ORIGINAL_PROOF_NOT_VERIFIED');
+
+    const executionReadback=o.execution_spine_readback??null;
+    if(executionReadback!==null){
+     const e=executionReadback;
+     if(!['NO_FENCED_CHILD_INVOCATION_OBSERVED','SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED',
+       'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN',
+       'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'].includes(e.status)||
+      !Number.isSafeInteger(e.fenced_count)||e.fenced_count<0||e.fenced_count>63||
+      !Number.isSafeInteger(e.signed_observation_count)||e.signed_observation_count<0||
+      !Array.isArray(e.observations)||e.observations.length!==e.signed_observation_count||
+      new Set(e.observations.map(x=>x?.invocation_id)).size!==e.observations.length||
+      e.observations.some(x=>!/^work:[a-f0-9]{32}$/.test(x?.child_work_id||'')||
+       !UUID.test(x.invocation_id||'')||!UUID.test(x.worker_run_id||'')||!UUID.test(x.event_id||'')||
+       !HASH.test(x.scope_sha256||'')||!HASH.test(x.event_head_sha256||'')||
+       !HASH.test(x.release_receipt_sha256||'')||!Number.isSafeInteger(x.event_revision)||x.event_revision<1||
+       !/^[a-f0-9]{40}$/.test(x.release_sha||'')||
+       !(x.worker_completed===true&&x.worker_failure_attested===undefined&&x.worker_terminal_status===undefined||
+         x.worker_completed===false&&x.worker_terminal_status==='FAILED'&&
+         x.worker_failure_attested===true&&x.provider_outcome_unknown===true&&
+         x.worker_failure_stage==='EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE'&&
+         x.model_artifact_recorded===false)||
+       x.provider_outcome_verified!==false||x.replay_authorized!==false||
+       typeof x.model_artifact_recorded!=='boolean')||
+      e.canonical_return_committed!==(e.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN')||
+      (e.canonical_return_committed&&(!UUID.test(e.canonical_return_event_id||'')||
+       !HASH.test(e.canonical_return_head_sha256||'')||!HASH.test(e.observation_sha256||'')||
+       e.fenced_count===0||e.fenced_count!==e.signed_observation_count))||
+      e.execution_authorized!==false||
+      e.provider_outcome_verified!==false||e.original_job_completed!==false||e.replay_authorized!==false||
+      (e.status==='NO_FENCED_CHILD_INVOCATION_OBSERVED'&&(e.fenced_count!==0||e.signed_observation_count!==0))||
+      (e.status==='SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'&&
+       (e.fenced_count===0||e.fenced_count!==e.signed_observation_count)))
+      return safe('FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
+    }
+    verifiedHandoffs.push(Object.freeze({
+     source_ref:j.source_ref,original_work_id:j.original_work_id,
+     status:o.status,continuity_identity_verified:true,
+     qualifier_digest_verified:o.qualifier_digest_verified===true,
+     // Preserve the independently checked diagnosis for the recovery policy.
+     // Dropping these fields silently prevents a source-bound contract.
+     qualifier_receipt_sha256:j.original_work_id===null?null:o.qualifier_receipt_sha256,
+     next_qualified_action:j.original_work_id===null?null:o.next_qualified_action,
+     unresolved_proof_gates:Object.freeze(j.original_work_id===null?[]:
+      [...o.unresolved_proof_gates]),
+     independent_internal_ci_verified:
+      o.internal_maintenance_independent_frozen_ci_verified===true,
+     internal_maintenance_verifier_receipt_sha256:
+      o.internal_maintenance_independent_frozen_ci_verified===true?
+       o.internal_maintenance_verifier_receipt_sha256:null,
+     execution_spine_readback:executionReadback,
+     original_claim_admitted:o.original_claim_admitted===true,
+     independent_original_outcome_verified:
+      o.independent_original_outcome_verified===true,
+     universe_return_verified:o.universe_return_verified===true,
+     execution_authorized:false,original_job_completed:false
+    }));
+   }
+   return Object.freeze({
+    status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+    shift_id:shiftId,owner_id:graph.owner_id,
+    continuity_root_id:p.continuity_root_id,
+    continuity_head_sha256:p.continuity_head_sha256,
+    revision:p.revision,
+    observation_sha256:g.handoff_observation_sha256,
+    handoffs:Object.freeze(verifiedHandoffs),
+    read_only:true,execution_authorized:false,
+    transition_committed:false,original_job_completed:false
+   });
+}
+
 export async function inspectFinalLoopOnExistingSignedWorker({
  db,wake,graph,env=process.env,now=new Date().toISOString(),
  read=shiftRpc,fetchImpl=fetch
@@ -123,6 +327,155 @@ export async function inspectFinalLoopOnExistingSignedWorker({
      source_ref:item.source_ref
     }));
   }
+  const governedQualificationHandoffs=
+   verifyCanonicalQualificationHandoffs(p,refreshed);
+  if(governedQualificationHandoffs===null)
+   return safe('FINAL_LOOP_GOVERNED_QUALIFICATION_HANDOFF_INVALID');
+
+
+  // Cross-layer Continuity guard: reuse the canonical ledger and independent
+  // verifier receipts, never a model-generated handoff or a second ledger.
+  // The guard is required in strict rollout mode and must fail closed.
+  let sharedContinuityGuard={
+   status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_NOT_ENABLED',
+   read_only:true,execution_authorized:false,
+   transition_committed:false,original_job_completed:false
+  };
+  if(env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'){
+   let g;
+   try{
+    g=await read(db,'reality_read_final_loop_shared_continuity_guard_v1',
+     {p_shift_id:wake.shift_id},{fetchImpl,timeoutMs:6000});
+   }catch{
+    return safe('FINAL_LOOP_SHARED_CONTINUITY_GUARD_READ_UNAVAILABLE',{
+     owner_id:graph.owner_id,shift_id:wake.shift_id
+    });
+   }
+   sharedContinuityGuard=verifySharedFinalLoopContinuityGuard({g,p,graph:refreshed,shiftId:wake.shift_id});
+   if(sharedContinuityGuard.status!=='FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY')return sharedContinuityGuard;
+  }
+
+  // The Final Loop's durable event inbox lives in the same service-only
+  // continuity database. The event is an observation, never an execution
+  // instruction: no provider call, lease, retry or installation is granted.
+  let eventResumeShadow={
+   status:'FINAL_LOOP_EVENT_RESUME_SHADOW_DISABLED',
+   shadow_ready_event_count:0,subscribed_obligation_count:0,
+   event_dispatch_enabled:false,execution_authorized:false
+  };
+  if(env.REALITY_FINAL_LOOP_EVENT_RESUME_SHADOW_ENABLED==='true'){
+   let eventRead;
+   try{
+    eventRead=await read(db,
+     'reality_read_final_loop_event_resume_shadow_v1',
+     {p_shift_id:wake.shift_id},{fetchImpl,timeoutMs:6000});
+   }catch{
+    return safe('FINAL_LOOP_EVENT_RESUME_READBACK_UNAVAILABLE',{
+     owner_id:graph.owner_id,shift_id:wake.shift_id
+    });
+   }
+   if(eventRead?.schema!=='reality-final-loop-event-resume-shadow-v1'||
+      eventRead.status!=='FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY'||
+      eventRead.shift_id!==wake.shift_id||
+      eventRead.event_dispatch_enabled!==false||
+      eventRead.execution_authorized!==false||
+      eventRead.installation_authorized!==false||
+      eventRead.original_job_completed!==false||
+      eventRead.production_changed!==false||
+      !Array.isArray(eventRead.subscriptions)||
+      !Array.isArray(eventRead.events)||
+      eventRead.subscriptions.length>p.jobs.length*5||
+      eventRead.events.length>128)
+    return safe('FINAL_LOOP_EVENT_RESUME_SCOPE_OR_AUTHORITY_INVALID');
+   const known=new Set(p.jobs.filter(j=>
+    /^work:[a-f0-9]{32}$/.test(j.original_work_id||'')&&
+    j.independent_source_proof_verified===true)
+    .map(j=>j.source_ref+'|'+j.original_work_id));
+   const ready=[];
+   for(const s of eventRead.subscriptions){
+    if(!known.has(s?.source_ref+'|'+s?.original_work_id)||
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE'].includes(
+        s.condition_kind)||
+       !['SUSPENDED','SHADOW_SIGNALED'].includes(s.state)||
+       !HASH.test(s.subscribed_receipt_sha256||'')||
+       !Number.isSafeInteger(s.continuity_revision)||
+       s.continuity_revision!==p.revision)
+      return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
+   }
+   for(const e of eventRead.events){
+    if(!UUID.test(e?.event_id||'')||
+       !known.has(e.source_ref+'|'+e.original_work_id)||
+       !['QUALIFIER_PROOF_CHANGED','INDEPENDENT_FROZEN_CI_RECEIPT','VERIFIED_SUSPENSION_INVESTIGATION','VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE'].includes(
+        e.event_kind)||
+       !['SHADOW_PENDING','SHADOW_OBSERVED','SHADOW_STALE'].includes(
+        e.event_state)||
+       !HASH.test(e.source_receipt_sha256||'')||
+       !HASH.test(e.event_causality_sha256||'')||
+       !Number.isSafeInteger(e.continuity_revision)||e.continuity_revision<1||
+       e.continuity_revision>p.revision||
+       // Prior observed/stale events are immutable history, never active
+       // continuation authority. Only a current pending event can resume.
+       (e.continuity_revision!==p.revision&&
+        (e.event_state==='SHADOW_PENDING'||e.would_resume_suspended_obligation!==false))||
+       typeof e.source_current!=='boolean'||
+       typeof e.would_resume_suspended_obligation!=='boolean'||
+       (e.would_resume_suspended_obligation&&
+        (e.event_state!=='SHADOW_PENDING'||!e.source_current)))
+      return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+    if(e.would_resume_suspended_obligation){
+      const subscriptions=eventRead.subscriptions.filter(s=>
+       s.original_work_id===e.original_work_id&&s.source_ref===e.source_ref&&
+       s.condition_kind===e.event_kind&&s.continuity_revision===e.continuity_revision);
+      if(subscriptions.length!==1)
+       return safe('FINAL_LOOP_EVENT_RESUME_SUBSCRIPTION_INVALID');
+      if(e.event_kind==='VERIFIED_REVIEW_TECHNICAL_EVIDENCE'&&
+       (e.signal_next_action!=='READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'||
+        subscriptions[0].next_qualified_action!==e.signal_next_action))
+       return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+      if(e.event_kind==='VERIFIED_INVESTIGATION_REVIEW'&&
+       (e.signal_next_action!=='INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'||
+        subscriptions[0].next_qualified_action!==e.signal_next_action))
+       return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+      if(e.event_kind==='VERIFIED_SUSPENSION_INVESTIGATION'&&
+       (e.signal_next_action!=='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'||
+        subscriptions[0].next_qualified_action!==e.signal_next_action))
+       return safe('FINAL_LOOP_EVENT_RESUME_EVENT_INVALID');
+      // The subscription describes the prior suspended state. A verified
+      // current qualifier may supersede its action without changing the
+      // original identity or granting a fresh attempt budget.
+      const current=governedQualificationHandoffs.filter(h=>
+       h.source_ref===e.source_ref&&h.original_work_id===e.original_work_id&&
+       h.qualifier_receipt_sha256===e.source_receipt_sha256);
+      const terminal=e.event_kind==='QUALIFIER_PROOF_CHANGED'&&
+       current.length===1&&current[0].next_qualified_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+       current[0].unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED');
+      const acceptedReview=e.event_kind==='QUALIFIER_PROOF_CHANGED'&&
+       current.length===1&&current[0].next_qualified_action==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
+       !current[0].unresolved_proof_gates.includes('OWNER_GOAL_ACCEPTANCE_EVENT_MISSING')&&
+       !current[0].unresolved_proof_gates.includes('EXACT_ACCEPTANCE_APPROVAL_MISSING');
+      ready.push(Object.freeze({
+       event_id:e.event_id,source_ref:e.source_ref,
+       original_work_id:e.original_work_id,event_kind:e.event_kind,
+       event_causality_sha256:e.event_causality_sha256,
+       source_receipt_sha256:e.source_receipt_sha256,
+       continuity_revision:e.continuity_revision,
+       continuity_head_sha256:p.continuity_head_sha256,
+       next_qualified_action:terminal||acceptedReview?current[0].next_qualified_action:subscriptions[0].next_qualified_action,
+       would_resume_suspended_obligation:true,
+       executor_invoked:false,execution_authorized:false
+      }));
+    }
+   }
+   eventResumeShadow=Object.freeze({
+    status:'FINAL_LOOP_VERIFIED_EVENT_SHADOW_CONSUMED_NO_DISPATCH',
+    shadow_ready_event_count:ready.length,
+    subscribed_obligation_count:eventRead.subscriptions.length,
+    ready_event_refs:Object.freeze(ready),
+    event_dispatch_enabled:false,execution_authorized:false,
+    installation_authorized:false,original_job_completed:false
+   });
+  }
+
   const canonicalSourceDecisions=derivePendingFinalLoopSourceDecisions(p);
   if(canonicalSourceDecisions===null)
    return safe('FINAL_LOOP_CANONICAL_SOURCE_ADMISSION_POLICY_UNVERIFIED');
@@ -158,7 +511,12 @@ export async function inspectFinalLoopOnExistingSignedWorker({
    frozen_shift_scope_sha256:p.frozen_shift_scope_sha256,
    continuity_head_sha256:p.continuity_head_sha256,
    revision:p.revision,checkpoint_candidates:Object.freeze(pending),
-   next_governed_action:canonicalSourceDecisions.some(d=>
+   governed_qualification_handoffs:governedQualificationHandoffs,
+   event_resume_shadow:eventResumeShadow,
+   shared_continuity_guard:sharedContinuityGuard,
+   next_governed_action:governedQualificationHandoffs.length>0?
+    governedQualificationHandoffs[0].next_qualified_action:
+    canonicalSourceDecisions.some(d=>
     d.decision==='SUSPEND')?
     'QUALIFY_DISTINCT_SOURCE_TO_ORIGINAL_BEFORE_ACCEPTANCE':
     'INDEPENDENTLY_BIND_FROZEN_ORIGINAL_GOAL_ACCEPTANCE_AND_FOUR_PROOFS'
@@ -266,10 +624,27 @@ export async function recordOneFinalLoopEvidenceCheckpoint({
   return safe('FINAL_LOOP_DB_CHECKPOINT_RECEIPT_UNVERIFIED_NO_REPLAY',{
    shift_id:wake.shift_id,original_work_id:original.original_work_id
   });
+
+ // When shared Continuity is active, require the actual DB writer's
+ // atomic revision-and-event-subscription proof too. A local receipt
+ // hash alone cannot certify the next cycle.
+ if(env.REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED==='true'&&
+    (receipt.shared_continuity_guard_verified!==true||
+     !HASH.test(receipt.shared_continuity_observation_sha256||'')||
+     receipt.next_continuity_revision!==inspection.revision+1||
+     !Number.isSafeInteger(receipt.event_subscriptions_rebound_to_next_revision)||
+     receipt.event_subscriptions_rebound_to_next_revision<0))
+  return safe('FINAL_LOOP_DURABLE_CHECKPOINT_SUBSCRIPTION_CAS_UNVERIFIED_NO_REPLAY',{
+   shift_id:wake.shift_id,original_work_id:original.original_work_id
+  });
+
  return safe('FINAL_LOOP_EVIDENCE_ONLY_CHECKPOINT_INDEPENDENTLY_ACKNOWLEDGED',{
   shift_id:wake.shift_id,original_work_id:original.original_work_id,
   checkpoint_receipt_id:receipt.receipt_id,
   checkpoint_receipt_sha256:receipt.receipt_sha256,
-  evidence_checkpoint_acknowledged:true
+  evidence_checkpoint_acknowledged:true,
+  next_continuity_revision:receipt.next_continuity_revision??null,
+  event_subscriptions_rebound_to_next_revision:
+   receipt.event_subscriptions_rebound_to_next_revision??null
  });
 }

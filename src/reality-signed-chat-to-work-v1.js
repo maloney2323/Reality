@@ -87,8 +87,10 @@ export async function investigateAuthenticatedChatUnderExistingShift({
  if(!c)return safe('NO_PENDING_CHAT_WITH_CURRENT_OWNER_WARRANT');
  let cause='MODEL_PROVIDER_OR_DIAGNOSIS_UNVERIFIED';
  try{
-  const graph=await callRpc(db,'reality_read_current_shift_execution_graph_v1',
-   {},{fetchImpl});
+  // Use the existing owner+shift graph for this exact claimed instruction;
+  // global latest/infinite-shift selection is not an authority boundary.
+  const graph=await callRpc(db,'reality_read_owner_shift_execution_graph_v1',
+   {p_owner_id:c.owner_id,p_shift_id:c.shift_id},{fetchImpl});
   if(graph?.status!=='OWNER_SHIFT_UNIFIED_EXECUTION_GRAPH_VERIFIED'||
      graph.owner_id!==c.owner_id||graph.shift_id!==c.shift_id||
      graph.installation_authorized!==false||

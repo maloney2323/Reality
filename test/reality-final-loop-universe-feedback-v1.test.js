@@ -38,7 +38,7 @@ const view={
   status:'FINAL_LOOP_TIME_HORIZONS_PROJECTED_READ_ONLY',
   execution_authorized:false,original_job_completed:false,
   present:{owner_id:owner,shift_id:shift,continuity_root_id:root,
-   obligations}
+   continuity_head_sha256:hash('1'),revision:3,obligations}
  }
 };
 const outcomes=(items=[])=>({
@@ -168,4 +168,89 @@ test('owner and signed worker resolve identical Universe facts from one canonica
  assert.deepEqual(workerRead,ownerRead);
  assert.equal(workerRead.execution_authorized,false);
  assert.equal(workerRead.shift_completed,false);
+});
+
+
+test('Universe rejects settlement not reconciled by the shared continuity verifier',()=>{
+ const guard={
+  status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+  owner_id:owner,shift_id:shift,continuity_root_id:root,
+  continuity_head_sha256:hash('1'),revision:3,observation_sha256:hash('9'),
+  read_only:true,execution_authorized:false,
+  transition_committed:false,original_job_completed:false,
+  handoffs:[
+   {source_ref:pr307,original_work_id:work,
+    continuity_identity_verified:true,execution_authorized:false,
+    independent_original_outcome_verified:false,
+    universe_return_verified:false},
+   {source_ref:pr308,original_work_id:null,
+    continuity_identity_verified:true,execution_authorized:false,
+    universe_return_verified:false}
+  ]
+ };
+ const synced={...view,time_horizon:{...view.time_horizon,
+  present:{...view.time_horizon.present,revision:3}}};
+ const okay=feedback({canonicalView:synced,
+  parentOutcomes:outcomes(),sharedContinuityGuard:guard});
+ assert.equal(okay.status,'FINAL_LOOP_UNIVERSE_CONTINUITY_FEEDBACK_VERIFIED_READ_ONLY');
+ assert.equal(okay.shared_continuity_guard_crosschecked,true);
+ assert.equal(okay.original_job_completed,false);
+ const invented=feedback({canonicalView:synced,
+  parentOutcomes:outcomes([verified]),sharedContinuityGuard:guard});
+ assert.equal(invented.status,
+  'FINAL_LOOP_UNIVERSE_INDEPENDENT_SETTLEMENT_NOT_RECONCILED');
+ const foreign=feedback({canonicalView:synced,parentOutcomes:outcomes(),
+  sharedContinuityGuard:{...guard,continuity_head_sha256:hash('2')}});
+ assert.equal(foreign.status,'FINAL_LOOP_UNIVERSE_SHARED_CONTINUITY_PROOF_MISMATCH');
+});
+
+
+test('owner Chat and temporal Universe readback require same service-only Continuity guard',()=>{
+ const ownerTime=readFileSync(new URL(
+  '../api/reality/personal-time-horizon.js',import.meta.url),'utf8');
+ const chat=readFileSync(new URL(
+  '../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.match(ownerTime,/reality_read_final_loop_shared_continuity_guard_v1/);
+ assert.match(ownerTime,/final_loop_shared_continuity_guard:finalLoopSharedContinuityGuard/);
+ assert.match(ownerTime,/sharedContinuityGuard:finalLoopSharedContinuityGuard\.status/);
+ assert.match(ownerTime,/REALITY_FINAL_LOOP_SHARED_CONTINUITY_GUARD_ENABLED/);
+ assert.match(chat,/x\.final_loop_shared_continuity_guard\?\.status/);
+ assert.match(chat,/feedback\.shared_continuity_guard_crosschecked===true/);
+ assert.doesNotMatch(ownerTime,/cron\.schedule\(|net\.http_post/);
+});
+
+
+test('Universe fences temporal projections from an earlier continuity revision or head',()=>{
+ for(const change of [{revision:2},{continuity_head_sha256:hash('2')}]) {
+  const stale={...view,time_horizon:{...view.time_horizon,
+   present:{...view.time_horizon.present,...change}}};
+  const r=feedback({canonicalView:stale,parentOutcomes:outcomes([verified])});
+  assert.equal(r.status,'FINAL_LOOP_UNIVERSE_CANONICAL_CONTINUITY_UNVERIFIED');
+  assert.equal(r.execution_authorized,false);
+  assert.equal(r.original_job_completed,false);
+ }
+});
+
+test('worker refreshes Universe and executive priorities after recovery evidence attachment using existing verifier',()=>{
+ const worker=readFileSync(new URL(
+  '../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const attachment=worker.indexOf("workerStage='FINAL_LOOP_TECHNICAL_CI_CONTINUITY_EVIDENCE_ATTACHMENT'");
+ const returned=worker.indexOf("workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN'");
+ const publication=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",returned);
+ assert.ok(attachment>=0&&returned>attachment&&publication>returned);
+ const section=worker.slice(returned,publication);
+ assert.match(section,/const universeReturnView=await requireFreshFinalLoopContinuity\(\)/);
+ assert.match(section,/canonicalView:universeReturnView/);
+ assert.match(section,/sharedContinuityGuard:universeReturnView\.shared_continuity_guard/);
+ assert.match(section,/timeHorizon:universeReturnView\.time_horizon/);
+ assert.doesNotMatch(section,/canonicalView:finalLoopEngineShadow/);
+});
+
+
+test('newly acknowledged atomic checkpoint defers Universe and executive publication until the next signed wake',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const section=worker.slice(worker.indexOf("workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN'"),worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",worker.indexOf("workerStage='FINAL_LOOP_POST_RECOVERY_UNIVERSE_RETURN'")));
+ assert.match(section,/finalLoopExecutiveBrief=projectRealityFinalLoopExecutiveBrief\(\{\}\)/);
+ assert.match(section,/if\(finalLoopEvidenceCheckpoint\?\.evidence_checkpoint_acknowledged!==true\)\{[\s\S]*?const universeReturnView=await requireFreshFinalLoopContinuity\(\)/);
+ assert.match(section,/\}else\{\s*finalLoopUniverseFeedback=\{\s*status:'FINAL_LOOP_UNIVERSE_CHECKPOINT_REBOUND_NEXT_WAKE_REQUIRED'/);
 });

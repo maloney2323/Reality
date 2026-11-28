@@ -107,13 +107,25 @@ export async function enforceSignedMaintenanceReceiptContinuity({
  let newlyRecorded=0;
  async function commit({stage,step,receipt,refs,payload}){
   if(!HASH.test(receipt))bad('TRANSITION_EVIDENCE_RECEIPT_REQUIRED');
-  const identity=card.maintenance_id+':'+step;
+  // A verified repair can remain unchanged while the independently read
+  // original obligation advances. Preserve the old event, and bind each
+  // return observation to the exact work, source and authorized next step.
+  // Existing matching receipts remain idempotent, including legacy IDs.
+  const isOriginalReturn=step==='NEXT_SIGNED_ORIGINAL_OBLIGATION_RECONCILED';
+  const matchesOriginalReturn=e=>!isOriginalReturn||(
+    e.payload?.original_work_id===payload.original_work_id&&
+    e.payload?.original_source_ref===payload.original_source_ref&&
+    e.payload?.next_required_action===payload.next_required_action);
+  const identity=card.maintenance_id+':'+step+(isOriginalReturn?
+    ':'+JSON.stringify([payload.original_work_id,payload.original_source_ref,
+      payload.next_required_action]):'');
   const previous=history.filter(e=>e.payload?.signed_maintenance_step===step&&
-    e.payload?.maintenance_id===card.maintenance_id);
+    e.payload?.maintenance_id===card.maintenance_id&&matchesOriginalReturn(e));
   if(previous.length>1)bad('DUPLICATE_MILESTONE_IN_CANONICAL_LEDGER');
   if(previous.length){
    const old=previous[0];
    if(old.payload?.receipt_sha256!==receipt||
+    old.payload?.owner_id!==ownerId||
     old.payload?.shift_id!==shiftId||
     old.payload?.candidate_commit_sha!==card.candidate_commit_sha||
     old.payload?.target_review_receipt_sha256!==card.target_review_receipt_sha256||

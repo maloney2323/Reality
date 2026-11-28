@@ -92,6 +92,7 @@ test('Chat renders exact sourced last activity, blocker and Reality next action 
  assert.match(ui,/Last verified activity:/);
  assert.match(ui,/What is stopping completion:/);
  assert.match(ui,/Next: Reality must register and run case-specific independent frozen tests/);
- assert.match(ui,/20000/);
+ assert.match(ui,/reality:chat-work-opened/);
+ assert.doesNotMatch(ui,/setInterval\(/);
  assert.doesNotMatch(ui,/independent_frozen_tests_completed:true/);
 });

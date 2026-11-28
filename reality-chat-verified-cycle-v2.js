@@ -34,8 +34,7 @@
   byId('realityVerifiedCycle')?.scrollIntoView({block:'nearest'});
  });
  headline.append(signal,show);
- const threadHead=center.querySelector('.reality-chat-thread-heading');
- if(threadHead)threadHead.insertAdjacentElement('afterend',headline);
+ workPanel.prepend(headline);
  const wrap=div('section','reality-verified-cycle');
  wrap.id='realityVerifiedCycle';
  wrap.setAttribute('aria-label','Reality original-job lifecycle and evidence');

@@ -78,7 +78,7 @@ function validateFile(file){
 // It does not create children or alter the parent/original/PR status.
 export async function inspectLargePrSourceForBoundedReview({
  job,ownerId,shiftId,metadata,fetchImpl=fetch,githubToken,
- env=process.env
+ env=process.env,capturePatchPaths=null
 }={}){
  const m=REF.exec(job?.source_ref||'');
  if(env.VERCEL_ENV!=='preview'||
@@ -93,7 +93,15 @@ export async function inspectLargePrSourceForBoundedReview({
  const number=Number(m[1]);
  if(!safeMeta(metadata,job,number))
   return denied('CURRENT_OPEN_PR_BASE_HEAD_OR_SIZE_UNVERIFIED',job);
- const all=[],paths=new Set();
+ // Optional, request-local capture for the already approved bounded review.
+ // Ordinary source planning never carries raw patches in its result.
+ if(capturePatchPaths!==null&&(!Array.isArray(capturePatchPaths)||
+    capturePatchPaths.length<1||capturePatchPaths.length>LARGE_PR_NATIVE_SCOPE_LIMIT||
+    capturePatchPaths.some(x=>typeof x!=='string'||x.length<1||x.length>350)||
+    new Set(capturePatchPaths).size!==capturePatchPaths.length))
+  return denied('SCOPED_PATCH_CAPTURE_INVALID',job);
+ const wanted=capturePatchPaths===null?null:new Set(capturePatchPaths);
+ const captured=[],all=[],paths=new Set();
  try{
   const pages=Math.ceil(metadata.changed_files/100);
   for(let page=1;page<=pages;page++){
@@ -107,6 +115,11 @@ export async function inspectLargePrSourceForBoundedReview({
     if(!item||paths.has(item.path))
      return denied('GITHUB_CHANGED_FILE_IDENTITY_OR_DUPLICATE_UNVERIFIED',job);
     paths.add(item.path);all.push(item);
+    if(wanted?.has(item.path))captured.push(Object.freeze({
+     filename:item.path,sha:item.blob_sha,status:item.status,
+     additions:item.additions,deletions:item.deletions,
+     patch:typeof f.patch==='string'&&f.patch.length<=40000?f.patch:null
+    }));
    }
   }
   if(all.length!==metadata.changed_files)
@@ -161,6 +174,7 @@ export async function inspectLargePrSourceForBoundedReview({
    bounded_scope_limit:LARGE_PR_NATIVE_SCOPE_LIMIT,
    bounded_scope_count:groups.length,
    bounded_scopes:Object.freeze(groups),
+   ...(wanted===null?{}:{captured_scope_patches:Object.freeze(captured)}),
    read_only:true,proposed_only:true,
    // Coverage is only inventory coverage, not patch or review coverage.
    patch_coverage_verified:false,

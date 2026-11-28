@@ -46,7 +46,9 @@ test('Chat sees verified account mission as observation, not as an execution war
  assert.match(chat,/OWNER_CONFIRMED_OBJECTIVE_NOT_BUSINESS_OUTCOME/);
  assert.match(chat,/grants_execution_authority:false/);
  assert.match(chat,/installation_authorized:false/);
- assert.match(chat,/currentObservations:ownerCurrentUniverseObservations/);
+ assert.match(chat,/currentObservations:observations,reconciledOriginals/);
+ assert.match(chat,/makeOwnerUniverseReadModel\(\{\s*observations:ownerCurrentUniverseObservations,reconciledOriginals/);
+ assert.match(chat,/\.\.\.\(primaryMissionObservation\?\[primaryMissionObservation\]:\[\]\)/);
 });
 test('Chat restores saved permanent mission across logins and never silently saves its default proposal',()=>{
  const html=source('../index.html');
