@@ -767,7 +767,12 @@ test('transport is attached to existing signed worker and canonical service-only
  assert.match(sql,/premodel_recovery_count=greatest\(premodel_recovery_count,1\)/);
  assert.match(sql,/reality_fence_final_loop_child_transport_v1\(text,uuid,uuid,text,uuid,boolean,jsonb\)[\s\n]+FROM PUBLIC,anon,authenticated/);
  const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
- assert.match(worker,/signedWorkerDurableReleaseWake\.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'/);
+ const router=readFileSync(new URL('../src/reality-evidence-driven-capability-router-v1.js',import.meta.url),'utf8');
+ assert.match(router,/release\?\.status!=='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'/);
+ assert.match(router,/release\.worker_run_id!==workerRunId/);
+ assert.match(router,/release\.release_sha!==delivery\.release_sha/);
+ assert.match(worker,/selectRegisteredSignedEventCapability\(\{[\s\S]*?release:signedWorkerDurableReleaseWake,[\s\S]*?workerRunId:actualWorkerRunId/);
+ assert.match(worker,/registeredEventHandlers\.get\(selectedEventCapability\)/);
  assert.match(worker,/runIsolatedAdvisory:transport\.runIsolatedAdvisory/);
 });
 
