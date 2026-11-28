@@ -632,12 +632,19 @@ test('signed worker connects the same Continuity/verifier BEFORE its first opera
  const universe=worker.indexOf("workerStage='SIGNED_MAINTENANCE_POSTINSTALL_UNIVERSE_RECONCILIATION'");
  const returnFence=worker.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'");
  const publish=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",returnFence);
- const exactStart=worker.indexOf('if(suspensionInvestigationWake){');
+ const exactStart=worker.indexOf('if(claimedEvidenceCapability){');
  const exact=worker.slice(exactStart,i);
  assert.ok(exactStart>0&&exactStart<i);
  assert.match(exact,/suspensionEventId:governedWakeScope.event_id/);
  assert.match(exact,/reality_observe_final_loop_suspension_investigation_v1/);
  assert.match(exact,/return res.status\(200\).json/);
+ assert.match(exact,/evidenceHandlers\.get\(mode.key\)/);
+ assert.match(exact,/const outcome=await handler\(\)/);
+ assert.ok(exact.indexOf('const witness=await shiftRpc')<exact.indexOf('const outcome=await handler()'));
+ assert.ok(exact.indexOf('const outcome=await handler()')<exact.indexOf('const pulse=await shiftRpc'));
+ for(const name of ['reality_record_signed_worker_release_wake_v1','reality_record_employee_shift_worker_pulse_v1','reality_record_signed_worker_actual_run_v1','reality_release_governed_shift_worker_run_v1'])
+  assert.equal(exact.split(name).length-1,1);
+ assert.ok(exact.indexOf('reality_release_governed_shift_worker_run_v1')<exact.indexOf('return res.status(200).json'));
  assert.doesNotMatch(exact,/claim_final_loop_child_review_v1|execute_signed_continuity_recovery_v1/);
  assert.ok(i>0&&i<q&&q<gate&&gate<effect&&effect<maintenance);
  assert.ok(universe>maintenance&&returnFence>universe&&publish>returnFence);
@@ -807,4 +814,37 @@ test('completed prior preclaim events remain observations rather than fabricated
  assert.match(sql,/c\.claimant_worker_run_id=r\.run_id OR c\.canonical_verify_invocation_run_id=r\.run_id/);
  assert.match(sql,/'canonical_child_claim_observed',false,'provider_outcome_verified',false/);
  assert.match(sql,/'prior_preclaim_worker_observations',prior_preclaim_events/);
+});
+
+
+import {selectClaimedEvidenceCapability} from '../src/reality-evidence-driven-capability-router-v1.js';
+
+test('signed event selects one installed evidence-only capability, not a fixed workflow',()=>{
+ const event='11111111-1111-4111-8111-111111111111';
+ const shift='22222222-2222-4222-8222-222222222222';
+ const run='33333333-3333-4333-8333-333333333333';
+ const delivery={kind:'RESUME',event_id:event,shift_id:shift};
+ const receipt={status:'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED',event_id:event,
+  shift_id:shift,worker_run_id:run,execution_authorized:false,
+  original_job_completed:false,production_changed:false};
+ const args={receipt,delivery,workerRunId:run};
+ assert.equal(selectClaimedEvidenceCapability(args),null);
+ for(const [flag,key] of [
+  ['terminal_technical_evidence_only','READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'],
+  ['independent_review_only','INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY'],
+  ['investigation_only','INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY']
+ ]){
+  const selected=selectClaimedEvidenceCapability({...args,receipt:{...receipt,[flag]:true}});
+  assert.equal(selected.key,key);
+  assert.ok(Object.isFrozen(selected));
+  assert.throws(()=>selectClaimedEvidenceCapability({...args,receipt:{...receipt,[flag]:true},
+   delivery:{...delivery,kind:'START'}}),/RUNTIME_FENCE_REJECTED/);
+ }
+ for(const changed of [
+  {...receipt,event_id:shift},{...receipt,worker_run_id:shift},{...receipt,shift_id:run},
+  {...receipt,execution_authorized:true},{...receipt,original_job_completed:true},
+  {...receipt,production_changed:true},{...receipt,status:'UNVERIFIED'}
+ ])assert.throws(()=>selectClaimedEvidenceCapability({...args,receipt:changed}),/NOT_DURABLY_CLAIMED/);
+ assert.throws(()=>selectClaimedEvidenceCapability({...args,receipt:{...receipt,
+  terminal_technical_evidence_only:true,independent_review_only:true}}),/CONFLICTING_EVIDENCE_LANES/);
 });
