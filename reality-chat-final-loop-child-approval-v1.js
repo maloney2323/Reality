@@ -7,7 +7,8 @@
  if(!/^\/chat\/?$/.test(location.pathname))return;
  const ready=document.getElementById('privateReady');
  const thread=document.getElementById('privateTranscript');
- if(!ready||!thread||document.getElementById('realityFinalLoopChildApproval'))return;
+ const composer=document.getElementById('realityChatComposer');
+ if(!ready||!thread||!composer||document.getElementById('realityFinalLoopChildApproval'))return;
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
  const HASH=/^sha256:[a-f0-9]{64}$/;
  const WORK=/^work:[a-f0-9]{32}$/;
@@ -43,9 +44,18 @@
  const message=node('p','reality-final-loop-child-message','');
  message.setAttribute('role','status');message.setAttribute('aria-live','polite');
  card.append(label,title,detail,evidence,limits,actions,message);
- thread.append(card);
- // Keep the exact decision visible even when saved history is rerendered.
- new MutationObserver(()=>{if(signed()&&!card.hidden&&!thread.contains(card))thread.append(card);}).observe(thread,{childList:true});
+ // Keep the same approval control outside the transcript, which history reads replace.
+ // The composer already resides in the main Chat workspace, including on mobile.
+ composer.parentNode.insertBefore(card,composer);
+ card.style.flexShrink='0';
+ card.style.maxHeight='min(36vh,280px)';
+ card.style.overflowY='auto';
+ function showCheck(text='Check the exact current review decision after Chat loads.'){
+  card.hidden=false;title.textContent='Reality · review decision';detail.textContent=text;
+  evidence.textContent='';limits.textContent='Read-only status check. No work starts until you explicitly approve an exact proposal.';
+  approve.hidden=true;approve.disabled=true;message.textContent='';
+  refresh.textContent='Check review decision';
+ }
  let selected=null,busy=false,uncertain=false;
  function valid(packet){
   return packet&&UUID.test(packet.packet_id||'')&&
@@ -116,18 +126,18 @@
    // The legacy isolated path still discovers the owner shift explicitly.
    let read=await readPackets(null);
    if(read===null){const active=await readActive();if(!active){selected=null;card.hidden=true;return;}read=await readPackets(active);}
-   if(read.unavailable){selected=null;card.hidden=true;return;}
+   if(read.unavailable){selected=null;showCheck('The authenticated review boundary did not accept this request. No approval is available from this response.');return;}
    const shiftId=read.shift_id,packets=read.packets;
    const pending=packets.filter(p=>p.state==='AWAITING_EXACT_OWNER_APPROVAL'&&p.approved===false||
     p.state==='EFFECT_RESERVED_RECONCILE_ONLY'&&Boolean(recovery(p)));
    if(explicit)uncertain=false;
    if(!pending.length){
-    selected=null;card.hidden=true;return;
+    selected=null;showCheck('No current exact review decision was returned. Existing work remains governed.');return;
    }
    const p=pending[0];
    const q=recovery(p);
    selected={...p,shift_id:shiftId,recovery:q};
-   card.hidden=false;approve.hidden=false;
+   card.hidden=false;approve.hidden=false;refresh.textContent='Check verified status';
    title.textContent='Review request for PR #'+p.source_ref.split('/').pop();
    detail.textContent='Original '+p.parent_original_work_id+
     ' remains open. Reality has identified '+p.file_count+
@@ -155,8 +165,8 @@
    approve.disabled=uncertain;
   }catch{
    card.hidden=false;
-   if(!selected){title.textContent='Reality · review decision unavailable';detail.textContent='Reality could not independently read your current exact review decision.';approve.hidden=true;}
-   message.textContent='The latest source or approval receipt is not verified. Use Check verified status. No action taken.';
+   if(!selected)showCheck('Reality could not independently read your current exact review decision.');
+   message.textContent='The exact read failed or timed out. Check again after Chat finishes loading. No action taken.';
    approve.disabled=true;
   }finally{busy=false;refresh.disabled=false;}
  }
@@ -213,13 +223,15 @@
  });
  refresh.addEventListener('click',()=>void reload({explicit:true}));
  const auth=new MutationObserver(()=>{
-  if(signed())void reload();
+  if(signed()){if(card.hidden)showCheck();}
   else{selected=null;uncertain=false;card.hidden=true;approve.disabled=true;}
  });
  auth.observe(ready,{attributes:true,attributeFilter:['style']});
- if(signed())void reload();
- window.addEventListener('pageshow',()=>{if(signed())void reload()});
+ // Do not add another database read to the concurrent Chat startup wave.
+ // An explicit read-only check can be repeated after a timeout; POST is never automatic.
+ if(signed())showCheck();
+ window.addEventListener('pageshow',()=>{if(signed()&&card.hidden)showCheck()});
  document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'&&signed())void reload();
+  if(document.visibilityState==='visible'&&signed()&&card.hidden)showCheck();
  });
 })();
