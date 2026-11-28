@@ -43,7 +43,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
    if(!req.headers?.origin)return res.status(403).json({ok:false,error:'EXACT_CHAT_ORIGIN_REQUIRED'});
    assertSameOrigin(req);
   }
-  const session=await authenticate(req,res);
+  const session=await (authenticate===authenticatedChatSession?authenticatedChatSession(req,res):authenticate(req,res));
   if(!session||!UUID.test(session.user_id))
    return res.status(401).json({ok:false,error:'OWNER_SIGN_IN_REQUIRED'});
   const db=database(env);
