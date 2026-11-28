@@ -83,9 +83,12 @@ test('same ledger, signed wake, immutable attempts and no authority grants',()=>
  const remediation=worker.indexOf('await qualifyVerifiedInvestigationRemediation');
  const inquiry=worker.indexOf('await investigateOneSignedShiftContinuityIncident',normal);
  assert.ok(remediation>0&&normal>remediation&&inquiry>normal);
- const exact=worker.slice(worker.indexOf('if(suspensionInvestigationWake){'),worker.indexOf('// Continuous, standing EVIDENCE qualification intake'));
+ const exact=worker.slice(worker.indexOf('if(claimedEvidenceCapability){'),worker.indexOf('// Continuous, standing EVIDENCE qualification intake'));
  assert.match(exact,/suspensionEventId:governedWakeScope.event_id/);
- assert.match(exact,/SUSPENSION_INVESTIGATION_RELEASE_WITNESS_UNVERIFIED/);
+ const router=readFileSync(new URL('../src/reality-evidence-driven-capability-router-v1.js',import.meta.url),'utf8');
+ assert.match(router,/SUSPENSION_INVESTIGATION_RELEASE_WITNESS_UNVERIFIED/);
+ assert.match(exact,/throw Error\(mode.witnessError\)/);
+ assert.ok(exact.indexOf('throw Error(mode.witnessError)')<exact.indexOf('const outcome=await handler()'));
 });
 
 test('independent observation routes the frozen original through existing target review only',async()=>{
