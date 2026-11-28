@@ -398,14 +398,17 @@ test('canonical approved scope binds exact receipt and five scopes to the shared
 
 test('exact claimed review uses fresh staged route read instead of speculative duplicate',()=>{
  const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
- const start=worker.indexOf('const exactReviewRouteRequired=');
- const end=worker.indexOf('// The existing signed worker advances the SAME Final Loop child',start);
+ const start=worker.indexOf("workerStage='EXACT_CLAIMED_EVENT_CAPABILITY_SELECTION'");
+ const end=worker.indexOf('// Existing signed worker performs ONLY independent readback',start);
  assert.ok(start>=0&&end>start);
  const route=worker.slice(start,end);
- assert.match(route,/if\(exactReviewRouteRequired\)\{[\s\S]*?requireFreshFinalLoopContinuity\(\)[\s\S]*?readCurrentFinalLoopStagedActions\(currentReviewContinuity,currentReviewGraph\)/);
- assert.match(route,/FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED[\s\S]*?\} else if\(hasReview[\s\S]*?readCurrentFinalLoopStagedActions\(lastFinalLoopContinuity,unifiedGraph\)/);
- assert.equal((route.match(/readCurrentFinalLoopStagedActions\(/g)||[]).length,2);
- assert.match(route,/claimedEventId:governedWakeScope.event_id/);
+ assert.match(route,/requireFreshFinalLoopContinuity\(\)[\s\S]*?reality_read_final_loop_pr_source_plans_v1[\s\S]*?reality_read_final_loop_child_approval_preflight_v1[\s\S]*?classifySignedFinalLoopStagedPlanActions\(/);
+ for(const rpc of ['reality_read_final_loop_pr_source_plans_v1','reality_read_final_loop_child_approval_preflight_v1'])
+  assert.equal(route.split(rpc).length-1,1);
+ assert.match(route,/claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes/);
+ assert.match(route,/return res.status\(200\).json/);
+ assert.ok(route.indexOf('return res.status(200).json')>route.indexOf('await selectedEventHandler()'));
+ assert.doesNotMatch(route,/readCurrentFinalLoopStagedActions\(lastFinalLoopContinuity/);
 });
 
 
