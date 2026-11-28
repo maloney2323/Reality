@@ -114,6 +114,7 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path TO '' AS $pro
   AND u.payload->>'owner_id'=c.owner_id::text AND u.payload->>'shift_id'=c.shift_id::text
   AND u.payload->>'original_work_id'=c.parent_original_work_id AND u.payload->>'source_ref'=plan.source_ref
   AND u.payload->>'observation_sha256'=e.previous_receipt_sha256
+  AND u.payload->>'observation_sha256'='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((u.payload->'invocation_observations')::text,'UTF8')),'hex')
   AND u.payload->>'provider_outcome_verified'='false' AND u.payload->>'replay_authorized'='false'
   AND u.payload->>'execution_authorized'='false' AND u.payload->>'original_job_completed'='false'
   AND u.evidence_refs ? e.previous_receipt_sha256
@@ -383,6 +384,13 @@ BEGIN
   OR after_g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
   OR after_g->>'continuity_head_sha256' IS DISTINCT FROM 'sha256:'||lineage
  THEN RAISE EXCEPTION 'FINAL_LOOP_SPINE_RETURN_POSTWRITE_READBACK_FAILED';END IF;
+ IF receipt_return AND NOT EXISTS(SELECT 1
+  FROM pg_catalog.jsonb_array_elements(after_g->'obligations') ob
+  CROSS JOIN LATERAL pg_catalog.jsonb_array_elements(ob->'independent_child_receipt_readback') rr
+  WHERE ob->>'original_work_id'=p_original_work_id AND ob->>'source_ref'=o->>'source_ref'
+   AND rr->>'event_id'=event::text AND rr->'receipt'=verified_receipt
+   AND rr->'uncertain_invocations'=payload->'uncertain_invocations')
+ THEN RAISE EXCEPTION 'FINAL_LOOP_INDEPENDENT_CHILD_RECEIPT_POSTWRITE_READBACK_FAILED';END IF;
  RETURN jsonb_build_object('status',CASE WHEN receipt_return THEN 'FINAL_LOOP_INDEPENDENT_CHILD_RECEIPT_RETURNED_ORIGINAL_OPEN' ELSE 'FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN' END,
   'canonical_return_committed',true,'event_id',event,'checkpoint_receipt_id',receipt,
   'observation_sha256',observation_hash,'continuity_head_sha256','sha256:'||lineage,
