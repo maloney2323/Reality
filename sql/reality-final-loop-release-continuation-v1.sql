@@ -4,6 +4,18 @@
 ALTER TABLE reality_internal.final_loop_resume_events_v1
  ADD COLUMN IF NOT EXISTS release_continuation_claim_id uuid
  REFERENCES reality_internal.governed_worker_release_approvals_v1(claim_id);
+-- The release claim remains a one-use activation. Only an individually
+-- qualified evidence-return event is exempt from its ordinary event cap.
+ALTER TABLE reality_internal.final_loop_resume_events_v1
+ ADD COLUMN IF NOT EXISTS ledger_return_condition_sha256 text
+ CHECK (ledger_return_condition_sha256 IS NULL OR
+  (ledger_return_condition_sha256 ~ '^sha256:[a-f0-9]{64}$'
+   AND release_continuation_claim_id IS NOT NULL
+   AND signal_kind='QUALIFIER_PROOF_CHANGED'
+   AND signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'));
+CREATE UNIQUE INDEX IF NOT EXISTS final_loop_ledger_return_condition_once_v1
+ ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,ledger_return_condition_sha256)
+ WHERE ledger_return_condition_sha256 IS NOT NULL;
 ALTER TABLE reality_internal.final_loop_resume_events_v1
  DROP CONSTRAINT IF EXISTS final_loop_resume_events_v1_shift_id_original_work_id_signa_key;
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_original_signal_once_v1
@@ -12,7 +24,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS final_loop_original_signal_once_v1
 DROP INDEX IF EXISTS reality_internal.final_loop_release_continuation_once_v1;
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_release_continuation_once_v1
  ON reality_internal.final_loop_resume_events_v1(release_continuation_claim_id)
- WHERE release_continuation_claim_id IS NOT NULL AND signal_kind NOT IN ('VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE');
+ WHERE release_continuation_claim_id IS NOT NULL AND ledger_return_condition_sha256 IS NULL
+ AND signal_kind NOT IN ('VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE');
 CREATE UNIQUE INDEX IF NOT EXISTS final_loop_verified_investigation_review_once_v1
  ON reality_internal.final_loop_resume_events_v1(shift_id,original_work_id,source_receipt_sha256)
  WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW';
@@ -1156,7 +1169,7 @@ CREATE OR REPLACE FUNCTION public.reality_claim_canonical_governed_wake_v1(
  p_owner_id uuid,p_shift_id uuid,p_plan_fingerprint text,p_event_id uuid,
  p_nonce uuid,p_kind text,p_release_sha text,p_worker_run_id uuid,p_lease_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE n int:=0; claimed_event record; investigation_only boolean:=false; independent_review_only boolean:=false; terminal_technical_evidence_only boolean:=false; evidence jsonb;
+DECLARE n int:=0; claimed_event record; investigation_only boolean:=false; independent_review_only boolean:=false; terminal_technical_evidence_only boolean:=false; ledger_return_only boolean:=false; evidence jsonb; ledger_condition jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'CANONICAL_WAKE_SERVICE_ONLY';END IF;
  IF p_nonce IS NULL OR p_event_id IS NULL OR p_kind IS NULL OR p_kind NOT IN('START','RESUME')
@@ -1203,7 +1216,16 @@ BEGIN
  IF n=1 THEN
   SELECT * INTO claimed_event FROM reality_internal.final_loop_resume_events_v1 e
    WHERE e.event_id=p_event_id AND e.governed_wake_worker_run_id=p_worker_run_id;
-  IF claimed_event.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' THEN
+  IF claimed_event.ledger_return_condition_sha256 IS NOT NULL THEN
+   -- An existing release is never a substitute for event-specific proof.
+   -- Re-evaluate the verifier condition after the one-use event is claimed.
+   ledger_condition:=reality_internal.read_final_loop_ledger_return_condition_v1(
+    claimed_event.shift_id,claimed_event.release_continuation_claim_id,
+    claimed_event.event_id,p_worker_run_id);
+   IF ledger_condition->>'condition_sha256' IS DISTINCT FROM claimed_event.ledger_return_condition_sha256
+   THEN RAISE EXCEPTION 'LEDGER_RETURN_CLAIM_PROOF_UNVERIFIED';END IF;
+   ledger_return_only:=true;
+  ELSIF claimed_event.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' THEN
    IF claimed_event.signal_next_action<>'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
     OR claimed_event.release_continuation_claim_id IS NULL
     OR claimed_event.source_receipt_sha256 IS DISTINCT FROM (reality_internal.read_final_loop_verified_suspension_v1(
@@ -1240,6 +1262,11 @@ BEGIN
  RETURN pg_catalog.jsonb_build_object('status',CASE WHEN n=1 THEN 'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' ELSE 'CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED' END,
  'event_id',p_event_id,'worker_run_id',p_worker_run_id,'shift_id',p_shift_id,
  'investigation_only',investigation_only,'independent_review_only',independent_review_only,'terminal_technical_evidence_only',terminal_technical_evidence_only,
+ 'ledger_return_only',ledger_return_only,'original_work_id',CASE WHEN ledger_return_only THEN claimed_event.original_work_id ELSE NULL END,
+ 'source_ref',CASE WHEN ledger_return_only THEN claimed_event.source_ref ELSE NULL END,
+ 'continuity_head_sha256',CASE WHEN ledger_return_only THEN claimed_event.continuity_head_sha256 ELSE NULL END,
+ 'continuity_revision',CASE WHEN ledger_return_only THEN claimed_event.continuity_revision ELSE NULL END,
+ 'observation_sha256',ledger_condition->>'observation_sha256',
  'execution_authorized',false,'original_job_completed',false,'production_changed',false);
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) FROM PUBLIC,anon,authenticated;
