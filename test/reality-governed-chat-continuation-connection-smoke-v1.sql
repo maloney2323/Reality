@@ -178,3 +178,44 @@ END$$;
 SELECT reality_internal.reconcile_current_qualification_proofs_v1();
 DO $$BEGIN IF (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1)<>1 THEN RAISE EXCEPTION 'HEARTBEAT_CREATED_DUPLICATE_EVENT';END IF;END$$;
 SELECT 'GOVERNED_CHAT_CONTINUATION_CONNECTION_PROVEN_IN_FIXTURE' AS result;
+
+-- Frozen failure: at 12 minutes the ordinary watchdog refuses to update
+-- proof, but the real release-observation trigger must requalify immediately.
+CREATE TABLE reality_internal.governed_worker_release_approvals_v1(
+ request_id uuid,shift_id uuid,claim_id uuid,capability_key text,provider_alias_observed_at timestamptz);
+CREATE TABLE reality_internal.fixture_release_stage_calls(kind text,proof_fresh boolean);
+CREATE FUNCTION public.reality_stage_final_loop_ledger_return_v1(p_shift uuid,p_claim uuid) RETURNS jsonb
+ LANGUAGE plpgsql AS $fixture$
+ BEGIN
+  INSERT INTO reality_internal.fixture_release_stage_calls
+  SELECT 'ledger',coalesce(bool_and(reconciliation_checked_at>clock_timestamp()-interval '10 minutes'),false)
+  FROM reality_internal.owner_continuity_qualification_routes_v1 WHERE intake_key=p_shift::text||':0';
+  RETURN jsonb_build_object('status','LEDGER_RETURN_EVENT_STAGED');
+ END $fixture$;
+CREATE FUNCTION reality_internal.stage_final_loop_release_continuation_v1(uuid) RETURNS void
+ LANGUAGE sql AS $$INSERT INTO reality_internal.fixture_release_stage_calls VALUES('ordinary',false)$$;
+CREATE TRIGGER fixture_release_observed AFTER UPDATE OF provider_alias_observed_at
+ ON reality_internal.governed_worker_release_approvals_v1 FOR EACH ROW
+ WHEN (OLD.provider_alias_observed_at IS NULL AND NEW.provider_alias_observed_at IS NOT NULL)
+ EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
+UPDATE reality_internal.owner_continuity_qualification_routes_v1
+ SET reconciliation_checked_at=clock_timestamp()-interval '12 minutes';
+SELECT reality_internal.reconcile_current_qualification_proofs_v1();
+DO $$BEGIN
+ IF EXISTS(SELECT 1 FROM reality_internal.owner_continuity_qualification_routes_v1
+ WHERE reconciliation_checked_at>clock_timestamp()-interval '10 minutes')
+ THEN RAISE EXCEPTION 'WATCHDOG_FIXTURE_NOT_STALE';END IF;
+END$$;
+INSERT INTO reality_internal.governed_worker_release_approvals_v1
+ SELECT gen_random_uuid(),shift_id,gen_random_uuid(),'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',NULL
+ FROM reality_internal.governed_employee_shifts_v1;
+UPDATE reality_internal.governed_worker_release_approvals_v1 SET provider_alias_observed_at=clock_timestamp();
+DO $$BEGIN
+ IF (SELECT count(*) FROM reality_internal.fixture_release_stage_calls WHERE kind='ledger' AND proof_fresh)<>1
+ OR EXISTS(SELECT 1 FROM reality_internal.fixture_release_stage_calls WHERE kind='ordinary')
+ OR (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1)<>1
+ THEN RAISE EXCEPTION 'ON_DEMAND_QUALIFICATION_OR_DUPLICATE_FENCE_FAILED';END IF;
+ IF has_function_privilege('service_role','reality_internal.reconcile_current_qualification_proofs_v1(uuid)','EXECUTE')
+ THEN RAISE EXCEPTION 'QUALIFIER_PRIVILEGE_WIDENED';END IF;
+END$$;
+SELECT 'RELEASE_PROOF_DEMAND_REQUALIFIED_WITHOUT_WATCHDOG_OR_DUPLICATE_EVENT' AS result;
