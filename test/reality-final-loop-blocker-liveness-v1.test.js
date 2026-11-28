@@ -326,7 +326,7 @@ test('bounded capability checkpoint preserves negative evidence without raw prov
   status:'FINAL_LOOP_CANONICAL_ISOLATED_PROVIDER_UNCERTAIN_NO_REPLAY',
   provider_failure_reason:'FINAL_LOOP_CHILD_MODEL_PROVIDER_REQUEST_UNVERIFIED',
   isolated_authority_read_attempts:1,raw_provider_error:'private data',
-  candidate:'untrusted model content',original_job_completed:true,production_changed:true});
+  candidate:'untrusted model content',original_job_completed:false,production_changed:false});
  assert.equal(c.provider_failure_reason,'FINAL_LOOP_CHILD_MODEL_PROVIDER_REQUEST_UNVERIFIED');
  assert.equal(c.isolated_authority_read_attempts,1);
  assert.equal(c.original_job_completed,false);
@@ -335,7 +335,9 @@ test('bounded capability checkpoint preserves negative evidence without raw prov
  assert.equal(c.candidate,undefined);
  assert.equal(boundedRegisteredCapabilityCheckpoint('bad',{status:'bad'}),null);
  assert.equal(boundedRegisteredCapabilityCheckpoint('VALID_CAPABILITY',{
-  status:'VALID_STATUS',provider_failure_reason:'raw private error'}).provider_failure_reason,null);
+  status:'VALID_STATUS',provider_failure_reason:'raw private error',original_job_completed:false,production_changed:false}).provider_failure_reason,null);
+ assert.equal(boundedRegisteredCapabilityCheckpoint('VALID_CAPABILITY',{
+  status:'VALID_STATUS',original_job_completed:true,production_changed:false}),null);
  const code=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
  const select=code.indexOf('const selectedEventCapability=selectRegisteredSignedEventCapability(');
  const execute=code.indexOf('finalLoopChildReview=await selectedEventHandler()');
