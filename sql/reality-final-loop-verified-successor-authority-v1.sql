@@ -1105,3 +1105,15 @@ BEGIN
  END;
  RETURN NEW;
 END $function$;
+
+-- The existing completion trigger must actually deliver the newly supported
+-- evidence stages; its earlier filter excluded both ledger-return publication
+-- and the verifier's preexecution fence. Same trigger, same handler.
+DROP TRIGGER IF EXISTS final_loop_completed_investigation_wake_v1 ON reality_internal.signed_worker_actual_runs_v1;
+CREATE TRIGGER final_loop_completed_investigation_wake_v1
+ AFTER UPDATE OF status ON reality_internal.signed_worker_actual_runs_v1
+ FOR EACH ROW WHEN (OLD.status='STARTED' AND NEW.status='COMPLETED'
+ AND NEW.worker_stage IN ('SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION',
+ 'INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION','WORKER_RESPONSE_PUBLICATION',
+ 'SHARED_CONTINUITY_VERIFIER_RETURN_FENCE','LEDGER_RETURN_RESPONSE_PUBLICATION'))
+ EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
