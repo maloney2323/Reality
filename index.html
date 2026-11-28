@@ -6791,7 +6791,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   const p=trackedEmployeeProgress(rows);
   if(!p.total){
    const empty=document.createElement('div');empty.className='reality-employee-progress-unmeasured';empty.setAttribute('aria-hidden','true');host.append(empty);
-   liveNode('small','Progress not measurable · no currently verified action attributed to this employee.',host).className='reality-employee-progress-note';
+   liveNode('small','Progress not measurable. No currently verified action attributed to this employee.',host).className='reality-employee-progress-note';
    return;
   }
   const bar=document.createElement('progress');bar.className='reality-employee-progress-track';
