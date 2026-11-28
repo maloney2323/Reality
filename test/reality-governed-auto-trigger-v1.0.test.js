@@ -208,3 +208,32 @@ test('Final Loop auto trigger rejects ambiguous, stale or unauthorized proof eve
  assert.equal(route(completed).status,'FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE');
  assert.equal(route(completed).dispatch_permitted,false);
 });
+
+
+import {resolveQualifiedCapabilityKey} from '../src/reality-evidence-driven-capability-router-v1.js';
+
+test('qualified capability selection is independent of task, capability name and registry order',()=>{
+ const eventId=randomUUID(),receipt='sha256:'+'d'.repeat(64);
+ const identity={source_ref:'https://example.org/operations/work/923',
+  original_work_id:'work:'+'e'.repeat(32)};
+ for(const key of ['INVESTIGATE_SOURCE','GENERATE_CORRECTIVE_CANDIDATE','RUN_INDEPENDENT_CI',
+  'INSTALL_EXACT_APPROVED_ARTIFACT','VERIFY_ORIGINAL_OUTCOME','NOVEL_REGISTERED_CAPABILITY']){
+  const event={...identity,event_id:eventId,event_kind:'QUALIFIER_PROOF_CHANGED',
+   source_receipt_sha256:receipt,next_qualified_action:key,executor_invoked:false,execution_authorized:false};
+  const handoff={...identity,continuity_identity_verified:true,qualifier_digest_verified:true,
+   qualifier_receipt_sha256:receipt,next_qualified_action:key,execution_authorized:false,original_job_completed:false};
+  const q={...identity,qualifier_receipt_sha256:receipt,next_qualified_action:key};
+  const input={event,handoff,qualifications:[q],registeredActionKeys:['OTHER_CAPABILITY',key]};
+  assert.equal(resolveQualifiedCapabilityKey(input),key);
+  assert.equal(resolveQualifiedCapabilityKey({...input,registeredActionKeys:[key,'OTHER_CAPABILITY']}),key);
+  for(const bad of [
+   {registeredActionKeys:[]},{registeredActionKeys:[key,key]},
+   {event:{...event,execution_authorized:true}},
+   {event:{...event,source_ref:'https://example.org/other'}},
+   {handoff:{...handoff,qualifier_digest_verified:false}},
+   {handoff:{...handoff,next_qualified_action:'OTHER_CAPABILITY'}},
+   {qualifications:[q,q]},
+   {qualifications:[{...q,qualifier_receipt_sha256:'sha256:'+'f'.repeat(64)}]}
+  ])assert.equal(resolveQualifiedCapabilityKey({...input,...bad}),null);
+ }
+});
