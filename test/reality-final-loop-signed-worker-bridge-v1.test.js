@@ -559,6 +559,26 @@ test('same-ledger cross-layer guard requires independent receipts and denies inv
  const observe=async(e)=>caller(async(db,name)=>name==='reality_read_final_loop_shared_continuity_guard_v1'?
   {...guard,obligations:[{...guard.obligations[0],execution_spine_readback:e}]}:load(db,name),{env:state});
  assert.deepEqual((await observe(evidence)).shared_continuity_guard.handoffs[0].execution_spine_readback,evidence);
+ // Historical receipt can be genuine while a new invocation is still active.
+ const historic={child_work_id:'work:'+'a'.repeat(32),scope_sha256:sha('a'),
+  invocation_id:'00000000-0000-4000-8000-000000000011',
+  worker_run_id:'00000000-0000-4000-8000-000000000012',
+  event_id:'00000000-0000-4000-8000-000000000013',event_head_sha256:sha('b'),
+  event_revision:5,release_sha:'a'.repeat(40),release_receipt_sha256:sha('c'),
+  worker_completed:true,provider_outcome_verified:false,replay_authorized:false,
+  model_artifact_recorded:false};
+ const partial={...evidence,status:'SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED',
+  fenced_count:2,signed_observation_count:1,observations:[historic],
+  observation_sha256:sha('d'),canonical_return_event_id:null,canonical_return_head_sha256:null,
+  historical_subset_return_event_id:'00000000-0000-4000-8000-000000000014',
+  historical_subset_return_head_sha256:sha('e')};
+ const acceptedPartial=await observe(partial);
+ assert.equal(acceptedPartial.status,'FINAL_LOOP_ORIGINAL_GOAL_ACCEPTANCE_PENDING');
+ assert.deepEqual(acceptedPartial.shared_continuity_guard.handoffs[0].execution_spine_readback,partial);
+ assert.equal((await observe({...partial,canonical_return_committed:true,
+  canonical_return_event_id:partial.historical_subset_return_event_id,
+  canonical_return_head_sha256:partial.historical_subset_return_head_sha256})).status,
+  'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
  assert.equal((await observe({...evidence,replay_authorized:true})).status,
   'FINAL_LOOP_SHARED_CONTINUITY_EXECUTION_READBACK_CONFLICT');
  assert.equal((await observe({...evidence,signed_observation_count:1})).status,
