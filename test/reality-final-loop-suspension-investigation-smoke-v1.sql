@@ -999,6 +999,9 @@ END $$;
 -- No synthetic release claim is created; the existing consumed approval stays
 -- byte-for-byte unchanged throughout the new recovery dispatch.
 \ir ../sql/reality-final-loop-verified-successor-authority-v1.sql
+ALTER TABLE reality_internal.final_loop_child_review_work_v1 ADD COLUMN IF NOT EXISTS scope_sha256 text, ADD COLUMN IF NOT EXISTS review_sha256 text;
+\ir ../sql/reality-final-loop-prepared-review-return-v1.sql
+
 -- The actual qualification algorithm is independently exercised in the
 -- governed-chat-connection smoke test. This fixture already has its
 -- canonical qualifier receipt; record only the demand, not a new proof.
@@ -1070,6 +1073,71 @@ BEGIN
  THEN RAISE EXCEPTION 'SUCCESSOR_DUPLICATE_OR_APPROVAL_DRIFT';END IF;
 END $$;
 SELECT 'VERIFIED_SUCCESSOR_REUSES_IMMUTABLE_RELEASE_NO_REPLAY' AS result;
+-- Separate prepared-artifact variant of the successor fixture. All changes
+-- below are disposable test data, never production or benchmark effects.
+DO $
+DECLARE a record; sub record; child record; u record; prep record; packet uuid;
+ obs jsonb; new_payload jsonb; snapshot jsonb; q text; digest text; saved_guard jsonb;
+ prior_scope jsonb; next_event uuid; inv uuid:=gen_random_uuid(); artifact text:='sha256:'||repeat('a',64);
+BEGIN
+ SELECT r.* INTO STRICT a FROM reality_internal.governed_worker_release_approvals_v1 r
+ WHERE r.release_ref='fixture-current' AND r.runtime_scope->>'source_ref'='https://github.com/fixture/ledger/pull/9';
+ SELECT * INTO STRICT sub FROM reality_internal.final_loop_resume_conditions_v1
+ WHERE shift_id=a.shift_id AND condition_kind='QUALIFIER_PROOF_CHANGED';
+ SELECT * INTO STRICT child FROM reality_internal.final_loop_child_review_work_v1 WHERE shift_id=a.shift_id AND phase='ADMITTED';
+ packet:=child.packet_id;
+ SELECT w.* INTO STRICT prep FROM reality_internal.governed_signed_worker_release_wakes_v1 w
+ JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=w.worker_run_id
+ WHERE w.release_claim_id=a.claim_id AND r.worker_stage='WORKER_RESPONSE_PUBLICATION' AND r.status='COMPLETED';
+ SELECT * INTO STRICT u FROM public.universe_events WHERE 'sha256:'||lineage_hash=sub.continuity_head_sha256;
+ -- Replace only fixture observations to exercise the prepared-artifact variant.
+ obs:=jsonb_build_array(jsonb_build_object('child_work_id',child.child_work_id,'scope_sha256',artifact,
+ 'invocation_id',inv,'worker_run_id',prep.worker_run_id,'release_sha',a.release_sha,
+ 'release_receipt_sha256',prep.release_receipt_sha256,'model_artifact_recorded',true,'worker_completed',true,
+ 'provider_outcome_verified',false,'replay_authorized',false));
+ digest:='sha256:'||encode(sha256(convert_to(obs::text,'UTF8')),'hex');
+ SELECT reconciliation_snapshot INTO STRICT snapshot FROM reality_internal.owner_continuity_qualification_routes_v1 WHERE owner_id=a.owner_id AND source_ref=sub.source_ref;
+ snapshot:=snapshot||jsonb_build_object('review_scope_qualified',true,'exact_goal_event_verified',true,'exact_acceptance_approval_verified',true,
+ 'accepted_review_scope',jsonb_build_object('packet_id',packet,'effect_type','READ_ONLY_INTERNAL_PR_REVIEW','execution_authorized',false,
+ 'scope_fingerprints',jsonb_build_array(jsonb_build_object('scope_sha256',artifact))));
+ q:='sha256:'||encode(sha256(convert_to(snapshot::text,'UTF8')),'hex');
+ UPDATE reality_internal.owner_continuity_qualification_routes_v1 SET reconciliation_snapshot=snapshot,reconciliation_receipt_sha256=q,reconciliation_checked_at=clock_timestamp()
+ WHERE owner_id=a.owner_id AND source_ref=sub.source_ref;
+ UPDATE reality_internal.governed_worker_release_approvals_v1 SET runtime_scope=runtime_scope||jsonb_build_object('qualifier_receipt_sha256',q)
+ WHERE claim_id=a.claim_id RETURNING runtime_scope INTO prior_scope;
+ UPDATE reality_internal.final_loop_resume_conditions_v1 SET subscribed_receipt_sha256=q WHERE shift_id=a.shift_id AND condition_kind='QUALIFIER_PROOF_CHANGED';
+ DELETE FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=a.shift_id AND continuity_revision=sub.continuity_revision;
+ new_payload:=u.payload||jsonb_build_object('invocation_observations',obs,'observation_sha256',digest);
+ UPDATE public.universe_events SET payload=new_payload,content_hash=encode(sha256(convert_to(public.reality_continuity_canonical_json_v1(new_payload),'UTF8')),'hex'),
+ evidence_refs=jsonb_build_array(digest,q) WHERE event_id=u.event_id;
+ UPDATE public.suspension_fixture_proof SET guard=jsonb_set(jsonb_set(guard,'{obligations,0,qualifier_receipt_sha256}',to_jsonb(q)),
+ '{obligations,0,execution_spine_readback}',jsonb_build_object('status','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',
+ 'canonical_return_committed',true,'canonical_return_event_id',u.event_id,'canonical_return_head_sha256',sub.continuity_head_sha256,
+ 'observation_sha256',digest,'replay_authorized',false)) WHERE shift_id=a.shift_id RETURNING guard INTO saved_guard;
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET phase='PREPARED',scope_sha256=artifact,review_sha256=artifact,
+ canonical_prepare_invocation_id=inv,model_response_id='resp_fixture_prepared',claimant_worker_run_id=prep.worker_run_id
+ WHERE child_work_id=child.child_work_id;
+ -- A consumed verifier fence must never create another dispatch.
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET canonical_verify_invocation_id=gen_random_uuid() WHERE child_work_id=child.child_work_id;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL THEN RAISE EXCEPTION 'CONSUMED_VERIFIER_REPLAYED';END IF;
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET canonical_verify_invocation_id=NULL WHERE child_work_id=child.child_work_id;
+ UPDATE public.suspension_fixture_proof SET guard=jsonb_set(guard,'{obligations,0,execution_spine_readback,observation_sha256}',to_jsonb(artifact)) WHERE shift_id=a.shift_id;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL THEN RAISE EXCEPTION 'MISMATCHED_ARTIFACT_RETURN_ACCEPTED';END IF;
+ UPDATE public.suspension_fixture_proof SET guard=saved_guard WHERE shift_id=a.shift_id;
+ -- Independent proof is current; request only the normal existing review capability.
+ next_event:=reality_internal.stage_final_loop_release_continuation_v1(a.request_id);
+ IF next_event IS NULL OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e WHERE e.event_id=next_event
+ AND e.signal_kind='QUALIFIER_PROOF_CHANGED' AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND e.release_continuation_claim_id=a.claim_id AND e.continuity_revision=sub.continuity_revision
+ AND e.previous_receipt_sha256=digest AND e.source_receipt_sha256=q)
+ THEN RAISE EXCEPTION 'PREPARED_ARTIFACT_VERIFIER_NOT_STAGED';END IF;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL
+ OR (SELECT runtime_scope FROM reality_internal.governed_worker_release_approvals_v1 WHERE claim_id=a.claim_id) IS DISTINCT FROM prior_scope
+ OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE child_work_id=child.child_work_id AND (phase<>'PREPARED' OR canonical_prepare_invocation_id<>inv OR canonical_verify_invocation_id IS NOT NULL))
+ OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=a.shift_id)
+ THEN RAISE EXCEPTION 'PREPARED_VERIFIER_REPLAY_OR_AUTHORITY_DRIFT';END IF;
+END $;
+SELECT 'PREPARED_ARTIFACT_CONTINUES_TO_EXISTING_VERIFIER_ONCE' AS result;
 ROLLBACK;
 
 -- Separate disposable fixture for the technical-return -> approved review
