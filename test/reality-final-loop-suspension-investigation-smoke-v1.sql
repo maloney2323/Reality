@@ -1159,6 +1159,7 @@ CREATE FUNCTION reality_internal.reconcile_current_qualification_proofs_v1(p_shi
  LANGUAGE sql AS $$SELECT jsonb_build_object('scope','EVIDENCE_ONLY_NO_AUTHORITY_CHANGE')$$;
 \ir ../sql/reality-final-loop-verified-successor-authority-v1.sql
 \ir ../sql/reality-final-loop-return-to-approved-review-v1.sql
+\ir ../sql/reality-final-loop-prepared-review-return-v1.sql
 DO $$
 DECLARE o uuid:=gen_random_uuid(); s uuid:=gen_random_uuid(); root uuid:=gen_random_uuid(); world uuid:=gen_random_uuid();
  prior uuid:=gen_random_uuid(); obs uuid:=gen_random_uuid(); ev uuid:=gen_random_uuid(); run uuid:=gen_random_uuid();
@@ -1251,6 +1252,29 @@ BEGIN
  OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE shift_id=s AND phase<>'ADMITTED')
  OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=s)
  THEN RAISE EXCEPTION 'REVIEW_RETURN_REPLAY_OR_AUTHORITY_DRIFT';END IF;
+ -- The immutable release began two revisions earlier. Reconcile its
+ -- completed preclaim return only through the verified terminal evidence.
+ UPDATE reality_internal.governed_worker_release_approvals_v1
+ SET runtime_scope=runtime_scope||jsonb_build_object('continuity_head_sha256','sha256:'||repeat('7',64),
+ 'continuity_revision',4,'qualifier_receipt_sha256',q) WHERE claim_id=cl;
+ DECLARE preclaim uuid:=gen_random_uuid(); queued timestamptz:=clock_timestamp(); verdict jsonb;
+ BEGIN
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,finished_at,worker_stage)
+ VALUES(preclaim,'COMPLETED',queued+interval '1 second',queued+interval '2 seconds','WORKER_RESPONSE_PUBLICATION');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1
+ VALUES(preclaim,o,s,cl,repeat('9',40),'fixture-return','NORMAL_SIGNED_SHIFT',scope_hash);
+ UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_worker_run_id=preclaim,
+ governed_wake_request_id=9010,governed_wake_requested_at=queued,governed_wake_queued_at=queued,
+ governed_wake_nonce=gen_random_uuid() WHERE event_id=newevent;
+ verdict:=reality_internal.read_final_loop_invocation_return_pending_v1(s,o,work,src,head,6,q,snap,
+ jsonb_build_object('observations','[]'::jsonb),NULL,NULL);
+ IF verdict->>'ready' IS DISTINCT FROM 'true' OR jsonb_array_length(verdict->'prior_preclaim_events')<>1
+ THEN RAISE EXCEPTION 'VERIFIED_TECHNICAL_SUCCESSOR_PRECLAIM_NOT_RECONCILED %',verdict;END IF;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET previous_receipt_sha256=scope_hash WHERE event_id=newevent;
+ verdict:=reality_internal.read_final_loop_invocation_return_pending_v1(s,o,work,src,head,6,q,snap,
+ jsonb_build_object('observations','[]'::jsonb),NULL,NULL);
+ IF verdict->>'ready' IS DISTINCT FROM 'false' THEN RAISE EXCEPTION 'UNBOUND_TECHNICAL_PRECLAIM_ACCEPTED';END IF;
+ END;
 END $$;
 SELECT 'VERIFIED_TECHNICAL_RETURN_STAGES_SAME_APPROVED_READ_ONLY_REVIEW' AS result;
 ROLLBACK;
