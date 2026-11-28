@@ -1013,6 +1013,21 @@ export default async function handler(req,res){
      attested.run_id===actualWorkerRunId&&attested.original_job_completed===false&&
      attested.installation_authorized===false&&attested.production_changed===false;
     if(!workerCompletionAttestedBeforeResponse)throw Error('EXACT_CLAIMED_CAPABILITY_ATTESTATION_UNVERIFIED');
+    // A completed exact review can leave newly reconciliable observations.
+    // Ask the existing inbox to qualify the changed condition once; the
+    // existing lease-release trigger, not a timer or direct HTTP, delivers it.
+    let ledgerReturnContinuation=null;
+    if(finalLoopChildReview.status==='FINAL_LOOP_CANONICAL_SPINE_RETURN_NOT_CONFIRMED_NO_CLAIM'&&
+       finalLoopChildReview.return_status==='FINAL_LOOP_SPINE_RETURN_PENDING_EVENTS_REQUIRE_CAUSAL_RECONCILIATION'&&
+       signedWorkerDurableReleaseWake.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
+       /^[a-f0-9-]{36}$/i.test(signedWorkerDurableReleaseWake.release_claim_id||'')){
+     try{
+      ledgerReturnContinuation=await shiftRpc(db,'reality_stage_final_loop_ledger_return_v1',{
+       p_shift_id:wakeReceipt.shift_id,p_release_claim_id:signedWorkerDurableReleaseWake.release_claim_id});
+     }catch{
+      ledgerReturnContinuation={status:'LEDGER_RETURN_STAGING_OUTCOME_UNVERIFIED_NO_REPLAY',execution_authorized:false};
+     }
+    }
     const released=await shiftRpc(db,'reality_release_governed_shift_worker_run_v1',{p_claim_id:governedWakeClaimId});
     wakeLeaseReleasedBeforeResponse=released?.status==='WAKE_RELEASED'&&released.original_job_completed===false&&released.installation_authorized===false;
     if(!wakeLeaseReleasedBeforeResponse)throw Error('EXACT_CLAIMED_CAPABILITY_LEASE_RELEASE_UNVERIFIED');
@@ -1025,6 +1040,7 @@ export default async function handler(req,res){
      final_loop_categorized_review_trigger:finalLoopCategorizedReviewTrigger,
      final_loop_child_review:finalLoopChildReview,final_loop_blocker_incident:finalLoopBlockerIncident,
      shift_continuity_investigation:exactReviewInvestigation,
+     ledger_return_continuation:ledgerReturnContinuation,
      original_job_completed:false,execution_authorized:false,installation_authorized:false,
      production_changed:false,new_shift_started:false});
    }
