@@ -193,7 +193,8 @@ import {executeOneRegisteredMaintenanceAction}
 import {executeOneRegisteredMaintenanceCiWake}
  from '../../src/reality-signed-maintenance-case-ci-executor-v1.js';
 import {planGovernedCapabilitiesFromOwnerReceipts,
- planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability}
+ planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability,
+ selectRegisteredSignedEventCapability,boundedRegisteredCapabilityCheckpoint}
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
@@ -259,6 +260,7 @@ export default async function handler(req,res){
  let governedWakeClaimId=null;
  let actualWorkerRunId=null;
  let durableWorkerCompletion=null;
+ let canonicalReviewCheckpoint=null;
  let workerCompletionAttestedBeforeResponse=false;
  let wakeLeaseReleasedBeforeResponse=false;
  let workerStage='SHIFT_DB_BOUNDARY';
@@ -3178,26 +3180,40 @@ export default async function handler(req,res){
    status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',
    original_job_completed:false,production_changed:false
   };
-  // No live claim is consumed until the exact approved release is witnessed
-  // AND the isolated transport answers its signed, non-executing probe.
-  if(canonicalEventRuntime&&finalLoopCategorizedReviewTrigger.review_claim_route_ready===true&&
-    process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED==='true'&&
-    signedWorkerDurableReleaseWake.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
-    signedWorkerDurableReleaseWake.worker_run_id===actualWorkerRunId&&
-    process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'&&
-    registeredRecoveryActionKeys.includes('VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM')){
-   try{
+  // The existing router selects the ledger's exact capability. The registry
+  // contains trusted adapters only; no model-generated handler or code is run.
+  const selectedEventCapability=selectRegisteredSignedEventCapability({
+   trigger:finalLoopCategorizedReviewTrigger,delivery:governedWakeScope,
+   wake:wakeReceipt,graph:unifiedGraph,release:signedWorkerDurableReleaseWake,
+   workerRunId:actualWorkerRunId,registeredActionKeys:registeredRecoveryActionKeys,
+   env:process.env
+  });
+  const registeredEventHandlers=new Map([
+   ['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',async()=>{
     const transport=await connectExistingIsolatedChildTransport({db,
      handoff:finalLoopCategorizedReviewTrigger.canonical_claim_handoff,env:process.env,fetchImpl:fetch});
-    finalLoopChildReview=transport.ready===true?
+    return transport.ready===true?
      await advanceCanonicalFinalLoopChildReview({db,trigger:finalLoopCategorizedReviewTrigger,
       workerRunId:actualWorkerRunId,env:process.env,readCurrentContinuity:requireFreshFinalLoopContinuity,
       runIsolatedAdvisory:transport.runIsolatedAdvisory,fetchImpl:fetch}):
      {status:transport.status,original_job_completed:false,production_changed:false};
+   }]
+  ]);
+  const selectedEventHandler=registeredEventHandlers.get(selectedEventCapability);
+  if(selectedEventHandler){
+   try{
+    finalLoopChildReview=await selectedEventHandler();
    }catch{
     finalLoopChildReview={status:'FINAL_LOOP_CANONICAL_TRANSPORT_UNVERIFIED_NO_REPLAY',
      original_job_completed:false,production_changed:false};
    }
+   // Capture only the bounded outcome immediately; a later projection must
+   // not erase the capability result or turn it into settlement evidence.
+   canonicalReviewCheckpoint=boundedRegisteredCapabilityCheckpoint(
+    selectedEventCapability,finalLoopChildReview);
+   if(canonicalReviewCheckpoint)
+    console.info('REALITY_REGISTERED_CAPABILITY_CHECKPOINT',
+     JSON.stringify(canonicalReviewCheckpoint));
   }
   // A verified suspension is a successful observation, not another failed
   // execution. Route its exact successor to the existing incident investigator
@@ -4035,6 +4051,7 @@ export default async function handler(req,res){
        automaticWorkSupervisor.next_worker_pulse_code:
       result?.status;
    const safeOutcome=finalLoopChildReview.continuity_blocker_code||
+    canonicalReviewCheckpoint?.status||
     (/^[A-Z0-9_]{3,100}$/.test(outcomeCode||'')?
     outcomeCode:'RESULT_READBACK_UNVERIFIED');
    // A signed wake is not shift progress when the same original-work
@@ -4618,6 +4635,7 @@ export default async function handler(req,res){
    if(res.headersSent)return;
    return res.status(200).json({
     status:'DURABLE_SHIFT_WAKE_COMPLETED_RESPONSE_FALLBACK',
+    registered_capability_checkpoint:canonicalReviewCheckpoint,
     actual_worker_completion_receipt:durableWorkerCompletion,
     original_job_completed:false,installation_authorized:false,
     production_changed:false,new_shift_started:false
@@ -4646,6 +4664,7 @@ export default async function handler(req,res){
   }
   return res.status(503).json({
    ok:false,error:'SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED',
+   registered_capability_checkpoint:canonicalReviewCheckpoint,
    work_completed:false,installation_authorized:false,
    production_changed:false});
  }finally{
