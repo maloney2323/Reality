@@ -103,6 +103,8 @@ ALTER TABLE reality_internal.final_loop_resume_events_v1
 CREATE OR REPLACE FUNCTION reality_internal.freeze_final_loop_predispatch_recovery_v1()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO '' AS $fn$
 BEGIN
+ IF OLD.predispatch_delivery_recovery_receipt IS NULL AND NEW.predispatch_delivery_recovery_receipt IS NOT NULL AND current_user<>'postgres'
+ THEN RAISE EXCEPTION 'FINAL_LOOP_PREDISPATCH_RECOVERY_ADMIN_ONLY'; END IF;
  IF OLD.predispatch_delivery_recovery_receipt IS NOT NULL
   AND NEW.predispatch_delivery_recovery_receipt IS DISTINCT FROM OLD.predispatch_delivery_recovery_receipt
  THEN RAISE EXCEPTION 'FINAL_LOOP_PREDISPATCH_RECOVERY_RECEIPT_IMMUTABLE'; END IF;
