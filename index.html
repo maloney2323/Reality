@@ -260,6 +260,32 @@ details summary{cursor:pointer;color:#c8d0de}.timeline{display:flex;gap:7px;flex
 #realityChatContinuityActivity[hidden]{display:none!important}
 #realityChatContinuityActivity{margin:0;overflow-wrap:anywhere}
 #realityChatContinuityActivity [hidden]{display:none!important}
+.reality-employee-live-activity{margin-top:18px;border-top:1px solid var(--line,#405060);padding-top:16px}
+.reality-employee-live-activity[hidden]{display:none!important}
+.reality-employee-live-activity h3{margin:0 0 6px;font-size:1rem}
+.reality-employee-live-activity p{margin:5px 0;line-height:1.5}
+.reality-employee-action-list{list-style:none;margin:8px 0 0;padding:0}
+.reality-employee-action-list li{border-top:1px solid var(--line,#405060);padding:8px 0;overflow-wrap:anywhere;font-size:.85rem}
+.reality-employee-action-list strong{display:block}
+.reality-employee-action-list small{display:block;margin-top:3px}
+.reality-employee-action-list [data-state="verified"] strong{color:#5bd6a4}
+.reality-employee-action-list [data-state="running"] strong{color:#77bff1}
+.reality-employee-action-list [data-state="blocked"] strong{color:#efb568}
+.reality-employee-activity-group{border-top:1px solid var(--line,#405060);padding:12px 0}
+.reality-employee-activity-group details{margin-top:8px}
+.reality-activity-progress{margin:10px 0;padding:10px 12px;border:1px solid var(--line,#405060);border-radius:10px}
+.reality-activity-progress strong{font-size:.95rem}
+.reality-activity-progress p{margin:5px 0}
+.reality-employee-progress-card{margin:10px 0;padding:12px;border:1px solid var(--line,#405060);border-radius:10px;min-width:0}
+.reality-employee-progress-card h3{font-size:1rem;margin:0 0 6px}
+.reality-employee-progress-track{display:block;width:100%;height:9px;margin:8px 0 4px;accent-color:#5bd6a4;border:0;border-radius:6px;overflow:hidden}
+.reality-employee-progress-track::-webkit-progress-bar{background:#334553;border-radius:6px}
+.reality-employee-progress-track::-webkit-progress-value{background:#5bd6a4;border-radius:6px}
+.reality-employee-progress-track::-moz-progress-bar{background:#5bd6a4;border-radius:6px}
+.reality-employee-progress-unmeasured{height:9px;background:#334553;border-radius:6px;margin:8px 0 4px}
+.reality-employee-progress-note{display:block;font-size:.77rem;line-height:1.5;color:#b5ccda}
+.reality-employee-progress-summary{display:block;margin:6px 0;font-size:.82rem}
+.reality-employee-progress-card .reality-employee-action-list li{margin-left:0}
 #realityChatContinuityHeadline{font-size:13px;line-height:1.5;color:#b5ccda;margin:8px 0}
 #realityChatContinuitySteps .reality-operational-message{margin:10px 0}
 #realityChatContinuitySteps .reality-operational-message>p{font-size:inherit;line-height:1.6}
@@ -1164,6 +1190,13 @@ body.reality-archive-open #realitySimpleHome > :not(#simpleArchivePanel){display
    <article data-home-employee="Jordan"><strong>Jordan</strong><span>Sales &amp; success</span><small data-home-work>Checking saved work…</small></article>
    <article data-home-employee="Sage"><strong>Sage</strong><span>Finance &amp; administration</span><small data-home-work>Checking saved work…</small></article>
   </div>
+  <section id="realityEmployeeLiveActivity" class="reality-employee-live-activity" aria-label="Live employee work" hidden>
+   <div class="home-team-head"><div><h3>Live employee activity</h3>
+    <p id="realityEmployeeActivityStatus" role="status" aria-live="polite">Reading verified employee actions…</p></div>
+    <button type="button" id="realityEmployeeActivityRefresh" class="simple-secondary">Refresh activity</button>
+   </div>
+   <div id="realityEmployeeActivityTimeline"></div>
+  </section>
   <p class="home-team-disclaimer">Employee names represent eight roles for one OpenAI model, not eight active autonomous workers. Suggestions are not authorized jobs.</p>
   <div class="home-team-actions">
    <a href="/employees">View employees &amp; saved work proposals</a>
@@ -6718,16 +6751,127 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   el('realityChatContinuitySteps').replaceChildren();
   el('realityChatContinuityChecked').textContent='';
   el('realityChatContinuityHeadline').textContent='Reading actual operational events…';
+  el('realityEmployeeLiveActivity').hidden=true;
+  el('realityEmployeeActivityTimeline').replaceChildren();
+  for(const card of document.querySelectorAll('[data-home-employee]')){card.querySelector('.reality-employee-action-list')?.remove();card.querySelector('.reality-employee-progress-card')?.remove();}
  }
  function liveNode(tag,text,host){
   const n=document.createElement(tag);n.textContent=String(text||'');host.append(n);return n;
+ }
+ const friendlyActivityState=state=>({verified:'Verified',running:'Running',blocked:'Needs attention',recorded:'Recorded, not yet verified',pending:'Waiting',historical:'Earlier event',proposal:'Proposed, not authorized'}[state]||'Evidence unavailable');
+ const activitySourceLabel=ref=>{
+  const match=/^https:\/\/github\.com\/[^/]+\/[^/]+\/(pull|issues)\/(\d+)\/?$/.exec(ref);
+  return match?(match[1]==='pull'?'Pull request #':'Issue #')+match[2]:'Original work';
+ };
+ function appendEmployeeAction(host,step,job){
+  const li=document.createElement('li');li.dataset.state=step.state;host.append(li);
+  liveNode('strong',friendlyActivityState(step.state)+' · '+step.label,li);
+  liveNode('p',activitySourceLabel(job.source_ref)+' · '+step.detail,li);
+  if(step.at)liveNode('small',new Date(step.at).toLocaleString(),li);
+  const details=document.createElement('details');li.append(details);liveNode('summary','Evidence',details);
+  if(step.receipt)liveNode('p','Receipt: '+step.receipt,details);
+  if(step.worker_run_id)liveNode('p','Worker run: '+step.worker_run_id,details);
+ }
+ // The progress denominator is recorded, attributed action steps only.
+ // No inferred assignment, fabricated plan, elapsed-time estimate, or job percentage.
+ function trackedEmployeeProgress(rows){
+  const unique=new Map();
+  for(const entry of rows){
+   const {job,step}=entry;
+   if(!['verified','running','blocked','pending','recorded'].includes(step.state)||!step.id)continue;
+   const identity=job.original_work_id+'|'+(step.state==='verified'&&step.receipt?'receipt:'+step.receipt:'event:'+step.id);
+   if(!unique.has(identity))unique.set(identity,entry);
+  }
+  const steps=[...unique.values()];
+  return {steps,total:steps.length,verified:steps.filter(x=>x.step.state==='verified').length,
+   running:steps.filter(x=>x.step.state==='running').length,blocked:steps.filter(x=>x.step.state==='blocked').length,
+   waiting:steps.filter(x=>['pending','recorded'].includes(x.step.state)).length};
+ }
+ function renderEmployeeStepProgress(host,rows,name,{partial=false,maxRows=12}={}){
+  const p=trackedEmployeeProgress(rows);
+  if(!p.total){
+   const empty=document.createElement('div');empty.className='reality-employee-progress-unmeasured';empty.setAttribute('aria-hidden','true');host.append(empty);
+   liveNode('small','Progress not measurable. No currently verified action attributed to this employee.',host).className='reality-employee-progress-note';
+   return;
+  }
+  const bar=document.createElement('progress');bar.className='reality-employee-progress-track';
+  bar.max=p.total;bar.value=p.verified;
+  bar.setAttribute('aria-label',name+' recorded steps independently verified');
+  bar.setAttribute('aria-valuetext',p.verified+' of '+p.total+' recorded steps verified');
+  host.append(bar);
+  liveNode('small',p.verified+' of '+p.total+' recorded steps verified · '+p.running+' running · '+p.blocked+' need attention · '+p.waiting+' waiting',host).className='reality-employee-progress-summary';
+  liveNode('small','Recorded steps only — not overall job completion.'+(partial?' Some evidence is unavailable.':''),host).className='reality-employee-progress-note';
+  const list=document.createElement('ul');list.className='reality-employee-action-list';host.append(list);
+  for(const {job,step} of p.steps.slice(-maxRows))appendEmployeeAction(list,step,job);
+  if(p.total>maxRows)liveNode('small','Showing the most recent '+maxRows+' recorded steps.',host).className='reality-employee-progress-note';
+ }
+ function renderChatEmployeeProgress(article,job,partial){
+  const groups=new Map();
+  for(const step of job.steps){
+   if(!['verified','running','blocked','pending','recorded'].includes(step.state))continue;
+   const employee=typeof step.employee==='string'&&step.employee.trim()?step.employee.trim():null;
+   // An unattributed worker event remains a shared Reality action.
+   const key=employee?'employee:'+employee:'shared';
+   if(!groups.has(key))groups.set(key,{name:employee||'Reality · Shared worker',employee,rows:[]});
+   groups.get(key).rows.push({job,step});
+  }
+  if(!groups.size)return;
+  const section=document.createElement('section');section.setAttribute('aria-label','Employee progress and current action steps');article.append(section);
+  liveNode('strong','Employee progress',section);
+  const ordered=[...groups.values()].sort((a,b)=>Number(!a.employee)-Number(!b.employee));
+  for(const group of ordered){
+   const card=document.createElement('article');card.className='reality-employee-progress-card';section.append(card);
+   liveNode('h3',group.name,card);
+   renderEmployeeStepProgress(card,group.rows,group.name,{partial});
+  }
+ }
+ function renderEmployeeLiveActivity(data){
+  const panel=el('realityEmployeeLiveActivity'),host=el('realityEmployeeActivityTimeline');
+  panel.hidden=false;
+  el('realityEmployeeActivityStatus').textContent='Last checked '+new Date(data.observed_at).toLocaleTimeString()+
+   (data.partial?' · Some source evidence unavailable.':' · Owner-scoped evidence.');
+  host.replaceChildren();
+  const cards=[...document.querySelectorAll('[data-home-employee]')];
+  const visible=[];
+  for(const job of data.obligations)for(const step of job.steps){
+   if(step.state==='historical'||step.state==='proposal')continue;
+   visible.push({job,step});
+  }
+  for(const card of cards){
+   card.querySelector('.reality-employee-action-list')?.remove();
+   card.querySelector('.reality-employee-progress-card')?.remove();
+   const rows=visible.filter(x=>x.step.employee===card.dataset.homeEmployee);
+   const progress=document.createElement('div');progress.className='reality-employee-progress-card';
+   const name=card.querySelector('strong');
+   if(name)name.insertAdjacentElement('afterend',progress);else card.append(progress);
+   renderEmployeeStepProgress(progress,rows,card.dataset.homeEmployee,{partial:data.partial,maxRows:6});
+  }
+  for(const job of data.obligations){
+   const group=document.createElement('article');group.className='reality-employee-activity-group';host.append(group);
+   liveNode('strong',activitySourceLabel(job.source_ref)+' · Continuity revision '+job.revision,group);
+   liveNode('p',job.original_complete?'Original outcome independently verified.':'Original work remains open.',group);
+   if(job.terminal_evidence)liveNode('p','Technical evidence accepted · revision '+job.terminal_evidence.prior_revision+' → '+job.terminal_evidence.revision+
+    ' · '+job.terminal_evidence.remaining_attempts+' repair attempts remaining.',group);
+   const list=document.createElement('ul');list.className='reality-employee-action-list';group.append(list);
+   // Shared worker actions with no verified employee assignment stay shared.
+   for(const {step} of visible.filter(x=>x.job===job).slice(-10)){
+    appendEmployeeAction(list,step,job);
+    if(step.employee)liveNode('small','Employee: '+step.employee,list.lastElementChild);
+   }
+  }
+  if(!data.obligations.length)liveNode('p','No current original-work activity was verified by this readback. This does not prove all employees are idle.',host);
  }
  function showLiveActivity(data){
   const host=el('realityChatContinuitySteps'),headline=el('realityChatContinuityHeadline');
   el('realityChatContinuityChecked').textContent='Checked '+new Date(data.observed_at).toLocaleTimeString()+' · live evidence';
   headline.hidden=true;el('realityChatContinuityChecked').hidden=true;el('realityChatContinuityRefresh').hidden=true;
   const key=JSON.stringify([data.partial,data.unverified_guard_count,data.obligations,data.final_receipts]);
+  if(realityCurrentRoute()==='employees'){
+   el('realityEmployeeLiveActivity').hidden=false;
+   el('realityEmployeeActivityStatus').textContent='Last checked '+new Date(data.observed_at).toLocaleTimeString()+(data.partial?' · Some source evidence unavailable.':' · Owner-scoped evidence.');
+  }
   if(liveActivityFingerprint===key)return;
+  if(realityCurrentRoute()==='employees')renderEmployeeLiveActivity(data);
   const open=new Set([...host.querySelectorAll('details[open][data-disclosure]')].map(d=>d.dataset.disclosure));
   liveActivityFingerprint=key;host.replaceChildren();
   headline.textContent='';
@@ -6747,14 +6891,16 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
    'independently review verified investigation no replay':'Independently review the recorded investigation.',
    'read distinct terminal technical evidence no replay':'Read and verify distinct technical evidence.',
    'verify existing approved child review claim':'Verify the existing authorized review claim.',
+   'independently qualify business original and case specific red':'Independently verify the original business work and its specific test evidence.',
    'qualify distinct recovery evidence and exact budget no replay':'Qualify distinct recovery evidence within the existing budget.',
    'independently qualify new source epoch no replay':'Verify the changed source before continuing.'
   }[action]||action||'Next action unavailable.');
   const renderStep=(step,list)=>{
    const li=document.createElement('li');li.dataset.state=step.state;list.append(li);
-   const state=liveNode('div',step.state==='proposal'?'Proposal · not approval':step.state,li);
+   const state=liveNode('div',friendlyActivityState(step.state),li);
    state.className='live-step-state';state.dataset.state=step.state;
    liveNode('strong',step.label,li);liveNode('p',step.detail,li);
+   if(step.employee)liveNode('p','Employee: '+step.employee,li);
    if(step.investigator)liveNode('p','Investigator: '+step.investigator,li);
    if(step.reviewer)liveNode('p','Independent reviewer: '+step.reviewer,li);
    if(step.diagnosis)liveNode('p','Findings: '+step.diagnosis,li);
@@ -6783,10 +6929,18 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     if(running)text.push(running.label+' is running.');
     else if(failed)text.push(failed.detail);
     else if(job.gates.length)text.push('The original work is paused because required evidence is still missing. Your existing shift remains open.');
-    if(proposal)text.push((proposal.investigator?proposal.investigator+' has':'I have')+' recorded a proposed correction, which still requires independent review.');
+    if(proposal&&!job.terminal_evidence)text.push((proposal.investigator?proposal.investigator+' has':'I have')+' recorded a proposed correction, which still requires independent review.');
     text.push('My next step: '+friendlyNext(job.next_action));
    }
    liveNode('p',text.join(' '),article);
+   if(job.terminal_evidence){
+    const progress=document.createElement('div');progress.className='reality-activity-progress';article.append(progress);
+    liveNode('strong','Verified progress · revision '+job.terminal_evidence.prior_revision+' → '+job.terminal_evidence.revision,progress);
+    liveNode('p','Technical evidence accepted and returned to the same original work. The original job remains open.',progress);
+    liveNode('p','Repair budget: '+job.terminal_evidence.remaining_attempts+' attempts remaining. No repeat approval is implied.',progress);
+   }
+   renderChatEmployeeProgress(article,job,data.partial);
+   liveNode('small','Checked '+new Date(data.observed_at).toLocaleTimeString(),article);
    if(data.partial)liveNode('small','Some evidence is unavailable; no additional progress is inferred.',article);
    const d=disclosure(article,'View activity and evidence',job.original_work_id);
    liveNode('p','Continuity revision '+job.revision+' · '+job.shift_status,d);
@@ -6820,11 +6974,12 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
   }
  }
  async function refreshLiveActivity(){
-  if(!liveActivitySignedIn||realityCurrentRoute()!=='chat'||document.visibilityState!=='visible'||liveActivityAbort)return;
+  if(!liveActivitySignedIn||!['chat','employees'].includes(realityCurrentRoute())||document.visibilityState!=='visible'||liveActivityAbort)return;
   const epoch=liveActivityEpoch,controller=new AbortController();liveActivityAbort=controller;
   const deadline=setTimeout(()=>controller.abort(),15000);
   clearTimeout(liveActivityTimer);liveActivityTimer=null;
-  el('realityChatContinuityActivity').hidden=false;
+  if(realityCurrentRoute()==='chat')el('realityChatContinuityActivity').hidden=false;
+  else el('realityEmployeeLiveActivity').hidden=false;
   try{
    const r=await fetch('/api/reality/personal-continuity-activity',{
     method:'GET',credentials:'same-origin',cache:'no-store',signal:controller.signal});
@@ -6845,6 +7000,7 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
     notice.textContent='I couldn’t refresh the current work status. Any previous work update is from the last successful check.';
     notice.hidden=false;
     el('realityChatContinuityRefresh').hidden=false;
+    el('realityEmployeeActivityStatus').textContent='Current evidence unavailable. Any previous work update is from the last successful check.';
    }
   }finally{
    clearTimeout(deadline);
@@ -6855,9 +7011,10 @@ if(['/','/work','/shifts'].includes(window.location.pathname)){
  }
  function startLiveActivity(){
   liveActivitySignedIn=true;
-  if(realityCurrentRoute()==='chat')void refreshLiveActivity();
+  if(['chat','employees'].includes(realityCurrentRoute()))void refreshLiveActivity();
  }
  el('realityChatContinuityRefresh').onclick=()=>void refreshLiveActivity();
+ el('realityEmployeeActivityRefresh').onclick=()=>void refreshLiveActivity();
  document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')void refreshLiveActivity();
   else{clearTimeout(liveActivityTimer);liveActivityTimer=null}

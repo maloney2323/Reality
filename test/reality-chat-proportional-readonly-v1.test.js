@@ -211,3 +211,141 @@ test('conversation persistence works with operational flags disabled and cannot 
  return {ok:true,json:async()=>request};}});
  assert.equal(reply.conversational_reply_persisted,true);assert.equal(reply.execution_authorized,false);
 });
+
+test('read-only intelligence receives the same operational temporal projection at top level',async()=>{
+ const horizon={schema:'reality-chat-operational-time-horizon-v1',
+  present:{status:'CURRENT_READBACK_PARTIAL',obligations:[{shift_id:'11111111-2222-4333-8444-555555555555',
+   existing_shift_authorized:true,original_work_id:'work:'+'a'.repeat(32),continuity_revision:3,
+   operational_next_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY',
+   current_events:[{interpretation:'WORKER_FINISHED_EVIDENCE_NOT_ACCEPTED'}],
+   active_release_observation:{release_sha:'b'.repeat(40),approval_receipt_sha256:'sha256:'+'c'.repeat(64)}}]},
+  past:{independent_original_settlements:[]},future:{next_action_is_not_execution_authority:true},
+  read_only:true,execution_authorized:false,installation_authorized:false};
+ const reply=await generateProportionalReadOnlyReply({...args,operationalTimeHorizon:horizon,
+  runtime:async params=>{
+   assert.equal(params.systemContext.operational_time_horizon,horizon);
+   return {mode:'FAST',authority_granted:false,execution_authorized:false,
+    answer:'No authorized active shift exists; you must formally start an authorized shift.'};
+  }});
+ assert.match(reply.answer,/existing owner-authorized shift/);
+ assert.match(reply.answer,/Continuity revision 3/);
+ assert.match(reply.answer,/worker invocation finished but its evidence is not yet accepted/);
+ assert.match(reply.answer,/approval receipt sha256:/);
+ assert.equal(reply.execution_authorized,false);
+});
+
+
+test('fast Chat preserves the same owner incident evidence as full cognition without another read or authority',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ const lane=api.split("stage='READ_ONLY_BOUNDED_CONTEXT'")[1].split('// The signed human message entered')[0];
+ assert.match(lane,/const incidentObservations=incidentChatUniverseObservations\(ctx\.values\.owner_handoff\)/);
+ assert.match(lane,/const observations=\[\.\.\.incidentObservations,\.\.\.selfVisibilityObservations/);
+ assert.match(lane,/owner_incident_evidence_status:ctx\.values\.owner_handoff\?'OWNER_SCOPED_READBACK':'UNAVAILABLE_NOT_ABSENCE'/);
+ assert.match(lane,/owner_shift_continuity_incidents:ctx\.values\.owner_handoff\?\.shift_continuity_incidents/);
+ assert.equal((lane.match(/readOwnerOperationalIncidentChatBriefing\(/g)||[]).length,1);
+ assert.match(lane,/conversation_never_grants_execution_authority:true/);
+ assert.match(lane,/external_actions_authorized:false/);
+ assert.match(api,/incidentChatUniverseObservations\(operationalIncidentsReadback\)/);
+});
+
+
+test('empty operational extraction withholds the draft; ordinary conversation and supported facts survive',async()=>{
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const run=async(answer,claims,operational)=>generateProportionalReadOnlyReply({...args,
+  ownerContext:{currently_authorized_shift:shift},
+  runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer}),
+  fetchImpl:async()=>({ok:true,json:async()=>({id:'resp_fixture',output_text:JSON.stringify({
+   claims,actions:[],operational,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})})})});
+ const missed='The supplier credited our account yesterday.';
+ const withheld=await run(missed,[],true);
+ assert.equal(withheld.output_claim_assessment.status,'CLAIM_COVERAGE_UNVERIFIED');
+ assert.equal(JSON.stringify(withheld).includes(missed),false);
+ assert.match(withheld.answer,/withheld/);
+ const conversational='We can discuss the available options.';
+ assert.equal((await run(conversational,[],false)).answer,conversational);
+ const supported='The shift status is AWAITING_EXACT_ORIGINAL_WORK.';
+ assert.equal((await run(supported,[{key:'shift.shift_status',value:shift.shift_status,quote:supported,assertion:'AFFIRMED'}],true)).answer,supported);
+});
+
+
+test('assessed operational output requires server-provided receipt before publication; ordinary conversation skips the writer',async()=>{
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const supported='The shift status is AWAITING_EXACT_ORIGINAL_WORK.';
+ const runtime=async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:supported});
+ const fetchImpl=async()=>({ok:true,json:async()=>({id:'resp_fixture',output_text:JSON.stringify({
+  claims:[{key:'shift.shift_status',value:shift.shift_status,quote:supported,assertion:'AFFIRMED'}],actions:[],operational:true,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})})});
+ let calls=0;
+ const recordClaimAssessment=async({answer,assessment})=>{calls++;assert.equal(answer,supported);assert.equal(assessment.status,'EXTRACTED_ASSERTIONS_SOURCE_COMPARED');return {...assessment,readback_verified:true,ledger_receipt_id:'receipt'};};
+ const props={...args,ownerContext:{currently_authorized_shift:shift},runtime,fetchImpl};
+ const r=await generateProportionalReadOnlyReply({...props,recordClaimAssessment});
+ assert.equal(r.answer,supported);assert.equal(r.output_claim_assessment.durable_continuity_receipt_verified,true);assert.equal(calls,1);
+ const failed=await generateProportionalReadOnlyReply({...props,recordClaimAssessment:async()=>{throw Error('readback unavailable')}});
+ assert.equal(failed.output_claim_assessment.durable_continuity_receipt_verified,false);assert.equal(JSON.stringify(failed).includes(supported),false);
+ const ordinary=await generateProportionalReadOnlyReply({...args,runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:'Hello!'}),recordClaimAssessment});
+ assert.equal(ordinary.answer,'Hello!');assert.equal(calls,1);
+});
+
+
+test('shift cognition bounds presentation history without truncating the authenticated authority ledger',()=>{
+ const source=readFileSync(new URL('../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
+ assert.match(source,/buildRealityShiftConversationBrief\(read\.shifts\.slice\(0,5\),\[\],now\)/);
+ assert.match(source,/ownerId:session\.user_id,shifts:read\.shifts/);
+ const api=readFileSync(new URL('../api/reality/personal-governed-employee-shift.js',import.meta.url),'utf8');
+ assert.match(api,/try\{recovery_diagnosis=diagnoseRealityEmployeeRecovery/);
+});
+test('failed extraction retains exact authenticated shift status but never releases model draft',async()=>{
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const draft='The supplier credited our account yesterday.';let recorded;
+ const result=await generateProportionalReadOnlyReply({...args,ownerContext:{currently_authorized_shift:shift},
+  runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:draft}),
+  fetchImpl:async()=>{const e=Error('provider private body');e.name='TimeoutError';throw e;},
+  recordClaimAssessment:async a=>{recorded=a;return {...a.assessment,readback_verified:true,ledger_receipt_id:'receipt'};}});
+ assert.match(result.answer,/awaiting exact original work/);assert.match(result.answer,/withheld/);
+ assert.equal(result.answer.includes(draft),false);assert.equal(recorded.assessment.extraction_failure_code,'RELIABILITY_EXTRACTION_TIMEOUT');
+ assert.equal(recorded.assessment.extraction_completeness_verified,false);
+ assert.equal(recorded.assessment.released_source_facts.length,2);
+ assert.equal(recorded.answer,result.answer);assert.equal(JSON.stringify(recorded).includes('provider private body'),false);
+ assert.equal(result.execution_authorized,false);
+});
+
+
+test('timeout preserves verified guarded original even when shift briefing unavailable',async()=>{
+ const draft='The supplier credited our account yesterday.';let recorded;
+ const original='work:'+'d'.repeat(32),shift='12345678-1234-4234-8234-123456789abc',guard='sha256:'+'a'.repeat(64);
+ const horizon={present:{obligations:[{shift_id:shift,original_work_id:original,continuity_revision:3,
+  existing_shift_authorized:true,guard_receipt_sha256:guard,operational_next_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE',
+  read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false}]}};
+ const r=await generateProportionalReadOnlyReply({...args,operationalTimeHorizon:horizon,
+  runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:draft}),
+  fetchImpl:async()=>{const e=Error('timeout');e.name='TimeoutError';throw e;},
+  recordClaimAssessment:async a=>{recorded=a;return {...a.assessment,readback_verified:true,ledger_receipt_id:'receipt'};}});
+ assert.match(r.answer,/Continuity revision 3/);assert.ok(r.answer.includes(original));assert.ok(r.answer.includes(shift));
+ assert.match(r.answer,/recorded next action is qualify distinct recovery evidence/);
+ assert.equal(r.answer.includes(draft),false);assert.equal(recorded.assessment.released_source_facts.length,5);
+ assert.deepEqual(recorded.assessment.released_source_fact_refs,[guard]);assert.equal(recorded.assessment.extraction_completeness_verified,false);
+ assert.equal(recorded.answer,r.answer);assert.equal(r.execution_authorized,false);
+});
+test('fast shift briefing does not wait for optional serial audits',()=>{
+ const source=readFileSync(new URL('../src/reality-employee-shift-chat-context-v1.js',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.ok(source.indexOf('if(briefOnly===true)return observations;')>source.indexOf('const observations=[Object.freeze({'));
+ assert.ok(source.indexOf('if(briefOnly===true)return observations;')<source.indexOf("'reality_read_owner_internal_maintenance_v1'"));
+ assert.match(api,/id:'active_shift',timeoutMs:5000,read:\(\)=>readVerifiedEmployeeShiftForChat\(\{session,message:text,db:isolated,briefOnly:true\}\)/);
+});
+test('generalized settlement exclusion requires independent inventory reconciliation',async()=>{
+ const {ownerSettledOriginalSourceRefs}=await import('../api/reality/personal-governed-employee-shift.js');
+ const source='https://github.com/maloney2323/Reality/issues/789';
+ const settled={phase:'SETTLED',source_ref:source,original_work_id:'work:'+'d'.repeat(32),source_proof_sha256:'sha256:'+'a'.repeat(64),
+  original_job_completed:true,code_repair_completed:true,production_changed:false,original_settlement_receipt_ref:'supabase:governed_original_independent_final_receipts_v1:12345678-1234-4234-8234-123456789abc'};
+ const run=refs=>ownerSettledOriginalSourceRefs({ownerId:owner,db:{},call:async(_db,rpc)=>({
+  reality_read_owner_riley_pr_review_v1:{status:'OWNER_PR_REVIEW_ORIGINAL_READBACK',production_changed:false,jobs:[]},
+  reality_read_owner_shift_failure_triage_143_v1:{status:'OWNER_SCOPED_VERIFIED_SHIFT_FAILURE_TRIAGE',production_changed:false,jobs:[]},
+  reality_read_owner_riley_repair_original_v1:{status:'OWNER_SCOPED_UNATTENDED_REPAIR_ORIGINAL_READBACK',production_changed:false,does_not_authorize_new_work:true,jobs:[settled]},
+  reality_read_owner_additional_settled_shift_sources_v1:{status:'OWNER_ADDITIONAL_SETTLED_SOURCES_INDEPENDENTLY_RECONCILED',owner_id:owner,source_refs:refs,settled_source_count:refs.length,work_creation_authorized:false,shift_authorized:false,installation_authorized:false,production_changed:false}
+ })[rpc]});
+ assert.deepEqual(await run([source]),[source]);
+ await assert.rejects(run([]),/SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED/);
+});

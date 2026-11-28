@@ -4,6 +4,29 @@ on:
     paths:
       - 'index.html'
       - 'src/reality-chat-continuity-activity-v1.js'
+      - 'api/reality/personal-chat.js'
+      - 'src/reality-chat-self-visibility-v1.js'
+      - 'src/reality-chat-proportional-readonly-v1.js'
+      - 'src/reality-model-gateway-v0.1.js'
+      - 'test/reality-chat-self-visibility-v1.test.js'
+      - 'test/reality-chat-proportional-readonly-v1.test.js'
+      - 'test/run-reality-five-failure-acceptance-v1.mjs'
+      - 'test/reality-governed-tool-session-v1.test.js'
+      - 'test/reality-governed-late-bound-tool-adapter-v1.test.js'
+      - 'test/reality-final-chat-publication-proof-v0.1.test.js'
+      - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
+      - 'test/reality-active-path-audit-regression.test.js'
+      - 'test/reality-adversarial-negative-external-action-regression.test.js'
+      - 'test/reality-continuous-reliability-v0.1.test.js'
+      - 'test/reality-unified-semantic-review-v0.1.test.js'
+      - 'src/reality-private-chat-store-v0.1.js'
+      - 'src/reality-governed-late-bound-tool-adapter-v1.js'
+      - 'api/chat.js'
+      - 'src/reality-governed-tool-session-v1.js'
+      - 'src/reality-final-chat-publication-proof-v0.1.js'
+      - 'src/reality-reliability-claim-extraction-v0.1.js'
+      - 'src/reality-semantic-review-v0.1.js'
+      - 'src/reality-live-intelligence-orchestration-v0.1.js'
       - 'api/reality/personal-continuity-activity.js'
       - 'test/reality-chat-continuity-activity-v1.test.js'
       - '.github/workflows/reality-chat-continuity-activity-v1.yml'
@@ -14,7 +37,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Test evidence-backed Chat progress
         run: |
           node --test test/reality-chat-continuity-activity-v1.test.js
           node --check api/reality/personal-continuity-activity.js
+          node --check api/reality/personal-chat.js
+          node --test test/reality-chat-self-visibility-v1.test.js test/reality-chat-proportional-readonly-v1.test.js
+      - name: Test existing objective and publication boundaries
+        run: node --test test/reality-governed-tool-session-v1.test.js test/reality-governed-late-bound-tool-adapter-v1.test.js test/reality-final-chat-publication-proof-v0.1.test.js test/reality-live-intelligence-orchestration-v0.1.test.js test/reality-active-path-audit-regression.test.js test/reality-adversarial-negative-external-action-regression.test.js test/reality-continuous-reliability-v0.1.test.js test/reality-unified-semantic-review-v0.1.test.js
+      - name: Record identical five-failure benchmark before and after
+        if: always()
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/five-failure-before" 938f9d16aefdd40461121f7fa29f62822593c943
+          mkdir -p "$RUNNER_TEMP/five-failure-results"
+          node test/run-reality-five-failure-acceptance-v1.mjs "$RUNNER_TEMP/five-failure-before" | tee "$RUNNER_TEMP/five-failure-results/before.json"
+          node test/run-reality-five-failure-acceptance-v1.mjs "$GITHUB_WORKSPACE" | tee "$RUNNER_TEMP/five-failure-results/after.json"
+          node --input-type=module -e 'import fs from "node:fs";const d=process.env.RUNNER_TEMP+"/five-failure-results/";const b=JSON.parse(fs.readFileSync(d+"before.json"));const a=JSON.parse(fs.readFileSync(d+"after.json"));if(b.rows.length!==7||a.rows.length!==7)throw Error("FROZEN_CASE_COVERAGE_MISSING");for(const id of ["1","3","5a","5c"]){const before=b.rows.find(x=>x.id===id),after=a.rows.find(x=>x.id===id);if(before.escaped!==true||after.escaped!==false||after.detected!==true)throw Error("EXPECTED_REGRESSION_NOT_REPRODUCED_OR_FIXED "+id);}for(const id of ["2","4","5b"]){if(a.rows.find(x=>x.id===id)?.escaped!==false)throw Error("PREEXISTING_PROTECTION_REGRESSED "+id);}console.log("Controlled improvements verified; unresolved cases remain explicit.");'
+      - name: Preserve before and after evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: five-failure-controlled-boundaries
+          path: ${{ runner.temp }}/five-failure-results/
+          if-no-files-found: error
+      - name: Require detector-independent enforcement and retained protections
+        if: always()
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root=process.env.RUNNER_TEMP+'/five-failure-results/';
+          const before=JSON.parse(fs.readFileSync(root+'before.json','utf8'));
+          const after=JSON.parse(fs.readFileSync(root+'after.json','utf8'));
+          const errors=[];
+          const ids=['1','2','3','4','5a','5b','5c'];
+          for(const id of ids){
+            const b=before.rows.filter(x=>x.id===id);
+            const a=after.rows.filter(x=>x.id===id);
+            if(b.length!==1||a.length!==1||a[0].escaped!==false||a[0].side_effects!==0)
+              errors.push('FROZEN_PROTECTION_REGRESSED_OR_UNEXERCISED:'+id);
+          }
+          if(after.rows.length!==ids.length)errors.push('FROZEN_CASE_COUNT_CHANGED');
+          const probes=after.supplemental_detector_miss_probes||[];
+          for(const id of ['5d','5e']){
+            const p=probes.filter(x=>x.id===id);
+            if(p.length!==1||p[0].escaped!==false||p[0].side_effects!==0||
+              p[0].enforcement!=='WITHHELD'||
+              (id==='5d'&&p[0].extractor_invoked!==true)||
+              (id==='5e'&&p[0].synthetic_receipt_only!==true))
+              errors.push('DETECTOR_MISS_NOT_ENFORCED_OR_UNEXERCISED:'+id);
+          }
+          if(errors.length){console.error(errors.join('\n'));process.exitCode=1;}
+          else console.log('Frozen protections and supplemental detector-miss probes passed; live acceptance remains separate.');
+          NODE

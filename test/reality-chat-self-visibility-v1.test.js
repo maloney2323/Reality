@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {needsRealityCapabilityInspection,readRealitySelfVisibilityForChat,
- reconcileOwnerOriginalStatesForChat,projectCurrentContinuitySelfVisibility}
+ reconcileOwnerOriginalStatesForChat,projectCurrentContinuitySelfVisibility,
+ readOperationalSelfVisibilityForChat,projectChatOperationalHorizon}
  from '../src/reality-chat-self-visibility-v1.js';
 const sha='a'.repeat(40),tree='b'.repeat(40);
 const session={user_id:'85eeae0b-2988-43c4-b20c-590fb51da70d',
@@ -137,12 +138,16 @@ test('model receives self visibility in both Chat lanes, not solely if employee 
  const gateway=file('src/reality-model-gateway-v0.1.js');
  const self=file('src/reality-chat-self-visibility-v1.js');
  assert.match(api,/id:'self_visibility'/);
- assert.match(api,/self_visibility:selfVisibilityObservations/);
+ assert.match(api,/self_visibility:selfVisibilityReadback/);
+ assert.match(api,/readOperationalSelfVisibilityForChat/);
+ assert.equal((api.match(/projectChatOperationalHorizon\(\{/g)||[]).length,2);
  assert.match(api,/\.\.\.selfVisibilityObservations/);
  assert.match(api,/currentObservations:observations,reconciledOriginals/);
  assert.match(api,/makeOwnerUniverseReadModel\(\{\s*observations:ownerCurrentUniverseObservations,reconciledOriginals/);
  assert.match(api,/makeOwnerUniverseReadModel\(\{observations\}\)/);
- assert.match(api,/\.\.\.\(ctx\.values\.self_visibility\|\|\[\]\)/);
+ assert.match(api,/ctx\.values\.self_visibility\?\.observations\|\|\[\]/);
+ assert.match(api,/operationalTimeHorizon:operationalHorizon/);
+ assert.match(api,/operational_time_horizon:operationalHorizon/);
  assert.match(api,/verifiedUniverseObservations:ownerUniverse\.observations/);
  assert.match(api,/connected_world_observations:ownerUniverse\.observations/);
  assert.match(gateway,/REALITY SELF-VISIBILITY AND SELF-CORRECTION CONTRACT/);
@@ -244,4 +249,64 @@ test('current canonical receipts take precedence over source-only self descripti
  assert.equal(projectCurrentContinuitySelfVisibility(raw,reviewer),null);
  assert.equal(projectCurrentContinuitySelfVisibility({...raw,execution_authorized:true},owner),null);
  assert.equal(projectCurrentContinuitySelfVisibility({...raw,obligations:[{...ob,verified_independent_review:{...review,review_worker_run_id:investigator}}]},owner),null);
+});
+
+test('ordinary operational question reads current Spine once without repository inspection',async()=>{
+ let currentCalls=0,sourceCalls=0;
+ const current={observed_at:'2026-11-27T23:00:00Z',active_shift_count:1,unverified_guard_count:1,observations:[]};
+ const result=await readOperationalSelfVisibilityForChat({...base,message:'What happens next?',
+  readCurrent:async()=>{currentCalls++;return current},
+  readSource:async()=>{sourceCalls++;throw Error('not required')}
+ });
+ assert.equal(currentCalls,1);assert.equal(sourceCalls,0);
+ assert.equal(result.current,current);
+ assert.equal(projectChatOperationalHorizon({visibility:result}).present.status,'CURRENT_READBACK_PARTIAL');
+ const missing=await readOperationalSelfVisibilityForChat({...base,message:'What happens next?',readCurrent:async()=>null});
+ const h=projectChatOperationalHorizon({visibility:missing});
+ assert.equal(h.present.status,'CURRENT_READBACK_UNKNOWN');
+ assert.equal(h.present.active_shift_count,null);
+ assert.equal(h.execution_authorized,false);
+});
+test('past settlement cannot replace current original, recorded approval, or pending worker evidence',async()=>{
+ const H=x=>'sha256:'+x.repeat(64);
+ const shift='11111111-2222-4333-8444-555555555555',work='work:'+'a'.repeat(32);
+ const event={event_id:'33333333-4444-4555-8666-777777777777',
+  state:'SHADOW_PENDING',worker_status:'COMPLETED',signal_kind:'VERIFIED_REVIEW_TECHNICAL_EVIDENCE',
+  worker_stage:'TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION',source_receipt_sha256:H('c'),
+  governed_wake_worker_run_id:'44444444-5555-4666-8777-888888888888',
+  observed_at:null,signal_next_action:'READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY'};
+ const ob={shift_id:shift,shift_status:'AWAITING_EXACT_ORIGINAL_WORK',existing_shift_authorized:true,
+  original_work_id:work,source_ref:'https://github.com/fixture/repository/pull/1',
+  continuity_root_id:'22222222-3333-4444-8555-666666666666',continuity_head_sha256:H('b'),
+  continuity_revision:3,guard_receipt_sha256:H('d'),qualifier_receipt_sha256:H('e'),
+  unresolved_proof_gates:['EXACT_EVIDENCE_REQUIRED'],current_events:[event],
+  verified_investigation:null,verified_independent_review:null,
+  active_release_observation:{release_sha:'f'.repeat(40),approval_receipt_sha256:H('f'),alias_observed_at:'2026-11-27T22:59:00Z'},
+  operational_next_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY',
+  read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false};
+ const current=projectCurrentContinuitySelfVisibility({status:'OWNER_CURRENT_CONTINUITY_SELF_VISIBILITY_READ_ONLY',
+  owner_id:session.user_id,owner_scope_verified:true,read_only:true,execution_authorized:false,
+  installation_authorized:false,production_changed:false,observed_at:'2026-11-27T23:00:00Z',
+  active_shift_count:1,unverified_guard_count:1,obligations:[ob]},session.user_id);
+ assert(current,'validated current source required');
+ let calls=0;
+ const visibility=await readOperationalSelfVisibilityForChat({...base,readCurrent:async()=>{calls++;return current}});
+ assert.equal(calls,1);
+ assert.equal(visibility.observations.filter(e=>e.event_kind==='reality_current_verified_operational_self_visibility').length,1);
+ const old={event_kind:'owner_independent_original_job_final_receipt',
+  source_kind:'SERVICE_VERIFIED_OWNER_SCOPED_EXISTING_FINAL_RECEIPT_LEDGER',
+  original_work_id:'work:'+'9'.repeat(32),independent_settlement_event_id:'55555555-6666-4777-8888-999999999999',
+  installed_commit_sha:'1'.repeat(40),assertion_time:'2026-11-04T00:00:00Z',original_job_completed:true,production_changed:false};
+ const t=projectChatOperationalHorizon({visibility,settlements:[old,{...old,source_kind:'MODEL_PROPOSAL'}]});
+ assert.equal(t.past.independent_original_settlements.length,1);
+ assert.equal(t.past.independent_original_settlements[0].original_work_id,old.original_work_id);
+ assert.equal(t.present.status,'CURRENT_READBACK_PARTIAL');
+ assert.equal(t.present.obligations[0].original_work_id,work);
+ assert.equal(t.present.obligations[0].continuity_revision,3);
+ assert.equal(t.present.obligations[0].active_release_observation.approval_receipt_sha256,H('f'));
+ assert.equal(t.present.obligations[0].current_events[0].interpretation,'WORKER_FINISHED_EVIDENCE_NOT_ACCEPTED');
+ assert.equal(t.future.obligations[0].pending_signals[0].event_id,event.event_id);
+ assert.equal(t.future.obligations[0].next_action,ob.operational_next_action);
+ assert.equal(t.future.next_action_is_not_execution_authority,true);
+ assert.equal(t.installation_authorized,false);
 });

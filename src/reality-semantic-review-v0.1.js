@@ -413,7 +413,7 @@ function validate(parsed,answer,snapshot,worldId,conversationEvidence=null,goalT
    }
    const fact=records.get(claim.key);
    if(!fact){
-     unassessed.push({key:claim.key,reason:'NOT_IN_SOURCE_RECORD'});
+     unassessed.push({key:claim.key,reason:'NOT_IN_SOURCE_RECORD',quote:claim.quote.slice(0,350),asserted_value:claim.asserted_value.slice(0,350)});
      continue; // Unsupported is NOT equivalent to false.
    }
    const value=normalize(claim.asserted_value,fact.value);
