@@ -550,6 +550,47 @@ async function recordClaimedFinalLoopChildAdvisory({
  }
 }
 
+// A completed, canonically returned uncertain read-only invocation blocks
+// its own scope, not other already-approved scopes. No history or attempt
+// budget is reset; the existing database claim and transport fence still
+// exclusively authorize each untouched scope.
+export function qualifyDistinctApprovedReviewScopes(evidence,handoff){
+ const observations=evidence?.observations;
+ if(evidence?.status!=='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'||
+    evidence.canonical_return_committed!==true||
+    evidence.replay_authorized!==false||evidence.execution_authorized!==false||
+    evidence.original_job_completed!==false||
+    !UUID.test(evidence.canonical_return_event_id||'')||
+    !HASH.test(evidence.canonical_return_head_sha256||'')||
+    !HASH.test(evidence.observation_sha256||'')||
+    handoff?.effect_type!=='READ_ONLY_INTERNAL_PR_REVIEW'||
+    handoff.read_only!==true||handoff.execution_authorized!==false||
+    handoff.original_job_completed!==false||handoff.production_changed!==false||
+    !Array.isArray(observations)||observations.length===0||
+    evidence.fenced_count!==observations.length||
+    evidence.signed_observation_count!==observations.length||
+    !Array.isArray(handoff.scope_fingerprints)||
+    handoff.scope_fingerprints.length!==handoff.scope_count||
+    new Set(observations.map(x=>x?.invocation_id)).size!==observations.length)
+  return null;
+ const unresolved=observations.filter(x=>x?.model_artifact_recorded!==true);
+ if(!unresolved.length)return null;
+ if(observations.some(x=>!x||!WORK.test(x.child_work_id||'')||
+    !UUID.test(x.invocation_id||'')||!UUID.test(x.worker_run_id||'')||
+    !UUID.test(x.event_id||'')||!HASH.test(x.event_head_sha256||'')||
+    !HASH.test(x.release_receipt_sha256||'')||!SHA.test(x.release_sha||'')||
+    x.worker_completed!==true||x.replay_authorized!==false||
+    !handoff.scope_fingerprints.some(s=>s.scope_sha256===x.scope_sha256))||
+    unresolved.some(x=>x.model_artifact_recorded!==false||x.provider_outcome_verified!==false))
+  return null;
+ return Object.freeze({
+  blocked_child_ids:Object.freeze([...new Set(unresolved.map(x=>x.child_work_id))]),
+  blocked_scope_sha256s:Object.freeze([...new Set(unresolved.map(x=>x.scope_sha256))]),
+  observation_sha256:evidence.observation_sha256,
+  replay_authorized:false,original_job_completed:false
+ });
+}
+
 // Canonical half of the EXISTING child worker. A trusted, independently
 // qualified isolated capability must be wired by the signed service before
 // this entry point is usable. No canonical service secret is sent to it.
@@ -630,12 +671,13 @@ export async function advanceCanonicalFinalLoopChildReview({
   c.source_manifest_sha256===h.source_manifest_sha256&&
   c.acceptance_contract_sha256===h.acceptance_contract_sha256&&
   h.scope_fingerprints.some(x=>x.index===c.scope_index&&x.scope_sha256===c.scope_sha256);
- let c,mode;
+ let c,mode,distinctScopeFence=null;
  try{
   if(!await aligned())return no('FINAL_LOOP_CANONICAL_CONTINUITY_REQUALIFICATION_REQUIRED');
   // Consume the current signed event for evidence-only canonical return
-  // BEFORE claiming another child. Missing or uncertain readback is not
-  // permission to use an untouched scope. No retry/reset in this branch.
+  // BEFORE claiming another child. A completed, independently returned
+  // observation may quarantine its own scope while distinct scopes proceed.
+  // Missing readback, unknown authority, or an active attempt still blocks.
   const evidence=alignedExecutionReadback;
   if(!evidence||evidence.status==='SIGNED_INVOCATION_EVIDENCE_RECONCILIATION_REQUIRED')
    return no('FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
@@ -675,9 +717,13 @@ export async function advanceCanonicalFinalLoopChildReview({
     next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
   }
   if(evidence.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'&&
-     evidence.observations.some(x=>x.model_artifact_recorded!==true))
-   return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
-    next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+     (!Array.isArray(evidence.observations)||evidence.observations.some(x=>x?.model_artifact_recorded!==true))){
+   distinctScopeFence=qualifyDistinctApprovedReviewScopes(evidence,h);
+   if(!distinctScopeFence||h.scope_fingerprints.every(x=>
+      distinctScopeFence.blocked_scope_sha256s.includes(x.scope_sha256)))
+    return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
+     next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+  }
   if(!['NO_FENCED_CHILD_INVOCATION_OBSERVED','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'].includes(evidence.status))
    return no('FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
   // Verification and generation use the same canonical database and distinct
@@ -691,7 +737,12 @@ export async function advanceCanonicalFinalLoopChildReview({
   }else if(review?.status==='FINAL_LOOP_NO_PREPARED_CHILD_FOR_INDEPENDENT_VERIFICATION'){
    const claim=await call(db,'reality_claim_final_loop_child_review_v1',{
     p_shift_id:h.shift_id,p_worker_run_id:workerRunId,p_canonical_handoff:h},{fetchImpl});
-   if(claim?.status!=='FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE')return no(claim?.status||'FINAL_LOOP_CANONICAL_CLAIM_UNVERIFIED');
+   if(claim?.status!=='FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE'){
+    if(distinctScopeFence&&claim?.status==='FINAL_LOOP_ALL_CHILDREN_CLAIMED_OR_PENDING_VERIFICATION')
+     return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
+      next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+    return no(claim?.status||'FINAL_LOOP_CANONICAL_CLAIM_UNVERIFIED');
+   }
    c=identity(claim,'CLAIM');mode='PREPARE';
    if(c.canonical_scope_bound!==true||c.packet_id!==h.packet_id||
       c.plan_id!==h.plan_id||c.claimant_worker_run_id!==workerRunId||
@@ -699,6 +750,11 @@ export async function advanceCanonicalFinalLoopChildReview({
     deny('CANONICAL_CLAIM_DRIFT');
   }else return no('FINAL_LOOP_CANONICAL_VERIFICATION_SCOPE_UNVERIFIED');
   if(!bound(c))deny('ORIGINAL_SCOPE_DRIFT');
+  if(distinctScopeFence&&(distinctScopeFence.blocked_child_ids.includes(c.child_work_id)||
+     distinctScopeFence.blocked_scope_sha256s.includes(c.scope_sha256)))
+   return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
+    next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+
  }catch{return no('FINAL_LOOP_CANONICAL_CHILD_CLAIM_OR_VERIFY_READBACK_UNAVAILABLE_NO_REPLAY');}
  const readCurrentChild=async()=>{
   if(!await aligned())return {status:'STALE'};
