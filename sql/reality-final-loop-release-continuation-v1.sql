@@ -1172,7 +1172,7 @@ CREATE OR REPLACE FUNCTION public.reality_claim_canonical_governed_wake_v1(
 DECLARE n int:=0; claimed_event record; investigation_only boolean:=false; independent_review_only boolean:=false; terminal_technical_evidence_only boolean:=false; ledger_return_only boolean:=false; evidence jsonb; ledger_condition jsonb; ledger_context jsonb:='{}'::jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'CANONICAL_WAKE_SERVICE_ONLY';END IF;
- IF p_nonce IS NULL OR p_event_id IS NULL OR p_kind IS NULL OR p_kind NOT IN('START','RESUME')
+ IF p_nonce IS NULL OR p_event_id IS NULL OR p_kind IS NULL OR p_kind NOT IN('START','RESUME','RESUME_WITH_LEDGER_RETURN')
  OR coalesce(p_release_sha,'') !~ '^[a-f0-9]{40}$'
  OR coalesce(p_plan_fingerprint,'') !~ '^sha256:[a-f0-9]{64}$'
  OR NOT EXISTS(SELECT 1 FROM reality_internal.governed_employee_shifts_v1 s
@@ -1199,10 +1199,12 @@ BEGIN
  AND w.state='ACTIVE' AND w.governed_start_nonce=p_nonce AND w.governed_start_request_id IS NOT NULL
  AND w.governed_start_worker_run_id IS NULL AND w.governed_start_queued_at>pg_catalog.clock_timestamp()-interval '5 minutes';
  GET DIAGNOSTICS n=ROW_COUNT;
- ELSIF p_kind='RESUME' THEN
+ ELSIF p_kind IN ('RESUME','RESUME_WITH_LEDGER_RETURN') THEN
  UPDATE reality_internal.final_loop_resume_events_v1 e SET governed_wake_worker_run_id=p_worker_run_id
  WHERE e.owner_id=p_owner_id AND e.shift_id=p_shift_id AND e.event_id=p_event_id
  AND e.state='SHADOW_PENDING' AND e.governed_wake_nonce=p_nonce AND e.governed_wake_request_id IS NOT NULL
+ -- An older worker cannot claim a ledger-only event or fall through to ordinary work.
+ AND (e.ledger_return_condition_sha256 IS NULL OR p_kind='RESUME_WITH_LEDGER_RETURN')
  AND (e.release_continuation_claim_id IS NULL OR EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 a
   WHERE a.claim_id=e.release_continuation_claim_id AND a.release_sha=p_release_sha AND a.state='CLAIMED_ONCE'
   AND a.owner_id=e.owner_id AND a.shift_id=e.shift_id AND a.runtime_scope->>'original_work_id'=e.original_work_id
