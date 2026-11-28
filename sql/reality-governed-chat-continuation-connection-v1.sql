@@ -584,7 +584,7 @@ REVOKE ALL ON FUNCTION reality_internal.reconcile_current_qualification_proofs_v
 
 CREATE OR REPLACE FUNCTION reality_internal.on_final_loop_governed_wake_v1()
  RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $function$
-DECLARE ledger_stage jsonb;
+DECLARE ledger_stage jsonb; demand record;
 BEGIN
  -- Reuse the existing governed qualifier on receipt of a saved continuation.
  -- This is not a second executor, a direct HTTP wake, or an authority grant.
@@ -620,6 +620,32 @@ BEGIN
    END IF;
    PERFORM reality_internal.notify_final_loop_governed_trigger_v1(NEW.shift_id);
   ELSIF TG_TABLE_NAME='signed_worker_actual_runs_v1' THEN
+   -- A completed signed worker with an unobserved qualifier event is a
+   -- proof demand, not permission to rerun that worker or its provider effect.
+   -- Recompute for the exact witnessed shift before trying the existing
+   -- evidence-only stage. Its verifier independently checks the complete scope.
+   IF NEW.status='COMPLETED' AND OLD.status='STARTED'
+    AND NEW.worker_stage IN ('SHARED_CONTINUITY_VERIFIER_RETURN_FENCE','WORKER_RESPONSE_PUBLICATION') THEN
+    FOR demand IN
+     SELECT DISTINCT e.shift_id,a.claim_id
+     FROM reality_internal.final_loop_resume_events_v1 e
+     JOIN reality_internal.governed_signed_worker_release_wakes_v1 w
+      ON w.worker_run_id=NEW.run_id AND w.owner_id=e.owner_id AND w.shift_id=e.shift_id
+     JOIN reality_internal.governed_worker_release_approvals_v1 a
+      ON a.claim_id=w.release_claim_id AND a.claim_id=e.release_continuation_claim_id
+       AND a.owner_id=e.owner_id AND a.shift_id=e.shift_id AND a.release_sha=w.running_release_sha
+     WHERE e.governed_wake_worker_run_id=NEW.run_id AND e.state='SHADOW_PENDING'
+      AND e.signal_kind='QUALIFIER_PROOF_CHANGED'
+      AND e.ledger_return_condition_sha256 IS NULL
+      AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+      AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+      AND a.state='CLAIMED_ONCE' AND a.provider_alias_observed_at IS NOT NULL
+      AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    LOOP
+     PERFORM reality_internal.reconcile_current_qualification_proofs_v1(demand.shift_id);
+     PERFORM public.reality_stage_final_loop_ledger_return_v1(demand.shift_id,demand.claim_id);
+    END LOOP;
+   END IF;
    -- Only a completed investigation may request a distinct review run.
    IF NEW.status='COMPLETED' AND OLD.status='STARTED'
     AND (NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION'
