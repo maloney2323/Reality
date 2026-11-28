@@ -38,7 +38,7 @@ import {readOwnerOriginalWorkForChat,originalWorkObservation,
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
-import {assertFinalChatPublicationProof}
+import {assertFinalChatPublicationProof,summarizeOutputClaimAssessment}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
 import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
@@ -350,7 +350,7 @@ export default async function handler(req,res){
      reply_recovery_requires_exact_saved_request:!publication},
     reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',transient_answer_not_a_receipt:!publication,
      canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
-     output_claim_assessment:advisory.output_claim_assessment||null,
+     output_claim_assessment:summarizeOutputClaimAssessment(advisory.output_claim_assessment),
      independently_verified_semantic_correctness:false,business_outcome_verified:false,external_actions_authorized:false},
     contextual_readback_status:{evidence:ctx.status,unavailable_sources:ctx.unavailable,grants_execution_authority:false},
     execution:{status:'NOT_EXECUTED',external_actions_authorized:false,installation_authorized:false},
@@ -815,7 +815,10 @@ export default async function handler(req,res){
      user_goal_continuity:result.reliability.user_goal_continuity||null,
      assistant_goal_governance:result.reliability.goal_governance||null,
      final_answer_publication_proof:finalPublicationProof,
-     final_answer_direction_release:result.reliability.final_direction_release||{
+     final_answer_direction_release:result.reliability.final_direction_release?{
+       ...result.reliability.final_direction_release,
+       output_claim_assessment:summarizeOutputClaimAssessment(result.reliability.final_direction_release.output_claim_assessment)
+     }:{
        status:'NOT_ASSESSED_IN_THIS_RUNTIME',release_allowed:null,
        semantic_accuracy_independently_verified:false},
      three_contract_integrity:{
@@ -834,7 +837,7 @@ export default async function handler(req,res){
      semantic_review_status:result.reliability.semantic_review?.status||'NOT_ASSESSED',
      semantic_review_provenance_status:result.reliability.semantic_review?.provenance_review_status||'NOT_ASSESSED',
      semantic_issue_candidates:(result.reliability.semantic_review?.issues||[]).map(issue=>({
-       kind:issue.kind,quote:issue.quote,reason:issue.reason})),
+       kind:issue.kind})),
      conversational_drift_findings_count:result.reliability.conversational_assessment?.findings_count||0,
      goal_drift_coverage:result.reliability.conversational_assessment?.goal_drift_coverage||{
        status:'NOT_SEMANTICALLY_ASSESSED',candidate_count_zero_means_drift_free:false,

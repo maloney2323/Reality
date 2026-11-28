@@ -5,6 +5,7 @@
 // that attested DIFFERENT bytes or a different user-goal revision.
 import {createHash} from 'node:crypto';
 import {assessDrift} from './reality-drift-recovery-v0.1.js';
+import {adjudicateSourceReview} from './reality-source-review-adjudication-v0.1.js';
 const hash=text=>'sha256:'+createHash('sha256')
  .update(JSON.stringify(text)).digest('hex');
 function require(condition,code){if(!condition)throw new Error(code)}
@@ -30,7 +31,12 @@ export function compileFinalOutputClaimAssessment({answer,candidate=null,snapsho
     r.kind==='ACTION'?'ACTION_CANDIDATE_NOT_OUTCOME_PROOF':'SOURCE_MATCHED_TYPED_ASSERTION_ONLY',
     violation_codes:violations};
   });
- const concerns=(review?.issues||[]).filter(i=>['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION','FACT_CONTRADICTION'].includes(i.kind)&&
+ // Preserve independently source-matched literal facts against an
+ // untrusted reviewer's false positive. This is the existing adjudicator,
+ // not a new reviewer or a blanket exception for any warning.
+ const sourceAdjudication=adjudicateSourceReview({answer,review,candidate,sourceSnapshot:snapshot});
+ const supportedQuotes=new Set(sourceAdjudication.source_supported_issue_quotes.map(x=>x.issue_quote));
+ const concerns=(review?.issues||[]).filter(i=>!(i.kind==='UNSUPPORTED_FACT'&&supportedQuotes.has(i.quote))&&['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION','FACT_CONTRADICTION'].includes(i.kind)&&
   typeof i.quote==='string'&&answer.includes(i.quote)).map(i=>({kind:i.kind,quote:i.quote}));
  const unassessed=(review?.unassessed_claims||[]).map(x=>({key:x.key,reason:x.reason,
   quote:typeof x.quote==='string'&&answer.includes(x.quote)?x.quote:null}));
@@ -42,6 +48,7 @@ export function compileFinalOutputClaimAssessment({answer,candidate=null,snapsho
   candidate_answer_hash:hash(answer),extraction_status:extractionStatus,
   source_receipt_ids:snapshot?.source_receipt_ids||[],
   claim_rows:rows,review_concerns:concerns,unassessed_claims:unassessed,
+  source_adjudicated_review_warning_count:sourceAdjudication.source_supported_count,
   deterministic_violation_codes:result?.codes||[],
   unsupported_assertion_detected:unsupported,
   status:unsupported?'UNSUPPORTED_ASSERTIONS_REQUIRE_WITHHOLDING':
@@ -49,6 +56,29 @@ export function compileFinalOutputClaimAssessment({answer,candidate=null,snapsho
   extraction_completeness_verified:false,semantic_accuracy_independently_verified:false,
   external_execution_authorized:false});
 }
+
+// A client receives disposition and hashes, not quarantined candidate prose,
+// even when the underlying audit receipt contains the exact extracted quotes.
+export function summarizeOutputClaimAssessment(assessment){
+ if(!assessment)return null;
+ return Object.freeze({
+  schema:assessment.schema,status:assessment.status,disposition:assessment.disposition||null,
+  candidate_answer_hash:assessment.candidate_answer_hash||null,
+  released_answer_hash:assessment.released_answer_hash||null,
+  assessment_hash:assessment.assessment_hash||null,
+  ledger_receipt_id:assessment.ledger_receipt_id||null,
+  durable_continuity_receipt_verified:assessment.readback_verified===true,
+  unsupported_assertion_detected:assessment.unsupported_assertion_detected===true,
+  extracted_claim_count:(assessment.claim_rows||[]).length,
+  unassessed_claim_count:(assessment.unassessed_claims||[]).length,
+  deterministic_violation_codes:assessment.deterministic_violation_codes||[],
+  extraction_completeness_verified:false,semantic_accuracy_independently_verified:false,
+  external_execution_authorized:false
+ });
+}
+const ordered=v=>v===null||typeof v!=='object'?v:Array.isArray(v)?v.map(ordered):
+ Object.fromEntries(Object.keys(v).sort().map(k=>[k,ordered(v[k])]));
+export const hashOutputClaimAssessment=assessment=>hash(ordered(assessment));
 
 export function assertFinalChatPublicationProof({
  answer,reliability,atomicGoalPublicationEnabled=false,
@@ -85,6 +115,10 @@ export function assertFinalChatPublicationProof({
   claims.extraction_completeness_verified===false&&claims.semantic_accuracy_independently_verified===false&&
   claims.external_execution_authorized===false,
   'CHAT_FINAL_OUTPUT_CLAIM_RECEIPT_REQUIRED');
+ const {assessment_hash,ledger_receipt_id,readback_verified,...assessedPayload}=claims;
+ require(typeof claims.unsupported_assertion_detected==='boolean'&&
+  hashOutputClaimAssessment(assessedPayload)===assessment_hash,
+  'CHAT_OUTPUT_CLAIM_ASSESSMENT_DIGEST_MISMATCH');
  require(claims.unsupported_assertion_detected!==true||
   claims.disposition==='UNSUPPORTED_CANDIDATE_WITHHELD'||
   claims.disposition==='DIRECTION_CANDIDATE_WITHHELD',

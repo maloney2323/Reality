@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {assertFinalChatPublicationProof as check,compileFinalOutputClaimAssessment}
+import {assertFinalChatPublicationProof as check,compileFinalOutputClaimAssessment,hashOutputClaimAssessment,summarizeOutputClaimAssessment}
  from '../src/reality-final-chat-publication-proof-v0.1.js';
 const digest=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const answer='The user goal remains drafting the contractor pilot summary.  ';
 function mock({text=answer,allow=true}={}){
- return {canonical_epistemic_state:{
+ const result={canonical_epistemic_state:{
   status:'PERSISTED_AND_READBACK_VERIFIED',frame_hash:'sha256:frame',
   source_receipt_id:'source-canonical-1'},readback_verified:true,
   goal_authority_contracts:{authorized_user_goal_state:{transition_count:2}},
@@ -21,7 +21,9 @@ function mock({text=answer,allow=true}={}){
     unsupported_assertion_detected:false,extraction_completeness_verified:false,
     semantic_accuracy_independently_verified:false,external_execution_authorized:false}},
  };
+ seal(result);return result;
 }
+function seal(r){const a=r.final_direction_release.output_claim_assessment;const {assessment_hash,ledger_receipt_id,readback_verified,...payload}=a;a.assessment_hash=hashOutputClaimAssessment(payload);}
 test('exact checked answer, durable source receipts and atomic publication are jointly required',()=>{
  const r=check({answer,reliability:mock(),atomicGoalPublicationEnabled:true});
  assert.equal(r.final_answer_hash,digest(answer));
@@ -68,7 +70,7 @@ test('unsupported exact extracted claim is not source truth and cannot pass as r
  const a=compileFinalOutputClaimAssessment({answer:text,candidate,snapshot});
  assert.equal(a.unsupported_assertion_detected,true);
  assert.equal(a.claim_rows[0].verification_status,'UNSUPPORTED_OR_CONTRADICTED');
- const bad=mock({text});bad.final_direction_release.output_claim_assessment.unsupported_assertion_detected=true;
+ const bad=mock({text});bad.final_direction_release.output_claim_assessment.unsupported_assertion_detected=true;seal(bad);
  assert.throws(()=>check({answer:text,reliability:bad,atomicGoalPublicationEnabled:true}),/CHAT_UNSUPPORTED_OUTPUT_NOT_WITHHELD/);
 });
 test('matched claims carry exact source reference but never prove extraction completeness',()=>{
@@ -79,4 +81,18 @@ test('matched claims carry exact source reference but never prove extraction com
  assert.equal(a.claim_rows[0].verification_status,'SOURCE_MATCHED_TYPED_ASSERTION_ONLY');
  assert.equal(a.unsupported_assertion_detected,false);
  assert.equal(a.extraction_completeness_verified,false);
+});
+
+test('stored assessment cannot be altered while keeping the original digest',()=>{
+ const bad=mock();bad.final_direction_release.output_claim_assessment.unsupported_assertion_detected=true;
+ assert.throws(()=>check({answer,reliability:bad,atomicGoalPublicationEnabled:true}),/CHAT_OUTPUT_CLAIM_ASSESSMENT_DIGEST_MISMATCH/);
+});
+test('quarantined operational assertion stays in audit, never in client diagnostics',()=>{
+ const marker='private withheld candidate 41234';
+ const view=summarizeOutputClaimAssessment({schema:'reality-final-output-claim-assessment-v0.1',
+  status:'UNSUPPORTED_ASSERTIONS_REQUIRE_WITHHOLDING',unsupported_assertion_detected:true,
+  claim_rows:[{quote:marker,value:marker}],review_concerns:[{quote:marker}],unassessed_claims:[{quote:marker}]});
+ assert.equal(view.unsupported_assertion_detected,true);
+ assert.equal(view.extracted_claim_count,1);
+ assert.equal(JSON.stringify(view).includes(marker),false);
 });

@@ -33,9 +33,11 @@ async function injectedAnswer(id,scenario,bad){
    actions:[],operational:true,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})})};
  }});
 
- const escaped=result.answer.includes(bad);
- record(id,scenario,!escaped,escaped,0,escaped?'NOT_RECOVERED':'UNSAFE_ASSERTION_WITHHELD',
-  'Actual read-only Chat release adapter; model output injected; no provider action');
+ const escaped=JSON.stringify(result).includes(bad);
+ const actualClaimDetected=result.output_claim_assessment?.unsupported_assertion_detected===true;
+ const detected=id==='1'?actualClaimDetected:!escaped;
+ record(id,scenario,detected,escaped,0,escaped?'NOT_RECOVERED':detected?'UNSAFE_ASSERTION_WITHHELD':'WITHHELD_WITHOUT_PROVEN_DETECTION',
+  {scope:'Actual read-only Chat release adapter; model output injected; no provider action',claim_detection:actualClaimDetected,claim_status:result.output_claim_assessment?.status||null});
 }
 await injectedAnswer('1','Unsupported factual claim','The supplier confirmed a $79,413 refund yesterday.');
 await injectedAnswer('2','Contradiction with recorded decision','No authorized active shift exists; you must formally start an authorized shift.');

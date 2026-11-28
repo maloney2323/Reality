@@ -29,7 +29,7 @@ import {
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
-import {compileFinalOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
+import {compileFinalOutputClaimAssessment,hashOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
@@ -1282,7 +1282,7 @@ export async function runLiveIntelligenceOrchestration({
     const releasedHash='sha256:'+createHash('sha256').update(
       JSON.stringify(releasedAnswer)).digest('hex');
     const claimPublication={...outputClaimAssessment,released_answer_hash:releasedHash,disposition:claimDisposition};
-    const claimAssessmentHash='sha256:'+createHash('sha256').update(JSON.stringify(claimPublication)).digest('hex');
+    const claimAssessmentHash=hashOutputClaimAssessment(claimPublication);
     // Compile all three existing user-goal / assistant-proposal contracts
     // against the exact final bytes and freshness readback BEFORE admitting
     // the final text into append-only Continuity or returning it to chat.
@@ -1339,6 +1339,7 @@ export async function runLiveIntelligenceOrchestration({
         e.payload?.actual_released_answer_hash===releasedHash&&
         e.payload?.output_claim_assessment_hash===claimAssessmentHash&&
         e.payload?.output_claim_assessment?.released_answer_hash===releasedHash&&
+        hashOutputClaimAssessment(e.payload.output_claim_assessment)===claimAssessmentHash&&
         e.payload?.canonical_frame_hash===canonicalEpistemicFrame.frame_hash);
       if(!recorded)throw Error('FINAL_ASSISTANT_DIRECTION_RELEASE_READBACK_FAILED');
       finalDirectionRelease={

@@ -8,7 +8,7 @@ import {buildGovernedChatSignal}
 import {runRealityCognitiveRuntime}
  from './reality-cognitive-runtime-v1.0.js';
 import {extractReliabilityClaims} from './reality-reliability-claim-extraction-v0.1.js';
-import {compileFinalOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
+import {compileFinalOutputClaimAssessment,summarizeOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
 
 // Reuse only the already authenticated, structured current operational
 // observations. This is a bounded comparison input, not another truth ledger.
@@ -192,8 +192,7 @@ export async function generateProportionalReadOnlyReply({
  return Object.freeze({
   status:'READ_ONLY_AUTHENTICATED_MODEL_REPLY_PREPARED',
   answer:released,
-  output_claim_assessment:claimAssessment?{...claimAssessment,
-   durable_continuity_receipt_verified:false}:null,
+  output_claim_assessment:summarizeOutputClaimAssessment(claimAssessment),
   model:result.model||model,
   semantic_correctness_independently_verified:false,
   independent_business_outcome_verified:false,
