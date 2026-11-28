@@ -211,6 +211,34 @@ export async function generateProportionalReadOnlyReply({
     claimAssessment=Object.freeze({...claimAssessment,released_source_fact_refs:[fact.evidence_ref],
      released_source_facts:[fact,id].map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref}))});
    }
+   // A canonical guard may survive even when the separate shift briefing
+   // is unavailable. Render only the existing exact guarded facts; never
+   // infer a shift status or outcome from an original's admission.
+   const originals=(operationalTimeHorizon?.present?.obligations||[]).slice(0,3);
+   const recordedFacts=[];
+   for(const o of originals){
+    if(o.existing_shift_authorized!==true||o.read_only!==true||
+       o.execution_authorized!==false||o.installation_authorized!==false||
+       o.production_changed!==false||!UUID.test(o.shift_id||'')||
+       !/^work:[a-f0-9]{32}$/.test(o.original_work_id||'')||
+       !/^sha256:[a-f0-9]{64}$/.test(o.guard_receipt_sha256||'')||
+       !Number.isSafeInteger(o.continuity_revision)||o.continuity_revision<1)continue;
+    const prefix='original.'+o.original_work_id+'.';
+    const fields=['shift_id','original_work_id','continuity_revision','existing_shift_authorized'];
+    if(/^[A-Z][A-Z0-9_]{2,119}$/.test(o.operational_next_action||''))fields.push('operational_next_action');
+    const rows=fields.map(key=>snapshot.facts.find(f=>f.key===prefix+key&&f.value===o[key]&&f.evidence_ref===o.guard_receipt_sha256));
+    if(rows.some(f=>!f))continue;
+    released+='The current guarded original '+o.original_work_id+' is at Continuity revision '+o.continuity_revision+
+     ' under existing authorized shift '+o.shift_id+'. ';
+    if(fields.includes('operational_next_action'))
+     released+='The recorded next action is '+o.operational_next_action.toLowerCase().replaceAll('_',' ')+'. ';
+    recordedFacts.push(...rows.map(f=>({key:f.key,value:f.value,evidence_ref:f.evidence_ref})));
+   }
+   if(recordedFacts.length){
+    const rows=[...(claimAssessment.released_source_facts||[]),...recordedFacts];
+    claimAssessment=Object.freeze({...claimAssessment,released_source_facts:rows,
+     released_source_fact_refs:[...new Set(rows.map(f=>f.evidence_ref))]});
+   }
    released+='No new work, installation or original-job completion is established by this reply.';
   }
  }
