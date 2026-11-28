@@ -100,14 +100,20 @@ GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_suspension_v
 
 -- A completed signed investigation and independently validated receipt are
 -- the causal source of the distinct reviewer event. No model verdict is proof.
-CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_verified_investigation_v1(
- p_owner_id uuid,p_shift_id uuid,p_original_work_id text,p_source_ref text,p_head text,p_revision bigint)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
+CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_verified_investigation_v1(p_owner_id uuid, p_shift_id uuid, p_original_work_id text, p_source_ref text, p_head text, p_revision bigint)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+ WITH suspension AS MATERIALIZED (
+  SELECT reality_internal.read_final_loop_verified_suspension_v1(p_owner_id,p_shift_id,p_original_work_id,p_source_ref,p_head,p_revision) AS value
+ ), legacy AS MATERIALIZED (
  SELECT pg_catalog.jsonb_build_object('incident_id',i.incident_id,
   'investigation_receipt_sha256',i.investigation_receipt_sha256,'investigation_worker_run_id',run.run_id,
   'investigation_event_id',ev.event_id,'suspension_receipt_sha256',ev.source_receipt_sha256,
   'frozen_source_head_sha',q.reconciliation_snapshot->>'source_head_sha',
-  'unresolved_proof_gates',q.reconciliation_snapshot->'unsatisfied_gates')
+  'unresolved_proof_gates',q.reconciliation_snapshot->'unsatisfied_gates') AS value
  FROM reality_internal.owner_shift_continuity_incidents_v1 i
  JOIN reality_internal.final_loop_resume_events_v1 ev ON ev.event_id::text=i.source_evidence->>'event_id'
   AND ev.owner_id=i.owner_id AND ev.shift_id=i.shift_id AND ev.original_work_id=p_original_work_id
@@ -136,6 +142,7 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
   AND q.reconciliation_snapshot->'recovery_terminal_history'->>'new_attempt_authorized'='false'
   AND q.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(
    pg_catalog.convert_to(q.reconciliation_snapshot::text,'UTF8')),'hex')
+ CROSS JOIN suspension sus
  WHERE i.owner_id=p_owner_id AND i.shift_id=p_shift_id AND i.kind='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'
   AND i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' AND i.qualified_job_id IS NULL
   AND i.reviewer_function_id IS NOT NULL AND i.reviewer_function_id<>i.assigned_function_id
@@ -153,16 +160,138 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
     'diagnosis',i.diagnosis,'proposed_upgrade',i.proposed_upgrade,
     'required_independent_test',i.independent_test_requirement,'limitations',i.limitations,
     'new_original_jobs_created',0,'installation_authorized',false)::text,'UTF8')),'hex')
-  AND ev.source_receipt_sha256=(reality_internal.read_final_loop_verified_suspension_v1(
-   p_owner_id,p_shift_id,p_original_work_id,p_source_ref,p_head,p_revision)->>'receipt_sha256')
- ORDER BY q.reconciliation_checked_at DESC NULLS LAST,i.investigated_at DESC LIMIT 1;
-$fn$;
+  AND ev.source_receipt_sha256=(sus.value->>'receipt_sha256')
+ ORDER BY q.reconciliation_checked_at DESC NULLS LAST,i.investigated_at DESC LIMIT 1
+), current_guard AS MATERIALIZED (
+ SELECT public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id) AS value WHERE NOT EXISTS(SELECT 1 FROM legacy)
+), current_invocation AS (
+ SELECT pg_catalog.jsonb_build_object('incident_id',i.incident_id,
+  'investigation_receipt_sha256',i.investigation_receipt_sha256,'investigation_worker_run_id',run.run_id,
+  'investigation_event_id',ev.event_id,'suspension_receipt_sha256',tr.receipt_sha256,
+  'frozen_source_head_sha',q.reconciliation_snapshot->>'source_head_sha',
+  'unresolved_proof_gates',q.reconciliation_snapshot->'unsatisfied_gates',
+  'evidence_kind','RETURNED_UNRESOLVED_INVOCATION','qualifier_receipt_sha256',ev.source_receipt_sha256,
+  'invocation_observation_sha256',sp.value->>'observation_sha256') AS value
+ FROM reality_internal.owner_shift_continuity_incidents_v1 i
+ JOIN reality_internal.final_loop_resume_events_v1 ev ON ev.event_id::text=i.source_evidence->>'event_id'
+  AND ev.owner_id=i.owner_id AND ev.shift_id=i.shift_id AND ev.original_work_id=p_original_work_id
+  AND ev.source_ref=p_source_ref AND ev.continuity_head_sha256=p_head AND ev.continuity_revision=p_revision
+  AND ev.signal_kind='QUALIFIER_PROOF_CHANGED' AND ev.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND ev.state IN ('SHADOW_PENDING','SHADOW_STALE') AND ev.observed_at IS NULL
+  AND ev.governed_wake_request_id IS NOT NULL
+ JOIN reality_internal.signed_worker_actual_runs_v1 run ON run.run_id=ev.governed_wake_worker_run_id
+  AND run.status='COMPLETED' AND run.finished_at>=i.investigated_at
+  AND run.started_at<=i.investigated_at AND run.worker_stage='WORKER_RESPONSE_PUBLICATION'
+ JOIN reality_internal.governed_signed_worker_release_wakes_v1 wake ON wake.worker_run_id=run.run_id
+  AND wake.release_claim_id=ev.release_continuation_claim_id AND wake.owner_id=i.owner_id AND wake.shift_id=i.shift_id
+  AND wake.operating_lane='NORMAL_SIGNED_SHIFT'
+ JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=wake.release_claim_id
+  AND a.owner_id=i.owner_id AND a.shift_id=i.shift_id AND a.state='CLAIMED_ONCE'
+  AND a.release_sha=wake.running_release_sha AND a.release_ref=wake.running_release_ref
+  AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND a.provider_alias_observed_at>=a.claimed_at AND a.provider_alias_observed_at<=run.started_at
+  AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
+  AND a.runtime_scope->>'original_work_id'=p_original_work_id AND a.runtime_scope->>'source_ref'=p_source_ref
+  AND a.runtime_scope->>'continuity_head_sha256'=p_head AND a.runtime_scope->>'continuity_revision'=p_revision::text
+  AND a.runtime_scope->>'qualifier_receipt_sha256'=ev.source_receipt_sha256
+  AND a.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+  AND a.runtime_scope->>'child_execution_enabled'='false' AND a.runtime_scope->>'parent_delivery_enabled'='false'
+  AND a.runtime_scope->>'production_changed'='false'
+ JOIN reality_internal.owner_continuity_qualification_routes_v1 q ON q.owner_id=i.owner_id AND q.source_ref=p_source_ref
+  AND q.reconciliation_receipt_sha256=ev.source_receipt_sha256
+  AND q.reconciliation_snapshot->>'shift_id'=p_shift_id::text
+  AND q.reconciliation_snapshot->>'original_candidate_work_id'=p_original_work_id
+  AND q.reconciliation_snapshot->>'source_proof_bound'='true'
+  AND q.reconciliation_snapshot->>'review_scope_qualified'='true'
+  AND q.reconciliation_snapshot->>'exact_goal_event_verified'='true'
+  AND q.reconciliation_snapshot->>'exact_acceptance_approval_verified'='true'
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'source_head_sha'=q.reconciliation_snapshot->>'source_head_sha'
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'parent_original_work_id'=p_original_work_id
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'source_ref'=p_source_ref
+  AND q.reconciliation_snapshot->'accepted_review_scope'->>'execution_authorized'='false'
+  AND q.reconciliation_snapshot->'recovery_terminal_history'->>'remaining_attempts'='0'
+  AND q.reconciliation_snapshot->'recovery_terminal_history'->>'replay_permitted'='false'
+  AND q.reconciliation_snapshot->'recovery_terminal_history'->>'new_attempt_authorized'='false'
+  AND q.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(
+   pg_catalog.convert_to(q.reconciliation_snapshot::text,'UTF8')),'hex')
+ CROSS JOIN current_guard g
+ CROSS JOIN LATERAL pg_catalog.jsonb_array_elements(coalesce(g.value->'obligations','[]'::jsonb)) ob(value)
+ CROSS JOIN LATERAL (SELECT ob.value->'execution_spine_readback' AS value) sp
+ JOIN public.universe_events u ON u.continuity_root_id::text=g.value->>'continuity_root_id'
+  AND 'sha256:'||u.lineage_hash=p_head AND u.entity_type='reality_final_loop_terminal_technical_observation_v1'
+  AND u.epistemic_status='OBSERVED' AND u.parent_event_id::text=sp.value->>'canonical_return_event_id'
+  AND u.payload->>'prior_head_sha256'=sp.value->>'canonical_return_head_sha256'
+  AND u.payload->>'prior_revision'=(p_revision-1)::text
+  AND u.payload->>'owner_id'=p_owner_id::text AND u.payload->>'shift_id'=p_shift_id::text
+  AND u.payload->>'original_work_id'=p_original_work_id AND u.payload->>'source_ref'=p_source_ref
+  AND u.payload->>'technical_evidence_only'='true' AND u.payload->>'original_job_completed'='false'
+  AND u.payload->>'provider_outcome_verified'='false' AND u.payload->>'execution_authorized'='false'
+  AND u.payload->>'replay_authorized'='false' AND u.payload->>'new_attempt_authorized'='false'
+  AND u.payload->>'production_changed'='false' AND u.payload->>'previous_attempt_budget_preserved'='true'
+  AND u.content_hash=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(public.reality_continuity_canonical_json_v1(u.payload),'UTF8')),'hex')
+ JOIN reality_internal.shift_continuity_independent_reviews_v1 prior ON prior.receipt_sha256=u.payload->>'review_receipt_sha256'
+  AND prior.owner_id=p_owner_id AND prior.shift_id=p_shift_id AND prior.original_work_id=p_original_work_id
+  AND prior.source_ref=p_source_ref AND prior.continuity_head_sha256=sp.value->>'canonical_return_head_sha256'
+  AND prior.status='SOURCE_MATCHED_NEEDS_FROZEN_TEST' AND prior.source_head_sha=prior.frozen_source_head_sha
+  AND prior.frozen_source_head_sha=q.reconciliation_snapshot->>'source_head_sha'
+  AND prior.investigation_receipt_sha256=u.payload->>'investigation_receipt_sha256'
+  AND prior.independent_verdict->>'original_job_completed'='false'
+  AND prior.independent_verdict->>'replay_authorized'='false'
+  AND prior.receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(prior.independent_verdict::text,'UTF8')),'hex')
+ JOIN reality_internal.final_loop_transition_receipts_v1 tr ON tr.receipt_sha256=prior.independent_verdict->>'suspension_receipt_sha256'
+  AND tr.owner_id=p_owner_id AND tr.shift_id=p_shift_id AND tr.original_work_id=p_original_work_id AND tr.source_ref=p_source_ref
+  AND tr.continuity_root_id=u.continuity_root_id AND tr.expected_revision=p_revision-2
+  AND tr.decision='SUSPEND' AND tr.reason_code='PROVIDER_EFFECT_UNCERTAIN'
+ WHERE i.owner_id=p_owner_id AND i.shift_id=p_shift_id AND i.kind='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'
+  AND i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF' AND i.qualified_job_id IS NULL
+  AND i.reviewer_function_id IS NOT NULL AND i.reviewer_function_id<>i.assigned_function_id
+  AND i.source_evidence->>'blocker_code'='FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED'
+  AND i.source_evidence->>'original_work_id'=p_original_work_id AND i.source_evidence->>'source_ref'=p_source_ref
+  AND i.source_evidence->>'continuity_head_sha256'=p_head AND i.source_evidence->>'continuity_revision'=p_revision::text
+  AND i.source_evidence->>'continuity_root_id'=g.value->>'continuity_root_id'
+  AND i.source_evidence->>'worker_run_id'=run.run_id::text AND i.source_evidence->>'release_sha'=wake.running_release_sha
+  AND i.source_evidence->>'release_receipt_sha256'=wake.release_receipt_sha256
+  AND i.source_evidence->>'investigation_only'='true' AND i.source_evidence->>'provider_outcome_verified'='false'
+  AND i.source_evidence->>'original_job_completed'='false' AND i.source_evidence->>'installation_authorized'='false'
+  AND i.source_evidence->>'production_changed'='false' AND i.source_evidence->>'previous_attempt_budget_preserved'='true'
+  AND i.source_evidence->>'replay_authorized'='false' AND i.source_evidence->>'new_attempt_authorized'='false'
+  AND i.evidence_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(i.source_evidence::text,'UTF8')),'hex')
+  AND i.investigation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+   pg_catalog.jsonb_build_object('owner_id',i.owner_id,'incident_id',i.incident_id,
+    'evidence_sha256',i.evidence_sha256,'model_response_id',i.model_response_id,
+    'assigned_employee',i.assigned_employee,'reviewer',i.independent_reviewer,
+    'diagnosis',i.diagnosis,'proposed_upgrade',i.proposed_upgrade,
+    'required_independent_test',i.independent_test_requirement,'limitations',i.limitations,
+    'new_original_jobs_created',0,'installation_authorized',false)::text,'UTF8')),'hex')
+  AND g.value->>'status'='FINAL_LOOP_SHARED_CONTINUITY_CHECKED' AND g.value->>'owner_id'=p_owner_id::text
+  AND g.value->>'shift_id'=p_shift_id::text AND g.value->>'continuity_head_sha256'=p_head AND g.value->>'revision'=p_revision::text
+  AND g.value->>'execution_authorized'='false'
+  AND ob.value->>'original_work_id'=p_original_work_id AND ob.value->>'source_ref'=p_source_ref
+  AND ob.value->>'continuity_identity_verified'='true' AND ob.value->>'qualifier_digest_verified'='true'
+  AND ob.value->>'qualifier_receipt_sha256'=q.reconciliation_receipt_sha256
+  AND ob.value->>'next_qualified_action'='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+  AND ob.value->>'independent_original_outcome_verified'='false'
+  AND sp.value->>'status'='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'
+  AND sp.value->>'canonical_return_committed'='true' AND sp.value->>'execution_authorized'='false'
+  AND sp.value->>'replay_authorized'='false' AND sp.value->>'original_job_completed'='false'
+  AND sp.value->>'observation_sha256'=i.source_evidence->>'invocation_observation_sha256'
+  AND sp.value->>'canonical_return_event_id'=i.source_evidence->>'canonical_return_event_id'
+  AND sp.value->>'canonical_return_head_sha256'=i.source_evidence->>'canonical_return_head_sha256'
+  AND sp.value->'observations'=i.source_evidence->'invocation_observations'
+  AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(coalesce(sp.value->'observations','[]'::jsonb)) x(value)
+   WHERE x.value->>'model_artifact_recorded'='false' AND x.value->>'provider_outcome_verified'='false'
+    AND x.value->>'replay_authorized'='false' AND x.value->>'worker_completed'='true')
+ ORDER BY i.investigated_at DESC LIMIT 1
+
+)
+ SELECT value FROM legacy UNION ALL SELECT value FROM current_invocation LIMIT 1;
+$function$;
 REVOKE ALL ON FUNCTION reality_internal.read_final_loop_verified_investigation_v1(uuid,uuid,text,text,text,bigint) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_verified_investigation_v1(uuid,uuid,text,text,text,bigint) TO service_role;
 
 CREATE OR REPLACE FUNCTION reality_internal.stage_final_loop_independent_investigation_review_v1(p_request_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text;
+DECLARE a record; evidence jsonb; sub record; fresh_id uuid; causal text; current_invocation boolean;
 BEGIN
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
  WHERE r.request_id=p_request_id AND r.state='CLAIMED_ONCE' AND r.claim_id IS NOT NULL
@@ -181,15 +310,32 @@ BEGIN
   a.runtime_scope->>'original_work_id',a.runtime_scope->>'source_ref',
   a.runtime_scope->>'continuity_head_sha256',(a.runtime_scope->>'continuity_revision')::bigint);
  IF evidence IS NULL THEN RETURN NULL;END IF;
+ current_invocation:=coalesce(evidence->>'evidence_kind'='RETURNED_UNRESOLVED_INVOCATION',false);
  SELECT * INTO sub FROM reality_internal.final_loop_resume_conditions_v1 c
  WHERE c.owner_id=a.owner_id AND c.shift_id=a.shift_id AND c.original_work_id=a.runtime_scope->>'original_work_id'
   AND c.source_ref=a.runtime_scope->>'source_ref' AND c.condition_kind='QUALIFIER_PROOF_CHANGED'
   AND c.continuity_head_sha256=a.runtime_scope->>'continuity_head_sha256'
-  AND c.continuity_revision::text=a.runtime_scope->>'continuity_revision' AND c.state='SUSPENDED'
+  AND c.continuity_revision::text=a.runtime_scope->>'continuity_revision'
+  AND (c.state='SUSPENDED' OR (current_invocation AND c.state='SHADOW_SIGNALED'
+   AND c.last_signaled_receipt_sha256=evidence->>'qualifier_receipt_sha256'))
  FOR UPDATE;
  IF NOT FOUND OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
   WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id
-   AND (e.state='SHADOW_PENDING' OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
+   AND ((e.state='SHADOW_PENDING' AND NOT (current_invocation AND e.owner_id=a.owner_id AND e.source_ref=sub.source_ref
+    AND e.continuity_head_sha256=sub.continuity_head_sha256 AND e.continuity_revision=sub.continuity_revision
+    AND e.signal_kind='QUALIFIER_PROOF_CHANGED' AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND e.source_receipt_sha256=evidence->>'qualifier_receipt_sha256'
+    AND e.previous_receipt_sha256=sub.subscribed_receipt_sha256 AND e.governed_wake_request_id IS NOT NULL
+    AND e.observed_at IS NULL AND EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+     JOIN reality_internal.governed_signed_worker_release_wakes_v1 w ON w.worker_run_id=r.run_id
+     JOIN reality_internal.governed_worker_release_approvals_v1 rel ON rel.claim_id=w.release_claim_id
+     WHERE r.run_id=e.governed_wake_worker_run_id AND r.status='COMPLETED' AND r.finished_at IS NOT NULL
+      AND r.worker_stage='WORKER_RESPONSE_PUBLICATION' AND w.owner_id=e.owner_id AND w.shift_id=e.shift_id
+      AND w.release_claim_id=e.release_continuation_claim_id AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+      AND rel.owner_id=e.owner_id AND rel.shift_id=e.shift_id AND rel.state='CLAIMED_ONCE'
+      AND rel.release_sha=w.running_release_sha AND rel.runtime_scope->>'original_work_id'=e.original_work_id
+      AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
+      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false'))) OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
     AND e.source_receipt_sha256=evidence->>'investigation_receipt_sha256'))) THEN RETURN NULL;END IF;
  INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,
   subscribed_receipt_sha256,continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
@@ -202,6 +348,27 @@ BEGIN
    AND c.source_ref=sub.source_ref AND c.condition_kind='VERIFIED_INVESTIGATION_REVIEW'
    AND c.continuity_head_sha256=sub.continuity_head_sha256 AND c.continuity_revision=sub.continuity_revision
    AND c.subscribed_receipt_sha256=evidence->>'suspension_receipt_sha256') THEN RETURN NULL;END IF;
+ -- Completed, already consumed qualifier deliveries are historical only.
+ -- Keep their nonce, worker, claim and receipt intact; do not infer provider success.
+ IF current_invocation THEN
+  UPDATE reality_internal.final_loop_resume_events_v1 e SET state='SHADOW_STALE'
+  WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id AND e.state='SHADOW_PENDING'
+   AND (current_invocation AND e.owner_id=a.owner_id AND e.source_ref=sub.source_ref
+    AND e.continuity_head_sha256=sub.continuity_head_sha256 AND e.continuity_revision=sub.continuity_revision
+    AND e.signal_kind='QUALIFIER_PROOF_CHANGED' AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND e.source_receipt_sha256=evidence->>'qualifier_receipt_sha256'
+    AND e.previous_receipt_sha256=sub.subscribed_receipt_sha256 AND e.governed_wake_request_id IS NOT NULL
+    AND e.observed_at IS NULL AND EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+     JOIN reality_internal.governed_signed_worker_release_wakes_v1 w ON w.worker_run_id=r.run_id
+     JOIN reality_internal.governed_worker_release_approvals_v1 rel ON rel.claim_id=w.release_claim_id
+     WHERE r.run_id=e.governed_wake_worker_run_id AND r.status='COMPLETED' AND r.finished_at IS NOT NULL
+      AND r.worker_stage='WORKER_RESPONSE_PUBLICATION' AND w.owner_id=e.owner_id AND w.shift_id=e.shift_id
+      AND w.release_claim_id=e.release_continuation_claim_id AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+      AND rel.owner_id=e.owner_id AND rel.shift_id=e.shift_id AND rel.state='CLAIMED_ONCE'
+      AND rel.release_sha=w.running_release_sha AND rel.runtime_scope->>'original_work_id'=e.original_work_id
+      AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
+      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false'));
+ END IF;
  causal:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
   a.shift_id::text||'|'||sub.original_work_id||'|'||sub.continuity_head_sha256||'|'||
   sub.continuity_revision::text||'|'||(evidence->>'suspension_receipt_sha256')||'|'||
@@ -213,6 +380,7 @@ BEGIN
   evidence->>'investigation_receipt_sha256',evidence->>'suspension_receipt_sha256',causal,sub.continuity_head_sha256,
   sub.continuity_revision,'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',a.claim_id)
  ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+ IF current_invocation AND fresh_id IS NULL THEN RAISE EXCEPTION 'CURRENT_INVOCATION_REVIEW_NOT_STAGED';END IF;
  RETURN fresh_id;
 END $fn$;
 REVOKE ALL ON FUNCTION reality_internal.stage_final_loop_independent_investigation_review_v1(uuid) FROM PUBLIC,anon,authenticated,service_role;
@@ -879,7 +1047,12 @@ BEGIN
   ELSIF TG_TABLE_NAME='signed_worker_actual_runs_v1' THEN
    -- Only a completed investigation may request a distinct review run.
    IF NEW.status='COMPLETED' AND OLD.status='STARTED'
-    AND NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION' THEN
+    AND (NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION'
+     OR (NEW.worker_stage='WORKER_RESPONSE_PUBLICATION' AND EXISTS(
+       SELECT 1 FROM reality_internal.owner_shift_continuity_incidents_v1 i
+        WHERE i.source_evidence->>'worker_run_id'=NEW.run_id::text
+         AND i.source_evidence->>'blocker_code'='FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED'
+         AND i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'))) THEN
     PERFORM reality_internal.stage_final_loop_independent_investigation_review_v1(a.request_id)
     FROM reality_internal.governed_signed_worker_release_wakes_v1 w
     JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
@@ -906,7 +1079,7 @@ END $$;
 REVOKE ALL ON FUNCTION reality_internal.on_final_loop_governed_wake_v1() FROM PUBLIC,anon,authenticated,service_role;
 DROP TRIGGER IF EXISTS final_loop_completed_investigation_wake_v1 ON reality_internal.signed_worker_actual_runs_v1;
 CREATE TRIGGER final_loop_completed_investigation_wake_v1 AFTER UPDATE OF status ON reality_internal.signed_worker_actual_runs_v1
- FOR EACH ROW WHEN (OLD.status='STARTED' AND NEW.status='COMPLETED' AND NEW.worker_stage IN ('SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION','INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION'))
+ FOR EACH ROW WHEN (OLD.status='STARTED' AND NEW.status='COMPLETED' AND NEW.worker_stage IN ('SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION','INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION','WORKER_RESPONSE_PUBLICATION'))
  EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
 
 
