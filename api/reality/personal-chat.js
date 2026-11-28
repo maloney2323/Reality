@@ -38,7 +38,7 @@ import {readOwnerOriginalWorkForChat,originalWorkObservation,
 import {createHash} from 'node:crypto';
 import {resolvePrivateChatContinuity} from '../../src/reality-private-chat-continuity-recovery-v1.js';
 import {isPublicResearchRequest,publishedReferencesForChat} from '../../src/reality-chat-research-bridge-v1.js';
-import {assertFinalChatPublicationProof,summarizeOutputClaimAssessment}
+import {assertFinalChatPublicationProof,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment}
  from '../../src/reality-final-chat-publication-proof-v0.1.js';
 import {startContinuityRuntime} from '../../src/reality-continuity-spine-runtime-v0.1.js';
 import {buildGovernedChatSignal} from '../../src/reality-governed-fragmented-signal-cleaner-v0.1.js';
@@ -335,7 +335,24 @@ export default async function handler(req,res){
      owner_incident_evidence_status:ctx.values.owner_handoff?'OWNER_SCOPED_READBACK':'UNAVAILABLE_NOT_ABSENCE',
      owner_shift_continuity_incidents:ctx.values.owner_handoff?.shift_continuity_incidents?.slice(0,3)||null,
      conversation_never_grants_execution_authority:true},
-    verifiedUniverseObservations:ownerUniverse.observations
+    verifiedUniverseObservations:ownerUniverse.observations,
+    recordClaimAssessment:async({answer,assessment})=>{
+     // Only assessed operational replies use the canonical writer. Ordinary
+     // Chat never waits on a history reconstruction. Enforce a shared time
+     // budget and exact preview credentials; never fall back to production.
+     const ledgerDb=resolveReliabilityBenchmarkDb();
+     if(!isolated||!ledgerDb||ledgerDb.url!==isolated.url||
+        process.env.REALITY_UNIVERSE_PERSISTENCE_ENABLED!=='true')throw Error('CHAT_READ_ONLY_CLAIM_LEDGER_UNAVAILABLE');
+     const deadline=AbortSignal.timeout(5000);
+     const observedAt=new Date().toISOString();
+     const runtime=await startContinuityRuntime({
+      continuityRootSource:scopedRoot,worldlineSource:scopedRoot,subjectId:conversationId,
+      signal:buildGovernedChatSignal({message:text,observedAt}),observedAt,
+      fetchImpl:(url,options={})=>fetch(url,{...options,signal:options.signal?
+       AbortSignal.any([deadline,options.signal]):deadline})
+     });
+     return recordReadOnlyOutputClaimAssessment({runtime,requestId,sourceRef:recordedUser.source_ref,answer,assessment});
+    }
    });
    governedCognitionMs=Date.now()-quickStart;
    stage='READ_ONLY_CONVERSATION_PUBLICATION';
@@ -356,7 +373,7 @@ export default async function handler(req,res){
      reply_recovery_requires_exact_saved_request:!publication},
     reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',transient_answer_not_a_receipt:!publication,
      canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
-     output_claim_assessment:summarizeOutputClaimAssessment(advisory.output_claim_assessment),
+     output_claim_assessment:advisory.output_claim_assessment,
      independently_verified_semantic_correctness:false,business_outcome_verified:false,external_actions_authorized:false},
     contextual_readback_status:{evidence:ctx.status,unavailable_sources:ctx.unavailable,grants_execution_authority:false},
     execution:{status:'NOT_EXECUTED',external_actions_authorized:false,installation_authorized:false},
