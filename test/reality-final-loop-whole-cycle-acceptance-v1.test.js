@@ -133,7 +133,7 @@ test('live signed worker publishes whole-cycle verdict AFTER independent return 
  const acceptance=s.indexOf("workerStage='FINAL_LOOP_WHOLE_CYCLE_INDEPENDENT_ACCEPTANCE_CHECK'");
  const publication=s.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",acceptance);
  assert.ok(returnFence>0&&acceptance>returnFence&&publication>acceptance);
- const investigationStart=s.indexOf('if(suspensionInvestigationWake){');
+ const investigationStart=s.indexOf('if(claimedEvidenceCapability){');
  const investigationEnd=s.indexOf('// Continuous, standing EVIDENCE qualification intake',investigationStart);
  assert.ok(investigationStart>0&&investigationEnd>investigationStart&&investigationEnd<returnFence);
  const investigation=s.slice(investigationStart,investigationEnd);
