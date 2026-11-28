@@ -315,7 +315,8 @@ export function selectRegisteredSignedEventCapability({
 // fails. Never publish prompts, model content, provider error text or secrets.
 export function boundedRegisteredCapabilityCheckpoint(action,result){
  const code=v=>typeof v==='string'&&/^[A-Z0-9_]{3,100}$/.test(v)?v:null;
- if(!KEY.test(action||'')||!code(result?.status))return null;
+ if(!KEY.test(action||'')||!code(result?.status)||
+    result.original_job_completed!==false||result.production_changed!==false)return null;
  return Object.freeze({capability_key:action,status:code(result.status),
   provider_failure_reason:code(result.provider_failure_reason),
   continuity_blocker_code:code(result.continuity_blocker_code),
