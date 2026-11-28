@@ -19,7 +19,7 @@ const no=(status,more={})=>Object.freeze({
  version:REALITY_FINAL_LOOP_CHILD_WORKER_VERSION,status,
  read_only_effects_only:true,owner_approval_created:false,
  external_effect_performed:false,parent_obligation_remains_open:true,
- parent_original_completed:false,production_changed:false,...more
+ parent_original_completed:false,original_job_completed:false,production_changed:false,...more
 });
 // A provider diagnostic is evidence only, never permission to retry.
 const CHILD_FAILURE_REASONS=new Set([
