@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {projectChatContinuityActivity} from '../src/reality-chat-continuity-activity-v1.js';
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const h=n=>'sha256:'+String(n).repeat(64);
@@ -47,4 +49,63 @@ test('missing evidence is unavailable, not no work, and closed shift can retain 
  const r=projectChatContinuityActivity({...input,current:{...current,observations:[],active_shift_count:0},finalReadback:{...finalReadback,receipts:[{status:'FULL_LOOP_INDEPENDENTLY_VERIFIED',original_work_id:work,settlement_event_id:id(7),artifact_sha256:'a'.repeat(64),installed_commit_sha:'b'.repeat(40),verifier_artifact_digest:h(4),provider_run_id:1,production_changed:false}]}});
  assert.equal(r.final_receipts.length,1);
  assert.equal(r.installation_authorized,false);
+});
+
+const stable=v=>v===null||typeof v!=='object'?v:Array.isArray(v)?v.map(stable):Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])]));
+const digest=v=>createHash('sha256').update(JSON.stringify(stable(v))).digest('hex');
+function terminalFixture(){
+ const root=id(11),head=h(4),qualifier=h(6),parent=id(12);
+ const ob={...obs,continuity_revision:4,continuity_root_id:root,continuity_head_sha256:head,qualifier_receipt_sha256:qualifier,
+ verified_investigation:null,verified_independent_review:null,current_events:[]};
+ const payload={owner_id:ownerId,shift_id:shift,original_work_id:work,source_ref:ref,qualifier_receipt_sha256:qualifier,
+ prior_revision:3,prior_head_sha256:h(1),review_receipt_sha256:h(7),investigation_receipt_sha256:h(3),
+ technical_evidence_only:true,previous_attempt_budget_preserved:true,replay_authorized:false,new_attempt_authorized:false,
+ original_job_completed:false,original_business_red_verified:false,execution_authorized:false,installation_authorized:false,production_changed:false,
+ terminal_recovery_history:{original_work_id:work,attempt_count:3,remaining_attempts:0,new_attempt_authorized:false,replay_permitted:false},
+ next_action:'INDEPENDENTLY_QUALIFY_BUSINESS_ORIGINAL_AND_CASE_SPECIFIC_RED',
+ technical_provider_proof:{status:'RECOVERY_TERMINAL_TECHNICAL_CI_ATTESTED_BUDGET_UNCHANGED',owner_id:ownerId,shift_id:shift,
+ obligation_id:work,source_ref:ref,qualifier_receipt_sha256:qualifier,independent_technical_ci_verified:true,
+ frozen_technical_red_verified:true,independent_ci_provider_observation:true,original_business_case_red_verified:false,
+ original_job_completed:false,execution_authorized:false,production_changed:false,previous_attempt_budget_preserved:true,
+ new_attempt_authorized:false,repeat_prior_ci_dispatch_permitted:false,github_artifact_digest:h(8)}};
+ const row={event_id:id(13),parent_event_id:parent,continuity_root_id:root,lineage_hash:head.slice(7),
+ entity_type:'reality_final_loop_terminal_technical_observation_v1',event_kind:'OBSERVATION',epistemic_status:'OBSERVED',
+ assertion_time:current.observed_at,payload,content_hash:digest(payload),provenance:{source:'SIGNED_TERMINAL_TECHNICAL_CI_READBACK',
+ principal_id:ownerId,worker_run_id:id(14),continuity_spine:{source_event_id:parent,prior_lineage_hash:h(1).slice(7)}}};
+ return {row,ob};
+}
+test('exact accepted technical return shows revision progress and source-attributed actions, never original completion',()=>{
+ const {row,ob}=terminalFixture();
+ const r=projectChatContinuityActivity({...input,current:{...current,observations:[{current_operational_facts:ob}]},terminalRows:[row]});
+ const j=r.obligations[0];
+ assert.equal(j.terminal_evidence.revision,4);
+ assert.equal(j.terminal_evidence.prior_revision,3);
+ assert.equal(j.terminal_evidence.remaining_attempts,0);
+ assert.equal(j.original_complete,false);
+ assert.deepEqual(j.steps.filter(x=>x.state==='verified'&&x.employee).map(x=>x.employee),['Engineer','Reviewer']);
+ const technical=j.steps.find(x=>x.id===row.event_id);
+ assert.equal(technical.state,'verified');assert.equal(technical.employee,undefined);
+ assert.equal(r.execution_authorized,false);
+});
+test('wrong owner, head, original, digest, or expanded budget cannot display accepted technical evidence',()=>{
+ const {row,ob}=terminalFixture();
+ const changes=[{...row,lineage_hash:h(9).slice(7)},{...row,content_hash:h(9).slice(7)}];
+ for(const delta of [{owner_id:id(99)},{original_work_id:'work:'+'b'.repeat(32)},{new_attempt_authorized:true},
+ {terminal_recovery_history:{...row.payload.terminal_recovery_history,remaining_attempts:1}}]){
+  const payload={...row.payload,...delta};changes.push({...row,payload,content_hash:digest(payload)});
+ }
+ for(const invalid of changes){
+  const j=projectChatContinuityActivity({...input,current:{...current,observations:[{current_operational_facts:ob}]},terminalRows:[invalid]}).obligations[0];
+  assert.equal(j.terminal_evidence,null);assert.equal(j.steps.some(x=>x.id===row.event_id),false);
+ }
+});
+test('shared signed-in activity refresh covers Chat and Employees without another timer or execution request',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/id="realityEmployeeLiveActivity"/);
+ assert.match(html,/function renderEmployeeLiveActivity\(data\)/);
+ assert.match(html,/x\.step\.employee===card\.dataset\.homeEmployee/);
+ assert.match(html,/\['chat','employees'\]\.includes\(realityCurrentRoute\(\)\)/);
+ assert.equal((html.match(/setTimeout\(refreshLiveActivity,8000\)/g)||[]).length,1);
+ assert.equal((html.match(/fetch\('\/api\/reality\/personal-continuity-activity'/g)||[]).length,1);
+ assert.match(html,/No currently verified action attributed to this employee/);
 });
