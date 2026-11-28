@@ -395,7 +395,7 @@ test('exact canonical review dispatch owns the signed event before unrelated mai
  const selection=code.indexOf("workerStage='EXACT_CLAIMED_EVENT_CAPABILITY_SELECTION'");
  const dispatch=code.indexOf("workerStage='EXACT_CLAIMED_REVIEW_CAPABILITY_DISPATCH'");
  const run=code.indexOf('finalLoopChildReview=await selectedEventHandler()',dispatch);
- const fence=code.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'",run);
+ const fence=code.indexOf("workerStage='EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE'",run);
  const pulse=code.indexOf('p_safe_result:canonicalReviewCheckpoint?.status',fence);
  const finish=code.indexOf('return res.status(200).json({',pulse);
  const unrelated=code.indexOf("workerStage='EXACT_APPROVED_BUSINESS_EFFECT_SIGNED_HANDOFF'");
@@ -404,7 +404,7 @@ test('exact canonical review dispatch owns the signed event before unrelated mai
  assert.match(lane,/if\(!otherQualifiedRoute\)/);
  assert.match(lane,/if\(ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY'\)\s*throw Error/);
  assert.match(lane,/await requireFreshFinalLoopContinuity\(\)/);
- assert.match(lane,/await readSignedWorkerReleaseWitness\(unifiedGraph\)/);
+ assert.match(lane,/await readSignedWorkerReleaseWitness\(exactReviewGraph\)/);
  assert.match(lane,/connectExistingIsolatedChildTransport\(/);
  assert.match(lane,/advanceCanonicalFinalLoopChildReview\(/);
  assert.match(lane,/if\(!selectedEventHandler\)/);
