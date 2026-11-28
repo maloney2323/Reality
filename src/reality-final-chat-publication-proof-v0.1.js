@@ -101,6 +101,9 @@ export async function recordReadOnlyOutputClaimAssessment({
   typeof sourceRef==='string'&&assessment?.schema==='reality-final-output-claim-assessment-v0.1',
   'CHAT_READ_ONLY_CLAIM_LEDGER_REQUIRED');
  const released=hash(answer);
+ require(assessment.publication_contract!=='SOURCE_RENDERED_OPERATIONAL_REPORT'||
+  assessment.candidate_answer_hash!==released,
+  'CHAT_OPERATIONAL_SOURCE_RENDER_REQUIRED');
  const publication={...assessment,released_answer_hash:released,
   disposition:assessment.candidate_answer_hash===released?'CANDIDATE_RELEASED_COVERAGE_LIMITED':'UNSUPPORTED_CANDIDATE_WITHHELD'};
  const digest=hashOutputClaimAssessment(publication);
@@ -128,7 +131,7 @@ export async function recordReadOnlyOutputClaimAssessment({
 }
 
 export function assertFinalChatPublicationProof({
- answer,reliability,atomicGoalPublicationEnabled=false,
+ answer,reliability,atomicGoalPublicationEnabled=false,sourceRenderedOperationalRequired=false,
 }={}){
  require(atomicGoalPublicationEnabled===true,
   'CHAT_ATOMIC_GOAL_PUBLICATION_REQUIRED');
@@ -174,6 +177,13 @@ export function assertFinalChatPublicationProof({
   claims.candidate_answer_hash===gate.final_answer_hash:
   claims.candidate_answer_hash!==gate.final_answer_hash,
   'CHAT_OUTPUT_CLAIM_RELEASE_DISPOSITION_MISMATCH');
+ // The authenticated request independently selects this contract.
+ // Neither a forged clean assessment nor the extractor's conversation label
+ // may release a raw operational report.
+ require(!sourceRenderedOperationalRequired||
+  (claims.publication_contract==='SOURCE_RENDERED_OPERATIONAL_REPORT'&&
+   claims.disposition!=='CANDIDATE_RELEASED_COVERAGE_LIMITED'),
+  'CHAT_OPERATIONAL_SOURCE_RENDER_REQUIRED');
  // An empty operational/unknown extraction cannot authorize raw candidate bytes.
  require(!(claims.disposition==='CANDIDATE_RELEASED_COVERAGE_LIMITED'&&
   claims.status==='CLAIM_COVERAGE_UNVERIFIED'&&claims.candidate_scope!=='CONVERSATIONAL'),
