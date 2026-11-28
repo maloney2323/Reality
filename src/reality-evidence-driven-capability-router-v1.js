@@ -435,10 +435,17 @@ export function resolveQualifiedCapabilityKey({
     qualifications[0]?.source_ref!==event.source_ref||
     qualifications[0].original_work_id!==event.original_work_id||
     qualifications[0].qualifier_receipt_sha256!==event.source_receipt_sha256||
-    qualifications[0].next_qualified_action!==key||
-    !Array.isArray(registeredActionKeys)||registeredActionKeys.length>32||
-    registeredActionKeys.some(k=>!KEY.test(k||''))||
-    new Set(registeredActionKeys).size!==registeredActionKeys.length)
+    qualifications[0].next_qualified_action!==key)
   return null;
+ return selectRegisteredCapabilityKey({key,registeredActionKeys});
+}
+
+
+// Common registry lookup for all verified selector inputs. The registry
+// contains installed capability TYPES; this function never grants authority.
+export function selectRegisteredCapabilityKey({key,registeredActionKeys=[]}={}){
+ if(!KEY.test(key||'')||!Array.isArray(registeredActionKeys)||
+    registeredActionKeys.length>32||registeredActionKeys.some(k=>!KEY.test(k||''))||
+    new Set(registeredActionKeys).size!==registeredActionKeys.length)return null;
  return registeredActionKeys.includes(key)?key:null;
 }
