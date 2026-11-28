@@ -1070,6 +1070,74 @@ BEGIN
  THEN RAISE EXCEPTION 'SUCCESSOR_DUPLICATE_OR_APPROVAL_DRIFT';END IF;
 END $$;
 SELECT 'VERIFIED_SUCCESSOR_REUSES_IMMUTABLE_RELEASE_NO_REPLAY' AS result;
+\ir ../sql/reality-final-loop-same-release-investigation-interruption-v1.sql
+DO $$
+DECLARE a record; e record; n uuid; newrun uuid:=gen_random_uuid(); next_run uuid:=gen_random_uuid();
+ nonce uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid(); stamp timestamptz; bad_incident uuid;
+ proof jsonb; original_scope jsonb; before_count int; request bigint:=900901;
+BEGIN
+ SELECT * INTO STRICT a FROM reality_internal.governed_worker_release_approvals_v1
+ WHERE release_ref='fixture-current' AND runtime_scope->>'source_ref'='https://github.com/fixture/ledger/pull/9';
+ SELECT * INTO STRICT e FROM reality_internal.final_loop_resume_events_v1
+ WHERE shift_id=a.shift_id AND continuity_revision=5 AND signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
+ original_scope:=a.runtime_scope;
+ SELECT count(*) INTO before_count FROM reality_internal.governed_worker_release_approvals_v1 WHERE shift_id=a.shift_id;
+ -- Simulate the consumed signed request with a terminal HTTP failure and no
+ -- incident claim. Choose a timestamp later than all earlier fixture runs.
+ PERFORM pg_sleep(0.03);
+ stamp:=clock_timestamp();
+ UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_requested_at=stamp-interval '5 milliseconds',
+  governed_wake_queued_at=stamp-interval '4 milliseconds',governed_wake_request_id=request,
+  governed_wake_nonce=nonce,governed_wake_worker_run_id=newrun WHERE event_id=e.event_id;
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,finished_at,worker_stage)
+ VALUES(newrun,'STARTED',stamp-interval '2 milliseconds',NULL,'SHIFT_DB_BOUNDARY');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1
+ VALUES(newrun,a.owner_id,a.shift_id,a.claim_id,a.release_sha,a.release_ref,'NORMAL_SIGNED_SHIFT','sha256:'||repeat('1',64));
+ INSERT INTO reality_internal.governed_preview_shift_worker_leases_v1(worker_key,claim_id,claimed_at,lease_expires_at,next_wake_at,released_at)
+ VALUES('preview-governed-employee-shift-worker',lease,stamp-interval '3 milliseconds',stamp+interval '1 minute',stamp,NULL)
+ ON CONFLICT(worker_key) DO UPDATE SET claim_id=EXCLUDED.claim_id,claimed_at=EXCLUDED.claimed_at,
+ lease_expires_at=EXCLUDED.lease_expires_at,next_wake_at=EXCLUDED.next_wake_at,released_at=NULL;
+ DELETE FROM reality_internal.governed_employee_shift_worker_pulses_v1 WHERE shift_id=a.shift_id;
+ INSERT INTO reality_internal.governed_employee_shift_worker_pulses_v1(shift_id,owner_id,last_worker_seen_at,last_worker_status,last_worker_completed_at)
+ VALUES(a.shift_id,a.owner_id,stamp-interval '1 millisecond','WAKE_RECEIVED',stamp-interval '1 minute');
+ INSERT INTO net._http_response VALUES(request,503,'application/json',
+ '{"ok":false,"error":"SHIFT_WORKER_PROVIDER_OR_DATABASE_UNVERIFIED","registered_capability_checkpoint":null,"work_completed":false,"installation_authorized":false,"production_changed":false}',
+ false,stamp-interval '3 milliseconds');
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL
+ THEN RAISE EXCEPTION 'ACTIVE_INVESTIGATION_LEASE_SUPERSEDED';END IF;
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1 SET lease_expires_at=stamp WHERE worker_key='preview-governed-employee-shift-worker';
+ UPDATE net._http_response SET status_code=200 WHERE id=request;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL
+ THEN RAISE EXCEPTION 'NONFAILURE_RESPONSE_SUPERSEDED';END IF;
+ UPDATE net._http_response SET status_code=503 WHERE id=request;
+ INSERT INTO reality_internal.owner_shift_continuity_incidents_v1(owner_id,shift_id,kind,evidence_key,evidence_sha256,source_evidence)
+ VALUES(a.owner_id,a.shift_id,'SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED','fixture-claimed','sha256:'||repeat('a',64),
+ jsonb_build_object('event_id',e.event_id,'worker_run_id',newrun,'original_work_id',e.original_work_id,'verified_suspension_receipt_sha256',e.source_receipt_sha256))
+ RETURNING incident_id INTO bad_incident;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL
+ THEN RAISE EXCEPTION 'CLAIMED_INVESTIGATION_SUPERSEDED';END IF;
+ DELETE FROM reality_internal.owner_shift_continuity_incidents_v1 WHERE incident_id=bad_incident;
+ n:=reality_internal.stage_final_loop_release_continuation_v1(a.request_id);
+ IF n IS NULL OR n=e.event_id THEN RAISE EXCEPTION 'SAME_RELEASE_PRECLAIM_CONTINUATION_NOT_STAGED';END IF;
+ SELECT interrupted_evidence_failure_v1 INTO proof FROM reality_internal.signed_worker_actual_runs_v1 WHERE run_id=newrun AND status='FAILED';
+ IF proof->>'investigation_claim_observed' IS DISTINCT FROM 'false'
+ OR proof->>'provider_outcome_verified' IS DISTINCT FROM 'false'
+ OR proof->>'replay_authorized' IS DISTINCT FROM 'false'
+ OR proof->>'new_attempt_authorized' IS DISTINCT FROM 'false'
+ OR proof->>'receipt_sha256' IS DISTINCT FROM 'sha256:'||encode(sha256(convert_to((proof-'receipt_sha256')::text,'UTF8')),'hex')
+ OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=e.event_id AND state='SHADOW_STALE'
+  AND governed_wake_nonce=nonce AND governed_wake_request_id=request AND governed_wake_worker_run_id=newrun)
+ OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=n AND state='SHADOW_PENDING'
+  AND release_continuation_claim_id=a.claim_id AND original_work_id=e.original_work_id AND continuity_revision=e.continuity_revision
+  AND source_receipt_sha256=e.source_receipt_sha256 AND event_causality_sha256=e.event_causality_sha256)
+ OR (SELECT count(*) FROM reality_internal.governed_worker_release_approvals_v1 WHERE shift_id=a.shift_id)<>before_count
+ OR (SELECT runtime_scope FROM reality_internal.governed_worker_release_approvals_v1 WHERE claim_id=a.claim_id) IS DISTINCT FROM original_scope
+ OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=a.shift_id)
+ OR EXISTS(SELECT 1 FROM reality_internal.final_loop_child_review_work_v1 WHERE shift_id=a.shift_id AND canonical_prepare_invocation_id IS NOT NULL)
+ THEN RAISE EXCEPTION 'SAME_RELEASE_INTERRUPTION_PROOF_OR_AUTHORITY_DRIFT %',proof;END IF;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL THEN RAISE EXCEPTION 'SAME_RELEASE_INTERRUPTION_DUPLICATED';END IF;
+END $$;
+SELECT 'EXPIRED_PRECLAIM_INVESTIGATION_RECOVERED_ONCE_UNDER_SAME_RELEASE' AS result;
 ROLLBACK;
 
 -- Separate disposable fixture for the technical-return -> approved review
