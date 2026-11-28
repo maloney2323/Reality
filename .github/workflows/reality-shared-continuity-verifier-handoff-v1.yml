@@ -39,6 +39,10 @@ on:
       - 'test/reality-final-loop-interrupted-obligation-qualification-v1.mjs'
       - 'sql/reality-final-loop-bounded-same-obligation-claim-v1.sql'
       - 'test/reality-final-loop-bounded-same-obligation-claim-v1.mjs'
+      - 'sql/reality-final-loop-chat-recovery-receipt-continuation-v1.sql'
+      - 'test/reality-final-loop-chat-receipt-continuation-v1.mjs'
+      - 'api/reality/owner-final-loop-child-approval.js'
+      - 'reality-chat-final-loop-child-approval-v1.js'
       - 'src/reality-shift-continuity-independent-review-v1.js'
       - 'src/reality-dynamic-employee-inquiry-worker-v1.js'
       - 'test/reality-shift-continuity-independent-review-v1.test.js'
@@ -93,6 +97,10 @@ on:
       - 'test/reality-final-loop-interrupted-obligation-qualification-v1.mjs'
       - 'sql/reality-final-loop-bounded-same-obligation-claim-v1.sql'
       - 'test/reality-final-loop-bounded-same-obligation-claim-v1.mjs'
+      - 'sql/reality-final-loop-chat-recovery-receipt-continuation-v1.sql'
+      - 'test/reality-final-loop-chat-receipt-continuation-v1.mjs'
+      - 'api/reality/owner-final-loop-child-approval.js'
+      - 'reality-chat-final-loop-child-approval-v1.js'
       - 'src/reality-shift-continuity-independent-review-v1.js'
       - 'src/reality-dynamic-employee-inquiry-worker-v1.js'
       - 'test/reality-shift-continuity-independent-review-v1.test.js'
@@ -143,6 +151,8 @@ jobs:
           node --test test/reality-shift-continuity-independent-review-v1.test.js
           node --test test/reality-chat-self-visibility-v1.test.js
           node --test test/reality-chat-optional-evidence-v1.test.js
+          node --check reality-chat-final-loop-child-approval-v1.js
+          node --test test/reality-final-loop-chat-recovery-approval-v1.test.js
           node --test test/reality-final-loop-shared-owner-packet-v1.test.js
           node --test test/reality-final-loop-whole-cycle-acceptance-v1.test.js
           node --test test/reality-final-loop-proof-carrying-recovery-v1.test.js
@@ -216,6 +226,8 @@ jobs:
           PGDATABASE=reality_interrupted_obligation_smoke node test/reality-final-loop-interrupted-obligation-qualification-v1.mjs
           createdb reality_bounded_continuation_smoke
           PGDATABASE=reality_bounded_continuation_smoke node test/reality-final-loop-bounded-same-obligation-claim-v1.mjs
+          createdb reality_chat_receipt_continuation_smoke
+          PGDATABASE=reality_chat_receipt_continuation_smoke node test/reality-final-loop-chat-receipt-continuation-v1.mjs
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-governed-start-smoke-v1.sql
           createdb reality_identity_red
