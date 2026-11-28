@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {assertFinalChatPublicationProof as check,compileFinalOutputClaimAssessment,hashOutputClaimAssessment,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment}
+import {assertFinalChatPublicationProof as check,compileFinalOutputClaimAssessment,hashOutputClaimAssessment,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment,requiresSourceRenderedOperationalReply}
  from '../src/reality-final-chat-publication-proof-v0.1.js';
 const digest=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const answer='The user goal remains drafting the contractor pilot summary.  ';
@@ -120,4 +120,16 @@ test('read-only assessment receipt is bound to exact source, released bytes and 
  assert.equal(receipt.external_execution_authorized,false);
  assert.equal(stored.payload.source_user_message_ref,source);
  corrupt=true;await assert.rejects(recordReadOnlyOutputClaimAssessment(params),/CHAT_READ_ONLY_CLAIM_LEDGER_READBACK_FAILED/);
+});
+
+test('server-selected operational reports cannot be downgraded by a clean conversational receipt',()=>{
+ assert.equal(requiresSourceRenderedOperationalReply('Investigate the interrupted worker review invocations and restore automatic continuation of the existing authorized shift'),true);
+ assert.equal(requiresSourceRenderedOperationalReply('Hello, how are you?'),false);
+ assert.equal(requiresSourceRenderedOperationalReply('Can you explain the difference between evidence and inference?'),false);
+ const r=mock();Object.assign(r.final_direction_release.output_claim_assessment,{status:'CLAIM_COVERAGE_UNVERIFIED',candidate_scope:'CONVERSATIONAL'});seal(r);
+ assert.throws(()=>check({answer,reliability:r,atomicGoalPublicationEnabled:true,sourceRenderedOperationalRequired:true}),/CHAT_OPERATIONAL_SOURCE_RENDER_REQUIRED/);
+ r.final_direction_release.output_claim_assessment.publication_contract='SOURCE_RENDERED_OPERATIONAL_REPORT';seal(r);
+ assert.throws(()=>check({answer,reliability:r,atomicGoalPublicationEnabled:true,sourceRenderedOperationalRequired:true}),/CHAT_OPERATIONAL_SOURCE_RENDER_REQUIRED/);
+ const withheld=mock({allow:false});Object.assign(withheld.final_direction_release.output_claim_assessment,{publication_contract:'SOURCE_RENDERED_OPERATIONAL_REPORT',status:'CLAIM_COVERAGE_UNVERIFIED',candidate_scope:'CONVERSATIONAL'});seal(withheld);
+ assert.equal(check({answer,reliability:withheld,atomicGoalPublicationEnabled:true,sourceRenderedOperationalRequired:true}).final_answer_hash,digest(answer));
 });
