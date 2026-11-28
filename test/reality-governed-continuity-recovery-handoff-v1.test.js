@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {classifyRealityContinuityRecoveryHandoff as classify}
  from '../src/reality-governed-continuity-evidence-classifier-v1.js';
 
@@ -139,4 +140,26 @@ test('an owner\'s historical action receipts are ignored for the active shift',(
  assert.equal(got.items[0].continuity_state,
   'DIAGNOSIS_RECORDED_CORRECTIVE_ACTION_UNVERIFIED');
  assert.equal(got.original_job_completed,false);
+});
+
+test('returned unresolved invocation routes through existing investigator without claiming or replaying work',()=>{
+ const worker=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const sql=readFileSync(new URL('../sql/reality-final-loop-blocker-incident-handoff-v1.sql',import.meta.url),'utf8');
+ const start=worker.indexOf('const unresolvedInvocationInvestigationDue=');
+ const route=worker.slice(start,worker.indexOf('let finalLoopParentIntegration=',start));
+ assert.ok(start>0);
+ assert.match(route,/FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM/);
+ assert.match(route,/QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY/);
+ assert.match(route,/reality_observe_signed_shift_no_progress_v1/);
+ assert.match(route,/FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED/);
+ assert.match(route,/investigateOneSignedShiftContinuityIncident/);
+ assert.doesNotMatch(route,/reality_claim_final_loop_child_review_v1|runIsolatedAdvisory/);
+ const branch=sql.slice(sql.indexOf('-- Re-read current canonical evidence'),sql.indexOf('evidence:=pg_catalog.jsonb_build_object'));
+ for(const required of ['FINAL_LOOP_SHARED_CONTINUITY_CHECKED','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',
+  'canonical_return_committed','replay_authorized','model_artifact_recorded','provider_outcome_verified',
+  'invocation_observation_sha256','FINAL_LOOP_UNRESOLVED_INVOCATION_SOURCE_UNVERIFIED']){
+  assert.ok(branch.includes(required),required);
+ }
+ assert.match(sql,/previous_attempt_budget_preserved',true,'new_attempt_authorized',false/);
+ assert.doesNotMatch(branch,/UPDATE reality_internal\.final_loop_child_review_work_v1|INSERT INTO reality_internal\.final_loop_child_review_work_v1/);
 });
