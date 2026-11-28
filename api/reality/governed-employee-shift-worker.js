@@ -32,7 +32,7 @@ import {projectFinalLoopUniverseFeedback}
 import {inspectFinalLoopGovernedEngineering}
  from '../../src/reality-final-loop-governed-engineering-v1.js';
 import {classifySignedFinalLoopStagedPlanActions,
- hasCurrentApprovedChildReviewRoute,
+ selectStagedRegisteredCapabilities,
  reconcileReviewedRecoveryToFinalLoopSource,
  inspectFinalLoopRecoveryContinuation,
  verifyFinalLoopRecoveryContinuityReadback}
@@ -3209,23 +3209,21 @@ export default async function handler(req,res){
   if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.VERCEL_ENV==='preview'&&
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'){
-   // An exact packet is never an execution warrant. The registered handler
-   // independently checks its isolated DB fence and signed source proof.
-   if((signedWorkerReleaseOperatingLane.status===
-       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
-       signedWorkerReleaseOperatingLane.status===
-       'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY')&&
-      registeredRecoveryActionKeys.includes('PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
-      finalLoopStagedActionRoutes.status===
-       'FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'&&
-      finalLoopStagedActionRoutes.routes.some(r=>
-       r.next_registered_handler==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET')&&
+   // Only a registered, classified packet capability may prepare an
+   // exact owner request; the adapter independently rereads selected plans.
+   const stagedPacketCapability=legacyEngineeringDeferred?null:
+    selectStagedRegisteredCapabilities({routes:finalLoopStagedActionRoutes,
+     operatingLane:signedWorkerReleaseOperatingLane,graph:unifiedGraph,
+     registeredActionKeys:registeredRecoveryActionKeys})
+     .find(c=>c.key==='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET');
+   if(stagedPacketCapability&&
       (process.env.REALITY_FINAL_LOOP_CHILD_APPROVAL_PREPARATION_ENABLED==='true'||
        process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true')){
     try{
      finalLoopChildApprovalRequest=
       await requestFinalLoopChildApprovalFromAcceptedOriginal({
        db,graph:unifiedGraph,workerRunId:actualWorkerRunId,
+       selectedRoutes:stagedPacketCapability.routes,
        env:process.env,fetchImpl:fetch
       });
     }catch{
@@ -3238,8 +3236,9 @@ export default async function handler(req,res){
    if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true'){
     const freshChildContinuity=await requireFreshFinalLoopContinuity();
     try{
+     let freshChildGraph=unifiedGraph;
      if(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
-     const freshChildGraph=assertRealityUnifiedShiftGraph(
+     freshChildGraph=assertRealityUnifiedShiftGraph(
       await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
        expectedShiftId:wakeReceipt.shift_id
       });
@@ -3248,9 +3247,11 @@ export default async function handler(req,res){
      // Route the existing approved goal to its existing handler only in
      // the isolated operating lane. The handler still owns all atomic
      // claim, source, worker lease and model authority checks.
-     finalLoopChildReview=hasCurrentApprovedChildReviewRoute({
-      routes:finalLoopStagedActionRoutes,operatingLane:signedWorkerReleaseOperatingLane
-     })?await advanceOneFinalLoopChildReview({
+     const stagedReviewCapability=selectStagedRegisteredCapabilities({
+      routes:finalLoopStagedActionRoutes,operatingLane:signedWorkerReleaseOperatingLane,
+      graph:freshChildGraph,registeredActionKeys:['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM']
+     }).find(c=>c.key==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM');
+     finalLoopChildReview=stagedReviewCapability?await advanceOneFinalLoopChildReview({
      db,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,
      env:process.env,fetchImpl:fetch
     }):{
