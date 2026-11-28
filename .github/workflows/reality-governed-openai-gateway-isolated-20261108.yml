@@ -10,6 +10,10 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, edited]
     paths:
+      - 'sql/reality-final-loop-execution-spine-readback-v1.sql'
+      - 'src/reality-final-loop-signed-worker-bridge-v1.js'
+      - 'src/reality-final-loop-child-review-worker-v1.js'
+      - 'test/reality-final-loop-child-transactional-v1.test.js'
       - 'sql/reality-final-loop-release-continuation-v1.sql'
       - 'supabase/functions/reality-signed-maintenance-repair-source-broker-v1/index.ts'
       - 'test/reality-existing-broker-release-ci-v1.test.js'
