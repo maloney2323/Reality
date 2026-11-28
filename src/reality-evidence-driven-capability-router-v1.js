@@ -411,3 +411,34 @@ export function selectEngineeringDispatchScope({
   return legacy;
  return 'EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY';
 }
+
+
+// Common selection rule for independently qualified proof-change events.
+// Capability names are data from Continuity, not a predetermined workflow.
+// Callers still validate the current signed event, revision, and runtime;
+// the selected adapter must enforce its own consequence-specific proof/claim.
+export function resolveQualifiedCapabilityKey({
+ event,handoff,qualifications,registeredActionKeys=[]
+}={}){
+ const key=event?.next_qualified_action;
+ if(event?.event_kind!=='QUALIFIER_PROOF_CHANGED'||
+    !KEY.test(key||'')||!UUID.test(event.event_id||'')||
+    !/^work:[a-f0-9]{32}$/.test(event.original_work_id||'')||
+    !safeRef(event.source_ref)||!SHA.test(event.source_receipt_sha256||'')||
+    event.executor_invoked!==false||event.execution_authorized!==false||
+    handoff?.continuity_identity_verified!==true||handoff.qualifier_digest_verified!==true||
+    handoff.source_ref!==event.source_ref||handoff.original_work_id!==event.original_work_id||
+    handoff.qualifier_receipt_sha256!==event.source_receipt_sha256||
+    (handoff.next_qualified_action!==undefined&&handoff.next_qualified_action!==key)||
+    handoff.execution_authorized!==false||handoff.original_job_completed!==false||
+    !Array.isArray(qualifications)||qualifications.length!==1||
+    qualifications[0]?.source_ref!==event.source_ref||
+    qualifications[0].original_work_id!==event.original_work_id||
+    qualifications[0].qualifier_receipt_sha256!==event.source_receipt_sha256||
+    qualifications[0].next_qualified_action!==key||
+    !Array.isArray(registeredActionKeys)||registeredActionKeys.length>32||
+    registeredActionKeys.some(k=>!KEY.test(k||''))||
+    new Set(registeredActionKeys).size!==registeredActionKeys.length)
+  return null;
+ return registeredActionKeys.includes(key)?key:null;
+}
