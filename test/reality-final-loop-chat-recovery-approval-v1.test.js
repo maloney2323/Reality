@@ -74,7 +74,18 @@ test('bounded continuation appears in main Chat when broad shift status is unava
  vm.runInNewContext(readFileSync('reality-chat-final-loop-child-approval-v1.js','utf8'),{
  location:{pathname:'/chat'},document:{getElementById:k=>k==='privateReady'?ready:k==='privateTranscript'?thread:k==='realityChatComposer'?composer:null,createElement:k=>new Node(k),addEventListener(){}},
  window:{addEventListener(){}},MutationObserver:class{observe(){}},AbortSignal,encodeURIComponent,
- fetch:async url=>{calls.push(url);assert.equal(url,'/api/reality/owner-final-loop-child-approval');if(calls.length===1)return {ok:false,status:503,json:async()=>({ok:false,error:'FINAL_LOOP_CHILD_OWNER_APPROVAL_SERVICE_UNAVAILABLE'})};return {ok:true,status:200,json:async()=>({ok:true,shift_id:shift,packets:[fixture],owner_scope_verified:true,read_only:true,execution_authorized:false})}}
+ fetch:async (url,options)=>{calls.push(url);const root='/api/reality/owner-final-loop-child-approval';
+ if(options.method==='POST'){
+  assert.equal(url,root);assert.deepEqual(JSON.parse(options.body),body);
+  return {ok:true,status:200,json:async()=>({...approved,ok:true,parent_original_work_id:fixture.parent_original_work_id})};
+ }
+ if(calls.length===1)return {ok:false,status:503,json:async()=>({ok:false,error:'FINAL_LOOP_CHILD_OWNER_APPROVAL_SERVICE_UNAVAILABLE'})};
+ if(calls.length===4){
+  assert.equal(url,root+'?shift_id='+shift);
+  return {ok:true,status:200,json:async()=>({ok:true,shift_id:shift,packets:[{...fixture,recovery_approval:{approved:true,proposal_sha256:h('a'),approval_receipt_sha256:h('c')}}],owner_scope_verified:true,read_only:true,execution_authorized:false})};
+ }
+ assert.equal(url,root);
+ return {ok:true,status:200,json:async()=>({ok:true,shift_id:shift,packets:[fixture],owner_scope_verified:true,read_only:true,execution_authorized:false})}}
  });
  const card=main.children[1];assert.equal(card.hidden,false);
  const flatten=x=>[x,...x.children.flatMap(flatten)];
@@ -89,4 +100,10 @@ test('bounded continuation appears in main Chat when broad shift status is unava
  assert.deepEqual(calls,['/api/reality/owner-final-loop-child-approval','/api/reality/owner-final-loop-child-approval']);
  assert.ok(flatten(card).some(x=>x.textContent==='Approve bounded continuation'&&!x.disabled&&!x.hidden));
  assert.ok(flatten(card).some(x=>x.textContent.includes('8 new read-only model calls')));
+ const button=flatten(card).find(x=>x.textContent==='Approve bounded continuation');
+ await button.events.click();
+ assert.deepEqual(calls,['/api/reality/owner-final-loop-child-approval','/api/reality/owner-final-loop-child-approval','/api/reality/owner-final-loop-child-approval','/api/reality/owner-final-loop-child-approval?shift_id='+shift]);
+ assert.ok(flatten(card).some(x=>x.textContent.includes('approval independently read back')));
+ assert.equal(button.disabled,true);assert.equal(check.disabled,false);
+ await button.events.click();assert.equal(calls.length,4);
 });
