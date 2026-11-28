@@ -5,6 +5,7 @@ import {resolveReliabilityBenchmarkDb}
  from './reality-reliability-db-boundary-v0.1.js';
 import {validUuid} from './reality-private-chat-store-v0.1.js';
 import {shiftRpc} from './reality-governed-shift-boundary-v1.js';
+import {resolveQualifiedCapabilityKey} from './reality-evidence-driven-capability-router-v1.js';
 
 export const GOVERNED_AUTO_TRIGGER_VERSION='reality-governed-auto-trigger-v1.0';
 const WORK=/^work:[a-f0-9]{32}$/;
@@ -367,13 +368,17 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claime
  const qualified=c.governed_qualification_handoffs.filter(q=>
   q?.source_ref===r.source_ref&&q.original_work_id===r.original_work_id);
  const reviewAction='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
+ const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
+ const action='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC';
+ // Existing installed capability types, not an execution sequence. The
+ // exact current qualifier and event select the type; each adapter below
+ // independently enforces its own effect/authority contract.
+ const selectedCapability=resolveQualifiedCapabilityKey({event:r,handoff:h,
+  qualifications:qualified,registeredActionKeys:[reviewAction,terminalAction,action]});
  // An exact review route is independently accepted, READ-ONLY review scope.
  // Its trigger is not the maintenance verifier and cannot renew repair budget.
  if(r.event_kind==='QUALIFIER_PROOF_CHANGED'&&r.next_qualified_action===reviewAction){
-  if(claimedEventId===null||h.next_qualified_action!==reviewAction||
-     h.qualifier_receipt_sha256!==r.source_receipt_sha256||
-     qualified.length!==1||qualified[0].qualifier_receipt_sha256!==r.source_receipt_sha256||
-     qualified[0].next_qualified_action!==reviewAction||
+  if(claimedEventId===null||selectedCapability!==reviewAction||h.next_qualified_action!==reviewAction||
      !Array.isArray(h.unresolved_proof_gates)||
      h.unresolved_proof_gates.includes('OWNER_GOAL_ACCEPTANCE_EVENT_MISSING')||
      h.unresolved_proof_gates.includes('EXACT_ACCEPTANCE_APPROVAL_MISSING'))
@@ -422,14 +427,10 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claime
    previous_attempt_budget_preserved:true,new_attempt_authorized:false,
    repeat_prior_ci_dispatch_permitted:false});
  }
- const terminalAction='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY';
  // The exhausted builder may qualify DISTINCT evidence, not replay CI or
  // lease another build. The existing verifier is the only permitted reader.
  if(r.event_kind==='QUALIFIER_PROOF_CHANGED'&&r.next_qualified_action===terminalAction){
-  if(h.next_qualified_action!==terminalAction||
-     h.qualifier_receipt_sha256!==r.source_receipt_sha256||
-     qualified.length!==1||qualified[0].qualifier_receipt_sha256!==r.source_receipt_sha256||
-     qualified[0].next_qualified_action!==terminalAction||
+  if(selectedCapability!==terminalAction||h.next_qualified_action!==terminalAction||
      !Array.isArray(h.unresolved_proof_gates)||
      !h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')||
      !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
@@ -443,12 +444,7 @@ export function routeVerifiedFinalLoopResumeTrigger({continuity:c,shiftId,claime
    previous_attempt_budget_preserved:true,new_attempt_authorized:false,
    repeat_prior_ci_dispatch_permitted:false});
  }
- const action='VERIFY_DISTINCT_CASE_SPECIFIC_FROZEN_CI_REUSE_PRIOR_DIAGNOSTIC';
- if(r.event_kind!=='QUALIFIER_PROOF_CHANGED'||
-    r.next_qualified_action!==action||
-    h.qualifier_receipt_sha256!==r.source_receipt_sha256||
-    qualified.length!==1||qualified[0].qualifier_receipt_sha256!==r.source_receipt_sha256||
-    qualified[0].next_qualified_action!==action||
+ if(selectedCapability!==action||
     !Array.isArray(h.unresolved_proof_gates)||
     !h.unresolved_proof_gates.includes('CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED')||
     h.unresolved_proof_gates.includes('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED')||
