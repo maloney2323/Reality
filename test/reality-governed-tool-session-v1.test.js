@@ -115,3 +115,18 @@ test('extra model tool calls require another governed checkpoint instead of unch
  assert.equal(s.dispatched.length,1);
  assert.equal(r.original_job_completed,false);
 });
+
+
+test('objective change during text-only provider response prevents stale output',async()=>{
+ const s=scenario({noTool:true});let current=job;
+ const fetchImpl=async(...args)=>{const r=await s.fetchImpl(...args);current={...job,objective:'A different authorized objective.'};return r;};
+ await assert.rejects(runGovernedToolSession({...s.props,fetchImpl,readOriginalTask:async()=>current}),/AUTHORIZED_OBJECTIVE_CHANGED/);
+ assert.equal(s.dispatched.length,0);
+});
+test('objective change during final provider response cannot publish old objective prose',async()=>{
+ const s=scenario({mode:'PRE_EQUIP'});let current=job;
+ const fetchImpl=async(...args)=>{const r=await s.fetchImpl(...args);if(s.requests.length===2)current={...job,goal_id:'goal:new'};return r;};
+ await assert.rejects(runGovernedToolSession({...s.props,fetchImpl,readOriginalTask:async()=>current}),/AUTHORIZED_OBJECTIVE_CHANGED/);
+ assert.equal(s.dispatched.length,1); // The existing independent tool receipt is not replayed.
+ assert.equal(s.requests.length,2);
+});
