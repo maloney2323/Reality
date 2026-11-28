@@ -1169,7 +1169,7 @@ CREATE OR REPLACE FUNCTION public.reality_claim_canonical_governed_wake_v1(
  p_owner_id uuid,p_shift_id uuid,p_plan_fingerprint text,p_event_id uuid,
  p_nonce uuid,p_kind text,p_release_sha text,p_worker_run_id uuid,p_lease_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $fn$
-DECLARE n int:=0; claimed_event record; investigation_only boolean:=false; independent_review_only boolean:=false; terminal_technical_evidence_only boolean:=false; ledger_return_only boolean:=false; evidence jsonb; ledger_condition jsonb;
+DECLARE n int:=0; claimed_event record; investigation_only boolean:=false; independent_review_only boolean:=false; terminal_technical_evidence_only boolean:=false; ledger_return_only boolean:=false; evidence jsonb; ledger_condition jsonb; ledger_context jsonb:='{}'::jsonb;
 BEGIN
  IF current_user<>'service_role' THEN RAISE EXCEPTION 'CANONICAL_WAKE_SERVICE_ONLY';END IF;
  IF p_nonce IS NULL OR p_event_id IS NULL OR p_kind IS NULL OR p_kind NOT IN('START','RESUME')
@@ -1225,6 +1225,9 @@ BEGIN
    IF ledger_condition->>'condition_sha256' IS DISTINCT FROM claimed_event.ledger_return_condition_sha256
    THEN RAISE EXCEPTION 'LEDGER_RETURN_CLAIM_PROOF_UNVERIFIED';END IF;
    ledger_return_only:=true;
+   ledger_context:=pg_catalog.jsonb_build_object('original_work_id',claimed_event.original_work_id,
+    'source_ref',claimed_event.source_ref,'continuity_head_sha256',claimed_event.continuity_head_sha256,
+    'continuity_revision',claimed_event.continuity_revision,'observation_sha256',ledger_condition->>'observation_sha256');
   ELSIF claimed_event.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION' THEN
    IF claimed_event.signal_next_action<>'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY'
     OR claimed_event.release_continuation_claim_id IS NULL
@@ -1262,12 +1265,8 @@ BEGIN
  RETURN pg_catalog.jsonb_build_object('status',CASE WHEN n=1 THEN 'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED' ELSE 'CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED' END,
  'event_id',p_event_id,'worker_run_id',p_worker_run_id,'shift_id',p_shift_id,
  'investigation_only',investigation_only,'independent_review_only',independent_review_only,'terminal_technical_evidence_only',terminal_technical_evidence_only,
- 'ledger_return_only',ledger_return_only,'original_work_id',CASE WHEN ledger_return_only THEN claimed_event.original_work_id ELSE NULL END,
- 'source_ref',CASE WHEN ledger_return_only THEN claimed_event.source_ref ELSE NULL END,
- 'continuity_head_sha256',CASE WHEN ledger_return_only THEN claimed_event.continuity_head_sha256 ELSE NULL END,
- 'continuity_revision',CASE WHEN ledger_return_only THEN claimed_event.continuity_revision ELSE NULL END,
- 'observation_sha256',ledger_condition->>'observation_sha256',
- 'execution_authorized',false,'original_job_completed',false,'production_changed',false);
+ 'ledger_return_only',ledger_return_only,
+ 'execution_authorized',false,'original_job_completed',false,'production_changed',false)||ledger_context;
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_claim_canonical_governed_wake_v1(uuid,uuid,text,uuid,uuid,text,text,uuid,uuid) TO service_role;
