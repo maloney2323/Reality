@@ -1160,6 +1160,18 @@ BEGIN
  IF reality_internal.stage_final_loop_verified_review_return_v1(run) IS NOT NULL THEN RAISE EXCEPTION 'ACTIVE_WORKER_RETURN_ACCEPTED';END IF;
  -- Deliberately mutate the proof only inside the disposable test. Both
  -- false-success and no-untouched-scope cases must fail closed.
+ UPDATE public.suspension_fixture_proof SET guard=jsonb_set(guard,'{no_new_executable_authority}','false'::jsonb) WHERE shift_id=s;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp() WHERE run_id=run;
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND continuity_revision=6)
+ THEN RAISE EXCEPTION 'REVIEW_RETURN_ACCEPTED_AUTHORITY_DRIFT';END IF;
+ UPDATE public.suspension_fixture_proof SET guard=g WHERE shift_id=s;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='STARTED',finished_at=NULL WHERE run_id=run;
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET canonical_prepare_invocation_id=gen_random_uuid() WHERE shift_id=s;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp() WHERE run_id=run;
+ IF EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND continuity_revision=6)
+ THEN RAISE EXCEPTION 'REVIEW_RETURN_ACCEPTED_FENCED_SCOPE';END IF;
+ UPDATE reality_internal.final_loop_child_review_work_v1 SET canonical_prepare_invocation_id=NULL WHERE shift_id=s;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='STARTED',finished_at=NULL WHERE run_id=run;
  UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp() WHERE run_id=run;
  SELECT event_id INTO newevent FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND continuity_revision=6 AND signal_kind='QUALIFIER_PROOF_CHANGED';
  IF newevent IS NULL OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1
