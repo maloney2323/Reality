@@ -801,13 +801,19 @@ test('canonical observation return preserves event lineage and never replays sta
  assert.match(sql,/CASE_SPECIFIC_FROZEN_RED_NOT_VERIFIED/);
  assert.match(sql,/SHADOW_STALE/);
  assert.match(sql,/FINAL_LOOP_SPINE_RETURN_EVENT_CAS_FAILED/);
- assert.doesNotMatch(sql,/pg_catalog\.to_jsonb\(v\)|governed_wake_nonce|DELETE FROM|net\.http_post/);
+ // The nonce may be checked for existence only; never serialize, update or return it.
+ assert.match(sql,/v\.governed_wake_nonce IS NOT NULL/);
+ assert.equal((sql.match(/governed_wake_nonce/g)||[]).length,1);
+ assert.doesNotMatch(sql,/pg_catalog\.to_jsonb\(v\)|DELETE FROM|net\.http_post/);
 });
 
 test('completed prior preclaim events remain observations rather than fabricated provider outcomes',()=>{
  const sql=readFileSync(new URL('../sql/reality-final-loop-execution-spine-return-v1.sql',import.meta.url),'utf8');
  assert.match(sql,/SIGNED_WORKER_FINISHED_NO_CANONICAL_CHILD_CLAIM_OBSERVED/);
- assert.match(sql,/r\.status='COMPLETED' AND r\.finished_at IS NOT NULL AND r\.worker_stage='WORKER_RESPONSE_PUBLICATION'/);
+ assert.match(sql,/r\.status='COMPLETED' AND r\.finished_at IS NOT NULL\s+AND r\.worker_stage IN \('WORKER_RESPONSE_PUBLICATION','SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'\)/);
+ assert.match(sql,/v\.governed_wake_queued_at<=r\.started_at AND r\.started_at<=r\.finished_at/);
+ assert.match(sql,/a\.provider_alias_observed_deployment_id=a\.runtime_scope->>'target_deployment_id'/);
+ assert.match(sql,/'observed_worker_stage',r\.worker_stage/);
  assert.match(sql,/a\.claim_id=v\.release_continuation_claim_id/);
  assert.match(sql,/a\.runtime_scope->>'continuity_revision'=v\.continuity_revision::text/);
  assert.match(sql,/a\.runtime_scope->>'qualifier_receipt_sha256'=v\.source_receipt_sha256/);
