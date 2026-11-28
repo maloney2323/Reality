@@ -6,8 +6,8 @@
  'use strict';
  if(!/^\/chat\/?$/.test(location.pathname))return;
  const ready=document.getElementById('privateReady');
- const work=document.getElementById('realityChatPanelWork');
- if(!ready||!work||document.getElementById('realityFinalLoopChildApproval'))return;
+ const thread=document.getElementById('privateTranscript');
+ if(!ready||!thread||document.getElementById('realityFinalLoopChildApproval'))return;
  const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
  const HASH=/^sha256:[a-f0-9]{64}$/;
  const WORK=/^work:[a-f0-9]{32}$/;
@@ -43,7 +43,9 @@
  const message=node('p','reality-final-loop-child-message','');
  message.setAttribute('role','status');message.setAttribute('aria-live','polite');
  card.append(label,title,detail,evidence,limits,actions,message);
- work.prepend(card);
+ thread.append(card);
+ // Keep the exact decision visible even when saved history is rerendered.
+ new MutationObserver(()=>{if(signed()&&!card.hidden&&!thread.contains(card))thread.append(card);}).observe(thread,{childList:true});
  let selected=null,busy=false,uncertain=false;
  function valid(packet){
   return packet&&UUID.test(packet.packet_id||'')&&
@@ -90,26 +92,32 @@
   return active[0]?.shift_id||null;
  }
  async function readPackets(shiftId){
-  const response=await fetch(URL+'?shift_id='+encodeURIComponent(shiftId),{
+  const response=await fetch(URL+(shiftId?'?shift_id='+encodeURIComponent(shiftId):''),{
    credentials:'same-origin',cache:'no-store',
    signal:AbortSignal.timeout(16000)
   });
   const data=await response.json().catch(()=>null);
+  if(!shiftId&&response.status===400&&data?.error==='EXACT_OWNER_SHIFT_REQUIRED')return null;
+  if(!shiftId&&response.status===403)return {unavailable:true,packets:[]};
   if(!response.ok||data?.ok!==true||
+     !UUID.test(data.shift_id||'')||(shiftId&&data.shift_id!==shiftId)||
      data.owner_scope_verified!==true||
      data.read_only!==true||data.execution_authorized!==false||
      !Array.isArray(data.packets)||data.packets.length>20||
      !data.packets.every(valid))
    throw Error('EXACT_OWNER_APPROVAL_PACKETS_UNVERIFIED');
-  return data.packets;
+  return {shift_id:data.shift_id,packets:data.packets};
  }
  async function reload({explicit=false}={}){
   if(!signed()||busy)return;
   busy=true;refresh.disabled=true;approve.disabled=true;
   try{
-   const shiftId=await readActive();
-   if(!shiftId){selected=null;card.hidden=true;return;}
-   const packets=await readPackets(shiftId);
+   // Canonical benchmark approval is independently scoped by the server.
+   // The legacy isolated path still discovers the owner shift explicitly.
+   let read=await readPackets(null);
+   if(read===null){const active=await readActive();if(!active){selected=null;card.hidden=true;return;}read=await readPackets(active);}
+   if(read.unavailable){selected=null;card.hidden=true;return;}
+   const shiftId=read.shift_id,packets=read.packets;
    const pending=packets.filter(p=>p.state==='AWAITING_EXACT_OWNER_APPROVAL'&&p.approved===false||
     p.state==='EFFECT_RESERVED_RECONCILE_ONLY'&&Boolean(recovery(p)));
    if(explicit)uncertain=false;
@@ -119,7 +127,7 @@
    const p=pending[0];
    const q=recovery(p);
    selected={...p,shift_id:shiftId,recovery:q};
-   card.hidden=false;
+   card.hidden=false;approve.hidden=false;
    title.textContent='Review request for PR #'+p.source_ref.split('/').pop();
    detail.textContent='Original '+p.parent_original_work_id+
     ' remains open. Reality has identified '+p.file_count+
@@ -146,8 +154,9 @@
    }
    approve.disabled=uncertain;
   }catch{
-   if(selected){card.hidden=false;message.textContent=
-    'The latest source or approval receipt is not verified. No action taken.';}
+   card.hidden=false;
+   if(!selected){title.textContent='Reality · review decision unavailable';detail.textContent='Reality could not independently read your current exact review decision.';approve.hidden=true;}
+   message.textContent='The latest source or approval receipt is not verified. Use Check verified status. No action taken.';
    approve.disabled=true;
   }finally{busy=false;refresh.disabled=false;}
  }
@@ -157,7 +166,7 @@
   const exact=selected;
   message.textContent='Checking your exact source and approving once…';
   try{
-   const packets=await readPackets(exact.shift_id);
+   const {packets}=await readPackets(exact.shift_id);
    const current=packets.find(p=>p.packet_id===exact.packet_id);
    const recovering=Boolean(exact.recovery),currentRecovery=recovery(current);
    if(!current||current.source_manifest_sha256!==exact.source_manifest_sha256||
@@ -189,7 +198,7 @@
       result.production_changed!==false)
     throw Error('OWNER_APPROVAL_RECEIPT_UNVERIFIED');
    uncertain=true;
-   const verified=await readPackets(exact.shift_id);
+   const {packets:verified}=await readPackets(exact.shift_id);
    if(!verified.some(p=>p.packet_id===exact.packet_id&&
       (recovering?p.recovery_approval?.approval_receipt_sha256===result.approval_receipt_sha256&&
         p.recovery_approval?.proposal_sha256===exact.recovery.proposal_sha256&&p.recovery_approval?.approved===true:
