@@ -300,9 +300,12 @@ BEGIN
      'worker_run_id',c.claimant_worker_run_id,'event_id',e.event_id,
      'event_head_sha256',e.continuity_head_sha256,'event_revision',e.continuity_revision,
      'release_sha',w.running_release_sha,'release_receipt_sha256',w.release_receipt_sha256,
-     'worker_completed',true,'model_artifact_recorded',c.model_response_id IS NOT NULL,
+     'worker_completed',r.status='COMPLETED','model_artifact_recorded',c.model_response_id IS NOT NULL,
      'provider_outcome_verified',false,'replay_authorized',false
-   ) ORDER BY c.scope_index,c.child_work_id),'[]'::jsonb)
+   ) || CASE WHEN r.status='FAILED' THEN pg_catalog.jsonb_build_object(
+     'worker_terminal_status','FAILED','worker_failure_stage',r.worker_stage,
+     'worker_failure_attested',true,'provider_outcome_unknown',true)
+     ELSE '{}'::jsonb END ORDER BY c.scope_index,c.child_work_id),'[]'::jsonb)
    INTO v_observation_count,v_observations
    FROM reality_internal.final_loop_child_review_work_v1 c
    JOIN reality_internal.final_loop_pr_source_plans_v1 cp ON cp.plan_id=c.plan_id
@@ -316,7 +319,12 @@ BEGIN
     AND ca.authority_effect='READ_ONLY_INTERNAL_PR_REVIEW'
     AND ca.owner_approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    JOIN reality_internal.signed_worker_actual_runs_v1 r ON r.run_id=c.claimant_worker_run_id
-    AND r.status='COMPLETED' AND r.finished_at IS NOT NULL AND r.started_at IS NOT NULL
+    AND r.finished_at IS NOT NULL AND r.started_at IS NOT NULL
+    AND (r.status='COMPLETED' OR (r.status='FAILED'
+      AND r.worker_stage='EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE'
+      AND r.finished_at>=r.started_at AND c.phase='CLAIMED'
+      AND c.model_response_id IS NULL AND c.review_sha256 IS NULL
+      AND c.independent_review_receipt_sha256 IS NULL))
    JOIN reality_internal.final_loop_resume_events_v1 e ON e.governed_wake_worker_run_id=r.run_id
     AND e.shift_id=c.shift_id AND e.owner_id=c.owner_id
     AND e.original_work_id=c.parent_original_work_id AND e.source_ref=v_source
@@ -329,7 +337,29 @@ BEGIN
     AND a.owner_id=c.owner_id AND a.shift_id=c.shift_id AND a.release_sha=w.running_release_sha
     AND a.approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
    WHERE c.owner_id=v_owner AND c.shift_id=p_shift_id
-    AND c.parent_original_work_id=v_work AND c.canonical_prepare_invocation_id IS NOT NULL;
+    AND c.parent_original_work_id=v_work AND c.canonical_prepare_invocation_id IS NOT NULL
+    -- A failed run is only evidence of its signed terminal worker state.
+    -- Require the exact consumed event, release approval and time ordering.
+    AND (r.status='COMPLETED' OR (
+      e.release_continuation_claim_id=a.claim_id
+      AND e.signal_kind='QUALIFIER_PROOF_CHANGED'
+      AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+      AND e.governed_wake_nonce IS NOT NULL AND e.governed_wake_request_id IS NOT NULL
+      AND e.governed_wake_requested_at<=e.governed_wake_queued_at
+      AND e.governed_wake_queued_at<=r.started_at
+      AND c.claimed_at>=r.started_at AND c.claimed_at<=r.finished_at
+      AND a.state='CLAIMED_ONCE' AND a.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+      AND a.provider_alias_observed_at>=a.claimed_at AND a.provider_alias_observed_at<=r.started_at
+      AND a.provider_alias_observed_deployment_id=a.runtime_scope->>'target_deployment_id'
+      AND a.release_ref=w.running_release_ref
+      AND a.runtime_scope->>'original_work_id'=c.parent_original_work_id
+      AND a.runtime_scope->>'source_ref'=v_source
+      AND a.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+      AND a.runtime_scope->>'independent_gateway_ci_verified'='true'
+      AND a.runtime_scope->>'independent_qualification_branch_verified'='true'
+      AND a.runtime_scope->>'child_execution_enabled'='false'
+      AND a.runtime_scope->>'parent_delivery_enabled'='false'
+      AND a.runtime_scope->>'production_changed'='false'));
 
    -- The writer's response is never its own proof. Independently locate
    -- the identical observation set on the same canonical parent chain.
