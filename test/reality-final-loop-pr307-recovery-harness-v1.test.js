@@ -133,7 +133,7 @@ test('same signed worker publishes recovery candidate after return fence, never 
  const recovery=worker.indexOf('const finalLoopProofCarryingRecovery=');
  const publication=worker.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",recovery);
  assert.ok(fence>0&&recovery>fence&&publication>recovery);
- const suspensionStart=worker.indexOf('if(suspensionInvestigationWake){');
+ const suspensionStart=worker.indexOf('if(claimedEvidenceCapability){');
  const suspensionEnd=worker.indexOf('// Continuous, standing EVIDENCE qualification intake',suspensionStart);
  assert.ok(suspensionStart>0&&suspensionEnd>suspensionStart&&suspensionEnd<fence);
  assert.doesNotMatch(worker.slice(suspensionStart,suspensionEnd),/projectRecoveryContractFromFinalLoop|advanceOneSignedProofRecovery/);
