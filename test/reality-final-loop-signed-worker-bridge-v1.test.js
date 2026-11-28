@@ -781,7 +781,7 @@ test('effect-capable Final Loop cannot bypass shared Continuity or reuse stale i
  assert.match(helper,/lastFinalLoopContinuity=fresh/);
  // Child routing now has an additional isolated accepted-goal guard.
  const child=worker.slice(worker.indexOf("if(process.env.REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED==='true')"),worker.indexOf('// The same authorized signed worker handles bounded integration AFTER'));
- assert.match(child,/await requireFreshFinalLoopContinuity\(\);\s*try\{[\s\S]*?finalLoopChildReview=hasCurrentApprovedChildReviewRoute\(\{\s*routes:finalLoopStagedActionRoutes,operatingLane:signedWorkerReleaseOperatingLane\s*\}\)\?await advanceOneFinalLoopChildReview\(/);
+ assert.match(child,/await requireFreshFinalLoopContinuity\(\);\s*try\{[\s\S]*?selectStagedRegisteredCapabilities\(\{[\s\S]*?graph:freshChildGraph,[\s\S]*?finalLoopChildReview=stagedReviewCapability\?await advanceOneFinalLoopChildReview\(/);
  assert.equal((child.match(/advanceOneFinalLoopChildReview\(/g)||[]).length,1);
  assert.match(child,/FINAL_LOOP_CHILD_CURRENT_APPROVED_ISOLATED_ROUTE_REQUIRED/);
  for(const call of ['finalLoopParentIntegration=\n     await advanceOneFinalLoopParentIntegration','finalLoopParentDelivery=await advanceOneFinalLoopParentDelivery']){
