@@ -1270,7 +1270,9 @@ export async function runLiveIntelligenceOrchestration({
     });
     let claimDisposition=finalDirectionRelease.candidate_answer_release_allowed?
       'CANDIDATE_RELEASED_COVERAGE_LIMITED':'DIRECTION_CANDIDATE_WITHHELD';
-    if(finalDirectionRelease.candidate_answer_release_allowed&&outputClaimAssessment.unsupported_assertion_detected){
+    if(finalDirectionRelease.candidate_answer_release_allowed&&(outputClaimAssessment.unsupported_assertion_detected||
+       (outputClaimAssessment.status==='CLAIM_COVERAGE_UNVERIFIED'&&outputClaimAssessment.candidate_scope!=='CONVERSATIONAL'&&
+        Boolean(systemContext?.chat_work_execution_bridge)))){
       modelResult.answer='Reality withheld an operational assertion because the available evidence does not establish it. That is an unresolved evidence state, not proof the assertion is false. No external action was authorized by this answer.';
       modelResult.reliability_intervention='FINAL_OUTPUT_UNSUPPORTED_ASSERTION_WITHHELD';
       claimDisposition='UNSUPPORTED_CANDIDATE_WITHHELD';
