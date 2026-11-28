@@ -563,6 +563,22 @@ test('canonical claim, isolated computation and independent return preserve one 
  assert.equal(claims,0);assert.equal(modelCalls,0);
  const unresolved=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(returnedEvidence)});
  assert.equal(unresolved.status,'FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM');
+ // A signed failed invocation can be reconciled into the ledger, but
+ // even an exact returned failure must not allocate an untouched scope.
+ const failedObservation={child_work_id:child,scope_sha256:h.scope_fingerprints[0].scope_sha256,
+  invocation_id:'00000000-0000-4000-8000-000000000031',worker_run_id:other,
+  event_id:event,event_head_sha256:h.continuity_head_sha256,event_revision:h.revision,
+  release_sha:'a'.repeat(40),release_receipt_sha256:hash('b'),
+  worker_completed:false,worker_terminal_status:'FAILED',worker_failure_attested:true,
+  worker_failure_stage:'EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE',
+  provider_outcome_unknown:true,model_artifact_recorded:false,
+  provider_outcome_verified:false,replay_authorized:false};
+ const failedReturned={...returnedEvidence,observations:[failedObservation]};
+ const stillFenced=await advanceCanonicalFinalLoopChildReview({...base,
+  readCurrentContinuity:async()=>withObservation(failedReturned)});
+ assert.equal(stillFenced.status,'FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM');
+ assert.equal(claims,0);assert.equal(modelCalls,0);
+
  returned=false;
  const unconfirmedReturn=await advanceCanonicalFinalLoopChildReview({...base,call:returnCall,
   readCurrentContinuity:async()=>withObservation(pendingObservation)});
