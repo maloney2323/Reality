@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {boundedRegisteredCapabilityCheckpoint} from '../src/reality-evidence-driven-capability-router-v1.js';
 import {createHash} from 'node:crypto';
-import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview,qualifyDistinctApprovedReviewScopes}
+import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview,qualifyDistinctApprovedReviewScopes,verifyBoundedSameObligationClaim}
  from '../src/reality-final-loop-child-review-worker-v1.js';
 import {connectExistingIsolatedChildTransport,handleExistingChildTransport}
  from '../src/reality-final-loop-child-transport-v1.js';
@@ -1085,4 +1085,37 @@ test('selected packet capability never prepares another newly eligible source',a
   assert.equal(r.execution_authorized,false);
  }
  assert.equal(writes,1);
+});
+
+test('a historical invocation remains fenced unless a new exact claim independently reads back',()=>{
+ const plan='11111111-1111-4111-8111-111111111111',inv='22222222-2222-4222-8222-222222222222',
+  oldClaim='33333333-3333-4333-8333-333333333333',newClaim='44444444-4444-4444-8444-444444444444';
+ const h={owner_id:owner,shift_id:shift,parent_original_work_id:parent,source_manifest_sha256:hash('a'),
+  source_head_sha:'b'.repeat(40),acceptance_contract_sha256:hash('c'),continuity_head_sha256:hash('d'),revision:10,plan_id:plan};
+ const n={child_work_id:child,scope_sha256:hash('e'),scope_index:0,proposal_sha256:hash('f'),approval_receipt_sha256:hash('1'),
+  continuity_head_sha256:h.continuity_head_sha256,continuity_revision:10,historical_invocation_id:inv,historical_worker_run_id:other,
+  historical_invocation_replay_authorized:false,new_original_admitted:false,execution_authorized:false};
+ const a={schema:'reality-final-loop-historical-preparation-fence-v1',invocation_id:inv,worker_run_id:other,claim_id:oldClaim,
+  provider_outcome:'UNKNOWN',replay_authorized:false,historical_observation_preserved:true,premodel_recovery_count:1,
+  continuation_proposal_sha256:n.proposal_sha256,continuation_approval_receipt_sha256:n.approval_receipt_sha256};
+ const c={child_work_id:child,scope_sha256:n.scope_sha256,scope_index:0,claim_id:newClaim,claimant_worker_run_id:run,
+  same_obligation_continuation:n,historical_prepare_fence:a,historical_invocation_replay_authorized:false};
+ const r={status:'FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT',independent_service_readback_verified:true,
+  owner_id:owner,shift_id:shift,parent_original_work_id:parent,source_manifest_sha256:h.source_manifest_sha256,source_head_sha:h.source_head_sha,
+  acceptance_contract_sha256:h.acceptance_contract_sha256,original_job_completed:false,production_changed:false,
+  approved_recovery_receipt_sha256:n.approval_receipt_sha256,children:[{child_original_work_id:child,active_claim_id:newClaim,
+   preparation_worker_run_id:run,canonical_prepare_invocation_id:null,prepared_artifact_available:false,historical_prepare_fence:a}]};
+ const evidence={observations:[{child_work_id:child,scope_sha256:n.scope_sha256,invocation_id:inv,worker_run_id:other,
+   model_artifact_recorded:false,provider_outcome_verified:false,replay_authorized:false}]};
+ const args={claim:c,readback:r,handoff:h,evidence,workerRunId:run};
+ assert.equal(verifyBoundedSameObligationClaim(args),true);
+ for(const altered of [
+  {claim:{...c,claim_id:oldClaim}},
+  {claim:{...c,historical_prepare_fence:{...a,replay_authorized:true}}},
+  {readback:{...r,approved_recovery_receipt_sha256:hash('2')}},
+  {readback:{...r,children:[{...r.children[0],canonical_prepare_invocation_id:inv}]}},
+  {readback:{...r,children:[{...r.children[0],historical_prepare_fence:null}]}},
+  {evidence:{observations:[{...evidence.observations[0],provider_outcome_verified:true}]}},
+  {handoff:{...h,revision:11}}
+ ])assert.equal(verifyBoundedSameObligationClaim({...args,...altered}),false);
 });
