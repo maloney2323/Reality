@@ -126,7 +126,7 @@ import {investigateAuthenticatedChatUnderExistingShift}
  from '../../src/reality-signed-chat-to-work-v1.js';
 import {continueRileyCorrectiveModelIntoIndependentCI}
  from '../../src/reality-riley-auto-corrective-ci-bridge-v1.js';
-import {isBoundedCorrectiveProofWake,classifyCorrectiveProofTick}
+import {classifyCorrectiveProofTick}
  from '../../src/reality-bounded-corrective-proof-tick-v1.js';
 import {isDurablyCompletedShiftWorkerPulse}
  from '../../src/reality-shift-worker-durable-completion-v1.js';
@@ -195,7 +195,7 @@ import {executeOneRegisteredMaintenanceCiWake}
 import {planGovernedCapabilitiesFromOwnerReceipts,
  planCategorizedContinuityRecovery,invokeOneRegisteredSignedCapability,
  selectRegisteredSignedEventCapability,boundedRegisteredCapabilityCheckpoint,
- selectClaimedEvidenceCapability,selectEngineeringDispatchScope}
+ selectClaimedEvidenceCapability,selectEngineeringDispatchScope,selectCorrectiveCiCapability}
  from '../../src/reality-evidence-driven-capability-router-v1.js';
 import {attestSignedWorkerLoadedCapabilities}
  from '../../src/reality-signed-worker-capability-delivery-v1.js';
@@ -2106,10 +2106,14 @@ export default async function handler(req,res){
   // A completed bounded check is not a completed customer job; every lane
   // still records its own durable worker outcome before responding.
   let boundedCorrectiveCheckpoint=null;
-  if(isBoundedCorrectiveProofWake(wakeReceipt,boundedCorrectiveScope)){
+  const correctiveCiCapabilityKeys=['RUN_INDEPENDENT_CORRECTIVE_CI'];
+  const boundedCorrectiveCapability=selectCorrectiveCiCapability({wake:wakeReceipt,
+   candidate:boundedCorrectiveScope,registeredActionKeys:correctiveCiCapabilityKeys});
+  if(boundedCorrectiveCapability){
    workerStage='CORRECTIVE_CI_BOUNDED';
    const corrective=await continueRileyCorrectiveModelIntoIndependentCI({
-    db,env:process.env,fetchImpl:fetch
+    db,env:process.env,fetchImpl:fetch,version:boundedCorrectiveCapability.version,
+    expectedScope:boundedCorrectiveCapability.expectedScope
    }).catch(()=>({
     status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
     original_job_completed:false,installation_authorized:false,
@@ -2171,20 +2175,13 @@ export default async function handler(req,res){
    'reality_read_next_same_original_recovery_candidate_v2',{})
    .catch(()=>null);
   let sameOriginalRecoveryCiCheckpoint=null;
-  if(!boundedCorrectiveCheckpoint&&
-     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-     recoveryCiScope?.status==='SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI'&&
-     recoveryCiScope.shift_id===wakeReceipt.shift_id&&
-     /^[a-f0-9-]{36}$/i.test(recoveryCiScope.attempt_id||'')&&
-     /^work:[a-f0-9]{32}$/.test(recoveryCiScope.original_work_id||'')&&
-     Number.isSafeInteger(recoveryCiScope.attempt_number)&&
-     recoveryCiScope.attempt_number>=2&&
-     recoveryCiScope.installation_authorized===false&&
-     recoveryCiScope.original_job_completed===false&&
-     recoveryCiScope.production_changed===false){
+  const recoveryCiCapability=selectCorrectiveCiCapability({wake:wakeReceipt,
+   candidate:recoveryCiScope,registeredActionKeys:correctiveCiCapabilityKeys});
+  if(!boundedCorrectiveCheckpoint&&recoveryCiCapability?.version===2){
    workerStage='SAME_ORIGINAL_RECOVERY_CI_BROKER';
    const retryCi=await continueRileyCorrectiveModelIntoIndependentCI({
-    db,env:process.env,fetchImpl:fetch,version:2
+    db,env:process.env,fetchImpl:fetch,version:recoveryCiCapability.version,
+    expectedScope:recoveryCiCapability.expectedScope
    }).catch(()=>({
     status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
     original_job_completed:false,new_shift_started:false,
