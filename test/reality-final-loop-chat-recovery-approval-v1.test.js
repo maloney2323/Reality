@@ -60,23 +60,30 @@ test('bounded continuation appears in main Chat when broad shift status is unava
   append(...nodes){this.children.push(...nodes);}
   setAttribute(){}
   contains(n){return this.children.includes(n);}
+  insertBefore(n,b){this.children.splice(this.children.indexOf(b),0,n);n.parentNode=this;}
+  replaceChildren(...nodes){this.children=nodes;}
+
   addEventListener(k,f){this.events[k]=f;}
  }
- const ready=new Node('div');ready.style.display='block';const thread=new Node('div');
+ const ready=new Node('div');ready.style.display='block';const thread=new Node('div'),composer=new Node('form'),main=new Node('div');main.append(thread,composer);composer.parentNode=main;
  const calls=[];
  const fixture={packet_id:packet,source_ref:'https://github.com/maloney2323/Reality/pull/307',parent_original_work_id:'work:'+'1'.repeat(32),
  source_manifest_sha256:h('b'),approval_fingerprint:h('d'),acceptance_contract_sha256:h('e'),effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',file_count:34,proposed_scope_count:5,
  state:'EFFECT_RESERVED_RECONCILE_ONLY',approved:true,recovery_qualification:{status:'SAME_ORIGINAL_MISSING_REVIEW_WORK_QUALIFIED_FOR_EXACT_OWNER_DECISION',proposal_sha256:h('a'),execution_authorized:false,new_attempt_authorized:false,replay_authorized:false,
  proposal:{packet_id:packet,original_work_id:'work:'+'1'.repeat(32),source_manifest_sha256:h('b'),historical_invocation_replay_authorized:false,new_budget_authorized:false,prior_budget_preserved:true,missing_scope_count:4,preserved_verified_scope_count:1,proposed_max_new_provider_calls:8,proposed_max_new_prepare_calls:4,proposed_max_new_independent_verify_calls:4}}};
  vm.runInNewContext(readFileSync('reality-chat-final-loop-child-approval-v1.js','utf8'),{
- location:{pathname:'/chat'},document:{getElementById:k=>k==='privateReady'?ready:k==='privateTranscript'?thread:null,createElement:k=>new Node(k),addEventListener(){}},
+ location:{pathname:'/chat'},document:{getElementById:k=>k==='privateReady'?ready:k==='privateTranscript'?thread:k==='realityChatComposer'?composer:null,createElement:k=>new Node(k),addEventListener(){}},
  window:{addEventListener(){}},MutationObserver:class{observe(){}},AbortSignal,encodeURIComponent,
  fetch:async url=>{calls.push(url);assert.equal(url,'/api/reality/owner-final-loop-child-approval');return {ok:true,status:200,json:async()=>({ok:true,shift_id:shift,packets:[fixture],owner_scope_verified:true,read_only:true,execution_authorized:false})}}
  });
+ const card=main.children[1];assert.equal(card.hidden,false);
+ const flatten=x=>[x,...x.children.flatMap(flatten)];
+ assert.deepEqual(calls,[]);
+ const check=flatten(card).find(x=>x.textContent==='Check review decision');assert.ok(check&&!check.disabled);
+ check.events.click();thread.replaceChildren(new Node('p'));
  await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(calls,['/api/reality/owner-final-loop-child-approval']);
- const card=thread.children[0];assert.equal(card.hidden,false);
- const flatten=x=>[x,...x.children.flatMap(flatten)];
+ assert.equal(main.children[1],card);assert.equal(card.hidden,false);
  assert.ok(flatten(card).some(x=>x.textContent==='Approve bounded continuation'&&!x.disabled&&!x.hidden));
  assert.ok(flatten(card).some(x=>x.textContent.includes('8 new read-only model calls')));
 });
