@@ -121,6 +121,7 @@
  async function reload({explicit=false}={}){
   if(!signed()||busy)return;
   busy=true;refresh.disabled=true;approve.disabled=true;
+  message.textContent='Reading the exact current decision…';
   try{
    // Canonical benchmark approval is independently scoped by the server.
    // The legacy isolated path still discovers the owner shift explicitly.
@@ -128,6 +129,9 @@
    if(read===null){const active=await readActive();if(!active){selected=null;card.hidden=true;return;}read=await readPackets(active);}
    if(read.unavailable){selected=null;showCheck('The authenticated review boundary did not accept this request. No approval is available from this response.');return;}
    const shiftId=read.shift_id,packets=read.packets;
+   // Reconcile a possibly committed decision before offering any repeat.
+   const recorded=selected?.recovery&&packets.find(p=>p.packet_id===selected.packet_id&&p.recovery_approval?.approved===true&&p.recovery_approval?.proposal_sha256===selected.recovery.proposal_sha256&&HASH.test(p.recovery_approval?.approval_receipt_sha256||''));
+   if(recorded){message.textContent='Bounded continuation approval independently read back. No further approval is required.';approve.hidden=true;selected=null;uncertain=false;return;}
    const pending=packets.filter(p=>p.state==='AWAITING_EXACT_OWNER_APPROVAL'&&p.approved===false||
     p.state==='EFFECT_RESERVED_RECONCILE_ONLY'&&Boolean(recovery(p)));
    if(explicit)uncertain=false;
@@ -172,18 +176,23 @@
  }
  approve.addEventListener('click',async()=>{
   if(!signed()||busy||uncertain||approve.disabled||!selected)return;
-  busy=true;approve.disabled=true;
-  const exact=selected;
-  message.textContent='Checking your exact source and approving once…';
+  busy=true;approve.disabled=true;refresh.disabled=true;
+  const exact=selected,recovering=Boolean(exact.recovery);
+  message.textContent='Submitting your exact approval once…';
   try{
-   const {packets}=await readPackets(exact.shift_id);
-   const current=packets.find(p=>p.packet_id===exact.packet_id);
-   const recovering=Boolean(exact.recovery),currentRecovery=recovery(current);
-   if(!current||current.source_manifest_sha256!==exact.source_manifest_sha256||
-      current.parent_original_work_id!==exact.parent_original_work_id||
-      (recovering?(current.state!=='EFFECT_RESERVED_RECONCILE_ONLY'||currentRecovery?.proposal_sha256!==exact.recovery.proposal_sha256):
-       (current.state!=='AWAITING_EXACT_OWNER_APPROVAL'||current.approved!==false||current.approval_fingerprint!==exact.approval_fingerprint)))
-    throw Error('OWNER_APPROVAL_PACKET_CHANGED');
+   // Bounded recovery POST independently re-reads the exact owner packet
+   // and the locked SQL approval function requalifies it again. Do not
+   // require a redundant browser GET before transmitting the owner's click.
+   // Retain the original pre-read for the legacy isolated approval path.
+   if(!recovering){
+    const {packets}=await readPackets(exact.shift_id);
+    const current=packets.find(p=>p.packet_id===exact.packet_id);
+    if(!current||current.source_manifest_sha256!==exact.source_manifest_sha256||
+       current.parent_original_work_id!==exact.parent_original_work_id||
+       current.state!=='AWAITING_EXACT_OWNER_APPROVAL'||current.approved!==false||
+       current.approval_fingerprint!==exact.approval_fingerprint)
+     throw Error('OWNER_APPROVAL_PACKET_CHANGED');
+   }
    const response=await fetch(URL,{
     method:'POST',credentials:'same-origin',cache:'no-store',
     headers:{'content-type':'application/json'},
@@ -219,7 +228,7 @@
   }catch{
    uncertain=true;
    message.textContent='Approval result uncertain. Check verified status. Reality will not automatically repeat the approval.';
-  }finally{busy=false;approve.disabled=true;}
+  }finally{busy=false;approve.disabled=true;refresh.disabled=false;}
  });
  refresh.addEventListener('click',()=>void reload({explicit:true}));
  const auth=new MutationObserver(()=>{
