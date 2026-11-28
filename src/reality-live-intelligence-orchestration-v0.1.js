@@ -29,7 +29,7 @@ import {
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
-import {compileFinalOutputClaimAssessment,hashOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
+import {compileFinalOutputClaimAssessment,hashOutputClaimAssessment,requiresSourceRenderedOperationalReply} from './reality-final-chat-publication-proof-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
@@ -1264,13 +1264,15 @@ export async function runLiveIntelligenceOrchestration({
     const retryExact=candidateRelease===acceptedGoalRevisionText;
     const exactReview=retryExact?acceptedGoalRevisionReview:firstExact?semanticFirst?.review:null;
     const exactCandidate=retryExact?acceptedGoalRevisionCandidate:firstExact?semanticFirst?.candidate:null;
-    const outputClaimAssessment=compileFinalOutputClaimAssessment({
+    const sourceRenderedOperational=Boolean(systemContext?.chat_work_execution_bridge)&&requiresSourceRenderedOperationalReply(message);
+    let outputClaimAssessment=compileFinalOutputClaimAssessment({
       answer:candidateRelease,candidate:exactCandidate||null,snapshot:semanticSourceSnapshot,
       review:exactReview,extractionStatus:exactReview?'EXACT_EXISTING_SEMANTIC_EXTRACTION':'FINAL_TEXT_EXTRACTION_NOT_ESTABLISHED'
     });
+    if(sourceRenderedOperational)outputClaimAssessment=Object.freeze({...outputClaimAssessment,publication_contract:'SOURCE_RENDERED_OPERATIONAL_REPORT'});
     let claimDisposition=finalDirectionRelease.candidate_answer_release_allowed?
       'CANDIDATE_RELEASED_COVERAGE_LIMITED':'DIRECTION_CANDIDATE_WITHHELD';
-    if(finalDirectionRelease.candidate_answer_release_allowed&&(outputClaimAssessment.unsupported_assertion_detected||
+    if(finalDirectionRelease.candidate_answer_release_allowed&&(sourceRenderedOperational||outputClaimAssessment.unsupported_assertion_detected||
        (outputClaimAssessment.status==='CLAIM_COVERAGE_UNVERIFIED'&&outputClaimAssessment.candidate_scope!=='CONVERSATIONAL'&&
         Boolean(systemContext?.chat_work_execution_bridge)))){
       modelResult.answer='Reality withheld an operational assertion because the available evidence does not establish it. That is an unresolved evidence state, not proof the assertion is false. No external action was authorized by this answer.';
