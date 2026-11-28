@@ -233,3 +233,17 @@ test('read-only intelligence receives the same operational temporal projection a
  assert.match(reply.answer,/approval receipt sha256:/);
  assert.equal(reply.execution_authorized,false);
 });
+
+
+test('fast Chat preserves the same owner incident evidence as full cognition without another read or authority',()=>{
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ const lane=api.split("stage='READ_ONLY_BOUNDED_CONTEXT'")[1].split('// The signed human message entered')[0];
+ assert.match(lane,/const incidentObservations=incidentChatUniverseObservations\(ctx\.values\.owner_handoff\)/);
+ assert.match(lane,/const observations=\[\.\.\.incidentObservations,\.\.\.selfVisibilityObservations/);
+ assert.match(lane,/owner_incident_evidence_status:ctx\.values\.owner_handoff\?'OWNER_SCOPED_READBACK':'UNAVAILABLE_NOT_ABSENCE'/);
+ assert.match(lane,/owner_shift_continuity_incidents:ctx\.values\.owner_handoff\?\.shift_continuity_incidents/);
+ assert.equal((lane.match(/readOwnerOperationalIncidentChatBriefing\(/g)||[]).length,1);
+ assert.match(lane,/conversation_never_grants_execution_authority:true/);
+ assert.match(lane,/external_actions_authorized:false/);
+ assert.match(api,/incidentChatUniverseObservations\(operationalIncidentsReadback\)/);
+});
