@@ -994,4 +994,67 @@ BEGIN
   OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=s)
  THEN RAISE EXCEPTION 'RETURN_HISTORY_OR_AUTHORITY_DRIFT';END IF;
 END $$;
+
+-- Use the already proven ledger return above as the only successor evidence.
+-- No synthetic release claim is created; the existing consumed approval stays
+-- byte-for-byte unchanged throughout the new recovery dispatch.
+\ir ../sql/reality-final-loop-verified-successor-authority-v1.sql
+DO $$
+DECLARE a record; c record; v jsonb; before_scope jsonb; before_count int; next_event uuid; current_head text; current_rev bigint; q text; old_guard jsonb; old_proof jsonb;
+BEGIN
+ SELECT r.* INTO STRICT a FROM reality_internal.governed_worker_release_approvals_v1 r
+ WHERE r.release_ref='fixture-current' AND r.runtime_scope->>'source_ref'='https://github.com/fixture/ledger/pull/9';
+ -- Fixture adapters supply the independent guard fields normally calculated
+ -- by the canonical readback; the actual predecessor receipt and event are
+ -- produced by the previous real SQL return test.
+ UPDATE reality_internal.governed_worker_release_approvals_v1
+ SET runtime_scope=runtime_scope||jsonb_build_object('independent_transport_proof_sha256','sha256:'||repeat('8',64))
+ WHERE claim_id=a.claim_id RETURNING * INTO a;
+ SELECT * INTO STRICT c FROM reality_internal.final_loop_resume_conditions_v1
+ WHERE shift_id=a.shift_id AND condition_kind='QUALIFIER_PROOF_CHANGED';
+ current_head:=c.continuity_head_sha256;current_rev:=c.continuity_revision;q:=c.subscribed_receipt_sha256;
+ IF current_rev<>5 THEN RAISE EXCEPTION 'SUCCESSOR_FIXTURE_REVISION_NOT_ADVANCED';END IF;
+ UPDATE public.suspension_fixture_proof SET
+ proof=proof||jsonb_build_object('shift_id',a.shift_id,'plan_fingerprint',a.runtime_scope->>'plan_fingerprint'),
+ guard=jsonb_set(guard||jsonb_build_object('no_new_executable_authority',true,'unverified_handoffs',0,
+ 'worldline_parent_links_verified',true,'shift_scope_authority_event_present',true,'production_changed',false,
+ 'frozen_shift_scope_sha256',proof->>'frozen_shift_scope_sha256'),'{obligations,0,execution_permitted_by_handoff}','false'::jsonb)
+ WHERE shift_id=a.shift_id RETURNING guard,proof INTO old_guard,old_proof;
+ UPDATE reality_internal.signed_worker_actual_runs_v1 r SET status='COMPLETED',finished_at=clock_timestamp(),worker_stage='LEDGER_RETURN_RESPONSE_PUBLICATION'
+ FROM reality_internal.final_loop_resume_events_v1 e WHERE e.shift_id=a.shift_id AND e.ledger_return_condition_sha256 IS NOT NULL
+ AND r.run_id=e.governed_wake_worker_run_id;
+ before_scope:=a.runtime_scope;
+ SELECT count(*) INTO before_count FROM reality_internal.governed_worker_release_approvals_v1 WHERE shift_id=a.shift_id;
+ -- Rejection controls: the same receipt cannot authorize another original,
+ -- revision, or changed budget/authority.
+ SET LOCAL ROLE service_role;
+ v:=reality_internal.read_final_loop_release_successor_scope_v1(a.claim_id);
+ RESET ROLE;
+ IF v->>'continuity_revision' IS DISTINCT FROM '5' OR v->>'continuity_head_sha256' IS DISTINCT FROM current_head
+ OR v->>'execution_authorized' IS DISTINCT FROM 'false' OR v->>'replay_authorized' IS DISTINCT FROM 'false'
+ THEN RAISE EXCEPTION 'VERIFIED_SUCCESSOR_NOT_RECOGNIZED %',v;END IF;
+ IF reality_internal.final_loop_release_successor_matches_v1(a.claim_id,a.owner_id,a.shift_id,'work:'||repeat('9',32),c.source_ref,current_head,current_rev)
+ OR reality_internal.final_loop_release_successor_matches_v1(a.claim_id,a.owner_id,a.shift_id,c.original_work_id,c.source_ref,current_head,current_rev+1)
+ THEN RAISE EXCEPTION 'WRONG_ORIGINAL_OR_REVISION_ACCEPTED';END IF;
+ UPDATE public.suspension_fixture_proof SET guard=jsonb_set(guard,'{no_new_executable_authority}','false'::jsonb) WHERE shift_id=a.shift_id;
+ IF reality_internal.read_final_loop_release_successor_scope_v1(a.claim_id) IS NOT NULL THEN RAISE EXCEPTION 'NEW_AUTHORITY_ACCEPTED';END IF;
+ UPDATE public.suspension_fixture_proof SET guard=old_guard WHERE shift_id=a.shift_id;
+ -- Existing child-plan prerequisite is a real precondition in this fixture.
+ INSERT INTO reality_internal.final_loop_child_approval_packets_v1 VALUES(gen_random_uuid(),c.source_ref,'EFFECT_RESERVED_RECONCILE_ONLY');
+ INSERT INTO reality_internal.final_loop_child_review_work_v1(child_work_id,packet_id,owner_id,shift_id,parent_original_work_id,phase)
+ SELECT gen_random_uuid(),p.packet_id,a.owner_id,a.shift_id,c.original_work_id,'ADMITTED'
+ FROM reality_internal.final_loop_child_approval_packets_v1 p WHERE p.source_ref=c.source_ref LIMIT 1;
+ next_event:=reality_internal.stage_final_loop_release_continuation_v1(a.request_id);
+ IF next_event IS NULL OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
+ WHERE e.event_id=next_event AND e.release_continuation_claim_id=a.claim_id
+ AND e.continuity_revision=5 AND e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION'
+ AND e.signal_next_action='INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY')
+ THEN RAISE EXCEPTION 'SAME_RELEASE_SUCCESSOR_NOT_STAGED';END IF;
+ IF reality_internal.stage_final_loop_release_continuation_v1(a.request_id) IS NOT NULL
+ OR (SELECT count(*) FROM reality_internal.governed_worker_release_approvals_v1 WHERE shift_id=a.shift_id)<>before_count
+ OR (SELECT runtime_scope FROM reality_internal.governed_worker_release_approvals_v1 WHERE claim_id=a.claim_id) IS DISTINCT FROM before_scope
+ OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=a.shift_id)
+ THEN RAISE EXCEPTION 'SUCCESSOR_DUPLICATE_OR_APPROVAL_DRIFT';END IF;
+END $$;
+SELECT 'VERIFIED_SUCCESSOR_REUSES_IMMUTABLE_RELEASE_NO_REPLAY' AS result;
 ROLLBACK;
