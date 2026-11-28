@@ -310,3 +310,140 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint) TO service_role;
+
+-- Read the changed condition from the independently verified Continuity guard.
+-- A release is only a transport identity; the condition hash is separately
+-- deduplicated across release activations. No provider effects are inferred.
+CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_ledger_return_condition_v1(
+ p_shift_id uuid,p_release_claim_id uuid,p_current_event_id uuid,p_worker_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $condition$
+DECLARE a record; g jsonb; o jsonb; e jsonb; q record; p jsonb; digest text; writer_hash text; condition_hash text;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'LEDGER_RETURN_CONDITION_SERVICE_ONLY';END IF;
+ IF p_shift_id IS NULL OR p_release_claim_id IS NULL
+  OR (p_current_event_id IS NULL)<>(p_worker_run_id IS NULL) THEN RETURN NULL;END IF;
+ SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
+ JOIN reality_internal.governed_employee_shifts_v1 s ON s.shift_id=r.shift_id AND s.owner_id=r.owner_id
+ JOIN reality_internal.governed_employee_completion_warrants_v1 w ON w.shift_id=s.shift_id
+  AND w.owner_id=s.owner_id AND w.plan_fingerprint=s.plan_fingerprint
+ WHERE r.claim_id=p_release_claim_id AND r.shift_id=p_shift_id
+ AND r.state='CLAIMED_ONCE' AND r.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND r.approval_receipt_sha256~'^sha256:[a-f0-9]{64}$'
+ AND r.provider_alias_observed_at>=r.claimed_at
+ AND r.provider_alias_observed_deployment_id=r.runtime_scope->>'target_deployment_id'
+ AND r.runtime_scope->>'target_environment'='CANONICAL_BENCHMARK_PREVIEW'
+ AND r.runtime_scope->>'runtime_database_project_ref'='hvkfreoagbrphwghjajw'
+ AND r.runtime_scope->>'exact_runtime_database_contract_verified'='true'
+ AND r.runtime_scope->>'independent_gateway_ci_verified'='true'
+ AND r.runtime_scope->>'independent_qualification_branch_verified'='true'
+ AND r.runtime_scope->>'child_execution_enabled'='false'
+ AND r.runtime_scope->>'parent_delivery_enabled'='false'
+ AND r.runtime_scope->>'production_changed'='false'
+ AND r.runtime_scope->>'plan_fingerprint'=s.plan_fingerprint
+ AND s.authorized_at IS NOT NULL AND s.closed_at IS NULL
+ AND s.planned_start_at<=pg_catalog.clock_timestamp()
+ AND s.planned_end_at>pg_catalog.clock_timestamp()
+ AND s.status IN ('RUNNING','QUEUED','AWAITING_EXACT_ORIGINAL_WORK')
+ AND w.state='ACTIVE' AND w.mode='UNTIL_ALL_INDEPENDENT_INTERNAL_MAINTENANCE_RECEIPTS'
+ AND EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(w.source_scope) z
+  WHERE z->>'source_ref'=r.runtime_scope->>'source_ref')
+ AND NOT EXISTS(SELECT 1 FROM reality_internal.governed_worker_release_approvals_v1 newer
+  WHERE newer.owner_id=r.owner_id AND newer.shift_id=r.shift_id
+  AND newer.capability_key=r.capability_key AND newer.state='CLAIMED_ONCE'
+  AND newer.provider_alias_observed_at>r.provider_alias_observed_at);
+ IF NOT FOUND THEN RETURN NULL;END IF;
+ g:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+ IF g->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+ OR g->>'owner_id' IS DISTINCT FROM a.owner_id::text OR g->>'shift_id' IS DISTINCT FROM p_shift_id::text
+ OR g->>'continuity_root_id' IS DISTINCT FROM a.runtime_scope->>'continuity_root_id'
+ OR g->>'continuity_head_sha256' IS DISTINCT FROM a.runtime_scope->>'continuity_head_sha256'
+ OR g->>'revision' IS DISTINCT FROM a.runtime_scope->>'continuity_revision'
+ OR g->>'execution_authorized' IS DISTINCT FROM 'false'
+ OR g->>'original_job_completed' IS DISTINCT FROM 'false'
+ THEN RETURN NULL;END IF;
+ SELECT x.value INTO o FROM pg_catalog.jsonb_array_elements(g->'obligations') x
+ WHERE x.value->>'original_work_id'=a.runtime_scope->>'original_work_id'
+ AND x.value->>'source_ref'=a.runtime_scope->>'source_ref'
+ AND x.value->>'qualifier_receipt_sha256'=a.runtime_scope->>'qualifier_receipt_sha256'
+ AND x.value->>'next_qualified_action'='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND x.value->>'continuity_identity_verified'='true' AND x.value->>'qualifier_digest_verified'='true'
+ AND x.value->>'source_proof_verified'='true' AND x.value->>'independent_original_outcome_verified'='false';
+ IF NOT FOUND THEN RETURN NULL;END IF;
+ e:=o->'execution_spine_readback';
+ IF e->>'status' IS DISTINCT FROM 'SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN'
+ OR e->>'canonical_return_committed' IS DISTINCT FROM 'false'
+ OR e->>'provider_outcome_verified' IS DISTINCT FROM 'false'
+ OR e->>'replay_authorized' IS DISTINCT FROM 'false'
+ OR pg_catalog.jsonb_typeof(e->'observations') IS DISTINCT FROM 'array'
+ OR pg_catalog.jsonb_array_length(e->'observations') NOT BETWEEN 1 AND 63
+ THEN RETURN NULL;END IF;
+ digest:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((e->'observations')::text,'UTF8')),'hex');
+ IF e->>'observation_sha256' IS DISTINCT FROM digest THEN RETURN NULL;END IF;
+ SELECT r.* INTO q FROM reality_internal.owner_continuity_qualification_routes_v1 r
+ WHERE r.owner_id=a.owner_id AND r.source_ref=o->>'source_ref' AND r.intake_family='SIGNED_SHIFT_SOURCE'
+ AND r.reconciliation_receipt_sha256=o->>'qualifier_receipt_sha256'
+ AND r.reconciliation_receipt_sha256='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(r.reconciliation_snapshot::text,'UTF8')),'hex')
+ AND r.reconciliation_snapshot->>'shift_id'=p_shift_id::text
+ AND r.reconciliation_snapshot->>'original_candidate_work_id'=o->>'original_work_id'
+ AND r.reconciliation_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND r.reconciliation_checked_at>=pg_catalog.clock_timestamp()-interval '10 minutes'
+ ORDER BY r.reconciliation_checked_at DESC LIMIT 1;
+ IF NOT FOUND THEN RETURN NULL;END IF;
+ p:=reality_internal.read_final_loop_invocation_return_pending_v1(p_shift_id,a.owner_id,
+  o->>'original_work_id',o->>'source_ref',g->>'continuity_head_sha256',(g->>'revision')::bigint,
+  q.reconciliation_receipt_sha256,q.reconciliation_snapshot,e,p_current_event_id,p_worker_run_id);
+ IF p->>'ready' IS DISTINCT FROM 'true' THEN RETURN NULL;END IF;
+ -- Exact installed code identity, not a clock, run ID, or software release ID,
+ -- makes a changed correction distinguishable from a duplicate condition.
+ writer_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+  pg_catalog.pg_get_functiondef('public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint)'::regprocedure)||
+  pg_catalog.pg_get_functiondef('reality_internal.read_final_loop_invocation_return_pending_v1(uuid,uuid,text,text,text,bigint,text,jsonb,jsonb,uuid,uuid)'::regprocedure),
+  'UTF8')),'hex');
+ condition_hash:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+  pg_catalog.jsonb_build_array(p_shift_id,a.owner_id,o->>'original_work_id',o->>'source_ref',g->>'continuity_head_sha256',
+   g->>'revision',q.reconciliation_receipt_sha256,digest,writer_hash)::text,'UTF8')),'hex');
+ RETURN pg_catalog.jsonb_build_object('condition_sha256',condition_hash,'observation_sha256',digest,
+  'owner_id',a.owner_id,'original_work_id',o->>'original_work_id','source_ref',o->>'source_ref',
+  'head',g->>'continuity_head_sha256','revision',(g->>'revision')::bigint,'qualifier',q.reconciliation_receipt_sha256);
+END $condition$;
+REVOKE ALL ON FUNCTION reality_internal.read_final_loop_ledger_return_condition_v1(uuid,uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION reality_internal.read_final_loop_ledger_return_condition_v1(uuid,uuid,uuid,uuid) TO service_role;
+
+-- The trusted independent post-install verifier may call this on a changed
+-- condition. It inserts into the existing event inbox: the existing trigger
+-- and lease release path perform delivery; this function never calls HTTP.
+CREATE OR REPLACE FUNCTION public.reality_stage_final_loop_ledger_return_v1(p_shift_id uuid,p_release_claim_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $stage$
+DECLARE proof jsonb; old_event record; staged uuid;
+BEGIN
+ IF current_user<>'service_role' THEN RAISE EXCEPTION 'LEDGER_RETURN_STAGE_SERVICE_ONLY';END IF;
+ proof:=reality_internal.read_final_loop_ledger_return_condition_v1(p_shift_id,p_release_claim_id,NULL,NULL);
+ IF proof IS NULL THEN RETURN pg_catalog.jsonb_build_object('status','LEDGER_RETURN_CONDITION_NOT_QUALIFIED','execution_authorized',false);END IF;
+ -- Use the already verified qualifier subscription, never synthesize a new
+ -- qualifier receipt. All earlier events remain immutable historical evidence.
+ SELECT v.* INTO old_event FROM reality_internal.final_loop_resume_events_v1 v
+ JOIN reality_internal.final_loop_resume_conditions_v1 c ON c.shift_id=v.shift_id AND c.owner_id=v.owner_id
+  AND c.original_work_id=v.original_work_id AND c.source_ref=v.source_ref AND c.condition_kind=v.signal_kind
+  AND c.continuity_head_sha256=v.continuity_head_sha256 AND c.continuity_revision=v.continuity_revision
+  AND c.subscribed_receipt_sha256=v.previous_receipt_sha256
+ WHERE v.shift_id=p_shift_id AND v.owner_id::text=proof->>'owner_id' AND v.original_work_id=proof->>'original_work_id'
+ AND v.source_ref=proof->>'source_ref' AND v.continuity_head_sha256=proof->>'head' AND v.continuity_revision::text=proof->>'revision'
+ AND v.signal_kind='QUALIFIER_PROOF_CHANGED' AND v.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+ AND v.source_receipt_sha256=proof->>'qualifier' AND v.source_receipt_sha256<>v.previous_receipt_sha256
+ AND v.governed_wake_worker_run_id IS NOT NULL AND v.governed_wake_request_id IS NOT NULL
+ AND v.ledger_return_condition_sha256 IS NULL AND v.state='SHADOW_PENDING'
+ ORDER BY v.created_at DESC LIMIT 1 FOR UPDATE OF c;
+ IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('status','LEDGER_RETURN_SUBSCRIPTION_NOT_CURRENT','execution_authorized',false);END IF;
+ INSERT INTO reality_internal.final_loop_resume_events_v1(
+  shift_id,owner_id,original_work_id,source_ref,signal_kind,source_receipt_sha256,previous_receipt_sha256,
+  event_causality_sha256,continuity_head_sha256,continuity_revision,signal_next_action,
+  release_continuation_claim_id,ledger_return_condition_sha256)
+ VALUES(old_event.shift_id,old_event.owner_id,old_event.original_work_id,old_event.source_ref,
+  old_event.signal_kind,old_event.source_receipt_sha256,old_event.previous_receipt_sha256,old_event.event_causality_sha256,
+  old_event.continuity_head_sha256,old_event.continuity_revision,old_event.signal_next_action,p_release_claim_id,proof->>'condition_sha256')
+ ON CONFLICT DO NOTHING RETURNING event_id INTO staged;
+ RETURN pg_catalog.jsonb_build_object('status',CASE WHEN staged IS NOT NULL THEN 'LEDGER_RETURN_EVENT_STAGED' ELSE 'LEDGER_RETURN_CONDITION_ALREADY_STAGED_NO_REPLAY' END,
+  'event_id',staged,'condition_sha256',proof->>'condition_sha256','execution_authorized',false,'replay_authorized',false,'original_job_completed',false);
+END $stage$;
+REVOKE ALL ON FUNCTION public.reality_stage_final_loop_ledger_return_v1(uuid,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_stage_final_loop_ledger_return_v1(uuid,uuid) TO service_role;
