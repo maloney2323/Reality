@@ -37,15 +37,19 @@ export async function ownerFinalLoopChildApproval(req,res,{
  if(!['GET','POST'].includes(req.method))
   return res.status(405).setHeader('Allow','GET, POST')
    .json({ok:false,error:'FINAL_LOOP_CHILD_OWNER_METHOD_NOT_ALLOWED'});
+ let stage='CONFIG';
  try{
   config(env);
+  stage='ORIGIN';
   if(req.method==='POST'){
    if(!req.headers?.origin)return res.status(403).json({ok:false,error:'EXACT_CHAT_ORIGIN_REQUIRED'});
    assertSameOrigin(req);
   }
+  stage='AUTHENTICATED_OWNER';
   const session=await (authenticate===authenticatedChatSession?authenticatedChatSession(req,res):authenticate(req,res));
   if(!session||!UUID.test(session.user_id))
    return res.status(401).json({ok:false,error:'OWNER_SIGN_IN_REQUIRED'});
+  stage='DATABASE_BOUNDARY';
   const db=database(env);
   const canonicalPreview=canonical(db,env,session.user_id);
   if(db.url!==session.config?.url||(!isolated(db,env)&&!canonicalPreview))
@@ -62,6 +66,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
     return res.status(400).json({ok:false,error:'EXACT_OWNER_SHIFT_REQUIRED'});
    if(canonicalPreview&&shiftId!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID)
     return res.status(403).json({ok:false,error:'EXACT_BENCHMARK_SHIFT_REQUIRED'});
+   stage='READ_EXACT_PACKET';
    const p=await call(db,
     'reality_read_owner_final_loop_child_approvals_v1',{
      p_owner_id:session.user_id,p_shift_id:shiftId
@@ -75,6 +80,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
    return res.status(200).json({ok:true,shift_id:shiftId,packets:p.packets,
     owner_scope_verified:true,read_only:true,execution_authorized:false});
   }
+  stage='APPROVAL_INPUT';
   if(Object.keys(req.query||{}).length)
    return res.status(400).json({ok:false,error:'UNEXPECTED_APPROVAL_QUERY'});
   const b=req.body;
@@ -93,6 +99,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
   if(canonicalPreview){
    // A browser-provided hash is never sufficient. Bind this explicit
    // approval to the currently authenticated owner's frozen packet.
+   stage='REQUALIFY_EXACT_PACKET';
    const read=await call(db,'reality_read_owner_final_loop_child_approvals_v1',{
     p_owner_id:session.user_id,p_shift_id:env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID
    },{timeoutMs:6000});
@@ -107,9 +114,10 @@ export async function ownerFinalLoopChildApproval(req,res,{
         q.new_attempt_authorized!==false||q.replay_authorized!==false||
         q.proposal?.historical_invocation_replay_authorized!==false||q.proposal?.new_budget_authorized!==false):
        (packet.state!=='AWAITING_EXACT_OWNER_APPROVAL'||packet.approval_fingerprint!==b.proposal_fingerprint)))
-    return res.status(409).json({ok:false,error:'EXACT_CURRENT_OWNER_PROPOSAL_REQUIRED'});
+    {console.warn('REALITY_FINAL_LOOP_OWNER_DECISION_REJECTED',stage);return res.status(409).json({ok:false,error:'EXACT_CURRENT_OWNER_PROPOSAL_REQUIRED'});}
   }
   const approvalRequestId=crypto.randomUUID();
+  stage='RECORD_EXACT_APPROVAL';
   const approved=await call(db,
    'reality_owner_approve_final_loop_child_v1',{
     p_owner_id:session.user_id,p_packet_id:b.packet_id,
@@ -117,6 +125,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
     p_manifest_sha256:b.source_manifest_sha256,
     p_approval_request_id:approvalRequestId
    },{timeoutMs:6000});
+  stage='VALIDATE_APPROVAL_RECEIPT';
   if(approved?.status!==(recovering?'FINAL_LOOP_SAME_OBLIGATION_RECOVERY_APPROVED_ONCE':'FINAL_LOOP_EXACT_CHILD_REVIEW_OWNER_APPROVED_ONCE')||
     (recovering&&(approved.proposal_sha256!==b.proposal_fingerprint||
       approved.historical_invocation_replay_authorized!==false||approved.shift_id!==env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID))||
@@ -128,6 +137,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
     approved.child_originals_admitted!==0||
     approved.original_job_completed!==false||
     !HASH.test(approved.approval_receipt_sha256||'')){
+   console.warn('REALITY_FINAL_LOOP_OWNER_DECISION_REJECTED',stage);
    return res.status(409).json({
     ok:false,error:'FINAL_LOOP_CHILD_OWNER_APPROVAL_NOT_CURRENT_OR_UNVERIFIED',
     original_job_completed:false
@@ -146,6 +156,7 @@ export async function ownerFinalLoopChildApproval(req,res,{
    original_job_completed:false,production_changed:false
   });
  }catch(error){
+  console.warn('REALITY_FINAL_LOOP_OWNER_DECISION_FAILURE',req.method,stage);
   if(error?.status===403)return res.status(403).json({ok:false,error:'CROSS_ORIGIN_CHAT_REQUEST_REJECTED'});
   return res.status(503).json({
    ok:false,error:'FINAL_LOOP_CHILD_OWNER_APPROVAL_SERVICE_UNAVAILABLE',
