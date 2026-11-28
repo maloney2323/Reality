@@ -2,7 +2,7 @@
 import {authenticatedChatSession,privateChatConfig,assertSameOrigin} from '../../src/reality-private-chat-auth-v0.1.js';
 import {readPrivateChat,readPrivateChatRequest,recordPrivateMessage,publishPrivateAssistantAtomically,readPrivateChatGoalPublicationEpoch,listPrivateConversations,validUuid,resolvePrivateConversationDatabase,publishPrivateConversationReply} from '../../src/reality-private-chat-store-v0.1.js';
 import {runLiveIntelligenceOrchestration} from '../../src/reality-live-intelligence-orchestration-v0.1.js';
-import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply}
+import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply,isExistingWorkContinuationReply,prepareExistingWorkContinuationReply}
  from '../../src/reality-chat-proportional-readonly-v1.js';
 import {collectOptionalChatEvidence} from '../../src/reality-chat-optional-evidence-v1.js';
 import {readOperationalSelfVisibilityForChat,projectChatOperationalHorizon,
@@ -217,9 +217,12 @@ export default async function handler(req,res){
   // message. Only a fully hash-verified non-consequential terminal fork may
   // start a new, explicitly linked read-only recovery segment.
   const scope=createHash('sha256').update(session.user_id+'|'+conversationId).digest('hex');
-  const readOnlyTurn=isProportionalReadOnlyChat({
+  const continuationReply=isExistingWorkContinuationReply({
    message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
   });
+  const readOnlyTurn=isProportionalReadOnlyChat({
+   message:text,goalCommand,publicResearch:isPublicResearchRequest(text)
+  })||continuationReply;
   // Read-only conversational identity and storage are independent of work
   // configuration; action and goal mutation still require every old gate.
   let isolated=null;
@@ -282,7 +285,7 @@ export default async function handler(req,res){
    await recordPrivateMessage(session,{
     conversationId,requestId,role:'user',text,
    });
-  if(!key)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
+  if(!key&&!continuationReply)fail('CHAT_MODEL_KEY_NOT_CONFIGURED',503);
   // Conversation: use recent authenticated history and selectively collect
   // existing evidence. No work qualification, goal epoch, or full spine replay.
   if(readOnlyTurn){
@@ -291,7 +294,10 @@ export default async function handler(req,res){
    // This selects read-only context, NEVER action authority. Even a mistaken
    // relevance decision cannot create work. Greetings need only conversation.
    const wantsContext=text.length>35||needsRealityCapabilityInspection(text,recent)||/\b(past|present|future|universe|ceo|reality|work|job|shift|goal|history|yesterday|today|tomorrow|remember|progress|status|done|next|it|that|this|revision|release|receipt|approval|worker|continuity|recovery|blocker|capability|capabilities)\b/i.test(text);
-   const ctx=wantsContext&&isolated?await collectOptionalChatEvidence([
+   const ctx=(wantsContext||continuationReply)&&isolated?await collectOptionalChatEvidence([
+    ...(continuationReply?[{id:'continuation_handoff',
+     read:()=>readOwnerChatWorkHandoff({session,conversationId}),
+     validate:v=>v?.source==='AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK',fallback:null}]:[]),
     {id:'time_horizon',read:()=>readOwnerTimeHorizonEvidence({ownerId:session.user_id,db:isolated,env:process.env}),
      validate:v=>v?.status==='REALITY_OWNER_TIME_HORIZON_READ_ONLY'&&v.owner_scope_verified===true&&v.read_only===true&&v.approved_new_work_by_read===false,
      fallback:null},
@@ -317,7 +323,10 @@ export default async function handler(req,res){
    const ownerUniverse=makeOwnerUniverseReadModel({observations});
    stage='READ_ONLY_MODEL_COGNITION';
    const quickStart=Date.now();
-   const advisory=await generateProportionalReadOnlyReply({
+   const advisory=continuationReply?prepareExistingWorkContinuationReply({
+    ownerId:session.user_id,conversationId,requestId,sourceRef:recordedUser.source_ref,
+    handoff:ctx.values.continuation_handoff,shift
+   }):await generateProportionalReadOnlyReply({
     message:text,conversationId,requestId,ownerId:session.user_id,sourceRef:recordedUser.source_ref,
     verifiedPriorTurns:recent,worldlineId:scopedRoot,apiKey:key,
     operationalTimeHorizon:operationalHorizon,
@@ -365,6 +374,7 @@ export default async function handler(req,res){
    // A failed write is not called saved; the current request remains recoverable.
    return res.status(200).json({ok:true,conversation_id:conversationId,answer:advisory.answer,
     read_only_conversation:true,transient_answer_only:!publication,
+    ...(continuationReply?{work_handoff:advisory.work_handoff}:{}),
     original_request_id:requestId,replayed:false,
     continuity:{history_source:'AUTHENTICATED_SUPABASE_RLS',current_answer_persisted:Boolean(publication),
      coverage:history.history_status,recovered_messages:history.messages.length,
