@@ -11,7 +11,7 @@ CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_invocation_return_pe
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $read$
 DECLARE prior_preclaim_events jsonb;
 BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'FINAL_LOOP_RETURN_PREFLIGHT_SERVICE_ONLY';END IF;
+ IF current_user NOT IN ('service_role','postgres') THEN RAISE EXCEPTION 'FINAL_LOOP_RETURN_PREFLIGHT_SERVICE_ONLY';END IF;
  IF p_shift_id IS NULL OR p_owner_id IS NULL OR p_original_work_id IS NULL OR p_source_ref IS NULL
   OR p_expected_head_sha256 IS NULL OR p_expected_revision IS NULL OR qualifier_digest IS NULL
   OR pg_catalog.jsonb_typeof(qualifier) IS DISTINCT FROM 'object'
@@ -319,7 +319,7 @@ CREATE OR REPLACE FUNCTION reality_internal.read_final_loop_ledger_return_condit
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $condition$
 DECLARE a record; g jsonb; o jsonb; e jsonb; q record; p jsonb; digest text; writer_hash text; condition_hash text;
 BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'LEDGER_RETURN_CONDITION_SERVICE_ONLY';END IF;
+ IF current_user NOT IN ('service_role','postgres') THEN RAISE EXCEPTION 'LEDGER_RETURN_CONDITION_SERVICE_ONLY';END IF;
  IF p_shift_id IS NULL OR p_release_claim_id IS NULL
   OR (p_current_event_id IS NULL)<>(p_worker_run_id IS NULL) THEN RETURN NULL;END IF;
  SELECT r.* INTO a FROM reality_internal.governed_worker_release_approvals_v1 r
@@ -416,7 +416,7 @@ CREATE OR REPLACE FUNCTION public.reality_stage_final_loop_ledger_return_v1(p_sh
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $stage$
 DECLARE proof jsonb; old_event record; staged uuid;
 BEGIN
- IF current_user<>'service_role' THEN RAISE EXCEPTION 'LEDGER_RETURN_STAGE_SERVICE_ONLY';END IF;
+ IF current_user NOT IN ('service_role','postgres') THEN RAISE EXCEPTION 'LEDGER_RETURN_STAGE_SERVICE_ONLY';END IF;
  proof:=reality_internal.read_final_loop_ledger_return_condition_v1(p_shift_id,p_release_claim_id,NULL,NULL);
  IF proof IS NULL THEN RETURN pg_catalog.jsonb_build_object('status','LEDGER_RETURN_CONDITION_NOT_QUALIFIED','execution_authorized',false);END IF;
  -- Use the already verified qualifier subscription, never synthesize a new
