@@ -109,7 +109,7 @@ export function projectChatContinuityActivity({current,incidentReadback,finalRea
    timeline.push({id:e.event_id,label:names[e.signal_kind]||human(e.signal_kind),state,detail,
     receipt:isInv?inv.investigation_receipt_sha256:isReview?review.receipt_sha256:e.source_receipt_sha256,
     at:date(e.observed_at),worker_run_id:e.governed_wake_worker_run_id||null,
-    employee:isInv?bounded(incident?.assigned_employee,120):isReview?bounded(incident?.independent_reviewer,120):null});
+    employee:isInv?bounded(incident?.assigned_employee,120):isReview&&incident?.independent_source_review?.receipt_sha256===review?.receipt_sha256&&incident.independent_source_review.reviewer===incident.independent_reviewer?bounded(incident.independent_source_review.reviewer,120):null});
   }
   if(incident){const proposalStep={id:incident.incident_id+':proposal',label:'Investigation findings and proposed correction',
    state:'proposal',detail:'Recorded employee proposal — not independently verified root cause or permission to install.',
@@ -124,7 +124,11 @@ export function projectChatContinuityActivity({current,incidentReadback,finalRea
    // This exact accepted technical return binds the prior investigation and review receipts.
    if(incident){
     timeline.push({id:terminal.id+':investigation',label:'Investigated blocker',state:'verified',detail:'Recorded investigation linked to the accepted recovery evidence. The proposed repair is not installed by this receipt.',receipt:terminal.investigation_receipt,at:null,employee:bounded(incident.assigned_employee,120)});
-    timeline.push({id:terminal.id+':review',label:'Independently reviewed investigation',state:'verified',detail:'Separate reviewer receipt linked to the accepted recovery evidence. Original business outcome remains open.',receipt:terminal.review_receipt,at:null,employee:bounded(incident.independent_reviewer,120)});
+    const reviewed=incident.independent_source_review;
+    const reviewerMatched=reviewed?.receipt_sha256===terminal.review_receipt&&reviewed.status==='SOURCE_MATCHED_NEEDS_FROZEN_TEST'&&
+     reviewed.reviewer===incident.independent_reviewer&&UUID.test(reviewed.worker_run_id||'')&&
+     reviewed.original_job_completed===false&&reviewed.installation_authorized===false&&reviewed.production_changed===false;
+    timeline.push({id:terminal.id+':review',label:'Independently reviewed investigation',state:'verified',detail:'Separate reviewer receipt linked to the accepted recovery evidence. Original business outcome remains open.',receipt:terminal.review_receipt,at:reviewerMatched?date(reviewed.verified_at):null,employee:reviewerMatched?bounded(reviewed.reviewer,120):null});
    }
    timeline.push(terminal);
   }
