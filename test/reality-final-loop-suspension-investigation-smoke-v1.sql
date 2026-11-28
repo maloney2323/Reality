@@ -648,3 +648,137 @@ BEGIN
  IF r->>'status'='TERMINAL_TECHNICAL_EVIDENCE_RETURNED_ORIGINAL_OPEN' THEN RAISE EXCEPTION 'TECHNICAL_RETURN_REPLAYED';END IF;
 END $$;
 RESET ROLE;
+
+
+-- A new investigation of returned invocations at the *current* head must
+-- reach the existing independent reviewer. This is a disposable synthetic
+-- fixture of signed observations, not a new provider attempt or settlement.
+DO $$
+DECLARE u record; q record; sub record; a record; p record; e record; inc record; review record;
+ run uuid:=gen_random_uuid(); req uuid:=gen_random_uuid(); rel uuid:=gen_random_uuid();
+ incident uuid:=gen_random_uuid(); ev uuid:=gen_random_uuid(); nonce uuid:=gen_random_uuid();
+ now_at timestamptz:=clock_timestamp(); qhash text; ihash text; rhash text;
+ source_evidence jsonb; scope jsonb; snapshot jsonb; spine jsonb; guard jsonb; verdict jsonb;
+ observations jsonb:=jsonb_build_array(jsonb_build_object('worker_completed',true,
+  'model_artifact_recorded',false,'provider_outcome_verified',false,'replay_authorized',false));
+BEGIN
+ SELECT * INTO STRICT u FROM public.universe_events
+  WHERE entity_type='reality_final_loop_terminal_technical_observation_v1';
+ SELECT * INTO STRICT q FROM reality_internal.owner_continuity_qualification_routes_v1;
+ SELECT * INTO STRICT sub FROM reality_internal.final_loop_resume_conditions_v1
+  WHERE condition_kind='QUALIFIER_PROOF_CHANGED';
+ SELECT * INTO STRICT p FROM reality_internal.shift_continuity_independent_reviews_v1
+  WHERE receipt_sha256=u.payload->>'review_receipt_sha256';
+ SELECT * INTO a FROM reality_internal.governed_worker_release_approvals_v1
+  WHERE owner_id=q.owner_id ORDER BY provider_alias_observed_at DESC NULLS LAST LIMIT 1;
+ IF sub.continuity_revision<>4 OR sub.continuity_head_sha256<>'sha256:'||u.lineage_hash
+ THEN RAISE EXCEPTION 'FIXTURE_CURRENT_HEAD_MISSING';END IF;
+ snapshot:=q.reconciliation_snapshot||jsonb_build_object('fixture_current_qualifier',true);
+ qhash:='sha256:'||encode(sha256(convert_to(snapshot::text,'UTF8')),'hex');
+ UPDATE reality_internal.owner_continuity_qualification_routes_v1
+  SET reconciliation_snapshot=snapshot,reconciliation_receipt_sha256=qhash,
+      reconciliation_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',
+      reconciliation_checked_at=now_at WHERE owner_id=q.owner_id AND source_ref=q.source_ref;
+ UPDATE reality_internal.final_loop_resume_conditions_v1
+  SET state='SHADOW_SIGNALED',last_signaled_receipt_sha256=qhash
+  WHERE shift_id=sub.shift_id AND original_work_id=sub.original_work_id
+   AND condition_kind='QUALIFIER_PROOF_CHANGED';
+ spine:=jsonb_build_object('status','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',
+  'canonical_return_committed',true,'canonical_return_event_id',u.parent_event_id,
+  'canonical_return_head_sha256',u.payload->>'prior_head_sha256',
+  'observation_sha256','sha256:'||encode(sha256(convert_to(observations::text,'UTF8')),'hex'),
+  'observations',observations,'replay_authorized',false,'execution_authorized',false,
+  'original_job_completed',false);
+ SELECT f.guard INTO guard FROM public.suspension_fixture_proof f WHERE shift_id=sub.shift_id;
+ UPDATE public.suspension_fixture_proof f SET guard=f.guard||jsonb_build_object('obligations',
+  jsonb_build_array((guard->'obligations'->0)||jsonb_build_object(
+   'qualifier_receipt_sha256',qhash,'execution_spine_readback',spine)))
+  WHERE shift_id=sub.shift_id;
+ scope:=a.runtime_scope||jsonb_build_object('target_deployment_id','dpl_fixture_current_invocation',
+  'continuity_head_sha256',sub.continuity_head_sha256,'continuity_revision',4,
+  'qualifier_receipt_sha256',qhash);
+ INSERT INTO reality_internal.governed_worker_release_approvals_v1(request_id,owner_id,shift_id,claim_id,
+  capability_key,state,approval_receipt_sha256,claimed_at,provider_alias_observed_at,
+  provider_alias_observed_deployment_id,runtime_scope,release_sha,release_ref,scheduled_alias,independent_isolation_proof_sha256)
+ VALUES(req,sub.owner_id,sub.shift_id,rel,a.capability_key,'CLAIMED_ONCE',a.approval_receipt_sha256,
+  now_at-interval '2 seconds',now_at-interval '1 second','dpl_fixture_current_invocation',
+  scope,repeat('5',40),'fixture-current-invocation',a.scheduled_alias,a.independent_isolation_proof_sha256);
+ UPDATE reality_internal.signed_worker_actual_runs_v1
+  SET status='COMPLETED',finished_at=now_at,worker_stage='TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION'
+  WHERE status='STARTED';
+ UPDATE reality_internal.governed_preview_shift_worker_leases_v1
+  SET claim_id=gen_random_uuid(),claimed_at=now_at,released_at=NULL,lease_expires_at=now_at+interval '2 minutes';
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,worker_stage)
+  VALUES(run,'STARTED',now_at,'SHIFT_DB_BOUNDARY');
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1
+  VALUES(run,sub.owner_id,sub.shift_id,rel,repeat('5',40),'fixture-current-invocation',
+   'NORMAL_SIGNED_SHIFT','sha256:'||repeat('5',64));
+ INSERT INTO reality_internal.final_loop_resume_events_v1(event_id,owner_id,shift_id,original_work_id,source_ref,
+  signal_kind,source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,
+  continuity_head_sha256,continuity_revision,signal_next_action,state,governed_wake_request_id,
+  governed_wake_queued_at,governed_wake_nonce,governed_wake_worker_run_id,release_continuation_claim_id)
+ VALUES(ev,sub.owner_id,sub.shift_id,sub.original_work_id,sub.source_ref,'QUALIFIER_PROOF_CHANGED',
+  qhash,sub.subscribed_receipt_sha256,'sha256:'||repeat('5',64),sub.continuity_head_sha256,4,
+  'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','SHADOW_PENDING',5000,now_at,nonce,run,rel);
+ source_evidence:=jsonb_build_object('owner_id',sub.owner_id,'shift_id',sub.shift_id,
+  'original_work_id',sub.original_work_id,'source_ref',sub.source_ref,'continuity_root_id',u.continuity_root_id,
+  'continuity_head_sha256',sub.continuity_head_sha256,'continuity_revision',4,
+  'event_id',ev,'worker_run_id',run,'release_sha',repeat('5',40),'release_receipt_sha256','sha256:'||repeat('5',64),
+  'blocker_code','FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED','investigation_only',true,
+  'root_cause_verified',false,'provider_outcome_verified',false,'replay_authorized',false,
+  'original_job_completed',false,'installation_authorized',false,'production_changed',false,
+  'new_attempt_authorized',false,'previous_attempt_budget_preserved',true,
+  'invocation_observation_sha256',spine->>'observation_sha256','canonical_return_event_id',spine->>'canonical_return_event_id',
+  'canonical_return_head_sha256',spine->>'canonical_return_head_sha256','invocation_observations',observations);
+ ihash:='sha256:'||encode(sha256(convert_to(source_evidence::text,'UTF8')),'hex');
+ rhash:='sha256:'||encode(sha256(convert_to(jsonb_build_object(
+  'owner_id',sub.owner_id,'incident_id',incident,'evidence_sha256',ihash,'model_response_id','fixture_current_investigation',
+  'assigned_employee','engineer','reviewer','independent reviewer','diagnosis','Unresolved invocation',
+  'proposed_upgrade','Read-only review','required_independent_test','No replay',
+  'limitations','No outcome inferred','new_original_jobs_created',0,'installation_authorized',false)::text,'UTF8')),'hex');
+ INSERT INTO reality_internal.owner_shift_continuity_incidents_v1(incident_id,owner_id,shift_id,kind,
+  evidence_key,evidence_sha256,source_evidence,phase,assigned_employee,assigned_function_id,
+  independent_reviewer,reviewer_function_id,investigated_at,model_response_id,diagnosis,proposed_upgrade,
+  independent_test_requirement,limitations,investigation_receipt_sha256)
+ VALUES(incident,sub.owner_id,sub.shift_id,'SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED',substring(ihash from 8),ihash,
+  source_evidence,'INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF','engineer','engineering',
+  'independent reviewer','quality',clock_timestamp(),'fixture_current_investigation','Unresolved invocation',
+  'Read-only review','No replay','No outcome inferred',rhash);
+ IF reality_internal.stage_final_loop_independent_investigation_review_v1(req) IS NOT NULL
+ THEN RAISE EXCEPTION 'UNFINISHED_INVESTIGATION_STAGED';END IF;
+ -- Completion fires the existing automatic trigger; the active singleton
+ -- lease still prevents delivery while the first worker is finishing.
+ UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED',finished_at=clock_timestamp(),
+  worker_stage='WORKER_RESPONSE_PUBLICATION' WHERE run_id=run;
+ verdict:=reality_internal.read_final_loop_verified_investigation_v1(sub.owner_id,sub.shift_id,
+  sub.original_work_id,sub.source_ref,sub.continuity_head_sha256,4);
+ IF verdict->>'evidence_kind' IS DISTINCT FROM 'RETURNED_UNRESOLVED_INVOCATION'
+  OR verdict->>'investigation_receipt_sha256' IS DISTINCT FROM rhash
+  OR verdict->>'suspension_receipt_sha256' IS DISTINCT FROM p.independent_verdict->>'suspension_receipt_sha256'
+ THEN RAISE EXCEPTION 'CURRENT_INVOCATION_VERIFIER_HANDOFF_UNVERIFIED %',verdict;END IF;
+ SELECT * INTO STRICT review FROM reality_internal.final_loop_resume_events_v1
+  WHERE signal_kind='VERIFIED_INVESTIGATION_REVIEW' AND source_receipt_sha256=rhash;
+ SELECT * INTO STRICT e FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=ev;
+ IF review.continuity_revision<>4 OR review.original_work_id<>sub.original_work_id
+  OR review.continuity_head_sha256<>sub.continuity_head_sha256
+  OR review.governed_wake_request_id IS NOT NULL OR e.state<>'SHADOW_STALE'
+  OR e.governed_wake_worker_run_id<>run OR e.governed_wake_nonce<>nonce
+  OR e.governed_wake_request_id<>5000 OR e.observed_at IS NOT NULL
+ THEN RAISE EXCEPTION 'CURRENT_INVOCATION_REVIEW_EVENT_OR_HISTORY_UNVERIFIED';END IF;
+ IF reality_internal.stage_final_loop_independent_investigation_review_v1(req) IS NOT NULL
+  OR reality_internal.read_final_loop_verified_investigation_v1(sub.owner_id,sub.shift_id,
+   sub.original_work_id,sub.source_ref,'sha256:'||repeat('0',64),4) IS NOT NULL
+  OR reality_internal.read_final_loop_verified_investigation_v1(gen_random_uuid(),sub.shift_id,
+   sub.original_work_id,sub.source_ref,sub.continuity_head_sha256,4) IS NOT NULL
+ THEN RAISE EXCEPTION 'DUPLICATE_OR_FOREIGN_CURRENT_INVOCATION_ACCEPTED';END IF;
+ UPDATE reality_internal.owner_shift_continuity_incidents_v1
+  SET source_evidence=reality_internal.owner_shift_continuity_incidents_v1.source_evidence||'{"replay_authorized":true}'::jsonb
+  WHERE incident_id=incident;
+ IF reality_internal.read_final_loop_verified_investigation_v1(sub.owner_id,sub.shift_id,
+  sub.original_work_id,sub.source_ref,sub.continuity_head_sha256,4) IS NOT NULL
+ THEN RAISE EXCEPTION 'TAMPERED_INVOCATION_AUTHORITY_ACCEPTED';END IF;
+ IF EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1
+  WHERE original_work_id=sub.original_work_id) OR
+  (snapshot->'recovery_terminal_history'->>'remaining_attempts')<>'0'
+ THEN RAISE EXCEPTION 'RECOVERY_HANDOFF_INVENTED_OUTCOME_OR_BUDGET';END IF;
+END $$;
