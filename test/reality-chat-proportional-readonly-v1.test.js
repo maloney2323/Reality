@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {isProportionalReadOnlyChat,generateProportionalReadOnlyReply,
- reconcileReadOnlyOperationalAnswer}
+ reconcileReadOnlyOperationalAnswer,isExistingWorkContinuationReply,prepareExistingWorkContinuationReply}
  from '../src/reality-chat-proportional-readonly-v1.js';
 const owner='85eeae0b-2988-43c4-b20c-590fb51da70d';
 const conv='9d5b6de1-ecf0-42d8-a86a-b9c5396a4139';
@@ -371,4 +371,23 @@ test('real revision-4 false recovery report cannot escape under omitted or parti
   assert.equal(written.answer,r.answer);assert.equal(r.execution_authorized,false);
   if(context)assert.match(r.answer,/Continuity revision 4/);else assert.doesNotMatch(r.answer,/Continuity revision 4/);
  }
+});
+
+
+test('existing work continuation acknowledgement does not require the action publication pipeline or grant authority',()=>{
+ const message='Resume your existing authorized work. Use your existing governed capabilities to investigate and resolve the release qualification blocker.';
+ assert.equal(isExistingWorkContinuationReply({message}),true);
+ for(const message of ['Install the release','Start a new shift','Can you explain the original job?'])assert.equal(isExistingWorkContinuationReply({message}),false);
+ assert.equal(isExistingWorkContinuationReply({message,goalCommand:'replace_goal'}),false);
+ const input={ownerId:owner,conversationId:conv,requestId:request,sourceRef:source};
+ const item={request_id:request,source_ref:source,status:'CLAIMED',shift_id:owner,execution_authorized_by_chat:false,installation_authorized:false,production_changed:false};
+ const handoff={status:'OWNER_CHAT_WORK_INTAKE_READBACK',source:'AUTHENTICATED_OWNER_SCOPED_SERVICE_READBACK',owner_id:owner,conversation_id:conv,new_shift_started:false,installation_authorized:false,production_changed:false,items:[item]};
+ const result=prepareExistingWorkContinuationReply({...input,handoff});
+ assert.match(result.answer,/claimed your instruction/);assert.match(result.answer,/not verified yet/);
+ assert.equal(result.execution_authorized,false);assert.equal(result.work_handoff.status,'CLAIMED');
+ for(const invalid of [{...handoff,owner_id:conv},{...handoff,items:[item,item]},{...handoff,items:[{...item,request_id:conv}]},{...handoff,items:[{...item,installation_authorized:true}]}]){
+  const missing=prepareExistingWorkContinuationReply({...input,handoff:invalid});assert.match(missing.answer,/could not confirm/);assert.equal(missing.work_handoff,null);
+ }
+ const api=readFileSync(new URL('../api/reality/personal-chat.js',import.meta.url),'utf8');
+ assert.ok(api.includes('})||continuationReply;'));assert.ok(api.includes('continuationReply?prepareExistingWorkContinuationReply'));
 });
