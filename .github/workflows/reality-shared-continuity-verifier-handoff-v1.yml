@@ -197,6 +197,7 @@ jobs:
           PGPASSWORD: recovery-smoke-only
           PGDATABASE: reality_recovery_smoke
         run: |
+          node test/reality-final-loop-current-invocation-projection-v1.mjs
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-proof-recovery-ledger-smoke-v1.sql
           psql -v ON_ERROR_STOP=1 -f test/reality-final-loop-governed-start-smoke-v1.sql
           createdb reality_identity_red
