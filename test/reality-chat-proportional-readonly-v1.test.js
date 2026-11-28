@@ -267,3 +267,22 @@ test('empty operational extraction withholds the draft; ordinary conversation an
  const supported='The shift status is AWAITING_EXACT_ORIGINAL_WORK.';
  assert.equal((await run(supported,[{key:'shift.shift_status',value:shift.shift_status,quote:supported,assertion:'AFFIRMED'}],true)).answer,supported);
 });
+
+
+test('assessed operational output requires server-provided receipt before publication; ordinary conversation skips the writer',async()=>{
+ const shift={owner_shift_authorization_recorded:true,shift_start_command_already_satisfied:true,
+  shift_status:'AWAITING_EXACT_ORIGINAL_WORK',active_owner_shift_id:'ee80b4d8-0546-4269-9cfc-7bf6cb2b97ce'};
+ const supported='The shift status is AWAITING_EXACT_ORIGINAL_WORK.';
+ const runtime=async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:supported});
+ const fetchImpl=async()=>({ok:true,json:async()=>({id:'resp_fixture',output_text:JSON.stringify({
+  claims:[{key:'shift.shift_status',value:shift.shift_status,quote:supported,assertion:'AFFIRMED'}],actions:[],operational:true,provenance_assertions:[],recipient_scope:{target_id:'',quote:'',assertion:'UNCERTAIN'}})})});
+ let calls=0;
+ const recordClaimAssessment=async({answer,assessment})=>{calls++;assert.equal(answer,supported);assert.equal(assessment.status,'EXTRACTED_ASSERTIONS_SOURCE_COMPARED');return {...assessment,readback_verified:true,ledger_receipt_id:'receipt'};};
+ const props={...args,ownerContext:{currently_authorized_shift:shift},runtime,fetchImpl};
+ const r=await generateProportionalReadOnlyReply({...props,recordClaimAssessment});
+ assert.equal(r.answer,supported);assert.equal(r.output_claim_assessment.durable_continuity_receipt_verified,true);assert.equal(calls,1);
+ const failed=await generateProportionalReadOnlyReply({...props,recordClaimAssessment:async()=>{throw Error('readback unavailable')}});
+ assert.equal(failed.output_claim_assessment.durable_continuity_receipt_verified,false);assert.equal(JSON.stringify(failed).includes(supported),false);
+ const ordinary=await generateProportionalReadOnlyReply({...args,runtime:async()=>({mode:'FAST',authority_granted:false,execution_authorized:false,answer:'Hello!'}),recordClaimAssessment});
+ assert.equal(ordinary.answer,'Hello!');assert.equal(calls,1);
+});
