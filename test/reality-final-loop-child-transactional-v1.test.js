@@ -173,13 +173,18 @@ test('exact approved child with oversized complete patch reaches governed model 
  const scope=plan.bounded_scopes[0];
  const text=structuredReview(scope),artifact=assembledReview(scope);
  const modelId='resp_generated12345';
- let providerCalls=0,prepare=0;
+ let providerCalls=0,patchPageReads=0,metadataReads=0,prepare=0;
  const mockProvider=provider({id:modelId,text},files,request=>{
   const input=JSON.parse(request.input[1].content[0].text);
   assert.equal(input.files[0].patch,largePatch);
   assert.ok(JSON.stringify(request).length>26000);
  });
- const mock=async(url,options)=>{providerCalls++;return mockProvider(url,options)};
+ const mock=async(url,options)=>{
+  providerCalls++;
+  if(url.includes('/files?'))patchPageReads++;
+  else if(url.includes('api.github.com'))metadataReads++;
+  return mockProvider(url,options);
+ };
  const claim={
   status:'FINAL_LOOP_EXACT_SIGNED_CHILD_CLAIMED_ONCE',
   owner_id:owner,shift_id:shift,
@@ -217,7 +222,10 @@ test('exact approved child with oversized complete patch reaches governed model 
   }
  });
  assert.equal(prepare,1);
- assert.ok(providerCalls>4);
+ // Initial, pre-model and post-model observations remain distinct.
+ assert.equal(patchPageReads,3);
+ assert.equal(metadataReads,6);
+ assert.equal(providerCalls,10);
  assert.equal(r.status,'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED');
  assert.equal(r.parent_original_completed,false);
  assert.equal(r.external_effect_performed,false);
@@ -867,4 +875,43 @@ test('verified suspension reaches existing investigation without replay or a sec
  assert.match(investigator,/previous_attempt_budget_preserved!==true/);
  assert.match(investigator,/new_attempt_authorized!==false/);
  assert.doesNotMatch(fence,/INSERT INTO|UPDATE reality_internal|net\.http_post/);
+});
+
+
+test('one-pass scoped patch capture preserves manifest identity and rejects moving source',async()=>{
+ const files=completeLargeFiles();
+ const original=await sourcePlan(files);
+ const scope=original.bounded_scopes[0];
+ const capturePatchPaths=scope.files.map(f=>f.path);
+ assert.equal(original.captured_scope_patches,undefined);
+ const input={
+  job:{source_ref:pr,source_proof_sha256:sourceHash,original_work_id:parent,phase:'BLOCKED'},
+  ownerId:owner,shiftId:shift,metadata:meta(),env,capturePatchPaths
+ };
+ let pages=0;
+ const result=await inspectLargePrSourceForBoundedReview({...input,
+  fetchImpl:async url=>{
+   if(url.includes('/files?'))pages++;
+   return {ok:true,json:async()=>url.includes('/files?')?files:meta()};
+  }
+ });
+ assert.equal(pages,1);
+ assert.equal(result.source_manifest_sha256,original.source_manifest_sha256);
+ assert.deepEqual(result.bounded_scopes,original.bounded_scopes);
+ assert.equal(result.captured_scope_patches.length,scope.files.length);
+ assert.equal(result.captured_scope_patches[0].patch,largePatch);
+ assert.equal(result.patch_coverage_verified,false);
+ assert.equal(result.child_execution_authorized,undefined);
+ assert.equal(result.original_job_completed,false);
+ const drift=await inspectLargePrSourceForBoundedReview({...input,
+  fetchImpl:async url=>({ok:true,json:async()=>url.includes('/files?')?files:
+   {...meta(),head:{sha:'d'.repeat(40)}}})
+ });
+ assert.equal(drift.source_manifest_complete,false);
+ assert.equal(drift.captured_scope_patches,undefined);
+ const malformed=await inspectLargePrSourceForBoundedReview({...input,
+  capturePatchPaths:[...capturePatchPaths,capturePatchPaths[0]],
+  fetchImpl:async()=>{throw Error('MUST_NOT_FETCH')}
+ });
+ assert.equal(malformed.source_manifest_complete,false);
 });
