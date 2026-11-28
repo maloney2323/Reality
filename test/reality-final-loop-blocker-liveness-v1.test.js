@@ -402,7 +402,8 @@ test('exact canonical review dispatch owns the signed event before unrelated mai
  assert.ok(ingress>=0&&selection>ingress&&dispatch>selection&&run>dispatch&&fence>run&&pulse>fence&&finish>pulse&&unrelated>finish);
  const lane=code.slice(selection,unrelated);
  assert.match(lane,/if\(!otherQualifiedRoute\)/);
- assert.match(lane,/if\(ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY'\)\s*throw Error/);
+ assert.match(lane,/if\(ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY'\)\{[\s\S]*?workerStage=[\s\S]*?throw Error\('EXACT_CLAIMED_EVENT_CAPABILITY_UNVERIFIED'\)/);
+ assert.ok(lane.indexOf("throw Error('EXACT_CLAIMED_EVENT_CAPABILITY_UNVERIFIED')")<lane.indexOf('await requireFreshFinalLoopContinuity()'));
  assert.match(lane,/await requireFreshFinalLoopContinuity\(\)/);
  assert.match(lane,/await readSignedWorkerReleaseWitness\(exactReviewGraph\)/);
  assert.match(lane,/connectExistingIsolatedChildTransport\(/);
