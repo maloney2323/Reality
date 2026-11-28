@@ -9,7 +9,7 @@ export const maxDuration=25;
 // the authenticated owner guard. No browser-selected roots, replay or writes.
 async function readTerminalHeadRows({db,ownerId,current}){
  if(!db?.strictSecrets||db.url!=='https://'+db.project+'.supabase.co'||
-  !/^[a-f0-9-]{36}$/i.test(ownerId||'')||!Array.isArray(current?.observations))return [];
+  !/^[a-f0-9-]{36}$/i.test(ownerId||'')||!Array.isArray(current?.observations))return null;
  const heads=current.observations.slice(0,12).map(x=>x.current_operational_facts)
   .filter(x=>x.continuity_revision>1&&/^[a-f0-9-]{36}$/i.test(x.continuity_root_id||'')&&/^sha256:[a-f0-9]{64}$/.test(x.continuity_head_sha256||''));
  if(!heads.length)return [];
@@ -25,9 +25,9 @@ async function readTerminalHeadRows({db,ownerId,current}){
   const r=await fetch(db.url+'/rest/v1/universe_events?'+params,{method:'GET',cache:'no-store',redirect:'error',
    headers:{apikey:db.secretKey,authorization:'Bearer '+db.secretKey,accept:'application/json'},
    signal:AbortSignal.timeout(2500)});
-  if(!r.ok)return [];
-  const rows=await r.json();return Array.isArray(rows)&&rows.length<=12?rows:[];
- }catch{return []}
+  if(!r.ok)return null;
+  const rows=await r.json();return Array.isArray(rows)&&rows.length<=12?rows:null;
+ }catch{return null}
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
