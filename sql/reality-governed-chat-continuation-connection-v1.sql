@@ -584,6 +584,7 @@ REVOKE ALL ON FUNCTION reality_internal.reconcile_current_qualification_proofs_v
 
 CREATE OR REPLACE FUNCTION reality_internal.on_final_loop_governed_wake_v1()
  RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $function$
+DECLARE ledger_stage jsonb;
 BEGIN
  -- Reuse the existing governed qualifier on receipt of a saved continuation.
  -- This is not a second executor, a direct HTTP wake, or an authority grant.
@@ -609,9 +610,14 @@ BEGIN
    -- existing source inventory for this shift before either continuation path.
    PERFORM reality_internal.reconcile_current_qualification_proofs_v1(NEW.shift_id);
    IF NEW.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM' THEN
-    PERFORM public.reality_stage_final_loop_ledger_return_v1(NEW.shift_id,NEW.claim_id);
+    ledger_stage:=public.reality_stage_final_loop_ledger_return_v1(NEW.shift_id,NEW.claim_id);
    END IF;
-   PERFORM reality_internal.stage_final_loop_release_continuation_v1(NEW.request_id);
+   -- The qualified evidence-return route takes precedence. Never create an
+   -- ordinary continuation alongside the distinct evidence-only event.
+   IF coalesce(ledger_stage->>'status','') NOT IN
+    ('LEDGER_RETURN_EVENT_STAGED','LEDGER_RETURN_CONDITION_ALREADY_STAGED_NO_REPLAY') THEN
+    PERFORM reality_internal.stage_final_loop_release_continuation_v1(NEW.request_id);
+   END IF;
    PERFORM reality_internal.notify_final_loop_governed_trigger_v1(NEW.shift_id);
   ELSIF TG_TABLE_NAME='signed_worker_actual_runs_v1' THEN
    -- Only a completed investigation may request a distinct review run.
