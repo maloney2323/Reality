@@ -10,6 +10,7 @@ DECLARE sh record; prior reality_internal.shift_repeated_blocker_observations_v1
  v_claims integer; v_finals integer; v_key text; v_incident uuid;
  v_observed timestamptz:=clock_timestamp();
  exact_event record; suspension record; current_proof jsonb; current_guard jsonb; evidence jsonb; evidence_hash text;
+ invocation_spine jsonb; invocation_scope_count integer;
 BEGIN
  IF current_user<>'service_role' OR p_shift_id IS NULL OR
   p_worker_run_id IS NULL OR p_safe_result IS NULL OR
@@ -41,7 +42,8 @@ BEGIN
  -- First typed signed Final Loop failure is a durable incident, not a repeat counter.
  IF p_safe_result IN ('FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED',
   'FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED',
-  'FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED','FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED') THEN
+  'FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED','FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED',
+  'FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED') THEN
   SELECT e.event_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision,
    w.running_release_sha,w.release_receipt_sha256,a.runtime_scope->>'continuity_root_id' root_id
   INTO exact_event FROM reality_internal.final_loop_resume_events_v1 e
@@ -107,6 +109,54 @@ BEGIN
     'status','FINAL_LOOP_VERIFIED_SUSPENSION_SOURCE_UNVERIFIED',
     'new_original_admitted',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false); END IF;
   END IF;
+  -- Re-read current canonical evidence; an old observation or a status string alone is insufficient.
+  IF p_safe_result='FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED' THEN
+   current_guard:=public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id);
+   SELECT count(*)::integer,pg_catalog.jsonb_agg(o.value->'execution_spine_readback')->0
+   INTO invocation_scope_count,invocation_spine
+   FROM pg_catalog.jsonb_array_elements(coalesce(current_guard->'obligations','[]'::jsonb)) o(value)
+   WHERE o.value->>'original_work_id'=exact_event.original_work_id
+    AND o.value->>'source_ref'=exact_event.source_ref
+    AND o.value->>'continuity_identity_verified'='true'
+    AND o.value->>'qualifier_digest_verified'='true'
+    AND o.value->>'next_qualified_action'='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND o.value->>'independent_original_outcome_verified'='false';
+   IF current_guard->>'status' IS DISTINCT FROM 'FINAL_LOOP_SHARED_CONTINUITY_CHECKED'
+    OR current_guard->>'owner_id' IS DISTINCT FROM sh.owner_id::text
+    OR current_guard->>'shift_id' IS DISTINCT FROM p_shift_id::text
+    OR current_guard->>'continuity_root_id' IS DISTINCT FROM exact_event.root_id
+    OR current_guard->>'continuity_head_sha256' IS DISTINCT FROM exact_event.continuity_head_sha256
+    OR current_guard->>'revision' IS DISTINCT FROM exact_event.continuity_revision::text
+    OR current_guard->>'execution_authorized' IS DISTINCT FROM 'false'
+    OR invocation_scope_count<>1
+    OR invocation_spine->>'status' IS DISTINCT FROM 'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'
+    OR invocation_spine->>'canonical_return_committed' IS DISTINCT FROM 'true'
+    OR invocation_spine->>'replay_authorized' IS DISTINCT FROM 'false'
+    OR invocation_spine->>'execution_authorized' IS DISTINCT FROM 'false'
+    OR invocation_spine->>'original_job_completed' IS DISTINCT FROM 'false'
+    OR NOT coalesce(invocation_spine->>'observation_sha256' ~ '^sha256:[a-f0-9]{64}$',false)
+    OR NOT coalesce(invocation_spine->>'canonical_return_event_id' ~ '^[a-f0-9-]{36}$',false)
+    OR NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(coalesce(invocation_spine->'observations','[]'::jsonb)) o(value)
+      WHERE o.value->>'model_artifact_recorded'='false' AND o.value->>'provider_outcome_verified'='false'
+       AND o.value->>'replay_authorized'='false' AND o.value->>'worker_completed'='true')
+   THEN RETURN pg_catalog.jsonb_build_object(
+    'status','FINAL_LOOP_UNRESOLVED_INVOCATION_SOURCE_UNVERIFIED',
+    'new_original_admitted',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false);
+   END IF;
+   -- Do not duplicate an incident for the same evidence and continuity head.
+   SELECT incident_id INTO v_incident FROM reality_internal.owner_shift_continuity_incidents_v1 i
+   WHERE i.owner_id=sh.owner_id AND i.shift_id=p_shift_id AND i.kind='SIGNED_FINAL_LOOP_CONTINUITY_BLOCKED'
+    AND i.source_evidence->>'original_work_id'=exact_event.original_work_id
+    AND i.source_evidence->>'continuity_head_sha256'=exact_event.continuity_head_sha256
+    AND i.source_evidence->>'blocker_code'=p_safe_result
+    AND i.source_evidence->>'invocation_observation_sha256'=invocation_spine->>'observation_sha256'
+   LIMIT 1;
+   IF FOUND THEN RETURN pg_catalog.jsonb_build_object(
+    'status','SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED','incident_id',v_incident,
+    'original_work_id',exact_event.original_work_id,'next_action','INVESTIGATE_EXISTING_SIGNED_SHIFT_INCIDENT',
+    'new_original_admitted',false,'execution_authorized',false,'installation_authorized',false,'production_changed',false);
+   END IF;
+  END IF;
   evidence:=pg_catalog.jsonb_build_object('schema','reality-signed-final-loop-blocker-v1',
    'owner_id',sh.owner_id,'shift_id',p_shift_id,'original_work_id',exact_event.original_work_id,
    'source_ref',exact_event.source_ref,'continuity_root_id',exact_event.root_id,
@@ -121,6 +171,14 @@ BEGIN
     'verified_suspension_receipt_sha256',suspension.receipt_sha256,
     'continuity_head_sha256','sha256:'||suspension.lineage_hash,'continuity_revision',exact_event.continuity_revision+1,
     'prior_continuity_head_sha256',exact_event.continuity_head_sha256,
+    'previous_attempt_budget_preserved',true,'new_attempt_authorized',false);
+  END IF;
+  IF p_safe_result='FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED' THEN
+   evidence:=evidence||pg_catalog.jsonb_build_object(
+    'invocation_observation_sha256',invocation_spine->>'observation_sha256',
+    'canonical_return_event_id',invocation_spine->>'canonical_return_event_id',
+    'canonical_return_head_sha256',invocation_spine->>'canonical_return_head_sha256',
+    'invocation_observations',invocation_spine->'observations',
     'previous_attempt_budget_preserved',true,'new_attempt_authorized',false);
   END IF;
   evidence_hash:=pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(evidence::text,'UTF8')),'hex');
