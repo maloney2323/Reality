@@ -1,3 +1,11 @@
+-- Retain one ordinary continuation per claim and revision; independently
+-- verified suspension receipts are still unique across all releases.
+-- No prior event, nonce, claim or historical approval is reset.
+DROP INDEX IF EXISTS reality_internal.final_loop_release_continuation_once_v1;
+CREATE UNIQUE INDEX final_loop_release_continuation_once_v1
+ ON reality_internal.final_loop_resume_events_v1(release_continuation_claim_id,continuity_revision)
+ WHERE release_continuation_claim_id IS NOT NULL AND ledger_return_condition_sha256 IS NULL
+ AND signal_kind NOT IN ('VERIFIED_INVESTIGATION_REVIEW','VERIFIED_REVIEW_TECHNICAL_EVIDENCE');
 -- Derive an evidence-only operational binding from a consumed release.
 -- NEVER update the original release approval, mint authority or enable child/parent delivery.
 -- The first supported successor is the existing independently verified suspension return.
