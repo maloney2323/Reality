@@ -328,7 +328,7 @@ export default async function handler(req,res){
   if(governedWakeScope&&canonicalEventRuntime){
    const receipt=await shiftRpc(db,'reality_claim_canonical_governed_wake_v1',{
     p_owner_id:governedWakeScope.owner_id,p_shift_id:governedWakeScope.shift_id,p_plan_fingerprint:governedWakeScope.plan_fingerprint,
-    p_event_id:governedWakeScope.event_id,p_nonce:governedWakeScope.nonce,p_kind:governedWakeScope.kind,p_release_sha:governedWakeScope.release_sha,
+    p_event_id:governedWakeScope.event_id,p_nonce:governedWakeScope.nonce,p_kind:governedWakeScope.kind==='RESUME'?'RESUME_WITH_LEDGER_RETURN':governedWakeScope.kind,p_release_sha:governedWakeScope.release_sha,
     p_worker_run_id:actualWorkerRunId,p_lease_id:governedWakeClaimId});
    claimedEvidenceCapability=selectClaimedEvidenceCapability({
     receipt,delivery:governedWakeScope,workerRunId:actualWorkerRunId
