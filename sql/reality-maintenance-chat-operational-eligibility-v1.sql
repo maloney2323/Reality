@@ -43,13 +43,12 @@ BEGIN
    pg_catalog.convert_to(m.content,'UTF8')),'hex')
   AND pg_catalog.jsonb_typeof(w.source_scope)='array'
   AND pg_catalog.jsonb_array_length(w.source_scope) BETWEEN 1 AND 4
-  AND char_length(m.content) BETWEEN 40 AND 6000
-  -- Admit authenticated instructions to bounded advisory assessment, not
-  -- execution. Natural-language references cannot grant or expand authority.
-  -- Require an explicit continuation/investigation intent without a fixed
-  -- product name, source identifier format or mandatory UUID in the prompt.
+  AND char_length(m.content) BETWEEN 1 AND 6000
+  -- Intake is advisory only. The existing bounded worker classifier
+  -- distinguishes conversation, existing work and missing exact scope.
+  -- No magic sentence, product name, PR format or UUID is required.
+  -- Never turn pre-authorization historical conversation into shift work.
   AND i.created_at>=sh.authorized_at
-  AND m.content ~* '^[[:space:]]*(Reality[[:space:][:punct:]]+)?(please[[:space:]]+)?(continue|resume|investigate|diagnose|reconcile|verify|recover|resolve|review|check|assess|finish|fix|repair|test|help)[[:space:]]+'
   -- Do not infer which shift is intended when multiple active windows exist.
   AND NOT EXISTS (
    SELECT 1 FROM reality_internal.governed_employee_shifts_v1 other
