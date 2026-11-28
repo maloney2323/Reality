@@ -9,6 +9,16 @@ import {adjudicateSourceReview} from './reality-source-review-adjudication-v0.1.
 const hash=text=>'sha256:'+createHash('sha256')
  .update(JSON.stringify(text)).digest('hex');
 function require(condition,code){if(!condition)throw new Error(code)}
+// Server-selected operational report boundary. This selector establishes
+// a stricter presentation contract, never execution or authority.
+// A model's CONVERSATIONAL label cannot downgrade an operational request.
+export function requiresSourceRenderedOperationalReply(message){
+ const t=String(message||'');
+ const domain=/\b(?:shift|worker|employee|invocation|continuity|ledger|receipt|warrant|review scope|original (?:work|job|obligation)|release|deployment|production|PR\s*#?\d+)\b/i.test(t);
+ const action=/\b(?:investigat\w*|reconcil\w*|verif\w*|qualif\w*|resum\w*|continu\w*|recover\w*|fix|repair\w*|perform\w*|execut\w*|test\w*|install\w*|deploy\w*|activat\w*|complet\w*|progress|status|happened|receipt\w*|done|working|block\w*)\b/i.test(t);
+ return domain&&action;
+}
+
 // Compile the exact extracted assertions against the existing source verifier.
 // Extraction is a candidate, never an independent completeness or truth proof.
 // Unknown source claims are unsupported, not adjudicated false. No external
