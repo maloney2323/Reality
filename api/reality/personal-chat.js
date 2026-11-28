@@ -307,7 +307,11 @@ export default async function handler(req,res){
    const t=ctx.values.time_horizon;
    const shift=ctx.values.active_shift?.find(x=>x?.source_kind==='AUTHENTICATED_OWNER_SCOPED_SUPABASE_READBACK'&&x.owner_shift_authorization_recorded===true)||null;
    const selfVisibilityObservations=ctx.values.self_visibility?.observations||[];
-   const observations=[...selfVisibilityObservations,...(ctx.values.verified_work||[]),...(ctx.values.active_shift||[]),...(ctx.values.worker_observation||[])].slice(0,90);
+   // Reuse the full lane's authenticated incident projection, not a second
+   // read, detector, or authority path. Keep current incidents in the bounded
+   // context; unavailable evidence stays unknown.
+   const incidentObservations=incidentChatUniverseObservations(ctx.values.owner_handoff);
+   const observations=[...incidentObservations,...selfVisibilityObservations,...(ctx.values.verified_work||[]),...(ctx.values.active_shift||[]),...(ctx.values.worker_observation||[])].slice(0,90);
    const operationalHorizon=wantsContext?projectChatOperationalHorizon({visibility:ctx.values.self_visibility,settlements:ctx.values.verified_work||[]}):null;
    const mission=ctx.values.mission?.state?.active_goal;
    const ownerUniverse=makeOwnerUniverseReadModel({observations});
@@ -328,6 +332,8 @@ export default async function handler(req,res){
       expected_outcomes_are_not_verified_facts:true}:null,
      active_owner_mission:mission?.user_confirmed===true&&mission.status==='ACTIVE'?{title:mission.title,source_user_message_ref:mission.source_user_message_ref,grants_execution_authority:false}:null,
      owner_operational_incidents:ctx.values.owner_handoff?.items?.slice(0,3)||null,
+     owner_incident_evidence_status:ctx.values.owner_handoff?'OWNER_SCOPED_READBACK':'UNAVAILABLE_NOT_ABSENCE',
+     owner_shift_continuity_incidents:ctx.values.owner_handoff?.shift_continuity_incidents?.slice(0,3)||null,
      conversation_never_grants_execution_authority:true},
     verifiedUniverseObservations:ownerUniverse.observations
    });
