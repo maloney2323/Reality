@@ -324,3 +324,52 @@ export function boundedRegisteredCapabilityCheckpoint(action,result){
    result.isolated_authority_read_attempts:null,
   original_job_completed:false,production_changed:false});
 }
+
+
+// The durable canonical event claim selects one evidence-only capability.
+// These are installed capability types, not a hard-coded sequence of jobs.
+// An ordinary claim selects none; conflicting evidence modes fail closed.
+const evidenceModes=Object.freeze({
+ terminal_technical_evidence_only:Object.freeze({
+  key:'READ_DISTINCT_TERMINAL_TECHNICAL_EVIDENCE_NO_REPLAY',
+  releaseStage:'TERMINAL_TECHNICAL_EVIDENCE_RELEASE_ATTESTATION',
+  publicationStage:'TERMINAL_TECHNICAL_EVIDENCE_RESPONSE_PUBLICATION',
+  errorPrefix:'TERMINAL_TECHNICAL',
+  fenceError:'TERMINAL_TECHNICAL_EVIDENCE_RUNTIME_FENCE_REJECTED',
+  witnessError:'TERMINAL_TECHNICAL_EVIDENCE_WITNESS_UNVERIFIED',
+  attestationError:'TERMINAL_TECHNICAL_COMPLETION_ATTESTATION_UNVERIFIED'
+ }),
+ independent_review_only:Object.freeze({
+  key:'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',
+  releaseStage:'INDEPENDENT_INVESTIGATION_REVIEW_RELEASE_ATTESTATION',
+  publicationStage:'INDEPENDENT_INVESTIGATION_REVIEW_RESPONSE_PUBLICATION',
+  errorPrefix:'INDEPENDENT_INVESTIGATION_REVIEW',
+  fenceError:'INDEPENDENT_INVESTIGATION_REVIEW_RUNTIME_FENCE_REJECTED',
+  witnessError:'INDEPENDENT_INVESTIGATION_REVIEW_RELEASE_WITNESS_UNVERIFIED',
+  attestationError:'INDEPENDENT_INVESTIGATION_REVIEW_ATTESTATION_UNVERIFIED'
+ }),
+ investigation_only:Object.freeze({
+  key:'INVESTIGATE_VERIFIED_SUSPENSION_NO_REPLAY',
+  releaseStage:'VERIFIED_SUSPENSION_INVESTIGATION_RELEASE_ATTESTATION',
+  publicationStage:'SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION',
+  errorPrefix:'SUSPENSION_INVESTIGATION',
+  fenceError:'SUSPENSION_INVESTIGATION_RUNTIME_FENCE_REJECTED',
+  witnessError:'SUSPENSION_INVESTIGATION_RELEASE_WITNESS_UNVERIFIED',
+  attestationError:'SUSPENSION_INVESTIGATION_ATTESTATION_UNVERIFIED'
+ })
+});
+export function selectClaimedEvidenceCapability({receipt,delivery,workerRunId}={}){
+ if(receipt?.status!=='CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED'||
+    !UUID.test(workerRunId||'')||!UUID.test(delivery?.event_id||'')||
+    !UUID.test(delivery?.shift_id||'')||
+    receipt.event_id!==delivery.event_id||receipt.shift_id!==delivery.shift_id||
+    receipt.worker_run_id!==workerRunId||receipt.execution_authorized!==false||
+    receipt.original_job_completed!==false||receipt.production_changed!==false)
+  throw Error('CANONICAL_GOVERNED_WAKE_NOT_DURABLY_CLAIMED');
+ const modes=Object.keys(evidenceModes).filter(k=>receipt[k]===true);
+ if(modes.length>1)throw Error('GOVERNED_WAKE_CONFLICTING_EVIDENCE_LANES');
+ if(modes.length===0)return null;
+ const mode=evidenceModes[modes[0]];
+ if(delivery.kind!=='RESUME')throw Error(mode.fenceError);
+ return mode;
+}
