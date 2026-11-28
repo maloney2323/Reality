@@ -2349,13 +2349,29 @@ export default async function handler(req,res){
    Promise.resolve(boundedCorrectiveCheckpoint.corrective_ci_result):
    sameOriginalRecoveryCiCheckpoint?
    Promise.resolve(sameOriginalRecoveryCiCheckpoint.corrective_ci_result):
-   continueRileyCorrectiveModelIntoIndependentCI({
-    db,env:process.env,fetchImpl:fetch
-   }).catch(()=>({
-    status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
-    original_job_completed:false,installation_authorized:false,
-    production_changed:false,new_shift_started:false
-   }));
+   (async()=>{
+    // Work can become eligible during this shift. Reread the existing
+    // selector, not the provider broker, and invoke only qualified work.
+    const current=await shiftRpc(db,'reality_read_next_riley_auto_corrective_ci_v1',{})
+     .catch(()=>null);
+    const selected=selectCorrectiveCiCapability({wake:wakeReceipt,candidate:current,
+     registeredActionKeys:correctiveCiCapabilityKeys});
+    if(!selected)return {
+     status:['NO_UNTESTED_SAME_ORIGINAL_CORRECTIVE_REVISION',
+      'NO_CURRENT_OWNER_WARRANTED_CORRECTIVE_CI'].includes(current?.status)?
+      current.status:'ISOLATED_CORRECTIVE_CI_SELECTED_SCOPE_UNVERIFIED',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false
+    };
+    return continueRileyCorrectiveModelIntoIndependentCI({
+     db,env:process.env,fetchImpl:fetch,version:selected.version,
+     expectedScope:selected.expectedScope
+    }).catch(()=>({
+     status:'ISOLATED_CORRECTIVE_CI_BROKER_EFFECT_UNVERIFIED',
+     original_job_completed:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false
+    }));
+   })();
   
   // The signed shift step is already a DB-fenced, owner-authorized read.
   // One shared model offers bounded read-only role context on that same step.
