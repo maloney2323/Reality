@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {projectChatContinuityActivity} from '../src/reality-chat-continuity-activity-v1.js';
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const h=n=>'sha256:'+String(n).repeat(64);
@@ -114,4 +115,25 @@ test('assigned reviewer without the exact completed review receipt is not credit
  const {row,ob}=terminalFixture();
  const r=projectChatContinuityActivity({...input,current:{...current,observations:[{current_operational_facts:ob}]},terminalRows:[row],incidentReadback:{...incidentReadback,items:[{...incidentReadback.items[0],independent_source_review:null}]}});
  assert.equal(r.obligations[0].steps.find(x=>x.id===row.event_id+':review').employee,null);
+});
+
+test('employee progress is computed from unique recorded actions, never a guessed job percentage',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const helper=html.match(/function trackedEmployeeProgress\(rows\)\{[\s\S]*?\n \}(?=\n function renderEmployeeStepProgress)/)?.[0];
+ assert.ok(helper,'shared employee progress helper must exist');
+ const summarize=runInNewContext('('+helper+')');
+ const job={original_work_id:work};
+ const make=(id,state,receipt)=>({job,step:{id,state,receipt}});
+ const rows=[make('a','verified',h(1)),make('alias','verified',h(1)),make('b','running'),make('c','blocked'),make('d','pending'),make('e','recorded'),make('f','historical'),make('g','proposal')];
+ const p=summarize(rows);
+ assert.equal(p.total,5);assert.equal(p.verified,1);assert.equal(p.running,1);
+ assert.equal(p.blocked,1);assert.equal(p.waiting,2);
+ assert.equal(summarize([]).total,0);assert.equal(summarize([]).verified,0);
+ const other={...rows[0],job:{original_work_id:'work:'+'b'.repeat(32)}};
+ assert.equal(summarize([rows[0],other]).total,2);
+ assert.match(html,/bar\.max=p\.total;bar\.value=p\.verified/);
+ assert.match(html,/Recorded steps only — not overall job completion/);
+ assert.match(html,/renderChatEmployeeProgress\(article,job,data\.partial\)/);
+ assert.match(html,/name\.insertAdjacentElement\('afterend',progress\)/);
+ assert.match(html,/Reality · Shared worker/);
 });
