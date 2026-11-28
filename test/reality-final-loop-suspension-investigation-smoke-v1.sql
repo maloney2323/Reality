@@ -816,24 +816,30 @@ DECLARE o uuid:=gen_random_uuid(); s uuid:=gen_random_uuid(); root uuid:=gen_ran
  packet uuid:=gen_random_uuid(); nonce uuid:=gen_random_uuid(); t timestamptz:=clock_timestamp();
  work text:='work:'||repeat('a',32); src text:='https://github.com/fixture/ledger/pull/9';
  head text:='sha256:'||repeat('b',64); plan text:='sha256:'||repeat('c',64);
- q text; snapshot jsonb; scope jsonb; observations jsonb; guard jsonb; proof jsonb; verdict jsonb; returned jsonb;
+ q text; prior_q text:='sha256:'||repeat('e',64); causal text; snapshot jsonb; scope jsonb; observations jsonb; guard jsonb; proof jsonb; verdict jsonb; returned jsonb;
+ staged_event uuid; newrun uuid:=gen_random_uuid(); newlease uuid:=gen_random_uuid(); newnonce uuid:=gen_random_uuid(); condition_hash text;
 BEGIN
  snapshot:=jsonb_build_object('shift_id',s,'original_candidate_work_id',work,
   'next_action','VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','unsatisfied_gates',jsonb_build_array('TERMINAL_BUILDER_DISTINCT_EVIDENCE_AND_BUDGET_REQUIRED'),
   'recovery_terminal_history',jsonb_build_object('remaining_attempts',0,'replay_permitted',false));
  q:='sha256:'||encode(sha256(convert_to(snapshot::text,'UTF8')),'hex');
+ causal:='sha256:'||encode(sha256(convert_to(s::text||'|'||work||'|'||head||'|4|'||prior_q||'|'||q,'UTF8')),'hex');
  scope:=jsonb_build_object('original_work_id',work,'source_ref',src,'continuity_head_sha256',head,
+  'target_environment','CANONICAL_BENCHMARK_PREVIEW','runtime_database_project_ref','hvkfreoagbrphwghjajw',
+  'independent_gateway_ci_verified',true,'independent_qualification_branch_verified',true,'plan_fingerprint',plan,'continuity_root_id',root,
   'continuity_revision',4,'qualifier_receipt_sha256',q,'target_deployment_id','dpl_fixture_ledger',
   'exact_runtime_database_contract_verified',true,'child_execution_enabled',false,'parent_delivery_enabled',false,'production_changed',false);
  observations:=jsonb_build_array(jsonb_build_object('event_id',fenced,'model_artifact_recorded',false,'provider_outcome_verified',false,'replay_authorized',false));
  proof:=jsonb_build_object('status','FINAL_LOOP_FROZEN_SCOPE_VERIFIED_ORIGINAL_ACCEPTANCE_PENDING','owner_id',o,
   'continuity_root_id',root,'continuity_head_sha256',head,'revision',4,'frozen_shift_scope_sha256','sha256:'||repeat('d',64));
  guard:=jsonb_build_object('status','FINAL_LOOP_SHARED_CONTINUITY_CHECKED','continuity_head_sha256',head,'revision',4,
+  'owner_id',o,'shift_id',s,'continuity_root_id',root,'execution_authorized',false,'original_job_completed',false,
   'obligations',jsonb_build_array(jsonb_build_object('original_work_id',work,'source_ref',src,
    'continuity_identity_verified',true,'qualifier_digest_verified',true,'source_proof_verified',true,
-   'independent_original_outcome_verified',false,'qualifier_receipt_sha256',q,'execution_spine_readback',
+   'independent_original_outcome_verified',false,'qualifier_receipt_sha256',q,'next_qualified_action','VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','execution_spine_readback',
    jsonb_build_object('status','SIGNED_INVOCATION_OBSERVATIONS_READY_FOR_CANONICAL_RETURN',
-    'provider_outcome_verified',false,'replay_authorized',false,'observations',observations))));
+    'provider_outcome_verified',false,'replay_authorized',false,'canonical_return_committed',false,
+    'observation_sha256','sha256:'||encode(sha256(convert_to(observations::text,'UTF8')),'hex'),'observations',observations))));
  INSERT INTO public.suspension_fixture_proof VALUES(s,proof,guard);
  INSERT INTO public.universe_events(event_id,continuity_root_id,worldline_id,entity_type,epistemic_status,
   lineage_hash,content_hash,payload,provenance,assertion_time)
@@ -846,7 +852,7 @@ BEGIN
  VALUES(o,src,q,snapshot,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',t);
  INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,subscribed_receipt_sha256,
   continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
- VALUES(s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',snapshot->'unsatisfied_gates','RECOVER','SUSPENDED');
+ VALUES(s,o,work,src,'QUALIFIER_PROOF_CHANGED',prior_q,head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',snapshot->'unsatisfied_gates','RECOVER','SUSPENDED');
  INSERT INTO reality_internal.signed_worker_actual_runs_v1 VALUES
  (oldrun,'COMPLETED',t-interval '3 minutes',t-interval '2 minutes','SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'),
  (currentrun,'STARTED',t,NULL,'SHIFT_DB_BOUNDARY');
@@ -862,9 +868,9 @@ BEGIN
  INSERT INTO reality_internal.final_loop_resume_events_v1(event_id,shift_id,owner_id,original_work_id,source_ref,
   signal_kind,source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,signal_next_action,state,
   governed_wake_requested_at,governed_wake_request_id,governed_wake_queued_at,governed_wake_nonce,governed_wake_worker_run_id,release_continuation_claim_id)
- VALUES(oldev,s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,q,'sha256:'||repeat('5',64),head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','SHADOW_PENDING',
+ VALUES(oldev,s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,prior_q,causal,head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','SHADOW_PENDING',
   t-interval '3 minutes 2 seconds',9001,t-interval '3 minutes 1 second',nonce,oldrun,oldclaim),
- (currentev,s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,q,'sha256:'||repeat('6',64),head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','SHADOW_PENDING',
+ (currentev,s,o,work,src,'QUALIFIER_PROOF_CHANGED',q,prior_q,causal,head,4,'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM','SHADOW_PENDING',
   t-interval '2 seconds',9002,t-interval '1 second',gen_random_uuid(),currentrun,currentclaim);
  -- Negative control: unrelated completed stage cannot be accepted.
  UPDATE reality_internal.signed_worker_actual_runs_v1 SET worker_stage='SHIFT_DB_BOUNDARY' WHERE run_id=oldrun;
@@ -918,25 +924,71 @@ BEGIN
  RESET ROLE;
  IF verdict->>'ready' IS DISTINCT FROM 'false' THEN RAISE EXCEPTION 'UNBOUND_HISTORICAL_EVENT_PREFLIGHT_ACCEPTED %',verdict;END IF;
  UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_nonce=nonce WHERE event_id=oldev;
- UPDATE reality_internal.signed_worker_actual_runs_v1
- SET status='STARTED',worker_stage='SHIFT_DB_BOUNDARY',finished_at=NULL WHERE run_id=currentrun;
- -- Positive control: the historical signed completion is evidence only.
+ -- Stage against the same consumed release; earlier history remains intact.
  SET LOCAL ROLE service_role;
- verdict:=public.reality_return_final_loop_invocation_observations_v1(s,work,currentrun,head,4);
+ verdict:=public.reality_stage_final_loop_ledger_return_v1(s,currentclaim);
+ RESET ROLE;
+ IF verdict->>'status' IS DISTINCT FROM 'LEDGER_RETURN_EVENT_STAGED'
+ OR verdict->>'execution_authorized' IS DISTINCT FROM 'false'
+ OR verdict->>'replay_authorized' IS DISTINCT FROM 'false'
+ THEN RAISE EXCEPTION 'DISTINCT_LEDGER_EVENT_NOT_STAGED %',verdict;END IF;
+ staged_event:=(verdict->>'event_id')::uuid;condition_hash:=verdict->>'condition_sha256';
+ SET LOCAL ROLE service_role;
+ verdict:=public.reality_stage_final_loop_ledger_return_v1(s,currentclaim);
+ RESET ROLE;
+ IF verdict->>'status'='LEDGER_RETURN_EVENT_STAGED'
+ OR (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND ledger_return_condition_sha256=condition_hash)<>1
+ THEN RAISE EXCEPTION 'DUPLICATE_LEDGER_EVENT_STAGED %',verdict;END IF;
+ -- Emulate the existing signed worker transport (triggers disabled in this
+ -- fixture). The old protocol must not be able to claim the new event.
+ UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_requested_at=clock_timestamp(),
+ governed_wake_request_id=9003,governed_wake_queued_at=clock_timestamp(),governed_wake_nonce=newnonce
+ WHERE event_id=staged_event;
+ INSERT INTO reality_internal.governed_preview_shift_worker_leases_v1
+ (worker_key,claim_id,claimed_at,lease_expires_at,next_wake_at,released_at)
+ VALUES('preview-governed-employee-shift-worker',newlease,clock_timestamp()-interval '1 second',clock_timestamp()+interval '1 minute',clock_timestamp(),NULL)
+ ON CONFLICT(worker_key) DO UPDATE SET claim_id=EXCLUDED.claim_id,claimed_at=EXCLUDED.claimed_at,
+ lease_expires_at=EXCLUDED.lease_expires_at,next_wake_at=EXCLUDED.next_wake_at,released_at=NULL;
+ INSERT INTO reality_internal.signed_worker_actual_runs_v1(run_id,status,started_at,finished_at,worker_stage)
+ VALUES(newrun,'STARTED',clock_timestamp(),NULL,'SHIFT_DB_BOUNDARY');
+ SET LOCAL ROLE service_role;
+ verdict:=public.reality_claim_canonical_governed_wake_v1(o,s,plan,staged_event,newnonce,'RESUME',repeat('3',40),newrun,newlease);
+ RESET ROLE;
+ IF verdict->>'status' IS DISTINCT FROM 'CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED'
+ THEN RAISE EXCEPTION 'LEGACY_WORKER_ACCEPTED_LEDGER_ONLY_EVENT %',verdict;END IF;
+ SET LOCAL ROLE service_role;
+ verdict:=public.reality_claim_canonical_governed_wake_v1(o,s,plan,staged_event,newnonce,'RESUME_WITH_LEDGER_RETURN',repeat('3',40),newrun,newlease);
+ RESET ROLE;
+ IF verdict->>'status' IS DISTINCT FROM 'CANONICAL_GOVERNED_WAKE_DURABLY_CLAIMED'
+ OR verdict->>'ledger_return_only' IS DISTINCT FROM 'true'
+ OR verdict->>'original_work_id' IS DISTINCT FROM work
+ OR verdict->>'execution_authorized' IS DISTINCT FROM 'false'
+ THEN RAISE EXCEPTION 'LEDGER_ONLY_CLAIM_UNVERIFIED %',verdict;END IF;
+ SET LOCAL ROLE service_role;
+ verdict:=public.reality_claim_canonical_governed_wake_v1(o,s,plan,staged_event,newnonce,'RESUME_WITH_LEDGER_RETURN',repeat('3',40),newrun,newlease);
+ RESET ROLE;
+ IF verdict->>'status' IS DISTINCT FROM 'CANONICAL_GOVERNED_WAKE_MISSING_STALE_OR_CONSUMED'
+ THEN RAISE EXCEPTION 'LEDGER_EVENT_REPLAY_ACCEPTED %',verdict;END IF;
+ INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1
+ VALUES(newrun,o,s,currentclaim,repeat('3',40),'fixture-current','NORMAL_SIGNED_SHIFT','sha256:'||repeat('7',64));
+ -- Positive control: both prior completed runs return as observations only.
+ SET LOCAL ROLE service_role;
+ verdict:=public.reality_return_final_loop_invocation_observations_v1(s,work,newrun,head,4);
  RESET ROLE;
  IF verdict->>'status' IS DISTINCT FROM 'FINAL_LOOP_SPINE_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'
   OR verdict->>'canonical_return_committed' IS DISTINCT FROM 'true'
   OR verdict->>'revision' IS DISTINCT FROM '5'
-  OR verdict->>'prior_preclaim_workers_observed' IS DISTINCT FROM '1'
+  OR verdict->>'prior_preclaim_workers_observed' IS DISTINCT FROM '2'
   OR verdict->>'original_job_completed' IS DISTINCT FROM 'false'
   OR verdict->>'execution_authorized' IS DISTINCT FROM 'false'
   OR verdict->>'replay_authorized' IS DISTINCT FROM 'false'
  THEN RAISE EXCEPTION 'HISTORICAL_RETURN_DID_NOT_ADVANCE_SAME_ORIGINAL %',verdict;END IF;
  SELECT payload INTO STRICT returned FROM public.universe_events WHERE event_id=(verdict->>'event_id')::uuid;
- IF returned->'prior_preclaim_worker_observations'->0->>'observed_worker_stage' IS DISTINCT FROM 'SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'
-  OR returned->'prior_preclaim_worker_observations'->0->>'provider_outcome_verified' IS DISTINCT FROM 'false'
+ IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(returned->'prior_preclaim_worker_observations') a
+   WHERE a->>'observed_worker_stage'='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE' AND a->>'provider_outcome_verified'='false')
+  OR EXISTS(SELECT 1 FROM jsonb_array_elements(returned->'prior_preclaim_worker_observations') a WHERE a->>'provider_outcome_verified' IS DISTINCT FROM 'false')
   OR returned->'terminal_recovery_history'->>'remaining_attempts' IS DISTINCT FROM '0'
-  OR (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND state='SHADOW_OBSERVED')<>2
+  OR (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND state='SHADOW_OBSERVED')<>3
   OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 WHERE event_id=oldev AND governed_wake_nonce=nonce AND governed_wake_request_id=9001 AND governed_wake_worker_run_id=oldrun)
   OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 WHERE shift_id=s AND continuity_revision=5 AND original_work_id=work)
   OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=s)
