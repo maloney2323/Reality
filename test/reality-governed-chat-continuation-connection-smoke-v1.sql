@@ -219,3 +219,48 @@ DO $$BEGIN
  THEN RAISE EXCEPTION 'QUALIFIER_PRIVILEGE_WIDENED';END IF;
 END$$;
 SELECT 'RELEASE_PROOF_DEMAND_REQUALIFIED_WITHOUT_WATCHDOG_OR_DUPLICATE_EVENT' AS result;
+
+-- The actual signed completion trigger also qualifies stale evidence on demand,
+-- without a new release, owner action, watchdog tick or model replay.
+ALTER TABLE reality_internal.governed_worker_release_approvals_v1
+ ADD COLUMN owner_id uuid, ADD COLUMN release_sha text, ADD COLUMN state text;
+ALTER TABLE reality_internal.final_loop_resume_events_v1
+ ADD COLUMN state text, ADD COLUMN governed_wake_worker_run_id uuid,
+ ADD COLUMN release_continuation_claim_id uuid, ADD COLUMN ledger_return_condition_sha256 text;
+CREATE TABLE reality_internal.signed_worker_actual_runs_v1(run_id uuid PRIMARY KEY,status text,worker_stage text);
+CREATE TABLE reality_internal.governed_signed_worker_release_wakes_v1(worker_run_id uuid,owner_id uuid,shift_id uuid,release_claim_id uuid,running_release_sha text,operating_lane text);
+CREATE TABLE reality_internal.owner_shift_continuity_incidents_v1(source_evidence jsonb,phase text);
+CREATE TRIGGER fixture_signed_completion AFTER UPDATE OF status ON reality_internal.signed_worker_actual_runs_v1
+ FOR EACH ROW EXECUTE FUNCTION reality_internal.on_final_loop_governed_wake_v1();
+UPDATE reality_internal.governed_worker_release_approvals_v1 a SET
+ owner_id=s.owner_id,release_sha=repeat('a',40),state='CLAIMED_ONCE'
+ FROM reality_internal.governed_employee_shifts_v1 s WHERE s.shift_id=a.shift_id;
+INSERT INTO reality_internal.signed_worker_actual_runs_v1 VALUES
+ ('90000000-0000-4000-8000-000000000001','STARTED','SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'),
+ ('90000000-0000-4000-8000-000000000002','STARTED','SHARED_CONTINUITY_VERIFIER_RETURN_FENCE');
+UPDATE reality_internal.final_loop_resume_events_v1 e SET
+ state='SHADOW_PENDING',governed_wake_worker_run_id='90000000-0000-4000-8000-000000000001',
+ release_continuation_claim_id=a.claim_id
+ FROM reality_internal.governed_worker_release_approvals_v1 a WHERE a.shift_id=e.shift_id;
+INSERT INTO reality_internal.governed_signed_worker_release_wakes_v1
+ SELECT '90000000-0000-4000-8000-000000000001',owner_id,shift_id,claim_id,release_sha,'NORMAL_SIGNED_SHIFT'
+ FROM reality_internal.governed_worker_release_approvals_v1;
+UPDATE reality_internal.owner_continuity_qualification_routes_v1
+ SET reconciliation_checked_at=clock_timestamp()-interval '12 minutes';
+UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED'
+ WHERE run_id='90000000-0000-4000-8000-000000000002';
+DO $$BEGIN
+ IF (SELECT count(*) FROM reality_internal.fixture_release_stage_calls)<>1
+ OR EXISTS(SELECT 1 FROM reality_internal.owner_continuity_qualification_routes_v1
+ WHERE reconciliation_checked_at>clock_timestamp()-interval '10 minutes')
+ THEN RAISE EXCEPTION 'UNBOUND_COMPLETION_TRIGGERED_QUALIFICATION';END IF;
+END$$;
+UPDATE reality_internal.signed_worker_actual_runs_v1 SET status='COMPLETED'
+ WHERE run_id='90000000-0000-4000-8000-000000000001';
+DO $$BEGIN
+ IF (SELECT count(*) FROM reality_internal.fixture_release_stage_calls WHERE kind='ledger' AND proof_fresh)<>2
+ OR EXISTS(SELECT 1 FROM reality_internal.fixture_release_stage_calls WHERE kind='ordinary')
+ OR (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1)<>1
+ THEN RAISE EXCEPTION 'SIGNED_RECOVERY_PROOF_DEMAND_NOT_CONNECTED';END IF;
+END$$;
+SELECT 'SIGNED_COMPLETION_REQUALIFIED_EXACT_EXISTING_PROOF_DEMAND' AS result;
