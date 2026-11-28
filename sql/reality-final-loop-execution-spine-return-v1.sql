@@ -508,7 +508,7 @@ GRANT EXECUTE ON FUNCTION public.reality_return_final_loop_invocation_observatio
    AND (v.owner_id<>p_owner_id OR v.original_work_id<>p_original_work_id
     OR v.source_ref IS DISTINCT FROM p_source_ref
     OR v.continuity_head_sha256<>p_expected_head_sha256 OR v.continuity_revision<>p_expected_revision
-    OR NOT (v.event_id=p_current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(p_execution_readback->'observations') x
+    OR NOT (v.event_id IS NOT DISTINCT FROM p_current_event_id OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(p_execution_readback->'observations') x
       WHERE x.value->>'event_id'=v.event_id::text)
       OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(prior_preclaim_events) x
         WHERE x.value->>'event_id'=v.event_id::text)
