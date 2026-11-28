@@ -1,6 +1,7 @@
 // Existing signed Final Loop: durable source plans -> classified next handler.
 // This is a read model, never a substitute for an original admission, owner
 // approval, one-use service-role claim, executor, or independent final receipt.
+import {selectRegisteredCapabilityKey} from './reality-evidence-driven-capability-router-v1.js';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const HASH=/^sha256:[a-f0-9]{64}$/;
 const SHA=/^[a-f0-9]{40}$/;
@@ -238,6 +239,45 @@ export function selectCurrentApprovedChildReviewRoute({routes,operatingLane}={})
    r.handler_dispatched!==false||r.child_execution_authorized!==false||
    r.original_job_completed!==false)return null;
  return r;
+}
+// Resolve the installed adapter from classified source evidence. The
+// existing adapter still independently rereads and atomically claims its work.
+// Approval packet preparation can select multiple exact pending plans as one
+// capability; the review adapter requires a unique independently scoped route.
+export function selectStagedRegisteredCapabilities({routes,operatingLane,graph,
+ registeredActionKeys=[]}={}){
+ if(routes?.status!=='FINAL_LOOP_STAGED_PLANS_VERIFIED_AND_NEXT_HANDLERS_CLASSIFIED'||
+    routes.read_only!==true||routes.action_dispatched!==false||
+    routes.model_execution_authorized!==false||routes.original_job_completed!==false||
+    operatingLane?.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+    graph?.status!=='UNIFIED_OWNER_JOB_CONTROL_READY'||
+    graph.installation_authorized!==false||graph.production_changed!==false||
+    !Array.isArray(graph.jobs)||!Array.isArray(routes.routes))return Object.freeze([]);
+ const candidates=routes.routes.filter(r=>
+  selectRegisteredCapabilityKey({key:r.next_registered_handler,registeredActionKeys})!==null&&
+  r.handler_dispatched===false&&r.child_execution_authorized===false&&
+  r.original_job_completed===false&&r.handler_requires_isolated_service_claim===true&&
+  UUID.test(r.plan_id||'')&&WORK.test(r.parent_original_work_id||'')&&
+  PR.test(r.source_ref||'')&&SHA.test(r.source_head_sha||'')&&
+  HASH.test(r.source_manifest_sha256||'')&&HASH.test(r.acceptance_contract_sha256||'')&&
+  graph.jobs.filter(j=>j.source_ref===r.source_ref&&
+   j.original_work_id===r.parent_original_work_id&&j.phase==='BLOCKED'&&
+   j.original_kind==='REAL_PR_REVIEW_ORIGINAL'&&j.independent_source_proof_verified===true).length===1);
+ if(new Set(candidates.map(r=>r.plan_id)).size!==candidates.length)return Object.freeze([]);
+ const selected=[];
+ const packetKey='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET';
+ const packetRoutes=candidates.filter(r=>r.next_registered_handler===packetKey&&
+  r.next_governed_action==='PREPARE_EXACT_SOURCE_BOUND_OWNER_APPROVAL_PACKET'&&
+  r.operation_category==='AUTHORITY_REQUIRED'&&r.authority_scope==='EXACT_OWNER_APPROVAL_PENDING'&&
+  r.parent_source_phase==='BLOCKED'&&r.owner_action_required===true&&
+  r.existing_owner_goal_acceptance_verified===false);
+ if(packetRoutes.length&&['FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED',
+  'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'].includes(operatingLane.status))
+  selected.push(Object.freeze({key:packetKey,routes:Object.freeze(packetRoutes)}));
+ const review=selectCurrentApprovedChildReviewRoute({routes,operatingLane});
+ if(review&&candidates.includes(review))
+  selected.push(Object.freeze({key:review.next_registered_handler,routes:Object.freeze([review])}));
+ return Object.freeze(selected);
 }
 // Keep the original boolean consumer compatible; the existing worker can
 // now consume the precise route rather than rediscovering its category.
