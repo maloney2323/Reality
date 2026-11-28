@@ -346,3 +346,44 @@ test('bounded capability checkpoint preserves negative evidence without raw prov
  assert.ok(checkpoint<code.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
  assert.match(code,/registered_capability_checkpoint:canonicalReviewCheckpoint/);
 });
+
+
+import {selectEngineeringDispatchScope} from '../src/reality-evidence-driven-capability-router-v1.js';
+
+test('exact qualified review event does not run unrelated engineering lifecycle',()=>{
+ const event_id='11111111-1111-4111-8111-111111111111';
+ const delivery={kind:'RESUME',event_id,owner_id:owner,shift_id:shift};
+ const guard={status:'FINAL_LOOP_SHARED_CONTINUITY_GUARD_VERIFIED_READ_ONLY',
+  revision:4,continuity_head_sha256:sha('a'),execution_authorized:false,original_job_completed:false};
+ const event={event_id,event_kind:'QUALIFIER_PROOF_CHANGED',
+  next_qualified_action:'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',
+  continuity_revision:4,continuity_head_sha256:sha('a'),executor_invoked:false,execution_authorized:false};
+ const continuity={owner_id:owner,shift_id:shift,shared_continuity_guard:guard,
+  event_resume_shadow:{ready_event_refs:[event]}};
+ const trigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED',
+  reason:'CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED',dispatch_permitted:false,
+  execution_authorized_by_trigger:false,original_job_completed:false};
+ const input={trigger,continuity,delivery,wake:{status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',shift_id:shift},
+  canonicalEventRuntime:true,strictContinuityCycle:true};
+ assert.equal(selectEngineeringDispatchScope(input),'EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY');
+ for(const bad of [
+  {canonicalEventRuntime:false},{strictContinuityCycle:false},
+  {delivery:{...delivery,kind:'START'}},{delivery:{...delivery,event_id:shift}},
+  {trigger:{...trigger,reason:'NO_CURRENT_VERIFIED_EVENT'}},
+  {trigger:{...trigger,execution_authorized_by_trigger:true}},
+  {continuity:{...continuity,event_resume_shadow:{ready_event_refs:[event,event]}}},
+  {continuity:{...continuity,event_resume_shadow:{ready_event_refs:[{...event,continuity_revision:3}]}}},
+  {continuity:{...continuity,event_resume_shadow:{ready_event_refs:[{...event,next_qualified_action:'RUN_INDEPENDENT_CASE_CI'}]}}}
+ ])assert.equal(selectEngineeringDispatchScope({...input,...bad}),'EXISTING_SIGNED_SHIFT_ENGINEERING');
+ const code=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ assert.ok(code.indexOf('const engineeringDispatchScope=selectEngineeringDispatchScope(')<
+  code.indexOf("workerStage='CORRECTIVE_CI_WORK_READBACK'"));
+ for(const name of ['generalizedInstallReview','generalizedSourceWriteTransport',
+  'generalOriginalAcceptancePush','generalizedPreviewDeployment','generalOriginalInstall',
+  'generalOriginalRecoveryPublication','generalOriginalSettlement'])
+  assert.ok(code.includes('const '+name+'=legacyEngineeringDeferred?deferredEngineeringOutcome():'));
+ assert.match(code,/if\(!legacyEngineeringDeferred&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'\)\{\s*workerStage='SAME_ORIGINAL_RECOVERY_ELIGIBILITY'/);
+ assert.match(code,/const correctiveCiPromise=legacyEngineeringDeferred\?Promise.resolve\(deferredEngineeringOutcome\(\)\)/);
+ assert.match(code,/const fencedOriginalInvestigationPromise=legacyEngineeringDeferred\?Promise.resolve\(deferredEngineeringOutcome\(\)\)/);
+ assert.match(code,/const selectedEventCapability=selectRegisteredSignedEventCapability/);
+});
