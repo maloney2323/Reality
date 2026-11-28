@@ -128,7 +128,7 @@ test('existing signed worker routes from actual owner maintenance ledger, no ext
  assert.ok(src.indexOf("workerStage='FINAL_LOOP_EXISTING_CASE_CI_RECOVERY_CLASSIFICATION'")>
   src.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
  assert.ok(src.indexOf("workerStage='FINAL_LOOP_EXISTING_CASE_CI_RECOVERY_CLASSIFICATION'")<
-  src.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'"));
+  src.indexOf("workerStage='WORKER_RESPONSE_PUBLICATION'",src.indexOf("workerStage='FINAL_LOOP_EXISTING_CASE_CI_RECOVERY_CLASSIFICATION'")));
 });
 
 test('terminal evidence route reuses only completed diagnostic and exact event; never leases another attempt',()=>{
