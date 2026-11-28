@@ -573,6 +573,37 @@ BEGIN
  PERFORM reality_internal.notify_final_loop_governed_trigger_v1(e.shift_id);
  IF (SELECT count(*) FROM net.fake_requests)<>4 THEN RAISE EXCEPTION 'CORRECTED_RELEASE_DUPLICATE_DELIVERED';END IF;
 END $$;
+-- Compare the exact unchanged terminal-review proof before and after the
+-- function-scoped planner configuration, with the same fixture and zero budget.
+SELECT md5(prosrc) AS body_hash,coalesce(proacl::text,'') AS acl FROM pg_proc
+ WHERE oid='reality_internal.read_final_loop_verified_terminal_review_v1(uuid,uuid,text,text,text,bigint)'::regprocedure \gset prior_function_
+SET ROLE service_role;
+WITH e AS MATERIALIZED (SELECT * FROM reality_internal.final_loop_resume_events_v1
+ WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING'),
+ proof AS MATERIALIZED (SELECT reality_internal.read_final_loop_verified_terminal_review_v1(
+ e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision) AS value FROM e)
+SELECT coalesce(encode(sha256(convert_to(value::text,'UTF8')),'hex'),'MISSING') AS digest,
+ coalesce(value->'terminal_history'->>'remaining_attempts','MISSING') AS budget FROM proof \gset prior_proof_
+RESET ROLE;
+\ir ../sql/reality-continuity-terminal-readback-plan-v1.sql
+SELECT 1/CASE WHEN md5(prosrc)=:'prior_function_body_hash' AND coalesce(proacl::text,'')=:'prior_function_acl'
+ AND proconfig @> ARRAY['join_collapse_limit=1','from_collapse_limit=1'] THEN 1 ELSE 0 END AS unchanged_body_acl_and_local_plan
+ FROM pg_proc WHERE oid='reality_internal.read_final_loop_verified_terminal_review_v1(uuid,uuid,text,text,text,bigint)'::regprocedure;
+SET ROLE service_role;
+SET join_collapse_limit=8;
+SET from_collapse_limit=8;
+WITH e AS MATERIALIZED (SELECT * FROM reality_internal.final_loop_resume_events_v1
+ WHERE signal_kind='VERIFIED_REVIEW_TECHNICAL_EVIDENCE' AND state='SHADOW_PENDING'),
+ proof AS MATERIALIZED (SELECT reality_internal.read_final_loop_verified_terminal_review_v1(
+ e.owner_id,e.shift_id,e.original_work_id,e.source_ref,e.continuity_head_sha256,e.continuity_revision) AS value FROM e)
+SELECT 1/CASE WHEN :'prior_proof_digest'<>'MISSING' AND :'prior_proof_budget'='0'
+ AND encode(sha256(convert_to(value::text,'UTF8')),'hex')=:'prior_proof_digest'
+ AND value->'terminal_history'->>'remaining_attempts'='0'
+ AND value->>'execution_authorized'='false' AND value->>'replay_authorized'='false'
+ AND value->>'new_attempt_authorized'='false' THEN 1 ELSE 0 END AS identical_terminal_proof FROM proof;
+SELECT 1/CASE WHEN current_setting('join_collapse_limit')='8' AND current_setting('from_collapse_limit')='8'
+ THEN 1 ELSE 0 END AS caller_plan_restored;
+RESET ROLE;
 SET ROLE service_role;
 DO $$
 DECLARE e record; run uuid:=gen_random_uuid(); lease uuid:=gen_random_uuid(); plan text; ctx jsonb; r jsonb; proof jsonb;
