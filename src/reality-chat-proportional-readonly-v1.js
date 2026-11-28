@@ -181,7 +181,12 @@ export async function generateProportionalReadOnlyReply({
    claimAssessment=compileFinalOutputClaimAssessment({answer:released,candidate:extraction.candidate,
     snapshot,review:{unassessed_claims:extraction.unadjudicated_claims},
     extractionStatus:extraction.extraction_status});
-   if(claimAssessment.unsupported_assertion_detected)
+   // An explicitly operational extraction with no assessed assertion is
+   // not a clean bill of health. Withhold this candidate without treating
+   // empty extraction as a false claim or as verified semantic coverage.
+   const missingOperationalCoverage=extraction.candidate.scope==='OPERATIONAL'&&
+    claimAssessment.status==='CLAIM_COVERAGE_UNVERIFIED';
+   if(claimAssessment.unsupported_assertion_detected||missingOperationalCoverage)
     released='The available owner-scoped evidence does not establish the operational assertion in my draft. I have withheld that assertion; the actual outcome remains unverified.';
   }catch{
    // Do not turn extractor failure into a verified operational statement.
