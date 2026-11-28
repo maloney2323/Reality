@@ -618,7 +618,11 @@ export default async function handler(req,res){
    const presentationShifts=read.shifts.slice(0,5);
    const shift_briefing=buildRealityShiftConversationBrief(
     presentationShifts,handoffs,new Date(),shift_source_native_receipts);
-   const recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:presentationShifts,handoffs});
+   // A legacy diagnostic must not erase a successfully verified primary
+   // shift readback. Fail closed on optional recovery advice only.
+   let recovery_diagnosis=null;
+   try{recovery_diagnosis=diagnoseRealityEmployeeRecovery({shifts:presentationShifts,handoffs});}
+   catch{/* Unavailable diagnosis is not evidence of no existing work. */}
    let draft=null;
    if(hours!==null){
      const catalog=await buildRealityWorkCatalog();
