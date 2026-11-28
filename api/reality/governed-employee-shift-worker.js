@@ -751,6 +751,242 @@ export default async function handler(req,res){
    return fresh;
   };
 
+  const readSignedWorkerReleaseWitness=async(unifiedGraph)=>{
+  const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
+   env:process.env,dbProject:db.project
+  });
+  const registeredRecoveryActionKeys=Object.freeze([
+   'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
+   ...((signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
+       signedWorkerReleaseOperatingLane.status===
+       'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY')?
+    ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[]),
+   ...(canonicalEventRuntime&&process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED==='true'&&
+    process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE==='CANONICAL'&&
+    process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'?
+    ['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM']:[])
+  ]);
+  const signedWorkerCapabilityDelivery=attestSignedWorkerLoadedCapabilities({
+   wake:wakeReceipt,graph:unifiedGraph,env:process.env,
+   registeredActionKeys:registeredRecoveryActionKeys
+  });
+  // Durable evidence from the ACTUAL scheduled worker, not a deployed
+  // preview's environment or a release review's self-certification.
+  // Only the isolated, opt-in, service-role path may append this receipt.
+  // No new job, model action, owner approval or provider write is possible.
+  let signedWorkerDurableReleaseWake={
+   status:'SIGNED_WORKER_RELEASE_WAKE_ATTESTATION_NOT_ENABLED',
+   release_activated:false,original_job_completed:false
+  };
+  if(process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED==='true'){
+   const canonicalReleaseWake=process.env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW'&&
+    db.project===process.env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&
+    db.project===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
+    signedWorkerReleaseOperatingLane.status==='FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'&&
+    unifiedGraph.owner_id===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&
+    wakeReceipt.shift_id===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID;
+   if((!canonicalReleaseWake&&(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
+      db.project!==process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF))||
+      signedWorkerReleaseOperatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||
+      signedWorkerCapabilityDelivery.status!==
+       'SIGNED_WORKER_RELEASE_AND_REGISTERED_ACTIONS_OBSERVED'){
+    signedWorkerDurableReleaseWake={
+     status:'SIGNED_WORKER_RELEASE_WAKE_ISOLATION_OR_RUNTIME_UNVERIFIED',
+     release_activated:false,original_job_completed:false
+    };
+   }else{
+    try{
+     const actual=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
+      p_worker_run_id:actualWorkerRunId,
+      p_owner_id:unifiedGraph.owner_id,p_shift_id:wakeReceipt.shift_id,
+      p_release_sha:signedWorkerCapabilityDelivery.running_release_sha,
+      p_release_ref:signedWorkerCapabilityDelivery.running_release_ref,
+      p_registered_capabilities:registeredRecoveryActionKeys,
+      ...(canonicalReleaseWake?{p_wake_claim_id:governedWakeClaimId,
+       p_capability_key:process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY}:{})
+     },{timeoutMs:6000});
+     signedWorkerDurableReleaseWake=
+      actual?.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
+      actual.worker_run_id===actualWorkerRunId&&
+      actual.shift_id===wakeReceipt.shift_id&&
+      actual.release_sha===signedWorkerCapabilityDelivery.running_release_sha&&
+      actual.release_ref===signedWorkerCapabilityDelivery.running_release_ref&&
+      actual.original_job_completed===false&&
+      actual.release_activated===false?
+       actual:{
+        status:'SIGNED_WORKER_RELEASE_WAKE_RECEIPT_UNVERIFIED',
+        release_activated:false,original_job_completed:false
+       };
+    }catch{
+     signedWorkerDurableReleaseWake={
+      status:'SIGNED_WORKER_RELEASE_WAKE_DB_OR_TRANSPORT_UNAVAILABLE',
+      release_activated:false,original_job_completed:false
+     };
+    }
+   }
+  }
+   return {signedWorkerReleaseOperatingLane,registeredRecoveryActionKeys,signedWorkerCapabilityDelivery,signedWorkerDurableReleaseWake};
+  };
+
+  // A canonical RESUME is already one exact signed event, not a general
+  // maintenance shift. Route it before unrelated business/engineering work.
+  // The existing proof-change router still owns the action selection.
+  if(canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&strictContinuityCycle){
+   workerStage='EXACT_CLAIMED_EVENT_CAPABILITY_SELECTION';
+   const ingressTrigger=routeVerifiedFinalLoopResumeTrigger({
+    continuity:finalLoopContinuityIngress,shiftId:wakeReceipt.shift_id,
+    claimedEventId:governedWakeScope.event_id});
+   const ingressScope=selectEngineeringDispatchScope({
+    trigger:ingressTrigger,continuity:finalLoopContinuityIngress,
+    delivery:governedWakeScope,wake:wakeReceipt,canonicalEventRuntime,strictContinuityCycle});
+   // Evidence-only modes already returned above. Preserve the established
+   // independent CI/terminal readback routes; never fall through on an
+   // unqualified canonical event.
+   const otherQualifiedRoute=[
+    'FINAL_LOOP_GOVERNED_TRIGGER_EXISTING_CASE_VERIFIER_READY',
+    'FINAL_LOOP_GOVERNED_TRIGGER_RECONCILIATION_DUE',
+    'FINAL_LOOP_GOVERNED_TRIGGER_TERMINAL_EVIDENCE_REQUALIFICATION_DUE'
+   ].includes(ingressTrigger.status);
+   if(!otherQualifiedRoute){
+    if(ingressScope!=='EXACT_CLAIMED_REVIEW_CAPABILITY_ONLY')
+     throw Error('EXACT_CLAIMED_EVENT_CAPABILITY_UNVERIFIED_'+String(ingressTrigger.reason||'NO_ROUTE').slice(0,85));
+    const currentReviewContinuity=await requireFreshFinalLoopContinuity();
+    const unifiedGraph=assertRealityUnifiedShiftGraph(
+     await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),
+     {expectedShiftId:wakeReceipt.shift_id});
+    const [staged,preflight]=await Promise.all([
+     shiftRpc(db,'reality_read_final_loop_pr_source_plans_v1',{p_shift_id:wakeReceipt.shift_id},{timeoutMs:6000}),
+     shiftRpc(db,'reality_read_final_loop_child_approval_preflight_v1',{p_shift_id:wakeReceipt.shift_id},{timeoutMs:6000})
+    ]);
+    const finalLoopStagedActionRoutes=classifySignedFinalLoopStagedPlanActions({
+     graph:unifiedGraph,staged,preflight,continuity:currentReviewContinuity});
+    const finalLoopCategorizedReviewTrigger=routeVerifiedFinalLoopResumeTrigger({
+     continuity:currentReviewContinuity,shiftId:wakeReceipt.shift_id,
+     claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes});
+    const {registeredRecoveryActionKeys,signedWorkerDurableReleaseWake}=await readSignedWorkerReleaseWitness(unifiedGraph);
+    workerStage='EXACT_CLAIMED_REVIEW_CAPABILITY_DISPATCH';
+    let finalLoopChildReview={status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',original_job_completed:false,production_changed:false};
+    let shiftContinuityInvestigation={status:'NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'};
+  // The existing router selects the ledger's exact capability. The registry
+  // contains trusted adapters only; no model-generated handler or code is run.
+  const selectedEventCapability=selectRegisteredSignedEventCapability({
+   trigger:finalLoopCategorizedReviewTrigger,delivery:governedWakeScope,
+   wake:wakeReceipt,graph:unifiedGraph,release:signedWorkerDurableReleaseWake,
+   workerRunId:actualWorkerRunId,registeredActionKeys:registeredRecoveryActionKeys,
+   env:process.env
+  });
+  const registeredEventHandlers=new Map([
+   ['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',async()=>{
+    const transport=await connectExistingIsolatedChildTransport({db,
+     handoff:finalLoopCategorizedReviewTrigger.canonical_claim_handoff,env:process.env,fetchImpl:fetch});
+    return transport.ready===true?
+     await advanceCanonicalFinalLoopChildReview({db,trigger:finalLoopCategorizedReviewTrigger,
+      workerRunId:actualWorkerRunId,env:process.env,readCurrentContinuity:requireFreshFinalLoopContinuity,
+      runIsolatedAdvisory:transport.runIsolatedAdvisory,fetchImpl:fetch}):
+     {status:transport.status,original_job_completed:false,production_changed:false};
+   }]
+  ]);
+  const selectedEventHandler=registeredEventHandlers.get(selectedEventCapability);
+  if(selectedEventHandler){
+   try{
+    finalLoopChildReview=await selectedEventHandler();
+   }catch{
+    finalLoopChildReview={status:'FINAL_LOOP_CANONICAL_TRANSPORT_UNVERIFIED_NO_REPLAY',
+     original_job_completed:false,production_changed:false};
+   }
+   // Capture only the bounded outcome immediately; a later projection must
+   // not erase the capability result or turn it into settlement evidence.
+   canonicalReviewCheckpoint=boundedRegisteredCapabilityCheckpoint(
+    selectedEventCapability,finalLoopChildReview);
+   if(canonicalReviewCheckpoint)
+    console.info('REALITY_REGISTERED_CAPABILITY_CHECKPOINT',
+     JSON.stringify(canonicalReviewCheckpoint));
+  }
+  if(!selectedEventHandler){
+   finalLoopChildReview={status:'FINAL_LOOP_CLAIMED_CAPABILITY_DISPATCH_UNVERIFIED',
+    continuity_blocker_code:typeof finalLoopCategorizedReviewTrigger.reason==='string'&&
+     /^[A-Z0-9_]{3,100}$/.test(finalLoopCategorizedReviewTrigger.reason)?
+      finalLoopCategorizedReviewTrigger.reason:'EXACT_REGISTERED_CAPABILITY_OR_RELEASE_WITNESS_REQUIRED',
+    original_job_completed:false,production_changed:false};
+   canonicalReviewCheckpoint=boundedRegisteredCapabilityCheckpoint(
+    'VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',finalLoopChildReview);
+  }
+  // A verified suspension is a successful observation, not another failed
+  // execution. Route its exact successor to the existing incident investigator
+  // during the same signed wake, before waiting for a new proof-change event.
+  const verifiedSuspensionInvestigationDue=
+   finalLoopChildReview.status==='FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN'&&
+   finalLoopChildReview.next_governed_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+   finalLoopChildReview.child_claimed===false&&finalLoopChildReview.model_invoked===false&&
+   finalLoopChildReview.original_job_completed===false;
+  // An already-returned observation can still lack the provider artifact.
+  // Route that distinct verified state to the existing incident detector.
+  const unresolvedInvocationInvestigationDue=
+   finalLoopChildReview.status==='FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM'&&
+   finalLoopChildReview.next_governed_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
+   finalLoopChildReview.parent_original_completed===false&&
+   finalLoopChildReview.external_effect_performed===false;
+  // Record the exact transition before worker completion.
+  let finalLoopBlockerIncident={status:'NO_FINAL_LOOP_TRANSITION_BLOCKER_OBSERVED'};
+  if(canonicalEventRuntime&&(verifiedSuspensionInvestigationDue||unresolvedInvocationInvestigationDue||[
+   'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED',
+   'FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED'
+  ].includes(finalLoopChildReview.continuity_blocker_code))){
+   try{
+    finalLoopBlockerIncident=await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
+     p_safe_result:verifiedSuspensionInvestigationDue?
+      'FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED':unresolvedInvocationInvestigationDue?
+      'FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED':finalLoopChildReview.continuity_blocker_code});
+    if(finalLoopBlockerIncident?.status==='SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED'){
+     shiftContinuityInvestigation=await investigateOneSignedShiftContinuityIncident({
+      db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
+     }).catch(error=>({status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
+       failure_code:classifySignedContinuityClaimTransportError(error),execution_authorized:false,
+       installation_authorized:false,production_changed:false}));
+    }
+   }catch{
+    finalLoopBlockerIncident={status:'FINAL_LOOP_BLOCKER_INCIDENT_HANDOFF_UNVERIFIED',
+     original_job_completed:false,production_changed:false};
+   }
+  }
+
+    // Preserve the selected capability's result, rather than letting an
+    // unrelated operation overwrite the completion pulse. A fresh verifier
+    // return is required; no claim of original completion is made here.
+    workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE';
+    const finalLoopContinuityReturn=await requireFreshFinalLoopContinuity();
+    const pulse=await shiftRpc(db,'reality_record_employee_shift_worker_pulse_v1',{
+     p_shift_id:wakeReceipt.shift_id,p_status:'WAKE_COMPLETED',
+     p_safe_result:canonicalReviewCheckpoint?.status||'EXACT_CLAIMED_CAPABILITY_OUTCOME_UNVERIFIED'});
+    if(!isDurablyCompletedShiftWorkerPulse(pulse,wakeReceipt.shift_id))
+     throw Error('EXACT_CLAIMED_CAPABILITY_COMPLETION_PULSE_UNVERIFIED');
+    durableWorkerCompletion=pulse;
+    workerStage='WORKER_RESPONSE_PUBLICATION';
+    const attested=await shiftRpc(db,'reality_record_signed_worker_actual_run_v1',{
+     p_run_id:actualWorkerRunId,p_status:'COMPLETED',p_stage:workerStage});
+    workerCompletionAttestedBeforeResponse=attested?.status==='SIGNED_WORKER_RUN_COMPLETED'&&
+     attested.run_id===actualWorkerRunId&&attested.original_job_completed===false&&
+     attested.installation_authorized===false&&attested.production_changed===false;
+    if(!workerCompletionAttestedBeforeResponse)throw Error('EXACT_CLAIMED_CAPABILITY_ATTESTATION_UNVERIFIED');
+    const released=await shiftRpc(db,'reality_release_governed_shift_worker_run_v1',{p_claim_id:governedWakeClaimId});
+    wakeLeaseReleasedBeforeResponse=released?.status==='WAKE_RELEASED'&&released.original_job_completed===false&&released.installation_authorized===false;
+    if(!wakeLeaseReleasedBeforeResponse)throw Error('EXACT_CLAIMED_CAPABILITY_LEASE_RELEASE_UNVERIFIED');
+    return res.status(200).json({
+     status:canonicalReviewCheckpoint?.status||'EXACT_CLAIMED_CAPABILITY_OUTCOME_UNVERIFIED',
+     registered_capability_checkpoint:canonicalReviewCheckpoint,
+     signed_worker_durable_release_wake:signedWorkerDurableReleaseWake,
+     final_loop_continuity_ingress:finalLoopContinuityIngress,
+     final_loop_continuity_return:finalLoopContinuityReturn,
+     final_loop_categorized_review_trigger:finalLoopCategorizedReviewTrigger,
+     final_loop_child_review:finalLoopChildReview,final_loop_blocker_incident:finalLoopBlockerIncident,
+     shift_continuity_investigation:shiftContinuityInvestigation,
+     original_job_completed:false,execution_authorized:false,installation_authorized:false,
+     production_changed:false,new_shift_started:false});
+   }
+  }
+
   // Existing signed worker performs ONLY independent readback before choosing
   // a registered business executor. Owner approval never directly invokes it.
   // An installed handler must independently check the one-use claim.
@@ -2603,9 +2839,7 @@ export default async function handler(req,res){
   // classification does not independently authorize or replay that effect.
   // Missing provider authority is a proof/owner boundary, NOT an excuse
   // to synthesize a successful repair or restart the fenced GitHub write.
-  const signedWorkerReleaseOperatingLane=inspectFinalLoopSignedWorkerOperatingLane({
-   env:process.env,dbProject:db.project
-  });
+  const {signedWorkerReleaseOperatingLane,registeredRecoveryActionKeys,signedWorkerCapabilityDelivery,signedWorkerDurableReleaseWake}=await readSignedWorkerReleaseWitness(unifiedGraph);
   // The current signed worker may independently observe release direction,
   // never switch itself or grant deployment authority. Existing schedule only.
   let signedWorkerReleaseDirection={status:'GOVERNED_RELEASE_DIRECTION_OBSERVATION_NOT_ENABLED',release_activated:false};
@@ -2618,86 +2852,11 @@ export default async function handler(req,res){
      {status:observer.status,release_activated:false};
    }catch{signedWorkerReleaseDirection={status:'GOVERNED_RELEASE_DIRECTION_INDEPENDENT_READ_UNAVAILABLE',release_activated:false};}
   }
-  const registeredRecoveryActionKeys=Object.freeze([
-   'REQUALIFY_EXISTING_CONTINUITY_SOURCE',
-   ...((signedWorkerReleaseOperatingLane.status===
-       'FINAL_LOOP_WORKER_OWNER_PACKET_LANE_CONFIGURED_NOT_ACTIVATED'||
-       signedWorkerReleaseOperatingLane.status===
-       'FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY')?
-    ['PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET']:[]),
-   ...(canonicalEventRuntime&&process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED==='true'&&
-    process.env.REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ROLE==='CANONICAL'&&
-    process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY==='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'?
-    ['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM']:[])
-  ]);
   const continuityRecoveryRegisteredRouting=planCategorizedContinuityRecovery({
    classification:continuityRecoveryHandoffClassification,
    ownerId:unifiedGraph.owner_id,shiftId:wakeReceipt.shift_id,
    registeredActionKeys:registeredRecoveryActionKeys
   });
-  // The signed worker now reveals the capability release actually loaded
-  // on THIS wake. A different PR's READY preview is not an active install.
-  // The independent release/alias reviewer must separately compare this
-  // immutable runtime identity with an exact approved release and CI proof.
-  const signedWorkerCapabilityDelivery=attestSignedWorkerLoadedCapabilities({
-   wake:wakeReceipt,graph:unifiedGraph,env:process.env,
-   registeredActionKeys:registeredRecoveryActionKeys
-  });
-  // Durable evidence from the ACTUAL scheduled worker, not a deployed
-  // preview's environment or a release review's self-certification.
-  // Only the isolated, opt-in, service-role path may append this receipt.
-  // No new job, model action, owner approval or provider write is possible.
-  let signedWorkerDurableReleaseWake={
-   status:'SIGNED_WORKER_RELEASE_WAKE_ATTESTATION_NOT_ENABLED',
-   release_activated:false,original_job_completed:false
-  };
-  if(process.env.REALITY_SIGNED_WORKER_RELEASE_ATTESTATION_ENABLED==='true'){
-   const canonicalReleaseWake=process.env.REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY==='CANONICAL_BENCHMARK_PREVIEW'&&
-    db.project===process.env.REALITY_RELEASE_CONTROL_DB_PROJECT_REF&&
-    db.project===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_PROJECT_REF&&
-    signedWorkerReleaseOperatingLane.status==='FINAL_LOOP_WORKER_SHARED_OWNER_PACKET_PREPARATION_ONLY'&&
-    unifiedGraph.owner_id===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_OWNER_ID&&
-    wakeReceipt.shift_id===process.env.REALITY_FINAL_LOOP_SHARED_BENCHMARK_SHIFT_ID;
-   if((!canonicalReleaseWake&&(process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED!=='true'||
-      db.project!==process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLANS_ISOLATED_PROJECT_REF))||
-      signedWorkerReleaseOperatingLane.operating_lane!=='NORMAL_SIGNED_SHIFT'||
-      signedWorkerCapabilityDelivery.status!==
-       'SIGNED_WORKER_RELEASE_AND_REGISTERED_ACTIONS_OBSERVED'){
-    signedWorkerDurableReleaseWake={
-     status:'SIGNED_WORKER_RELEASE_WAKE_ISOLATION_OR_RUNTIME_UNVERIFIED',
-     release_activated:false,original_job_completed:false
-    };
-   }else{
-    try{
-     const actual=await shiftRpc(db,'reality_record_signed_worker_release_wake_v1',{
-      p_worker_run_id:actualWorkerRunId,
-      p_owner_id:unifiedGraph.owner_id,p_shift_id:wakeReceipt.shift_id,
-      p_release_sha:signedWorkerCapabilityDelivery.running_release_sha,
-      p_release_ref:signedWorkerCapabilityDelivery.running_release_ref,
-      p_registered_capabilities:registeredRecoveryActionKeys,
-      ...(canonicalReleaseWake?{p_wake_claim_id:governedWakeClaimId,
-       p_capability_key:process.env.REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY}:{})
-     },{timeoutMs:6000});
-     signedWorkerDurableReleaseWake=
-      actual?.status==='SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED'&&
-      actual.worker_run_id===actualWorkerRunId&&
-      actual.shift_id===wakeReceipt.shift_id&&
-      actual.release_sha===signedWorkerCapabilityDelivery.running_release_sha&&
-      actual.release_ref===signedWorkerCapabilityDelivery.running_release_ref&&
-      actual.original_job_completed===false&&
-      actual.release_activated===false?
-       actual:{
-        status:'SIGNED_WORKER_RELEASE_WAKE_RECEIPT_UNVERIFIED',
-        release_activated:false,original_job_completed:false
-       };
-    }catch{
-     signedWorkerDurableReleaseWake={
-      status:'SIGNED_WORKER_RELEASE_WAKE_DB_OR_TRANSPORT_UNAVAILABLE',
-      release_activated:false,original_job_completed:false
-     };
-    }
-   }
-  }
   // Reuse THIS signed worker wake, THIS owner-scoped shift graph, and the
   // existing employee discovery inventory. One bounded model inquiry at most
   // per wake; the database singleflight prevents replay of unchanged sources.
@@ -3068,48 +3227,10 @@ export default async function handler(req,res){
    ]);
    return classifySignedFinalLoopStagedPlanActions({graph,staged,preflight,continuity});
   };
-  // The canonical event was durably claimed at ingress. Reconcile its
-  // exact current category and independently accepted review scope here,
-  // after staging; never use a maintenance-only event as a review claim.
-  let finalLoopCategorizedReviewTrigger={
-   status:'FINAL_LOOP_CATEGORIZED_REVIEW_EVENT_NOT_OBSERVED',
+  const finalLoopCategorizedReviewTrigger={status:'FINAL_LOOP_CATEGORIZED_REVIEW_EVENT_NOT_OBSERVED',
    review_claim_route_ready:false,dispatch_permitted:false,
-   execution_authorized_by_trigger:false,original_job_completed:false
-  };
-  const exactReviewRouteRequired=canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&
-     strictContinuityCycle&&hasReview&&
-     finalLoopGovernedResumeTrigger?.status==='FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED'&&
-     finalLoopGovernedResumeTrigger.reason==='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'&&
-     wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true';
-  if(exactReviewRouteRequired){
-   try{
-    const currentReviewContinuity=await requireFreshFinalLoopContinuity();
-    const currentReviewGraph=assertRealityUnifiedShiftGraph(
-     await shiftRpc(db,'reality_read_current_shift_execution_graph_v1',{}),{
-      expectedShiftId:wakeReceipt.shift_id
-     });
-    finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(currentReviewContinuity,currentReviewGraph);
-    finalLoopCategorizedReviewTrigger=routeVerifiedFinalLoopResumeTrigger({
-     continuity:currentReviewContinuity,shiftId:wakeReceipt.shift_id,
-     claimedEventId:governedWakeScope.event_id,stagedActions:finalLoopStagedActionRoutes
-    });
-    // Route only. The later canonical executor branch requires an observed
-    // approved release and a signed probe of the exact isolated deployment.
-    // The canonical runtime itself never performs child model inference.
-   }catch{
-    finalLoopStagedActionRoutes={
-     status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
-     action_dispatched:false,owner_approval_granted:false,
-     model_execution_authorized:false,original_job_completed:false
-    };
-    finalLoopCategorizedReviewTrigger={
-     status:'FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED',
-     review_claim_route_ready:false,dispatch_permitted:false,
-     execution_authorized_by_trigger:false,original_job_completed:false
-    };
-   }
-  } else if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+   execution_authorized_by_trigger:false,original_job_completed:false};
+  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
      process.env.VERCEL_ENV==='preview'&&
      process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
      process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
@@ -3135,81 +3256,7 @@ export default async function handler(req,res){
    status:'FINAL_LOOP_CHILD_EXECUTOR_NOT_ENABLED',
    original_job_completed:false,production_changed:false
   };
-  // The existing router selects the ledger's exact capability. The registry
-  // contains trusted adapters only; no model-generated handler or code is run.
-  const selectedEventCapability=selectRegisteredSignedEventCapability({
-   trigger:finalLoopCategorizedReviewTrigger,delivery:governedWakeScope,
-   wake:wakeReceipt,graph:unifiedGraph,release:signedWorkerDurableReleaseWake,
-   workerRunId:actualWorkerRunId,registeredActionKeys:registeredRecoveryActionKeys,
-   env:process.env
-  });
-  const registeredEventHandlers=new Map([
-   ['VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',async()=>{
-    const transport=await connectExistingIsolatedChildTransport({db,
-     handoff:finalLoopCategorizedReviewTrigger.canonical_claim_handoff,env:process.env,fetchImpl:fetch});
-    return transport.ready===true?
-     await advanceCanonicalFinalLoopChildReview({db,trigger:finalLoopCategorizedReviewTrigger,
-      workerRunId:actualWorkerRunId,env:process.env,readCurrentContinuity:requireFreshFinalLoopContinuity,
-      runIsolatedAdvisory:transport.runIsolatedAdvisory,fetchImpl:fetch}):
-     {status:transport.status,original_job_completed:false,production_changed:false};
-   }]
-  ]);
-  const selectedEventHandler=registeredEventHandlers.get(selectedEventCapability);
-  if(selectedEventHandler){
-   try{
-    finalLoopChildReview=await selectedEventHandler();
-   }catch{
-    finalLoopChildReview={status:'FINAL_LOOP_CANONICAL_TRANSPORT_UNVERIFIED_NO_REPLAY',
-     original_job_completed:false,production_changed:false};
-   }
-   // Capture only the bounded outcome immediately; a later projection must
-   // not erase the capability result or turn it into settlement evidence.
-   canonicalReviewCheckpoint=boundedRegisteredCapabilityCheckpoint(
-    selectedEventCapability,finalLoopChildReview);
-   if(canonicalReviewCheckpoint)
-    console.info('REALITY_REGISTERED_CAPABILITY_CHECKPOINT',
-     JSON.stringify(canonicalReviewCheckpoint));
-  }
-  // A verified suspension is a successful observation, not another failed
-  // execution. Route its exact successor to the existing incident investigator
-  // during the same signed wake, before waiting for a new proof-change event.
-  const verifiedSuspensionInvestigationDue=
-   finalLoopChildReview.status==='FINAL_LOOP_CANONICAL_SPINE_RETURN_INDEPENDENTLY_OBSERVED_ORIGINAL_OPEN'&&
-   finalLoopChildReview.next_governed_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
-   finalLoopChildReview.child_claimed===false&&finalLoopChildReview.model_invoked===false&&
-   finalLoopChildReview.original_job_completed===false;
-  // An already-returned observation can still lack the provider artifact.
-  // Route that distinct verified state to the existing incident detector.
-  const unresolvedInvocationInvestigationDue=
-   finalLoopChildReview.status==='FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM'&&
-   finalLoopChildReview.next_governed_action==='QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'&&
-   finalLoopChildReview.parent_original_completed===false&&
-   finalLoopChildReview.external_effect_performed===false;
-  // Record the exact transition before worker completion.
-  let finalLoopBlockerIncident={status:'NO_FINAL_LOOP_TRANSITION_BLOCKER_OBSERVED'};
-  if(canonicalEventRuntime&&(verifiedSuspensionInvestigationDue||unresolvedInvocationInvestigationDue||[
-   'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_OUTCOME_UNVERIFIED',
-   'FINAL_LOOP_CONTINUITY_RETURN_PROOF_UNVERIFIED','FINAL_LOOP_CONTINUITY_RETURN_READBACK_UNVERIFIED'
-  ].includes(finalLoopChildReview.continuity_blocker_code))){
-   try{
-    finalLoopBlockerIncident=await shiftRpc(db,'reality_observe_signed_shift_no_progress_v1',{
-     p_shift_id:wakeReceipt.shift_id,p_worker_run_id:actualWorkerRunId,
-     p_safe_result:verifiedSuspensionInvestigationDue?
-      'FINAL_LOOP_VERIFIED_SUSPENSION_INVESTIGATION_REQUIRED':unresolvedInvocationInvestigationDue?
-      'FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED':finalLoopChildReview.continuity_blocker_code});
-    if(finalLoopBlockerIncident?.status==='SIGNED_FINAL_LOOP_BLOCKER_INCIDENT_RECORDED'&&
-       shiftContinuityInvestigation?.status==='NO_DETECTED_SHIFT_CONTINUITY_INCIDENT'){
-     shiftContinuityInvestigation=await investigateOneSignedShiftContinuityIncident({
-      db,env:process.env,shiftId:wakeReceipt.shift_id,workerRunId:actualWorkerRunId,fetchImpl:fetch
-     }).catch(error=>({status:'SHIFT_CONTINUITY_INVESTIGATION_PROOF_UNAVAILABLE',
-       failure_code:classifySignedContinuityClaimTransportError(error),execution_authorized:false,
-       installation_authorized:false,production_changed:false}));
-    }
-   }catch{
-    finalLoopBlockerIncident={status:'FINAL_LOOP_BLOCKER_INCIDENT_HANDOFF_UNVERIFIED',
-     original_job_completed:false,production_changed:false};
-   }
-  }
+  const finalLoopBlockerIncident={status:'NO_FINAL_LOOP_TRANSITION_BLOCKER_OBSERVED'};
   let finalLoopParentIntegration={
    status:'FINAL_LOOP_PARENT_INTEGRATION_NOT_ENABLED',
    original_job_completed:false,production_changed:false
