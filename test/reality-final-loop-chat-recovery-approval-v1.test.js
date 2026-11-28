@@ -74,7 +74,7 @@ test('bounded continuation appears in main Chat when broad shift status is unava
  vm.runInNewContext(readFileSync('reality-chat-final-loop-child-approval-v1.js','utf8'),{
  location:{pathname:'/chat'},document:{getElementById:k=>k==='privateReady'?ready:k==='privateTranscript'?thread:k==='realityChatComposer'?composer:null,createElement:k=>new Node(k),addEventListener(){}},
  window:{addEventListener(){}},MutationObserver:class{observe(){}},AbortSignal,encodeURIComponent,
- fetch:async url=>{calls.push(url);assert.equal(url,'/api/reality/owner-final-loop-child-approval');return {ok:true,status:200,json:async()=>({ok:true,shift_id:shift,packets:[fixture],owner_scope_verified:true,read_only:true,execution_authorized:false})}}
+ fetch:async url=>{calls.push(url);assert.equal(url,'/api/reality/owner-final-loop-child-approval');if(calls.length===1)return {ok:false,status:503,json:async()=>({ok:false,error:'FINAL_LOOP_CHILD_OWNER_APPROVAL_SERVICE_UNAVAILABLE'})};return {ok:true,status:200,json:async()=>({ok:true,shift_id:shift,packets:[fixture],owner_scope_verified:true,read_only:true,execution_authorized:false})}}
  });
  const card=main.children[1];assert.equal(card.hidden,false);
  const flatten=x=>[x,...x.children.flatMap(flatten)];
@@ -84,6 +84,9 @@ test('bounded continuation appears in main Chat when broad shift status is unava
  await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(calls,['/api/reality/owner-final-loop-child-approval']);
  assert.equal(main.children[1],card);assert.equal(card.hidden,false);
+ assert.ok(flatten(card).some(x=>x.textContent.includes('failed or timed out')));
+ assert.equal(check.disabled,false);check.events.click();await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(calls,['/api/reality/owner-final-loop-child-approval','/api/reality/owner-final-loop-child-approval']);
  assert.ok(flatten(card).some(x=>x.textContent==='Approve bounded continuation'&&!x.disabled&&!x.hidden));
  assert.ok(flatten(card).some(x=>x.textContent.includes('8 new read-only model calls')));
 });
