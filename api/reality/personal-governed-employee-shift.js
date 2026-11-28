@@ -147,10 +147,19 @@ export async function ownerSettledOriginalSourceRefs({ownerId,db,call=shiftRpc}=
      j.code_repair_completed!==true||
      j.production_changed!==false||
      !/^work:[a-f0-9]{32}$/.test(j.original_work_id||'')||
-     j.source_ref!=='https://github.com/maloney2323/Reality/issues/263'||
-     !/^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||'')||
-     !/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(
-      j.original_settlement_receipt_ref||''))
+     !/^https:\/\/github\.com\/maloney2323\/Reality\/issues\/[1-9]\d*$/.test(j.source_ref||'')||
+     !/^sha256:[a-f0-9]{64}$/.test(j.source_proof_sha256||''))
+   throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
+  // Generalized originals are excluded only through the existing additional
+  // independently joined settlement inventory, not by trusting this phase
+  // or accepting a new receipt namespace as sufficient proof.
+  if(/^supabase:governed_original_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(j.original_settlement_receipt_ref||'')){
+   if(!additional.source_refs.includes(j.source_ref))
+    throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
+   continue;
+  }
+  if(j.source_ref!=='https://github.com/maloney2323/Reality/issues/263'||
+     !/^supabase:riley_native_independent_final_receipts_v1:[a-f0-9-]{36}$/i.test(j.original_settlement_receipt_ref||''))
    throw Error('SHIFT_NATIVE_SETTLED_ORIGINAL_RECEIPT_UNVERIFIED');
   refs.add(j.source_ref);
  }
