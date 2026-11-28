@@ -986,3 +986,10 @@ BEGIN
  END;
  RETURN NEW;
 END $function$;
+
+-- Retain the exact existing writer/reader service role and internal trigger ACL.
+REVOKE ALL ON FUNCTION public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_return_final_loop_invocation_observations_v1(uuid,text,uuid,text,bigint) TO service_role;
+REVOKE ALL ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reality_read_final_loop_shared_continuity_guard_v1(uuid) TO service_role;
+REVOKE ALL ON FUNCTION reality_internal.on_final_loop_governed_wake_v1() FROM PUBLIC,anon,authenticated,service_role;
