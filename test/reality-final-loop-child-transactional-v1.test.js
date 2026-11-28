@@ -915,3 +915,50 @@ test('one-pass scoped patch capture preserves manifest identity and rejects movi
  });
  assert.equal(malformed.source_manifest_complete,false);
 });
+
+
+test('selected packet capability never prepares another newly eligible source',async()=>{
+ const selected={plan_id:'11111111-1111-4111-8111-111111111111',source_ref:pr,
+  parent_original_work_id:parent,source_manifest_sha256:hash('d'),
+  acceptance_contract_sha256:acceptance,next_registered_handler:'PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET',
+  owner_action_required:true,child_execution_authorized:false,handler_dispatched:false};
+ const otherPlan={...selected,plan_id:'22222222-2222-4222-8222-222222222222',
+  source_ref:'https://github.com/maloney2323/Reality/pull/1002',
+  parent_original_work_id:'work:'+'3'.repeat(32)};
+ const g={...graph,jobs:[...graph.jobs,{...graph.jobs[0],
+  source_ref:otherPlan.source_ref,original_work_id:otherPlan.parent_original_work_id}]};
+ const pending=r=>({...r,verified_signed_source_goal_contract_prepared:true,
+  owner_goal_acceptance_pending:true,independent_goal_acceptance_verified:false,
+  pending_exact_owner_approval:true});
+ const base={status:'FINAL_LOOP_CHILD_GOAL_ACCEPTANCE_PREFLIGHT_READ_ONLY',
+  owner_id:owner,shift_id:shift,plan_fingerprint:g.plan_fingerprint,
+  read_only:true,execution_authorized:false,plans:[pending(otherPlan),pending(selected)]};
+ let writes=0;
+ const runSelected=plans=>requestFinalLoopChildApprovalFromAcceptedOriginal({
+  db,env,graph:g,workerRunId:run,selectedRoutes:[selected],
+  call:async(_db,name,args)=>{
+   if(name==='reality_read_final_loop_child_approval_preflight_v1')return {...base,plans};
+   assert.equal(name,'reality_prepare_final_loop_child_approval_v1');
+   assert.equal(args.p_plan_id,selected.plan_id);
+   writes++;
+   return {status:'FINAL_LOOP_CHILD_EXACT_OWNER_APPROVAL_REQUIRED',
+    packet_id:selected.plan_id,owner_id:owner,shift_id:shift,
+    parent_original_work_id:parent,source_ref:pr,source_manifest_sha256:hash('d'),
+    acceptance_contract_sha256:acceptance,proposal_fingerprint:hash('e'),
+    effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',owner_approval_granted:false,
+    execution_authorized:false,original_job_completed:false};
+  }
+ });
+ const result=await runSelected(base.plans);
+ assert.equal(writes,1);
+ assert.equal(result.pending_exact_approval_count,1);
+ assert.equal(result.owner_approval_granted,false);
+ for(const invalid of [[pending(otherPlan)],
+  [pending(otherPlan),{...pending(selected),acceptance_contract_sha256:hash('f')}],
+  [pending(selected),pending(selected)]]){
+  const r=await runSelected(invalid);
+  assert.equal(r.status,'FINAL_LOOP_CHILD_SELECTED_PACKET_SCOPE_CHANGED');
+  assert.equal(r.execution_authorized,false);
+ }
+ assert.equal(writes,1);
+});
