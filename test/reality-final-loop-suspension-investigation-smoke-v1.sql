@@ -890,6 +890,36 @@ BEGIN
  IF verdict->>'status' IS DISTINCT FROM 'FINAL_LOOP_SPINE_RETURN_PENDING_EVENTS_REQUIRE_CAUSAL_RECONCILIATION'
  THEN RAISE EXCEPTION 'CHILD_CLAIM_TREATED_AS_PRECLAIM %',verdict;END IF;
  DELETE FROM reality_internal.final_loop_child_review_work_v1 WHERE child_work_id=child;
+ -- Preflight uses the SAME corrected predicate without consuming a delivery.
+ -- A currently running event is never a historical completion.
+ SET LOCAL ROLE service_role;
+ verdict:=reality_internal.read_final_loop_invocation_return_pending_v1(s,o,work,src,head,4,q,snapshot,
+  guard->'obligations'->0->'execution_spine_readback',NULL,NULL);
+ RESET ROLE;
+ IF verdict->>'ready' IS DISTINCT FROM 'false' THEN RAISE EXCEPTION 'ACTIVE_EVENT_ACCEPTED_AS_HISTORICAL %',verdict;END IF;
+ -- Model the already consumed delivery as a signed, completed preclaim run.
+ UPDATE reality_internal.signed_worker_actual_runs_v1
+ SET status='COMPLETED',worker_stage='WORKER_RESPONSE_PUBLICATION',finished_at=t+interval '1 second'
+ WHERE run_id=currentrun;
+ SET LOCAL ROLE service_role;
+ verdict:=reality_internal.read_final_loop_invocation_return_pending_v1(s,o,work,src,head,4,q,snapshot,
+  guard->'obligations'->0->'execution_spine_readback',NULL,NULL);
+ RESET ROLE;
+ IF verdict->>'ready' IS DISTINCT FROM 'true' OR jsonb_array_length(verdict->'prior_preclaim_events')<>2
+ THEN RAISE EXCEPTION 'COMPLETED_EVENTS_NOT_ELIGIBLE_FOR_EVIDENCE_ONLY_RETURN %',verdict;END IF;
+ IF (SELECT count(*) FROM reality_internal.final_loop_resume_events_v1 WHERE shift_id=s AND state='SHADOW_PENDING')<>2
+  OR EXISTS(SELECT 1 FROM reality_internal.final_loop_transition_receipts_v1 WHERE shift_id=s)
+  OR EXISTS(SELECT 1 FROM reality_internal.governed_original_independent_final_receipts_v1 WHERE shift_id=s)
+ THEN RAISE EXCEPTION 'READ_ONLY_PREFLIGHT_CREATED_EFFECT';END IF;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_nonce=NULL WHERE event_id=oldev;
+ SET LOCAL ROLE service_role;
+ verdict:=reality_internal.read_final_loop_invocation_return_pending_v1(s,o,work,src,head,4,q,snapshot,
+  guard->'obligations'->0->'execution_spine_readback',NULL,NULL);
+ RESET ROLE;
+ IF verdict->>'ready' IS DISTINCT FROM 'false' THEN RAISE EXCEPTION 'UNBOUND_HISTORICAL_EVENT_PREFLIGHT_ACCEPTED %',verdict;END IF;
+ UPDATE reality_internal.final_loop_resume_events_v1 SET governed_wake_nonce=nonce WHERE event_id=oldev;
+ UPDATE reality_internal.signed_worker_actual_runs_v1
+ SET status='STARTED',worker_stage='SHIFT_DB_BOUNDARY',finished_at=NULL WHERE run_id=currentrun;
  -- Positive control: the historical signed completion is evidence only.
  SET LOCAL ROLE service_role;
  verdict:=public.reality_return_final_loop_invocation_observations_v1(s,work,currentrun,head,4);
