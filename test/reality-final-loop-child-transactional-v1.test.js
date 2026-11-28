@@ -678,7 +678,8 @@ test('canonical claim, isolated computation and independent return preserve one 
   assert.equal(conn.ready,true);
   return conn.runIsolatedAdvisory(args);
  };
- const prepared=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(exactEvidence),runIsolatedAdvisory:viaSignedTransport});
+ const readDistinctContinuity=async()=>{reads++;return withObservation(exactEvidence);};
+ const prepared=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:readDistinctContinuity,runIsolatedAdvisory:viaSignedTransport});
  assert.equal(prepared.status,'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED');
  assert.equal(prepared.canonical_continuity_head_sha256,h.continuity_head_sha256);
  assert.equal(claims,1);assert.equal(prepares,1);assert.equal(modelCalls,1);
@@ -686,7 +687,7 @@ test('canonical claim, isolated computation and independent return preserve one 
  // fence RPC, rather than the direct callback used by the earlier fixture.
  assert.ok(reads>=2);assert.equal(transportBegins,1);assert.equal(transportChecks,1);
  verificationMode=true;
- const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,readCurrentContinuity:async()=>withObservation(exactEvidence),runIsolatedAdvisory:viaSignedTransport});
+ const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,readCurrentContinuity:readDistinctContinuity,runIsolatedAdvisory:viaSignedTransport});
  assert.equal(verified.status,'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN');
  assert.equal(transportBegins,2);assert.equal(transportChecks,2);assert.equal(transportFences.size,2);
  assert.notEqual(transportFences.get('PREPARE|'+run),transportFences.get('VERIFY|'+other));
