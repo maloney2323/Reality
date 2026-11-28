@@ -276,3 +276,71 @@ test('completed uncertain read-only attempts quarantine only their frozen scopes
  assert.equal(qualifyDistinctApprovedReviewScopes(evidence,
   {...handoff,effect_type:'GITHUB_PUBLICATION'}),null);
 });
+
+
+import {selectRegisteredSignedEventCapability,boundedRegisteredCapabilityCheckpoint}
+ from '../src/reality-evidence-driven-capability-router-v1.js';
+
+test('existing signed event selects only its registered, exact approved capability',()=>{
+ const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+ const key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM';
+ const event=uuid(10),run=uuid(11),root=uuid(12),revision=4,head=sha('a'),releaseSha='b'.repeat(40);
+ const graph={status:'UNIFIED_OWNER_JOB_CONTROL_READY',owner_id:owner,shift_id:shift,
+  plan_fingerprint:sha('c'),installation_authorized:false,production_changed:false};
+ const delivery={kind:'RESUME',owner_id:owner,shift_id:shift,event_id:event,
+  release_sha:releaseSha,plan_fingerprint:graph.plan_fingerprint};
+ const h={schema:'reality-canonical-approved-review-scope-v1',owner_id:owner,shift_id:shift,
+  parent_original_work_id:work,source_ref:source,continuity_root_id:root,
+  continuity_head_sha256:head,revision,effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',
+  canonical_claim_required:true,read_only:true,execution_authorized:false,
+  original_job_completed:false,production_changed:false};
+ const trigger={status:'FINAL_LOOP_GOVERNED_TRIGGER_EXACT_REVIEW_CLAIM_ROUTE_READY',
+  next_action:key,review_claim_route_ready:true,dispatch_permitted:false,
+  execution_authorized_by_trigger:false,canonical_claim_required:true,
+  new_attempt_authorized:false,previous_attempt_budget_preserved:true,
+  original_job_completed:false,production_changed:false,owner_id:owner,shift_id:shift,
+  event_id:event,original_work_id:work,source_ref:source,continuity_root_id:root,
+  continuity_head_sha256:head,continuity_revision:revision,canonical_claim_handoff:h};
+ const release={status:'SIGNED_WORKER_RELEASE_WAKE_DURABLY_RECORDED',
+  worker_run_id:run,shift_id:shift,release_sha:releaseSha};
+ const input={trigger,delivery,graph,release,workerRunId:run,registeredActionKeys:[key],
+  wake:{status:'SHIFT_WORKER_PULSE_DURABLY_RECORDED',shift_id:shift},
+  env:{VERCEL_ENV:'preview',REALITY_RELEASE_CONTROL_RUNTIME_TOPOLOGY:'CANONICAL_BENCHMARK_PREVIEW',
+   REALITY_FINAL_LOOP_REVIEW_TRANSPORT_ENABLED:'true',REALITY_SIGNED_WORKER_TARGET_CAPABILITY_KEY:key}};
+ assert.equal(selectRegisteredSignedEventCapability(input),key);
+ for(const change of [
+  {registeredActionKeys:[]},{delivery:{...delivery,event_id:uuid(20)}},
+  {delivery:{...delivery,kind:'START'}},{release:{...release,release_sha:'d'.repeat(40)}},
+  {release:{...release,worker_run_id:uuid(21)}},{graph:{...graph,owner_id:uuid(22)}},
+  {trigger:{...trigger,next_action:'UNREGISTERED_EFFECT'}},
+  {trigger:{...trigger,execution_authorized_by_trigger:true}},
+  {trigger:{...trigger,new_attempt_authorized:true}},
+  {trigger:{...trigger,canonical_claim_handoff:{...h,revision:5}}},
+  {trigger:{...trigger,canonical_claim_handoff:{...h,effect_type:'GITHUB_PUBLICATION'}}},
+  {env:{...input.env,VERCEL_ENV:'production'}}
+ ])assert.equal(selectRegisteredSignedEventCapability({...input,...change}),null);
+});
+
+test('bounded capability checkpoint preserves negative evidence without raw provider content',()=>{
+ const c=boundedRegisteredCapabilityCheckpoint('VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',{
+  status:'FINAL_LOOP_CANONICAL_ISOLATED_PROVIDER_UNCERTAIN_NO_REPLAY',
+  provider_failure_reason:'FINAL_LOOP_CHILD_MODEL_PROVIDER_REQUEST_UNVERIFIED',
+  isolated_authority_read_attempts:1,raw_provider_error:'private data',
+  candidate:'untrusted model content',original_job_completed:true,production_changed:true});
+ assert.equal(c.provider_failure_reason,'FINAL_LOOP_CHILD_MODEL_PROVIDER_REQUEST_UNVERIFIED');
+ assert.equal(c.isolated_authority_read_attempts,1);
+ assert.equal(c.original_job_completed,false);
+ assert.equal(c.production_changed,false);
+ assert.equal(c.raw_provider_error,undefined);
+ assert.equal(c.candidate,undefined);
+ assert.equal(boundedRegisteredCapabilityCheckpoint('bad',{status:'bad'}),null);
+ assert.equal(boundedRegisteredCapabilityCheckpoint('VALID_CAPABILITY',{
+  status:'VALID_STATUS',provider_failure_reason:'raw private error'}).provider_failure_reason,null);
+ const code=readFileSync(new URL('../api/reality/governed-employee-shift-worker.js',import.meta.url),'utf8');
+ const select=code.indexOf('const selectedEventCapability=selectRegisteredSignedEventCapability(');
+ const execute=code.indexOf('finalLoopChildReview=await selectedEventHandler()');
+ const checkpoint=code.indexOf('canonicalReviewCheckpoint=boundedRegisteredCapabilityCheckpoint(');
+ assert.ok(select>=0&&execute>select&&checkpoint>execute);
+ assert.ok(checkpoint<code.indexOf("workerStage='SHARED_CONTINUITY_VERIFIER_RETURN_FENCE'"));
+ assert.match(code,/registered_capability_checkpoint:canonicalReviewCheckpoint/);
+});
