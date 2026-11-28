@@ -3118,20 +3118,6 @@ export default async function handler(req,res){
    ]);
    return classifySignedFinalLoopStagedPlanActions({graph,staged,preflight,continuity});
   };
-  if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-     process.env.VERCEL_ENV==='preview'&&
-     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
-     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
-   try{
-    finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(lastFinalLoopContinuity,unifiedGraph);
-   }catch{
-    finalLoopStagedActionRoutes={
-     status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
-     action_dispatched:false,owner_approval_granted:false,
-     model_execution_authorized:false,original_job_completed:false
-    };
-   }
-  }
   // The canonical event was durably claimed at ingress. Reconcile its
   // exact current category and independently accepted review scope here,
   // after staging; never use a maintenance-only event as a review claim.
@@ -3140,12 +3126,13 @@ export default async function handler(req,res){
    review_claim_route_ready:false,dispatch_permitted:false,
    execution_authorized_by_trigger:false,original_job_completed:false
   };
-  if(canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&
+  const exactReviewRouteRequired=canonicalEventRuntime&&governedWakeScope?.kind==='RESUME'&&
      strictContinuityCycle&&hasReview&&
      finalLoopGovernedResumeTrigger?.status==='FINAL_LOOP_GOVERNED_TRIGGER_BLOCKED'&&
      finalLoopGovernedResumeTrigger.reason==='CURRENT_CATEGORIZED_REVIEW_SCOPE_REQUIRED'&&
      wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
-     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true';
+  if(exactReviewRouteRequired){
    try{
     const currentReviewContinuity=await requireFreshFinalLoopContinuity();
     const currentReviewGraph=assertRealityUnifiedShiftGraph(
@@ -3161,10 +3148,28 @@ export default async function handler(req,res){
     // approved release and a signed probe of the exact isolated deployment.
     // The canonical runtime itself never performs child model inference.
    }catch{
+    finalLoopStagedActionRoutes={
+     status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
+     action_dispatched:false,owner_approval_granted:false,
+     model_execution_authorized:false,original_job_completed:false
+    };
     finalLoopCategorizedReviewTrigger={
      status:'FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED',
      review_claim_route_ready:false,dispatch_permitted:false,
      execution_authorized_by_trigger:false,original_job_completed:false
+    };
+   }
+  } else if(hasReview&&wakeReceipt.status==='SHIFT_WORKER_PULSE_DURABLY_RECORDED'&&
+     process.env.VERCEL_ENV==='preview'&&
+     process.env.REALITY_FINAL_LOOP_ENGINE_SHADOW_ENABLED==='true'&&
+     process.env.REALITY_FINAL_LOOP_PR_SOURCE_PLAN_STAGING_ENABLED==='true'){
+   try{
+    finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions(lastFinalLoopContinuity,unifiedGraph);
+   }catch{
+    finalLoopStagedActionRoutes={
+     status:'FINAL_LOOP_STAGED_ACTION_INDEPENDENT_READBACK_UNAVAILABLE',
+     action_dispatched:false,owner_approval_granted:false,
+     model_execution_authorized:false,original_job_completed:false
     };
    }
   }
