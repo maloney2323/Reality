@@ -751,10 +751,21 @@ export async function advanceCanonicalFinalLoopChildReview({
   if(evidence.status==='SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'&&
      (!Array.isArray(evidence.observations)||evidence.observations.some(x=>x?.model_artifact_recorded!==true))){
    distinctScopeFence=qualifyDistinctApprovedReviewScopes(evidence,h);
-   if(!distinctScopeFence||h.scope_fingerprints.every(x=>
-      distinctScopeFence.blocked_scope_sha256s.includes(x.scope_sha256)))
+   if(!distinctScopeFence)
     return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
      next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+   if(h.scope_fingerprints.every(x=>distinctScopeFence.blocked_scope_sha256s.includes(x.scope_sha256))){
+    // A fully fenced plan may progress only on a separately authorized
+    // canonical candidate. The allocator must still independently recheck.
+    let candidate=null;
+    try{candidate=(await call(db,'reality_read_final_loop_child_recovery_v1',{
+     p_shift_id:h.shift_id,p_plan_id:h.plan_id},{fetchImpl}))?.approved_recovery_candidate;}catch{}
+    if(!candidate||candidate.continuity_head_sha256!==h.continuity_head_sha256||
+      candidate.continuity_revision!==h.revision||candidate.historical_invocation_replay_authorized!==false||
+      candidate.execution_authorized!==false||!HASH.test(candidate.approval_receipt_sha256||''))
+     return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
+      next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+   }
   }
   if(!['NO_FENCED_CHILD_INVOCATION_OBSERVED','SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN'].includes(evidence.status))
    return no('FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
