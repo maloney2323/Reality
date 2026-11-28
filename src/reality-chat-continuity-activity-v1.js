@@ -140,6 +140,6 @@ export function projectChatContinuityActivity({current,incidentReadback,finalRea
  });
  return {status:'OWNER_CHAT_CONTINUITY_ACTIVITY_READ_ONLY',observed_at:current.observed_at,
   active_shift_count:current.active_shift_count,unverified_guard_count:current.unverified_guard_count,
-  partial:!incidentValid||!finalValid||current.unverified_guard_count>0||obligations.some(o=>!o.history_available),
+  partial:terminalRows===null||!incidentValid||!finalValid||current.unverified_guard_count>0||obligations.some(o=>!o.history_available),
   obligations,final_receipts:receipts,read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false};
 }
