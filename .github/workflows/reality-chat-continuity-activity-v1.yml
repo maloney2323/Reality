@@ -11,6 +11,16 @@ on:
       - 'test/reality-chat-self-visibility-v1.test.js'
       - 'test/reality-chat-proportional-readonly-v1.test.js'
       - 'test/run-reality-five-failure-acceptance-v1.mjs'
+      - 'test/reality-governed-tool-session-v1.test.js'
+      - 'test/reality-governed-late-bound-tool-adapter-v1.test.js'
+      - 'test/reality-final-chat-publication-proof-v0.1.test.js'
+      - 'test/reality-live-intelligence-orchestration-v0.1.test.js'
+      - 'test/reality-active-path-audit-regression.test.js'
+      - 'test/reality-adversarial-negative-external-action-regression.test.js'
+      - 'test/reality-continuous-reliability-v0.1.test.js'
+      - 'test/reality-unified-semantic-review-v0.1.test.js'
+      - 'src/reality-private-chat-store-v0.1.js'
+      - 'src/reality-governed-late-bound-tool-adapter-v1.js'
       - 'api/chat.js'
       - 'src/reality-governed-tool-session-v1.js'
       - 'src/reality-final-chat-publication-proof-v0.1.js'
@@ -54,3 +64,32 @@ jobs:
           name: five-failure-controlled-boundaries
           path: ${{ runner.temp }}/five-failure-results/
           if-no-files-found: error
+      - name: Require detector-independent enforcement and retained protections
+        if: always()
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root=process.env.RUNNER_TEMP+'/five-failure-results/';
+          const before=JSON.parse(fs.readFileSync(root+'before.json','utf8'));
+          const after=JSON.parse(fs.readFileSync(root+'after.json','utf8'));
+          const errors=[];
+          const ids=['1','2','3','4','5a','5b','5c'];
+          for(const id of ids){
+            const b=before.rows.filter(x=>x.id===id);
+            const a=after.rows.filter(x=>x.id===id);
+            if(b.length!==1||a.length!==1||a[0].escaped!==false||a[0].side_effects!==0)
+              errors.push('FROZEN_PROTECTION_REGRESSED_OR_UNEXERCISED:'+id);
+          }
+          if(after.rows.length!==ids.length)errors.push('FROZEN_CASE_COUNT_CHANGED');
+          const probes=after.supplemental_detector_miss_probes||[];
+          for(const id of ['5d','5e']){
+            const p=probes.filter(x=>x.id===id);
+            if(p.length!==1||p[0].escaped!==false||p[0].side_effects!==0||
+              p[0].enforcement!=='WITHHELD'||
+              (id==='5d'&&p[0].extractor_invoked!==true)||
+              (id==='5e'&&p[0].synthetic_receipt_only!==true))
+              errors.push('DETECTOR_MISS_NOT_ENFORCED_OR_UNEXERCISED:'+id);
+          }
+          if(errors.length){console.error(errors.join('\n'));process.exitCode=1;}
+          else console.log('Frozen protections and supplemental detector-miss probes passed; live acceptance remains separate.');
+          NODE
