@@ -262,11 +262,10 @@ END $function$;
 REVOKE ALL ON FUNCTION public.reality_claim_signed_maintenance_chat_investigation_v1() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reality_claim_signed_maintenance_chat_investigation_v1() TO service_role;
 
-CREATE OR REPLACE FUNCTION reality_internal.reconcile_current_qualification_proofs_v1()
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
+-- Scoped on-demand qualification uses the same independent proof computation.
+-- The legacy zero-argument scheduled caller is retained as a watchdog only.
+CREATE OR REPLACE FUNCTION reality_internal.reconcile_current_qualification_proofs_v1(p_shift_id uuid)
+ RETURNS jsonb LANGUAGE plpgsql SET search_path TO '' AS $function$
 declare v_seen integer:=0; v_changed integer:=0;
 begin
   if current_user <> 'postgres' then
@@ -294,7 +293,8 @@ begin
     join reality_internal.governed_employee_shift_steps_v1 st
       on st.shift_id=p.shift_id and st.source_ref=p.source_ref
        and st.state='SOURCE_CHECKED'
-    where p.parent_original_work_id ~ '^work:[a-f0-9]{32}$'
+    where (p_shift_id is null or p.shift_id=p_shift_id)
+      and p.parent_original_work_id ~ '^work:[a-f0-9]{32}$'
       and p.state='PROPOSED_SOURCE_PLAN_AWAITING_INDEPENDENT_ADMISSION'
       and s.closed_at is null and s.authorized_at is not null
       and s.planned_start_at<=pg_catalog.clock_timestamp()
@@ -554,7 +554,8 @@ begin
       and r.intake_key=s.shift_id::text||':'||s.step_index::text
       and r.source_ref=s.source_ref
       and (r.reconciliation_receipt_sha256 is distinct from s.receipt_hash
-        or r.reconciliation_checked_at < pg_catalog.clock_timestamp()-interval '15 minutes'
+        or (p_shift_id is not null and r.reconciliation_checked_at < pg_catalog.clock_timestamp()-interval '10 minutes')
+        or (p_shift_id is null and r.reconciliation_checked_at < pg_catalog.clock_timestamp()-interval '15 minutes')
         or r.reconciliation_checked_at is null)
     returning r.owner_id,r.reconciliation_receipt_sha256,r.reconciliation_next_action
   ) select count(*)::integer into v_changed from changed;
@@ -575,19 +576,20 @@ begin
     'production_changed',false);
 end;
 $function$;
+REVOKE ALL ON FUNCTION reality_internal.reconcile_current_qualification_proofs_v1(uuid) FROM PUBLIC,anon,authenticated,service_role;
+CREATE OR REPLACE FUNCTION reality_internal.reconcile_current_qualification_proofs_v1()
+ RETURNS jsonb LANGUAGE plpgsql SET search_path TO '' AS $function$
+BEGIN RETURN reality_internal.reconcile_current_qualification_proofs_v1(NULL::uuid); END $function$;
+REVOKE ALL ON FUNCTION reality_internal.reconcile_current_qualification_proofs_v1() FROM PUBLIC,anon,authenticated,service_role;
 
 CREATE OR REPLACE FUNCTION reality_internal.on_final_loop_governed_wake_v1()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $function$
 BEGIN
  -- Reuse the existing governed qualifier on receipt of a saved continuation.
  -- This is not a second executor, a direct HTTP wake, or an authority grant.
  IF TG_TABLE_NAME='owner_chat_existing_shift_wakes_v1' THEN
   BEGIN
-   PERFORM reality_internal.reconcile_current_qualification_proofs_v1();
+   PERFORM reality_internal.reconcile_current_qualification_proofs_v1(NEW.shift_id);
   EXCEPTION WHEN OTHERS THEN
    RAISE WARNING 'CHAT_CONTINUATION_QUALIFICATION_PENDING_DURABLE_INTENT_RETAINED';
   END;
@@ -603,12 +605,23 @@ BEGIN
  -- Notification failures must not roll back durable authorization or evidence.
  BEGIN
   IF TG_TABLE_NAME='governed_worker_release_approvals_v1' THEN
+   -- A verified release observation is a concrete proof demand. Recompute the
+   -- existing source inventory for this shift before either continuation path.
+   PERFORM reality_internal.reconcile_current_qualification_proofs_v1(NEW.shift_id);
+   IF NEW.capability_key='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM' THEN
+    PERFORM public.reality_stage_final_loop_ledger_return_v1(NEW.shift_id,NEW.claim_id);
+   END IF;
    PERFORM reality_internal.stage_final_loop_release_continuation_v1(NEW.request_id);
    PERFORM reality_internal.notify_final_loop_governed_trigger_v1(NEW.shift_id);
   ELSIF TG_TABLE_NAME='signed_worker_actual_runs_v1' THEN
    -- Only a completed investigation may request a distinct review run.
    IF NEW.status='COMPLETED' AND OLD.status='STARTED'
-    AND NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION' THEN
+    AND (NEW.worker_stage='SUSPENSION_INVESTIGATION_RESPONSE_PUBLICATION'
+     OR (NEW.worker_stage='WORKER_RESPONSE_PUBLICATION' AND EXISTS(
+       SELECT 1 FROM reality_internal.owner_shift_continuity_incidents_v1 i
+        WHERE i.source_evidence->>'worker_run_id'=NEW.run_id::text
+         AND i.source_evidence->>'blocker_code'='FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED'
+         AND i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF'))) THEN
     PERFORM reality_internal.stage_final_loop_independent_investigation_review_v1(a.request_id)
     FROM reality_internal.governed_signed_worker_release_wakes_v1 w
     JOIN reality_internal.governed_worker_release_approvals_v1 a ON a.claim_id=w.release_claim_id
@@ -632,6 +645,7 @@ BEGIN
  END;
  RETURN NEW;
 END $function$;
+REVOKE ALL ON FUNCTION reality_internal.on_final_loop_governed_wake_v1() FROM PUBLIC,anon,authenticated,service_role;
 DROP TRIGGER IF EXISTS final_loop_governed_chat_continuation_v1 ON reality_internal.owner_chat_existing_shift_wakes_v1;
 CREATE TRIGGER final_loop_governed_chat_continuation_v1
  AFTER INSERT ON reality_internal.owner_chat_existing_shift_wakes_v1
