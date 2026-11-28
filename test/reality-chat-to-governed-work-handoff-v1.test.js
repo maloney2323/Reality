@@ -307,3 +307,20 @@ test('foreign shift graph cannot authorize a model call or select any source',as
  assert.equal(result.reason,'OWNER_SHIFT_GRAPH_AND_CLAIM_DO_NOT_MATCH');
  assert.equal(result.execution_authorized,false);assert.equal(model,0);assert.equal(failed,1);
 });
+
+test('replacement maintenance allocator accepts normal saved owner language but retains frozen scope and invoker-only lease',()=>{
+ const sql=readFileSync(new URL('../sql/reality-maintenance-chat-operational-eligibility-v1.sql',import.meta.url),'utf8');
+ assert.match(sql,/current_user <> 'service_role'/);
+ assert.match(sql,/i.created_at>=sh.authorized_at/);
+ assert.match(sql,/i.message_sha256=pg_catalog.encode/);
+ assert.match(sql,/incident.independent_review_receipt_sha256=/);
+ assert.match(sql,/incident.production_changed IS FALSE/);
+ assert.match(sql,/other.shift_id<>sh.shift_id/);
+ assert.match(sql,/FOR UPDATE OF i SKIP LOCKED/);
+ assert.match(sql,/'investigation_only',true/);
+ assert.match(sql,/'execution_authorized',false/);
+ assert.doesNotMatch(sql,/strpos\(m.content,sh.shift_id/);
+ assert.doesNotMatch(sql,/m.content ~\*/);
+ assert.doesNotMatch(sql,/\bSECURITY DEFINER\b/i);
+ assert.doesNotMatch(sql,/\bUPDATE reality_internal[.]governed_employee_shifts_v1\b/i);
+});
