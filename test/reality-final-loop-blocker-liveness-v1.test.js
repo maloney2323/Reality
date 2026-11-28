@@ -239,3 +239,40 @@ test('current durable strategy and next proof outrank stale diagnostic acquisiti
   assert.equal(r.original_job_completed,false);assert.equal(r.execution_authorized,false);
  }
 });
+
+import {qualifyDistinctApprovedReviewScopes} from '../src/reality-final-loop-child-review-worker-v1.js';
+
+test('completed uncertain read-only attempts quarantine only their frozen scopes',()=>{
+ const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+ const fingerprint=n=>({index:n,scope_sha256:sha(String(n))});
+ const handoff={effect_type:'READ_ONLY_INTERNAL_PR_REVIEW',read_only:true,
+  execution_authorized:false,original_job_completed:false,production_changed:false,
+  scope_count:5,scope_fingerprints:[0,1,2,3,4].map(fingerprint)};
+ const observation=n=>({child_work_id:'work:'+String(n).repeat(32),
+  scope_sha256:sha(String(n)),invocation_id:uuid(n+1),worker_run_id:uuid(n+10),
+  event_id:uuid(n+20),event_head_sha256:sha('a'),release_sha:'b'.repeat(40),
+  release_receipt_sha256:sha('c'),worker_completed:true,replay_authorized:false,
+  model_artifact_recorded:false,provider_outcome_verified:false});
+ const evidence={status:'SIGNED_INVOCATION_OBSERVATIONS_RETURNED_ORIGINAL_OPEN',
+  canonical_return_committed:true,canonical_return_event_id:uuid(50),
+  canonical_return_head_sha256:sha('a'),observation_sha256:sha('d'),
+  replay_authorized:false,execution_authorized:false,original_job_completed:false,
+  fenced_count:2,signed_observation_count:2,observations:[observation(0),observation(1)]};
+ const proof=qualifyDistinctApprovedReviewScopes(evidence,handoff);
+ assert.deepEqual(proof.blocked_scope_sha256s,[sha('0'),sha('1')]);
+ assert.deepEqual(handoff.scope_fingerprints.filter(x=>
+  !proof.blocked_scope_sha256s.includes(x.scope_sha256)).map(x=>x.index),[2,3,4]);
+ assert.equal(proof.replay_authorized,false);
+ assert.equal(proof.original_job_completed,false);
+ for(const bad of [
+  {...evidence,canonical_return_committed:false},
+  {...evidence,replay_authorized:true},
+  {...evidence,fenced_count:3},
+  {...evidence,observations:[observation(0),{...observation(1),worker_completed:false}]},
+  {...evidence,observations:[observation(0),{...observation(1),scope_sha256:sha('f')}]},
+  {...evidence,observations:[observation(0),{...observation(1),provider_outcome_verified:true}]},
+  {...evidence,observations:[observation(0),observation(0)]}
+ ])assert.equal(qualifyDistinctApprovedReviewScopes(bad,handoff),null);
+ assert.equal(qualifyDistinctApprovedReviewScopes(evidence,
+  {...handoff,effect_type:'GITHUB_PUBLICATION'}),null);
+});
