@@ -449,3 +449,32 @@ export function selectRegisteredCapabilityKey({key,registeredActionKeys=[]}={}){
     new Set(registeredActionKeys).size!==registeredActionKeys.length)return null;
  return registeredActionKeys.includes(key)?key:null;
 }
+
+
+// Existing service-only CI candidate selectors provide the current work,
+// not an instruction to run a procedural engineering chain. Both protocol
+// versions are one installed capability; the exact attempt is data.
+export function selectCorrectiveCiCapability({wake,candidate,registeredActionKeys=[]}={}){
+ const key=selectRegisteredCapabilityKey({key:'RUN_INDEPENDENT_CORRECTIVE_CI',registeredActionKeys});
+ const version=candidate?.status==='EXACT_SAME_SHIFT_CORRECTIVE_DRAFT_READY_FOR_CI'?1:
+  candidate?.status==='SAME_ORIGINAL_RECOVERY_CANDIDATE_READY_FOR_CI'?2:null;
+ if(!key||!version||wake?.status!=='SHIFT_WORKER_PULSE_DURABLY_RECORDED'||
+    !UUID.test(wake.shift_id||'')||wake.shift_id!==candidate.shift_id||
+    wake.installation_authorized!==false||wake.production_changed!==false||
+    !UUID.test(candidate.owner_id||'')||
+    !/^work:[a-f0-9]{32}$/.test(candidate.original_work_id||'')||
+    !/^[a-f0-9]{40}$/.test(candidate.source_commit_sha||'')||
+    !SHA.test(candidate.proposed_sha256||'')||
+    !/^resp_[A-Za-z0-9_-]{4,160}$/.test(candidate.model_response_id||'')||
+    candidate.installation_authorized!==false||candidate.original_job_completed!==false||
+    candidate.production_changed!==false||
+    (version===2&&(!UUID.test(candidate.attempt_id||'')||
+      !Number.isSafeInteger(candidate.attempt_number)||candidate.attempt_number<2||
+      candidate.attempt_number>8)))return null;
+ return Object.freeze({key,version,expectedScope:Object.freeze({
+  owner_id:candidate.owner_id,shift_id:candidate.shift_id,
+  original_work_id:candidate.original_work_id,source_commit_sha:candidate.source_commit_sha,
+  proposed_sha256:candidate.proposed_sha256,model_response_id:candidate.model_response_id,
+  ...(version===2?{attempt_id:candidate.attempt_id,attempt_number:candidate.attempt_number}:{})
+ })});
+}
