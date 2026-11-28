@@ -13,7 +13,7 @@ const obs={shift_id:shift,original_work_id:work,source_ref:ref,continuity_revisi
  verified_independent_review:null,independent_original_outcome_verified:false,universe_return_verified:false,
  current_events:[{event_id:id(4),signal_kind:'VERIFIED_SUSPENSION_INVESTIGATION',state:'SHADOW_OBSERVED',worker_status:'COMPLETED',source_receipt_sha256:h(2),governed_wake_worker_run_id:id(5)}]};
 const current={observed_at:'2026-11-27T14:00:00Z',active_shift_count:1,unverified_guard_count:0,observations:[{current_operational_facts:obs}]};
-const incidentReadback={status:'OWNER_SHIFT_CONTINUITY_INCIDENTS_READ_ONLY',owner_id:ownerId,owner_scope_verified:true,read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false,items:[{incident_id:id(3),shift_id:shift,investigation_receipt_sha256:h(3),diagnosis:'Recorded diagnosis',proposed_upgrade:'Reconnect existing capability',assigned_employee:'Engineer',independent_reviewer:'Reviewer'}]};
+const incidentReadback={status:'OWNER_SHIFT_CONTINUITY_INCIDENTS_READ_ONLY',owner_id:ownerId,owner_scope_verified:true,read_only:true,execution_authorized:false,installation_authorized:false,production_changed:false,items:[{incident_id:id(3),shift_id:shift,investigation_receipt_sha256:h(3),diagnosis:'Recorded diagnosis',proposed_upgrade:'Reconnect existing capability',assigned_employee:'Engineer',independent_reviewer:'Reviewer',independent_source_review:{status:'SOURCE_MATCHED_NEEDS_FROZEN_TEST',reviewer:'Reviewer',receipt_sha256:h(7),worker_run_id:id(15),verified_at:current.observed_at,original_job_completed:false,installation_authorized:false,production_changed:false}}]};
 const historyByShift={[shift]:{status:'FINAL_LOOP_EVENT_SUBSCRIPTIONS_AND_SIGNAL_TRACE_READ_ONLY',shift_id:shift,execution_authorized:false,installation_authorized:false,production_changed:false,events:[]}};
 const finalReadback={status:'INDEPENDENT_FINAL_RECEIPT_READBACK',does_not_authorize_actions:true,receipts:[]};
 const input={current,incidentReadback,finalReadback,historyByShift,ownerId};
@@ -108,4 +108,10 @@ test('shared signed-in activity refresh covers Chat and Employees without anothe
  assert.equal((html.match(/setTimeout\(refreshLiveActivity,8000\)/g)||[]).length,1);
  assert.equal((html.match(/fetch\('\/api\/reality\/personal-continuity-activity'/g)||[]).length,1);
  assert.match(html,/No currently verified action attributed to this employee/);
+});
+
+test('assigned reviewer without the exact completed review receipt is not credited with work',()=>{
+ const {row,ob}=terminalFixture();
+ const r=projectChatContinuityActivity({...input,current:{...current,observations:[{current_operational_facts:ob}]},terminalRows:[row],incidentReadback:{...incidentReadback,items:[{...incidentReadback.items[0],independent_source_review:null}]}});
+ assert.equal(r.obligations[0].steps.find(x=>x.id===row.event_id+':review').employee,null);
 });
