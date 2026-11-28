@@ -540,7 +540,7 @@ async function recordClaimedFinalLoopChildAdvisory({
  }
 }
 
-// A completed, canonically returned uncertain read-only invocation blocks
+// A completed or exactly attested failed, canonically returned uncertain read-only invocation blocks
 // its own scope, not other already-approved scopes. No history or attempt
 // budget is reset; the existing database claim and transport fence still
 // exclusively authorize each untouched scope.
@@ -569,7 +569,12 @@ export function qualifyDistinctApprovedReviewScopes(evidence,handoff){
     !UUID.test(x.invocation_id||'')||!UUID.test(x.worker_run_id||'')||
     !UUID.test(x.event_id||'')||!HASH.test(x.event_head_sha256||'')||
     !HASH.test(x.release_receipt_sha256||'')||!SHA.test(x.release_sha||'')||
-    x.worker_completed!==true||x.replay_authorized!==false||
+    !(x.worker_completed===true&&x.worker_failure_attested===undefined&&x.worker_terminal_status===undefined||
+      x.worker_completed===false&&x.worker_terminal_status==='FAILED'&&
+      x.worker_failure_attested===true&&x.provider_outcome_unknown===true&&
+      x.worker_failure_stage==='EXACT_CLAIMED_REVIEW_CONTINUITY_RETURN_FENCE'&&
+      x.model_artifact_recorded===false)||
+    x.provider_outcome_verified!==false||x.replay_authorized!==false||
     !handoff.scope_fingerprints.some(s=>s.scope_sha256===x.scope_sha256))||
     unresolved.some(x=>x.model_artifact_recorded!==false||x.provider_outcome_verified!==false))
   return null;
