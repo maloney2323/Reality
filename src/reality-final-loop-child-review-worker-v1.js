@@ -586,6 +586,43 @@ export function qualifyDistinctApprovedReviewScopes(evidence,handoff){
  });
 }
 
+// The old invocation is still uncertain. Only a distinct, exact, independently
+// re-read canonical claim on the SAME child may pass its historical fence.
+// An asserted model result or a copied approval cannot satisfy this check.
+export function verifyBoundedSameObligationClaim({claim,readback,handoff,evidence,workerRunId}={}){
+ const n=claim?.same_obligation_continuation,a=claim?.historical_prepare_fence;
+ const matching=readback?.children?.filter(x=>x.child_original_work_id===claim?.child_work_id);
+ const prior=evidence?.observations?.filter(x=>x.child_work_id===claim?.child_work_id&&
+  x.scope_sha256===claim?.scope_sha256&&x.model_artifact_recorded===false&&
+  x.provider_outcome_verified===false&&x.replay_authorized===false);
+ const canonical=x=>Array.isArray(x)?x.map(canonical):
+  x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
+ return Boolean(n&&a&&matching?.length===1&&prior?.length===1&&
+  readback.status==='FINAL_LOOP_CANONICAL_CHILD_RECOVERY_PROOF_NOT_PARENT_SETTLEMENT'&&
+  readback.independent_service_readback_verified===true&&readback.owner_id===handoff?.owner_id&&
+  readback.shift_id===handoff.shift_id&&readback.parent_original_work_id===handoff.parent_original_work_id&&
+  readback.source_manifest_sha256===handoff.source_manifest_sha256&&
+  readback.source_head_sha===handoff.source_head_sha&&readback.acceptance_contract_sha256===handoff.acceptance_contract_sha256&&
+  readback.original_job_completed===false&&readback.production_changed===false&&
+  HASH.test(n.proposal_sha256||'')&&HASH.test(n.approval_receipt_sha256||'')&&
+  readback.approved_recovery_receipt_sha256===n.approval_receipt_sha256&&
+  n.child_work_id===claim.child_work_id&&n.scope_sha256===claim.scope_sha256&&n.scope_index===claim.scope_index&&
+  n.continuity_head_sha256===handoff.continuity_head_sha256&&n.continuity_revision===handoff.revision&&
+  n.historical_invocation_id===prior[0].invocation_id&&n.historical_worker_run_id===prior[0].worker_run_id&&
+  n.historical_invocation_replay_authorized===false&&n.new_original_admitted===false&&n.execution_authorized===false&&
+  a.schema==='reality-final-loop-historical-preparation-fence-v1'&&
+  a.invocation_id===n.historical_invocation_id&&a.worker_run_id===n.historical_worker_run_id&&
+  a.provider_outcome==='UNKNOWN'&&a.replay_authorized===false&&a.historical_observation_preserved===true&&
+  a.premodel_recovery_count===1&&a.continuation_proposal_sha256===n.proposal_sha256&&
+  a.continuation_approval_receipt_sha256===n.approval_receipt_sha256&&
+  UUID.test(a.claim_id||'')&&a.claim_id!==claim.claim_id&&
+  a.worker_run_id!==workerRunId&&claim.claimant_worker_run_id===workerRunId&&
+  claim.historical_invocation_replay_authorized===false&&
+  matching[0].active_claim_id===claim.claim_id&&matching[0].preparation_worker_run_id===workerRunId&&
+  matching[0].canonical_prepare_invocation_id===null&&matching[0].prepared_artifact_available===false&&
+  JSON.stringify(canonical(matching[0].historical_prepare_fence))===JSON.stringify(canonical(a)));
+}
+
 // Canonical half of the EXISTING child worker. A trusted, independently
 // qualified isolated capability must be wired by the signed service before
 // this entry point is usable. No canonical service secret is sent to it.
@@ -746,9 +783,18 @@ export async function advanceCanonicalFinalLoopChildReview({
   }else return no('FINAL_LOOP_CANONICAL_VERIFICATION_SCOPE_UNVERIFIED');
   if(!bound(c))deny('ORIGINAL_SCOPE_DRIFT');
   if(distinctScopeFence&&(distinctScopeFence.blocked_child_ids.includes(c.child_work_id)||
-     distinctScopeFence.blocked_scope_sha256s.includes(c.scope_sha256)))
-   return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
+     distinctScopeFence.blocked_scope_sha256s.includes(c.scope_sha256))){
+   // No exceptions for old invocations: only the canonical allocator can
+   // return a separately approved, immutable historical fence and new claim.
+   let proof=false;
+   if(mode==='PREPARE'&&c.same_obligation_continuation&&c.historical_prepare_fence){
+    const recovery=await call(db,'reality_read_final_loop_child_recovery_v1',{
+     p_shift_id:h.shift_id,p_plan_id:h.plan_id},{fetchImpl});
+    proof=verifyBoundedSameObligationClaim({claim:c,readback:recovery,handoff:h,evidence,workerRunId});
+   }
+   if(!proof)return no('FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM',{
     next_governed_action:'QUALIFY_DISTINCT_RECOVERY_EVIDENCE_AND_EXACT_BUDGET_NO_REPLAY'});
+  }
 
  }catch{return no('FINAL_LOOP_CANONICAL_CHILD_CLAIM_OR_VERIFY_READBACK_UNAVAILABLE_NO_REPLAY');}
  const readCurrentChild=async()=>{
