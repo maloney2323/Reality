@@ -164,6 +164,13 @@ AS $function$
  ORDER BY q.reconciliation_checked_at DESC NULLS LAST,i.investigated_at DESC LIMIT 1
 ), current_guard AS MATERIALIZED (
  SELECT public.reality_read_final_loop_shared_continuity_guard_v1(p_shift_id) AS value WHERE NOT EXISTS(SELECT 1 FROM legacy)
+ AND EXISTS(SELECT 1 FROM reality_internal.owner_shift_continuity_incidents_v1 i
+  WHERE i.owner_id=p_owner_id AND i.shift_id=p_shift_id
+   AND i.source_evidence->>'original_work_id'=p_original_work_id
+   AND i.source_evidence->>'source_ref'=p_source_ref AND i.source_evidence->>'continuity_head_sha256'=p_head
+   AND i.source_evidence->>'continuity_revision'=p_revision::text
+   AND i.source_evidence->>'blocker_code'='FINAL_LOOP_UNRESOLVED_INVOCATION_INVESTIGATION_REQUIRED'
+   AND i.phase='INVESTIGATION_RECORDED_NEEDS_INDEPENDENT_PROOF')
 ), current_invocation AS (
  SELECT pg_catalog.jsonb_build_object('incident_id',i.incident_id,
   'investigation_receipt_sha256',i.investigation_receipt_sha256,'investigation_worker_run_id',run.run_id,
@@ -321,7 +328,7 @@ BEGIN
  FOR UPDATE;
  IF NOT FOUND OR EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
   WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id
-   AND ((e.state='SHADOW_PENDING' AND NOT (current_invocation AND e.owner_id=a.owner_id AND e.source_ref=sub.source_ref
+   AND ((e.state='SHADOW_PENDING' AND NOT coalesce((current_invocation AND e.owner_id=a.owner_id AND e.source_ref=sub.source_ref
     AND e.continuity_head_sha256=sub.continuity_head_sha256 AND e.continuity_revision=sub.continuity_revision
     AND e.signal_kind='QUALIFIER_PROOF_CHANGED' AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
     AND e.source_receipt_sha256=evidence->>'qualifier_receipt_sha256'
@@ -333,9 +340,12 @@ BEGIN
       AND r.worker_stage='WORKER_RESPONSE_PUBLICATION' AND w.owner_id=e.owner_id AND w.shift_id=e.shift_id
       AND w.release_claim_id=e.release_continuation_claim_id AND w.operating_lane='NORMAL_SIGNED_SHIFT'
       AND rel.owner_id=e.owner_id AND rel.shift_id=e.shift_id AND rel.state='CLAIMED_ONCE'
-      AND rel.release_sha=w.running_release_sha AND rel.runtime_scope->>'original_work_id'=e.original_work_id
+      AND rel.release_sha=w.running_release_sha AND rel.release_ref=w.running_release_ref
+      AND rel.provider_alias_observed_at>=rel.claimed_at AND rel.provider_alias_observed_at<=r.started_at
+      AND rel.provider_alias_observed_deployment_id=rel.runtime_scope->>'target_deployment_id'
+      AND w.release_receipt_sha256 ~ '^sha256:[a-f0-9]{64}
       AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
-      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false'))) OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
+      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false')),false)) OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
     AND e.source_receipt_sha256=evidence->>'investigation_receipt_sha256'))) THEN RETURN NULL;END IF;
  INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,
   subscribed_receipt_sha256,continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
@@ -366,6 +376,79 @@ BEGIN
       AND w.release_claim_id=e.release_continuation_claim_id AND w.operating_lane='NORMAL_SIGNED_SHIFT'
       AND rel.owner_id=e.owner_id AND rel.shift_id=e.shift_id AND rel.state='CLAIMED_ONCE'
       AND rel.release_sha=w.running_release_sha AND rel.runtime_scope->>'original_work_id'=e.original_work_id
+      AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
+      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false'));
+ END IF;
+ causal:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+  a.shift_id::text||'|'||sub.original_work_id||'|'||sub.continuity_head_sha256||'|'||
+  sub.continuity_revision::text||'|'||(evidence->>'suspension_receipt_sha256')||'|'||
+  (evidence->>'investigation_receipt_sha256'),'UTF8')),'hex');
+ INSERT INTO reality_internal.final_loop_resume_events_v1(shift_id,owner_id,original_work_id,source_ref,signal_kind,
+  source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,
+  signal_next_action,release_continuation_claim_id)
+ VALUES(a.shift_id,a.owner_id,sub.original_work_id,sub.source_ref,'VERIFIED_INVESTIGATION_REVIEW',
+  evidence->>'investigation_receipt_sha256',evidence->>'suspension_receipt_sha256',causal,sub.continuity_head_sha256,
+  sub.continuity_revision,'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',a.claim_id)
+ ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+ IF current_invocation AND fresh_id IS NULL THEN RAISE EXCEPTION 'CURRENT_INVOCATION_REVIEW_NOT_STAGED';END IF;
+ RETURN fresh_id;
+END $fn$;
+
+      AND rel.runtime_scope->>'original_work_id'=e.original_work_id
+      AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
+      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false')),false)) OR (e.signal_kind='VERIFIED_INVESTIGATION_REVIEW'
+    AND e.source_receipt_sha256=evidence->>'investigation_receipt_sha256'))) THEN RETURN NULL;END IF;
+ INSERT INTO reality_internal.final_loop_resume_conditions_v1(shift_id,owner_id,original_work_id,source_ref,condition_kind,
+  subscribed_receipt_sha256,continuity_head_sha256,continuity_revision,next_qualified_action,unresolved_proof_gates,proposed_transition,state)
+ VALUES(a.shift_id,a.owner_id,sub.original_work_id,sub.source_ref,'VERIFIED_INVESTIGATION_REVIEW',
+  evidence->>'suspension_receipt_sha256',sub.continuity_head_sha256,sub.continuity_revision,
+  'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',evidence->'unresolved_proof_gates','RECOVER','SUSPENDED')
+ ON CONFLICT(shift_id,original_work_id,condition_kind) DO NOTHING;
+ IF NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_conditions_v1 c
+  WHERE c.owner_id=a.owner_id AND c.shift_id=a.shift_id AND c.original_work_id=sub.original_work_id
+   AND c.source_ref=sub.source_ref AND c.condition_kind='VERIFIED_INVESTIGATION_REVIEW'
+   AND c.continuity_head_sha256=sub.continuity_head_sha256 AND c.continuity_revision=sub.continuity_revision
+   AND c.subscribed_receipt_sha256=evidence->>'suspension_receipt_sha256') THEN RETURN NULL;END IF;
+ -- Completed, already consumed qualifier deliveries are historical only.
+ -- Keep their nonce, worker, claim and receipt intact; do not infer provider success.
+ IF current_invocation THEN
+  UPDATE reality_internal.final_loop_resume_events_v1 e SET state='SHADOW_STALE'
+  WHERE e.shift_id=a.shift_id AND e.original_work_id=sub.original_work_id AND e.state='SHADOW_PENDING'
+   AND (current_invocation AND e.owner_id=a.owner_id AND e.source_ref=sub.source_ref
+    AND e.continuity_head_sha256=sub.continuity_head_sha256 AND e.continuity_revision=sub.continuity_revision
+    AND e.signal_kind='QUALIFIER_PROOF_CHANGED' AND e.signal_next_action='VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM'
+    AND e.source_receipt_sha256=evidence->>'qualifier_receipt_sha256'
+    AND e.previous_receipt_sha256=sub.subscribed_receipt_sha256 AND e.governed_wake_request_id IS NOT NULL
+    AND e.observed_at IS NULL AND EXISTS(SELECT 1 FROM reality_internal.signed_worker_actual_runs_v1 r
+     JOIN reality_internal.governed_signed_worker_release_wakes_v1 w ON w.worker_run_id=r.run_id
+     JOIN reality_internal.governed_worker_release_approvals_v1 rel ON rel.claim_id=w.release_claim_id
+     WHERE r.run_id=e.governed_wake_worker_run_id AND r.status='COMPLETED' AND r.finished_at IS NOT NULL
+      AND r.worker_stage='WORKER_RESPONSE_PUBLICATION' AND w.owner_id=e.owner_id AND w.shift_id=e.shift_id
+      AND w.release_claim_id=e.release_continuation_claim_id AND w.operating_lane='NORMAL_SIGNED_SHIFT'
+      AND rel.owner_id=e.owner_id AND rel.shift_id=e.shift_id AND rel.state='CLAIMED_ONCE'
+      AND rel.release_sha=w.running_release_sha AND rel.release_ref=w.running_release_ref
+      AND rel.provider_alias_observed_at>=rel.claimed_at AND rel.provider_alias_observed_at<=r.started_at
+      AND rel.provider_alias_observed_deployment_id=rel.runtime_scope->>'target_deployment_id'
+      AND w.release_receipt_sha256 ~ '^sha256:[a-f0-9]{64}
+      AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
+      AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false'));
+ END IF;
+ causal:='sha256:'||pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+  a.shift_id::text||'|'||sub.original_work_id||'|'||sub.continuity_head_sha256||'|'||
+  sub.continuity_revision::text||'|'||(evidence->>'suspension_receipt_sha256')||'|'||
+  (evidence->>'investigation_receipt_sha256'),'UTF8')),'hex');
+ INSERT INTO reality_internal.final_loop_resume_events_v1(shift_id,owner_id,original_work_id,source_ref,signal_kind,
+  source_receipt_sha256,previous_receipt_sha256,event_causality_sha256,continuity_head_sha256,continuity_revision,
+  signal_next_action,release_continuation_claim_id)
+ VALUES(a.shift_id,a.owner_id,sub.original_work_id,sub.source_ref,'VERIFIED_INVESTIGATION_REVIEW',
+  evidence->>'investigation_receipt_sha256',evidence->>'suspension_receipt_sha256',causal,sub.continuity_head_sha256,
+  sub.continuity_revision,'INDEPENDENTLY_REVIEW_VERIFIED_INVESTIGATION_NO_REPLAY',a.claim_id)
+ ON CONFLICT DO NOTHING RETURNING event_id INTO fresh_id;
+ IF current_invocation AND fresh_id IS NULL THEN RAISE EXCEPTION 'CURRENT_INVOCATION_REVIEW_NOT_STAGED';END IF;
+ RETURN fresh_id;
+END $fn$;
+
+      AND rel.runtime_scope->>'original_work_id'=e.original_work_id
       AND rel.runtime_scope->>'source_ref'=e.source_ref AND rel.runtime_scope->>'child_execution_enabled'='false'
       AND rel.runtime_scope->>'parent_delivery_enabled'='false' AND rel.runtime_scope->>'production_changed'='false'));
  END IF;
