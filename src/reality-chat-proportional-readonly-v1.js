@@ -111,7 +111,7 @@ export async function generateProportionalReadOnlyReply({
  message,conversationId,requestId,ownerId,sourceRef,
  verifiedPriorTurns=[],worldlineId,ownerContext=null,
  verifiedUniverseObservations=[],operationalTimeHorizon=null,apiKey,model='gpt-4.1-mini',
- runtime=runRealityCognitiveRuntime,fetchImpl=fetch
+ runtime=runRealityCognitiveRuntime,fetchImpl=fetch,recordClaimAssessment=null
 }={}){
  if(typeof message!=='string'||!message.trim()||
     !UUID.test(conversationId||'')||!UUID.test(requestId||'')||
@@ -192,6 +192,18 @@ export async function generateProportionalReadOnlyReply({
    // Do not turn extractor failure into a verified operational statement.
    claimAssessment=compileFinalOutputClaimAssessment({answer:released,extractionStatus:'EXTRACTION_UNAVAILABLE'});
    released='I cannot independently establish the operational assertions in this response from the available evidence. The underlying work has not been marked complete.';
+  }
+ }
+ // The server adapter supplies the existing durable ledger writer. Pure
+ // controlled calls can still inspect the uncommitted assessment.
+ if(claimAssessment&&typeof recordClaimAssessment==='function'){
+  try{
+   const receipt=await recordClaimAssessment({answer:released,assessment:claimAssessment});
+   if(receipt?.readback_verified!==true||!receipt.ledger_receipt_id)
+    fail('CLAIM_LEDGER_READBACK_REQUIRED');
+   claimAssessment=receipt;
+  }catch{
+   released='I cannot verify the operational output receipt right now. I have withheld the draft; the underlying outcome remains unverified.';
   }
  }
  return Object.freeze({
