@@ -999,6 +999,14 @@ END $$;
 -- No synthetic release claim is created; the existing consumed approval stays
 -- byte-for-byte unchanged throughout the new recovery dispatch.
 \ir ../sql/reality-final-loop-verified-successor-authority-v1.sql
+-- The actual qualification algorithm is independently exercised in the
+-- governed-chat-connection smoke test. This fixture already has its
+-- canonical qualifier receipt; record only the demand, not a new proof.
+CREATE TABLE reality_internal.fixture_successor_qualification_demands(shift_id uuid);
+CREATE FUNCTION reality_internal.reconcile_current_qualification_proofs_v1(p_shift_id uuid) RETURNS jsonb
+ LANGUAGE plpgsql SET search_path='' AS $fixture$
+ BEGIN INSERT INTO reality_internal.fixture_successor_qualification_demands VALUES(p_shift_id);
+ RETURN pg_catalog.jsonb_build_object('scope','EVIDENCE_ONLY_NO_AUTHORITY_CHANGE');END $fixture$;
 DO $$
 DECLARE a record; c record; v jsonb; before_scope jsonb; before_count int; next_event uuid; current_head text; current_rev bigint; q text; old_guard jsonb; old_proof jsonb;
 BEGIN
@@ -1020,11 +1028,21 @@ BEGIN
  'worldline_parent_links_verified',true,'shift_scope_authority_event_present',true,'production_changed',false,
  'frozen_shift_scope_sha256',proof->>'frozen_shift_scope_sha256'),'{obligations,0,execution_permitted_by_handoff}','false'::jsonb)
  WHERE shift_id=a.shift_id RETURNING guard,proof INTO old_guard,old_proof;
+ before_scope:=a.runtime_scope;
+ SELECT count(*) INTO before_count FROM reality_internal.governed_worker_release_approvals_v1 WHERE shift_id=a.shift_id;
+ -- Existing child-plan prerequisite is a real precondition in this fixture.
+ INSERT INTO reality_internal.final_loop_child_approval_packets_v1 VALUES(gen_random_uuid(),c.source_ref,'EFFECT_RESERVED_RECONCILE_ONLY');
+ INSERT INTO reality_internal.final_loop_child_review_work_v1(child_work_id,packet_id,owner_id,shift_id,parent_original_work_id,phase)
+ SELECT gen_random_uuid(),p.packet_id,a.owner_id,a.shift_id,c.original_work_id,'ADMITTED'
+ FROM reality_internal.final_loop_child_approval_packets_v1 p WHERE p.source_ref=c.source_ref LIMIT 1;
+ -- The real completion trigger, not a manual stage call, must request continuation.
  UPDATE reality_internal.signed_worker_actual_runs_v1 r SET status='COMPLETED',finished_at=clock_timestamp(),worker_stage='LEDGER_RETURN_RESPONSE_PUBLICATION'
  FROM reality_internal.final_loop_resume_events_v1 e WHERE e.shift_id=a.shift_id AND e.ledger_return_condition_sha256 IS NOT NULL
  AND r.run_id=e.governed_wake_worker_run_id;
- before_scope:=a.runtime_scope;
- SELECT count(*) INTO before_count FROM reality_internal.governed_worker_release_approvals_v1 WHERE shift_id=a.shift_id;
+ SELECT event_id INTO next_event FROM reality_internal.final_loop_resume_events_v1
+ WHERE shift_id=a.shift_id AND continuity_revision=current_rev AND signal_kind='VERIFIED_SUSPENSION_INVESTIGATION';
+ IF (SELECT count(*) FROM reality_internal.fixture_successor_qualification_demands WHERE shift_id=a.shift_id)<>1
+ THEN RAISE EXCEPTION 'LEDGER_COMPLETION_DID_NOT_REQUEST_QUALIFICATION';END IF;
  -- Rejection controls: the same receipt cannot authorize another original,
  -- revision, or changed budget/authority.
  SET LOCAL ROLE service_role;
@@ -1039,12 +1057,7 @@ BEGIN
  UPDATE public.suspension_fixture_proof SET guard=jsonb_set(guard,'{no_new_executable_authority}','false'::jsonb) WHERE shift_id=a.shift_id;
  IF reality_internal.read_final_loop_release_successor_scope_v1(a.claim_id) IS NOT NULL THEN RAISE EXCEPTION 'NEW_AUTHORITY_ACCEPTED';END IF;
  UPDATE public.suspension_fixture_proof SET guard=old_guard WHERE shift_id=a.shift_id;
- -- Existing child-plan prerequisite is a real precondition in this fixture.
- INSERT INTO reality_internal.final_loop_child_approval_packets_v1 VALUES(gen_random_uuid(),c.source_ref,'EFFECT_RESERVED_RECONCILE_ONLY');
- INSERT INTO reality_internal.final_loop_child_review_work_v1(child_work_id,packet_id,owner_id,shift_id,parent_original_work_id,phase)
- SELECT gen_random_uuid(),p.packet_id,a.owner_id,a.shift_id,c.original_work_id,'ADMITTED'
- FROM reality_internal.final_loop_child_approval_packets_v1 p WHERE p.source_ref=c.source_ref LIMIT 1;
- next_event:=reality_internal.stage_final_loop_release_continuation_v1(a.request_id);
+ -- Independently check the automatically staged continuation.
  IF next_event IS NULL OR NOT EXISTS(SELECT 1 FROM reality_internal.final_loop_resume_events_v1 e
  WHERE e.event_id=next_event AND e.release_continuation_claim_id=a.claim_id
  AND e.continuity_revision=5 AND e.signal_kind='VERIFIED_SUSPENSION_INVESTIGATION'
