@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
+import {boundedRegisteredCapabilityCheckpoint} from '../src/reality-evidence-driven-capability-router-v1.js';
 import {createHash} from 'node:crypto';
 import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview}
  from '../src/reality-final-loop-child-review-worker-v1.js';
@@ -525,6 +526,13 @@ test('canonical claim, isolated computation and independent return preserve one 
    return call(db,name,args);
   }});
  assert.equal(failedGateway.continuity_blocker_code,'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED');
+ const checkpoint=boundedRegisteredCapabilityCheckpoint('VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',failedGateway);
+ assert.equal(checkpoint?.status,failedGateway.status);
+ assert.equal(checkpoint?.continuity_blocker_code,'FINAL_LOOP_CONTINUITY_RPC_NOT_REGISTERED_UNVERIFIED');
+ assert.equal(checkpoint.original_job_completed,false);
+ assert.equal(checkpoint.production_changed,false);
+ assert.equal(boundedRegisteredCapabilityCheckpoint('VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',
+  {...failedGateway,original_job_completed:true}),null);
  assert.equal(claims,0);assert.equal(modelCalls,0);
  const missingEvidence=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(null)});
  assert.equal(missingEvidence.status,'FINAL_LOOP_CANONICAL_EXECUTION_SPINE_READBACK_REQUIRED_NO_CLAIM');
@@ -582,6 +590,9 @@ test('canonical claim, isolated computation and independent return preserve one 
   const r=await runIsolatedAdvisory(x);drift=true;return r;
  }});
  assert.equal(stale.status,'FINAL_LOOP_CHILD_CONTINUITY_DRIFT_NO_RECEIPT_REPLAY');
+ const failedReturnCheckpoint=boundedRegisteredCapabilityCheckpoint('VERIFY_EXISTING_APPROVED_CHILD_REVIEW_CLAIM',stale);
+ assert.equal(failedReturnCheckpoint?.status,'FINAL_LOOP_CHILD_CONTINUITY_DRIFT_NO_RECEIPT_REPLAY');
+ assert.equal(failedReturnCheckpoint.original_job_completed,false);
  assert.equal(verifies,2);assert.equal(modelCalls,4);
  // A valid provider envelope and signed original can still carry an
  // oversized advisory. Rejection must identify content, not imply
