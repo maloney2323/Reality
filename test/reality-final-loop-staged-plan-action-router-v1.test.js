@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {classifySignedFinalLoopStagedPlanActions as classify,
  hasCurrentApprovedChildReviewRoute as canRoute,
  selectCurrentApprovedChildReviewRoute as selectRoute,
+ selectStagedRegisteredCapabilities as selectCapabilities,
  projectCanonicalApprovedReviewHandoff as handoff,
  reconcileReviewedRecoveryToFinalLoopSource as reconcile,
  inspectFinalLoopRecoveryContinuation as inspect,
@@ -113,7 +114,8 @@ test('existing signed worker must publish route and keep child execution distinc
  assert.match(approval,/REALITY_FINAL_LOOP_PR_SOURCE_PLANS_DB_ISOLATED/);
  assert.match(worker,/REALITY_FINAL_LOOP_CHILD_EXECUTION_ENABLED/);
  assert.match(worker,/const freshChildContinuity=await requireFreshFinalLoopContinuity\(\);[\s\S]*?finalLoopStagedActionRoutes=await readCurrentFinalLoopStagedActions\(freshChildContinuity,freshChildGraph\)/);
- assert.match(worker,/finalLoopChildReview=hasCurrentApprovedChildReviewRoute\(\{[\s\S]*?\?await advanceOneFinalLoopChildReview/);
+ assert.match(worker,/const stagedReviewCapability=selectStagedRegisteredCapabilities\(\{[\s\S]*?finalLoopChildReview=stagedReviewCapability\?await advanceOneFinalLoopChildReview/);
+ assert.match(worker,/selectedRoutes:stagedPacketCapability.routes/);
 });
 
 
@@ -404,4 +406,26 @@ test('exact claimed review uses fresh staged route read instead of speculative d
  assert.match(route,/FINAL_LOOP_CATEGORIZED_REVIEW_FRESH_READBACK_UNVERIFIED[\s\S]*?\} else if\(hasReview[\s\S]*?readCurrentFinalLoopStagedActions\(lastFinalLoopContinuity,unifiedGraph\)/);
  assert.equal((route.match(/readCurrentFinalLoopStagedActions\(/g)||[]).length,2);
  assert.match(route,/claimedEventId:governedWakeScope.event_id/);
+});
+
+
+test('classified source plans select installed packet capability without granting consent',()=>{
+ const routes=classify({graph,staged,preflight});
+ const key='PREPARE_FINAL_LOOP_CHILD_OWNER_PACKET';
+ const input={routes,graph,operatingLane,registeredActionKeys:[key]};
+ const selected=selectCapabilities(input);
+ assert.equal(selected.length,1);
+ assert.equal(selected[0].key,key);
+ assert.equal(selected[0].routes[0].plan_id,admitted.plan_id);
+ assert.equal(selected[0].routes[0].owner_action_required,true);
+ assert.equal(selected[0].routes[0].child_execution_authorized,false);
+ for(const invalid of [
+  {registeredActionKeys:[]},{registeredActionKeys:[key,key]},
+  {graph:{...graph,jobs:[]}},
+  {operatingLane:{...operatingLane,operating_lane:'STAGING_ONLY'}},
+  {routes:{...routes,action_dispatched:true}},
+  {routes:{...routes,routes:[{...routes.routes[0],authority_scope:'EXACT_ACCEPTED_READ_ONLY_REVIEW'}]}},
+  {routes:{...routes,routes:[{...routes.routes[0],child_execution_authorized:true}]}},
+  {routes:{...routes,routes:[routes.routes[0],routes.routes[0]]}}
+ ])assert.deepEqual(selectCapabilities({...input,...invalid}),[]);
 });
