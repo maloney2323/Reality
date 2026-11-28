@@ -47,6 +47,7 @@ export async function runGovernedToolSession({
   typeof apiKey!=='string'||apiKey.length<12||
   typeof fetchImpl!=='function'||typeof now!=='function')
   fail('TRUSTED_MODEL_AND_SERVER_ADAPTER_REQUIRED');
+ const readVerifiedTask=async()=>{
  const task=await readOriginalTask();
  if(task?.independently_verified!==true||
   !WORK.test(task.original_work_id||'')||
@@ -59,7 +60,19 @@ export async function runGovernedToolSession({
   task.production_changed!==false||
   task.independently_settled!==false)
   fail('CURRENT_SIGNED_ORIGINAL_TASK_REQUIRED');
+ return task;
+ };
+ // Freeze the admission identity before the model can propose a tool call.
+ // A newer owner goal is not permission to execute the old model response.
+ const task=structuredClone(await readVerifiedTask());
  const job=task.original_work_id;
+ const requireSameObjective=async()=>{
+  const current=await readVerifiedTask();
+  if(current.original_work_id!==job||current.owner_id!==task.owner_id||
+   current.goal_id!==task.goal_id||current.objective!==task.objective)
+   fail('AUTHORIZED_OBJECTIVE_CHANGED_RECONCILE_ORIGINAL_NO_DISPATCH');
+ };
+
  if(verifiedContinuityContext!==null&&(
    verifiedContinuityContext.independently_verified!==true||
    verifiedContinuityContext.original_work_id!==job||
@@ -128,6 +141,7 @@ export async function runGovernedToolSession({
   if(!search)return Object.freeze({status:'MODEL_DID_NOT_REQUEST_TOOL_DISCOVERY',
    original_work_id:job,model_text:resultText(first),
    provider_requests:requests,original_job_completed:false});
+  await requireSameObjective();
   const loaded=await lateBoundAdapter.forToolSearch({
    searchCall:search,executionTime:now()});
   active=await ask({previous_response_id:first.id,input:[loaded]});
@@ -139,6 +153,9 @@ export async function runGovernedToolSession({
    original_work_id:job,model_text:resultText(active),
    tool_search_completed:searchDispatched,provider_requests:requests,
    original_job_completed:false});
+ // Check the same authorized source again at the last pre-dispatch boundary.
+ // The existing adapter still requires its own atomic fenced claim.
+ await requireSameObjective();
  const executed=await lateBoundAdapter.dispatch({
   functionCall,executionTime:now(),providerResponseId:active.id
  });
@@ -151,6 +168,9 @@ export async function runGovernedToolSession({
  // Same Responses conversation / response chain. Only the tool result is
  // returned; worker settlement and original-job continuation belong to
  // the separately trusted governed executor and independent receipt provider.
+ // A tool result has its own durable receipt. If the objective changed
+ // after dispatch, preserve that receipt and stop the old model continuation.
+ await requireSameObjective();
  const next=await ask({previous_response_id:active.id,
   input:[executed.response_input]});
  if(single(next,'function_call')||single(next,'tool_search_call'))

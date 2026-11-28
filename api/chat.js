@@ -21,7 +21,11 @@ export default async function handler(req, res) {
     const result = await runLiveIntelligenceOrchestration({
       message: req.body?.message,
       requestedBy: principal.principal_id,
-      systemContext: req.body?.systemContext || null,
+      // Compatibility Chat has only a signed session principal, not an
+      // authenticated owner evidence adapter. A browser cannot supply trusted
+      // Universe observations, a continuity root, or an authority snapshot.
+      // The existing authenticated Reality endpoints own that readback.
+      systemContext: null,
     });
 
     return res.status(200).json({
