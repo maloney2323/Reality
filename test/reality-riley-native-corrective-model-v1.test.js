@@ -31,7 +31,7 @@ const env={VERCEL_ENV:'preview',
  REALITY_STANDALONE_OPENAI_API_KEY:'isolated-example-credential-long'};
 const db={strictSecrets:true,project:'hvkfreoagbrphwghjajw'};
 const failProof='https://github.com/maloney2323/Reality/actions/runs/'+runId;
-function rig({duplicate=false,badRun=false,badModel=false,badEdit=false}={}){
+function rig({duplicate=false,badRun=false,badModel=false,badEdit=false,badJobs=false,jobName='Independent fixture failure',stepName='Verify frozen source outcome'}={}){
  let reads=0,models=0;const calls=[];
  const callRpc=async(_db,name,args)=>{
   calls.push({name,args});
@@ -57,6 +57,14 @@ function rig({duplicate=false,badRun=false,badModel=false,badEdit=false}={}){
   throw Error('UNEXPECTED_RPC_'+name);
  };
  const fetchImpl=async(url,options)=>{
+  if(url.includes('/jobs?')){
+   reads++;
+   return {ok:true,json:async()=>({total_count:1,jobs:[{
+    id:20001,run_id:runId,head_sha:badJobs?'d'.repeat(40):failedSha,
+    status:'completed',conclusion:'failure',name:jobName,
+    steps:[{number:3,name:stepName,conclusion:'failure'}]
+   }]})};
+  }
   if(url.includes('/actions/runs/')){
    reads++;
    return {ok:true,json:async()=>({
@@ -76,6 +84,9 @@ function rig({duplicate=false,badRun=false,badModel=false,badEdit=false}={}){
    assert.equal(options.headers['x-client-request-id'],reqId);
    const request=JSON.parse(options.body);
    assert.equal(request.store,false);
+   assert.ok(request.input[1].content[0].text.includes(jobName));
+   assert.ok(request.input[1].content[0].text.includes(stepName));
+   assert.doesNotMatch(request.input[0].content[0].text,/The independent frozen run failed two tests|draft added an advisory governed_code_generation_connected/);
    assert.equal(request.text.format.type,'json_schema');
    assert.equal(request.text.format.strict,true);
    assert.deepEqual(request.text.format.schema.required,['find','replace','reason']);
@@ -102,7 +113,7 @@ test('frozen failing run directs one genuine revised source patch to the same or
  assert.equal(out.original_job_completed,false);
  assert.equal(out.production_changed,false);
  assert.equal(out.independent_tests_passed,false);
- assert.equal(r.models,1);assert.equal(r.reads,2);
+ assert.equal(r.models,1);assert.equal(r.reads,3);
  const w=r.calls.find(x=>x.name==='reality_record_same_riley_native_model_revision_v1');
  assert.equal(w.args.p_original_work_id,work);
  assert.equal(w.args.p_find,find);assert.equal(w.args.p_replace,replace);
@@ -180,4 +191,18 @@ test('independent failed owner-scope CI readback supersedes stale pending model 
  assert.match(sql,/j\.exact_approval_receipt_ref is null/);
  assert.match(sql,/current_user<>'service_role'/);
  assert.doesNotMatch(sql,/grant execute[^;]*to authenticated/);
+});
+
+
+test('unrelated CI job evidence cannot reach the model; different verified failures supply different context',async()=>{
+ const bad=rig({badJobs:true});
+ const rejected=await reviseCurrentRileyNativeRepair({db,graph,env,fetchImpl:bad.fetchImpl,callRpc:bad.callRpc});
+ assert.match(rejected.status,/FROZEN_FAILURE_JOB_EVIDENCE_MISMATCH/);
+ assert.equal(bad.models,0);
+ for(const stepName of ['Verify parser boundary','Verify database transition']){
+  const r=rig({stepName});
+  const out=await reviseCurrentRileyNativeRepair({db,graph,env,fetchImpl:r.fetchImpl,callRpc:r.callRpc});
+  assert.equal(out.status,'SAME_ORIGINAL_CORRECTED_MODEL_DRAFT_AWAITING_FROZEN_TEST');
+  assert.equal(r.models,1);
+ }
 });
