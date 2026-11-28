@@ -4,9 +4,52 @@
 // An assistant-generated string must never be published under a receipt
 // that attested DIFFERENT bytes or a different user-goal revision.
 import {createHash} from 'node:crypto';
+import {assessDrift} from './reality-drift-recovery-v0.1.js';
 const hash=text=>'sha256:'+createHash('sha256')
  .update(JSON.stringify(text)).digest('hex');
 function require(condition,code){if(!condition)throw new Error(code)}
+// Compile the exact extracted assertions against the existing source verifier.
+// Extraction is a candidate, never an independent completeness or truth proof.
+// Unknown source claims are unsupported, not adjudicated false. No external
+// authority is granted by the outcome, even if all extracted claims match.
+export function compileFinalOutputClaimAssessment({answer,candidate=null,snapshot=null,
+ review=null,extractionStatus='NOT_ASSESSED'}={}){
+ require(typeof answer==='string'&&answer.trim(),'CHAT_OUTPUT_CANDIDATE_REQUIRED');
+ const claims=candidate?.claims||[],actions=candidate?.actions||[];
+ const anchored=[...claims,...actions].every(c=>typeof c.original_quote==='string'&&
+  c.original_quote.length>0&&answer.includes(c.original_quote));
+ let result=null;
+ if(candidate&&snapshot&&anchored)result=assessDrift({trustedSnapshot:snapshot,candidate});
+ const rows=[...claims.map((c,i)=>({kind:'FACT',key:c.key,value:c.value,
+  quote:c.original_quote,evidence_refs:c.evidence_refs||[],path:'claims['+i+']'})),
+  ...actions.map((a,i)=>({kind:'ACTION',key:a.action_id,value:a.status,
+   target:a.target,quote:a.original_quote,evidence_refs:[a.authority_ref,a.verification_ref].filter(Boolean),
+   path:'actions['+i+']'}))].map(r=>{
+   const violations=(result?.violations||[]).filter(v=>v.path===r.path).map(v=>v.code);
+   return {...r,verification_status:!result?'UNASSESSED':violations.length?'UNSUPPORTED_OR_CONTRADICTED':
+    r.kind==='ACTION'?'ACTION_CANDIDATE_NOT_OUTCOME_PROOF':'SOURCE_MATCHED_TYPED_ASSERTION_ONLY',
+    violation_codes:violations};
+  });
+ const concerns=(review?.issues||[]).filter(i=>['UNSUPPORTED_FACT','FALSE_COMPLETION','AUTHORITY_CONFUSION','FACT_CONTRADICTION'].includes(i.kind)&&
+  typeof i.quote==='string'&&answer.includes(i.quote)).map(i=>({kind:i.kind,quote:i.quote}));
+ const unassessed=(review?.unassessed_claims||[]).map(x=>({key:x.key,reason:x.reason,
+  quote:typeof x.quote==='string'&&answer.includes(x.quote)?x.quote:null}));
+ const unsupported=Boolean(result?.codes?.some(c=>['UNSUPPORTED_CLAIM','FACT_DRIFT',
+  'EVIDENCE_PROVENANCE_DRIFT','UNSUPPORTED_PROVENANCE','AUTHORITY_ESCALATION',
+  'FALSE_COMPLETION','WORLD_SCOPE_DRIFT'].includes(c))||
+  concerns.length||unassessed.some(x=>x.quote&&x.reason==='NOT_IN_SOURCE_RECORD')||!anchored);
+ return Object.freeze({schema:'reality-final-output-claim-assessment-v0.1',
+  candidate_answer_hash:hash(answer),extraction_status:extractionStatus,
+  source_receipt_ids:snapshot?.source_receipt_ids||[],
+  claim_rows:rows,review_concerns:concerns,unassessed_claims:unassessed,
+  deterministic_violation_codes:result?.codes||[],
+  unsupported_assertion_detected:unsupported,
+  status:unsupported?'UNSUPPORTED_ASSERTIONS_REQUIRE_WITHHOLDING':
+   result&&rows.length?'EXTRACTED_ASSERTIONS_SOURCE_COMPARED':'CLAIM_COVERAGE_UNVERIFIED',
+  extraction_completeness_verified:false,semantic_accuracy_independently_verified:false,
+  external_execution_authorized:false});
+}
+
 export function assertFinalChatPublicationProof({
  answer,reliability,atomicGoalPublicationEnabled=false,
 }={}){
@@ -32,6 +75,24 @@ export function assertFinalChatPublicationProof({
   require(gate.known_off_goal_text_withheld===true,
     'CHAT_KNOWN_OFF_GOAL_ANSWER_NOT_WITHHELD');
  }
+ const claims=gate.output_claim_assessment;
+ require(claims?.schema==='reality-final-output-claim-assessment-v0.1'&&
+  claims.readback_verified===true&&claims.ledger_receipt_id===gate.source_receipt_id&&
+  claims.released_answer_hash===gate.final_answer_hash&&
+  typeof claims.candidate_answer_hash==='string'&&
+  typeof claims.assessment_hash==='string'&&
+  ['CANDIDATE_RELEASED_COVERAGE_LIMITED','UNSUPPORTED_CANDIDATE_WITHHELD','DIRECTION_CANDIDATE_WITHHELD'].includes(claims.disposition)&&
+  claims.extraction_completeness_verified===false&&claims.semantic_accuracy_independently_verified===false&&
+  claims.external_execution_authorized===false,
+  'CHAT_FINAL_OUTPUT_CLAIM_RECEIPT_REQUIRED');
+ require(claims.unsupported_assertion_detected!==true||
+  claims.disposition==='UNSUPPORTED_CANDIDATE_WITHHELD'||
+  claims.disposition==='DIRECTION_CANDIDATE_WITHHELD',
+  'CHAT_UNSUPPORTED_OUTPUT_NOT_WITHHELD');
+ require(claims.disposition==='CANDIDATE_RELEASED_COVERAGE_LIMITED'?
+  claims.candidate_answer_hash===gate.final_answer_hash:
+  claims.candidate_answer_hash!==gate.final_answer_hash,
+  'CHAT_OUTPUT_CLAIM_RELEASE_DISPOSITION_MISMATCH');
  const authority=reliability?.goal_authority_contracts?.authorized_user_goal_state;
  require(authority&&Number.isSafeInteger(authority.transition_count)&&
    authority.transition_count>=0,
@@ -43,6 +104,8 @@ export function assertFinalChatPublicationProof({
   canonical_frame_hash:reliability.canonical_epistemic_state.frame_hash,
   canonical_frame_receipt_id:reliability.canonical_epistemic_state.source_receipt_id,
   current_authorized_goal_revision:authority.transition_count,
+  output_claim_assessment_hash:claims.assessment_hash,
+  claim_extraction_completeness_verified:false,
   external_execution_authorized:false,
   semantic_accuracy_independently_verified:false,
  });

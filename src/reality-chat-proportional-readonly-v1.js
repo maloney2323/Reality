@@ -7,6 +7,41 @@ import {buildGovernedChatSignal}
  from './reality-governed-fragmented-signal-cleaner-v0.1.js';
 import {runRealityCognitiveRuntime}
  from './reality-cognitive-runtime-v1.0.js';
+import {extractReliabilityClaims} from './reality-reliability-claim-extraction-v0.1.js';
+import {compileFinalOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
+
+// Reuse only the already authenticated, structured current operational
+// observations. This is a bounded comparison input, not another truth ledger.
+// A missing field or missing receipt remains unknown.
+function operationalClaimSnapshot({worldId,ownerContext,horizon}){
+ const facts=[],refs=new Set();
+ const add=(prefix,object,ref)=>{
+  if(!object||typeof ref!=='string'||!ref)return;
+  refs.add(ref);
+  for(const [key,value] of Object.entries(object)){
+   if(!['string','number','boolean'].includes(typeof value)||String(value).length>600)continue;
+   facts.push({key:prefix+key,value,world_id:worldId,evidence_ref:ref});
+  }
+ };
+ const shift=ownerContext?.currently_authorized_shift;
+ if(shift?.owner_shift_authorization_recorded===true&&UUID.test(shift.active_owner_shift_id||''))
+  add('shift.',{active_owner_shift_id:shift.active_owner_shift_id,shift_status:shift.shift_status,
+   owner_shift_authorization_recorded:true},'reality:employee-shift:'+shift.active_owner_shift_id);
+ for(const o of horizon?.present?.obligations||[]){
+  if(!UUID.test(o.shift_id||'')||!/^work:[a-f0-9]{32}$/.test(o.original_work_id||'')||
+   !/^sha256:[a-f0-9]{64}$/.test(o.guard_receipt_sha256||'')||o.existing_shift_authorized!==true)continue;
+  add('original.'+o.original_work_id+'.',o,o.guard_receipt_sha256);
+  if(o.active_release_observation?.approval_receipt_sha256)
+   add('release.'+o.original_work_id+'.',o.active_release_observation,o.active_release_observation.approval_receipt_sha256);
+  for(const e of o.current_events||[])if(UUID.test(e.event_id||''))
+   add('event.'+e.event_id+'.',e,e.event_id);
+ }
+ for(const s of horizon?.past?.independent_original_settlements||[])
+  if(UUID.test(s.receipt_id||''))
+   add('settlement.'+s.original_work_id+'.',s,s.receipt_id);
+ return {world_id:worldId,facts:facts.slice(0,100),obligations:[],authorities:[],receipts:[],
+  source_receipt_ids:[...refs]};
+}
 
 // Questions about capability or feasibility are conversation, not execution.
 // The independently authenticated work-intake adapter still classifies saved
@@ -76,7 +111,7 @@ export async function generateProportionalReadOnlyReply({
  message,conversationId,requestId,ownerId,sourceRef,
  verifiedPriorTurns=[],worldlineId,ownerContext=null,
  verifiedUniverseObservations=[],operationalTimeHorizon=null,apiKey,model='gpt-4.1-mini',
- runtime=runRealityCognitiveRuntime
+ runtime=runRealityCognitiveRuntime,fetchImpl=fetch
 }={}){
  if(typeof message!=='string'||!message.trim()||
     !UUID.test(conversationId||'')||!UUID.test(requestId||'')||
@@ -132,9 +167,33 @@ export async function generateProportionalReadOnlyReply({
     typeof result.answer!=='string'||!result.answer.trim()||
     result.answer.length>12000)
   fail('MODEL_OUTPUT_OR_EXECUTION_BOUNDARY_UNVERIFIED');
+ const reconciled=reconcileReadOnlyOperationalAnswer({answer:result.answer,ownerContext,operationalTimeHorizon});
+ let released=reconciled.answer,claimAssessment=null;
+ // Only owner-operational status turns need the extra bounded extraction.
+ // Greetings/advice without operational context stay on the ordinary fast lane.
+ const operational=Boolean(ownerContext?.currently_authorized_shift||
+  operationalTimeHorizon?.present?.obligations?.length);
+ if(operational&&reconciled.disposition==='CONVERSATIONAL_CLAIMS_UNCHANGED'){
+  const snapshot=operationalClaimSnapshot({worldId:worldlineId,ownerContext,horizon:operationalTimeHorizon});
+  try{
+   const extraction=await extractReliabilityClaims({modelOutput:released,worldId:worldlineId,
+    snapshot,apiKey,model,fetchImpl,allowEmptyEvidence:true});
+   claimAssessment=compileFinalOutputClaimAssessment({answer:released,candidate:extraction.candidate,
+    snapshot,review:{unassessed_claims:extraction.unadjudicated_claims},
+    extractionStatus:extraction.extraction_status});
+   if(claimAssessment.unsupported_assertion_detected)
+    released='The available owner-scoped evidence does not establish the operational assertion in my draft. I have withheld that assertion; the actual outcome remains unverified.';
+  }catch{
+   // Do not turn extractor failure into a verified operational statement.
+   claimAssessment=compileFinalOutputClaimAssessment({answer:released,extractionStatus:'EXTRACTION_UNAVAILABLE'});
+   released='I cannot independently establish the operational assertions in this response from the available evidence. The underlying work has not been marked complete.';
+  }
+ }
  return Object.freeze({
   status:'READ_ONLY_AUTHENTICATED_MODEL_REPLY_PREPARED',
-  answer:reconcileReadOnlyOperationalAnswer({answer:result.answer,ownerContext,operationalTimeHorizon}).answer,
+  answer:released,
+  output_claim_assessment:claimAssessment?{...claimAssessment,
+   durable_continuity_receipt_verified:false}:null,
   model:result.model||model,
   semantic_correctness_independently_verified:false,
   independent_business_outcome_verified:false,

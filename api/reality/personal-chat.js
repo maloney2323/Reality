@@ -350,6 +350,7 @@ export default async function handler(req,res){
      reply_recovery_requires_exact_saved_request:!publication},
     reliability:{chat_lane:'PROPORTIONAL_READ_ONLY',transient_answer_not_a_receipt:!publication,
      canonical_epistemic_state:{status:'NOT_ASSERTED_FOR_READ_ONLY_CHAT'},
+     output_claim_assessment:advisory.output_claim_assessment||null,
      independently_verified_semantic_correctness:false,business_outcome_verified:false,external_actions_authorized:false},
     contextual_readback_status:{evidence:ctx.status,unavailable_sources:ctx.unavailable,grants_execution_authority:false},
     execution:{status:'NOT_EXECUTED',external_actions_authorized:false,installation_authorized:false},

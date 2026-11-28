@@ -29,6 +29,7 @@ import {
 import { qualifyUnresolvedEvidence } from './reality-evidence-release-qualification-v0.1.js';
 import { adjudicateSourceReview } from './reality-source-review-adjudication-v0.1.js';
 import { assessDrift } from './reality-drift-recovery-v0.1.js';
+import {compileFinalOutputClaimAssessment} from './reality-final-chat-publication-proof-v0.1.js';
 import { buildUnmonitoredTrustPulse } from './reality-conversation-trust-pulse-v0.1.js';
 import { inspectConversationDrift } from './reality-conversation-drift-integrity-v0.1.js';
 import { inspectLiveDetectorShadow } from './reality-live-detector-shadow-v0.1.js';
@@ -842,6 +843,7 @@ export async function runLiveIntelligenceOrchestration({
   // Only a review of the EXACT final retry may clear an earlier assistant
   // goal redirection. An unreviewed fallback or disclaimer is not a revision.
   let acceptedGoalRevisionReview=null;
+  let acceptedGoalRevisionCandidate=null;
   let acceptedGoalRevisionText=null;
   let acceptedGoalRevisionReviewerId=null;
   // Meaning-first correction. Never accept a candidate because its keyword
@@ -1006,6 +1008,7 @@ export async function runLiveIntelligenceOrchestration({
         modelResult.answer=String(retry.answer);
         modelResult.reliability_intervention='SEMANTIC_REVIEW_CORRECTED';
         acceptedGoalRevisionReview=retryReview?.review||null;
+        acceptedGoalRevisionCandidate=retryReview?.candidate||null;
         acceptedGoalRevisionText=String(retry.answer);
         acceptedGoalRevisionReviewerId=retryReview?.response_id||null;
       } else if(materialUnsupportedClaim) {
@@ -1255,12 +1258,31 @@ export async function runLiveIntelligenceOrchestration({
       });
       modelResult.reliability_intervention='FINAL_ASSISTANT_GOAL_DIRECTION_WITHHELD';
     }
+    // Bind extracted claims to the exact text actually proposed for release.
+    // Do not reuse an assessment of different bytes after a rewrite.
+    const firstExact=candidateRelease===initialAssistantProposalText;
+    const retryExact=candidateRelease===acceptedGoalRevisionText;
+    const exactReview=retryExact?acceptedGoalRevisionReview:firstExact?semanticFirst?.review:null;
+    const exactCandidate=retryExact?acceptedGoalRevisionCandidate:firstExact?semanticFirst?.candidate:null;
+    const outputClaimAssessment=compileFinalOutputClaimAssessment({
+      answer:candidateRelease,candidate:exactCandidate||null,snapshot:semanticSourceSnapshot,
+      review:exactReview,extractionStatus:exactReview?'EXACT_EXISTING_SEMANTIC_EXTRACTION':'FINAL_TEXT_EXTRACTION_NOT_ESTABLISHED'
+    });
+    let claimDisposition=finalDirectionRelease.candidate_answer_release_allowed?
+      'CANDIDATE_RELEASED_COVERAGE_LIMITED':'DIRECTION_CANDIDATE_WITHHELD';
+    if(finalDirectionRelease.candidate_answer_release_allowed&&outputClaimAssessment.unsupported_assertion_detected){
+      modelResult.answer='Reality withheld an operational assertion because the available evidence does not establish it. That is an unresolved evidence state, not proof the assertion is false. No external action was authorized by this answer.';
+      modelResult.reliability_intervention='FINAL_OUTPUT_UNSUPPORTED_ASSERTION_WITHHELD';
+      claimDisposition='UNSUPPORTED_CANDIDATE_WITHHELD';
+    }
     // Prove the exact released bytes were committed before output; the
     // original, rejected candidate can never become the final response via
     // a later narration or the ordinary work-plan branch.
     const releasedAnswer=String(modelResult.answer||'');
     const releasedHash='sha256:'+createHash('sha256').update(
       JSON.stringify(releasedAnswer)).digest('hex');
+    const claimPublication={...outputClaimAssessment,released_answer_hash:releasedHash,disposition:claimDisposition};
+    const claimAssessmentHash='sha256:'+createHash('sha256').update(JSON.stringify(claimPublication)).digest('hex');
     // Compile all three existing user-goal / assistant-proposal contracts
     // against the exact final bytes and freshness readback BEFORE admitting
     // the final text into append-only Continuity or returning it to chat.
@@ -1300,6 +1322,8 @@ export async function runLiveIntelligenceOrchestration({
             'OFF_GOAL_TEXT_WITHHELD_AND_REPLACED_WITH_SOURCE_LINKED_NOTICE',
           released_intervention:modelResult.reliability_intervention||null,
           actual_released_answer_hash:releasedHash,
+          output_claim_assessment:claimPublication,
+          output_claim_assessment_hash:claimAssessmentHash,
           assistant_goal_mutated:false,
           external_action_executed:false,
           true_drift_rate_verified:false,
@@ -1313,6 +1337,8 @@ export async function runLiveIntelligenceOrchestration({
         e.payload?.three_contract_integrity_proof?.proof_hash===goalIntegrityProof.proof_hash&&
         e.payload?.three_contract_integrity_proof?.exact_released_answer_hash===releasedHash&&
         e.payload?.actual_released_answer_hash===releasedHash&&
+        e.payload?.output_claim_assessment_hash===claimAssessmentHash&&
+        e.payload?.output_claim_assessment?.released_answer_hash===releasedHash&&
         e.payload?.canonical_frame_hash===canonicalEpistemicFrame.frame_hash);
       if(!recorded)throw Error('FINAL_ASSISTANT_DIRECTION_RELEASE_READBACK_FAILED');
       finalDirectionRelease={
@@ -1329,6 +1355,9 @@ export async function runLiveIntelligenceOrchestration({
         finalDirectionRelease.second_semantic_review_bound_to_exact_final_text,
       source_receipt_id:finalDirectionRelease.source_receipt_id||null,
       final_answer_hash:releasedHash,
+      output_claim_assessment:{...claimPublication,assessment_hash:claimAssessmentHash,
+        ledger_receipt_id:finalDirectionRelease.source_receipt_id||null,
+        readback_verified:Boolean(finalDirectionRelease.source_receipt_id)},
       three_contract_integrity_proof_hash:goalIntegrityProof.proof_hash,
       goal_proposal_id:goalIntegrityProof.assistant_proposal_id,
       goal_transition_authorization:goalIntegrityProof.proposed_transition_authorization,
