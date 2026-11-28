@@ -299,7 +299,7 @@ export default async function handler(req,res){
      validate:v=>v?.status==='OWNER_OPERATIONAL_INCIDENT_CHAT_BRIEFING_READ_ONLY'&&v.owner_scope_verified===true&&v.original_job_authorized_by_chat===false,fallback:null},
     {id:'verified_work',read:()=>readVerifiedOwnerCompletedWorkForChat({session,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'self_visibility',timeoutMs:5000,read:()=>readOperationalSelfVisibilityForChat({session,message:text,priorTurns:recent,db:isolated}),validate:v=>Array.isArray(v?.observations),fallback:null},
-    {id:'active_shift',read:()=>readVerifiedEmployeeShiftForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
+    {id:'active_shift',timeoutMs:5000,read:()=>readVerifiedEmployeeShiftForChat({session,message:text,db:isolated,briefOnly:true}),validate:Array.isArray,fallback:[]},
     {id:'worker_observation',read:()=>readVerifiedIndependentWorkerForChat({session,message:text,db:isolated}),validate:Array.isArray,fallback:[]},
     {id:'mission',read:()=>readFreshPersonalAccountMissionState({session}),
      validate:v=>v?.principal_id===session.user_id&&v.source==='OWNER_ACCOUNT_SCOPED_SIGNED_CONTINUITY'&&v.execution_authorized===false&&v.state?.assistant_can_mutate_goals===false,fallback:null}
