@@ -46,6 +46,7 @@ export function compileFinalOutputClaimAssessment({answer,candidate=null,snapsho
   concerns.length||unassessed.some(x=>x.quote&&x.reason==='NOT_IN_SOURCE_RECORD')||!anchored);
  return Object.freeze({schema:'reality-final-output-claim-assessment-v0.1',
   candidate_answer_hash:hash(answer),extraction_status:extractionStatus,
+  candidate_scope:['OPERATIONAL','CONVERSATIONAL'].includes(candidate?.scope)?candidate.scope:'UNKNOWN',
   source_receipt_ids:snapshot?.source_receipt_ids||[],
   claim_rows:rows,review_concerns:concerns,unassessed_claims:unassessed,
   source_adjudicated_review_warning_count:sourceAdjudication.source_supported_count,
@@ -79,6 +80,42 @@ export function summarizeOutputClaimAssessment(assessment){
 const ordered=v=>v===null||typeof v!=='object'?v:Array.isArray(v)?v.map(ordered):
  Object.fromEntries(Object.keys(v).sort().map(k=>[k,ordered(v[k])]));
 export const hashOutputClaimAssessment=assessment=>hash(ordered(assessment));
+
+// Reuse the canonical append-only Spine; this is an unverified claim
+// assessment, not a new authority, semantic proof, or settlement.
+export async function recordReadOnlyOutputClaimAssessment({
+ runtime,requestId,sourceRef,answer,assessment
+}={}){
+ require(runtime?.enabled===true&&typeof runtime.appendStage==='function'&&
+  typeof runtime.readback==='function'&&typeof requestId==='string'&&
+  typeof sourceRef==='string'&&assessment?.schema==='reality-final-output-claim-assessment-v0.1',
+  'CHAT_READ_ONLY_CLAIM_LEDGER_REQUIRED');
+ const released=hash(answer);
+ const publication={...assessment,released_answer_hash:released,
+  disposition:assessment.candidate_answer_hash===released?'CANDIDATE_RELEASED_COVERAGE_LIMITED':'UNSUPPORTED_CANDIDATE_WITHHELD'};
+ const digest=hashOutputClaimAssessment(publication);
+ const event=await runtime.appendStage({
+  stage:'VERIFICATION',entityId:'read-only-output-claim:'+requestId,
+  eventId:'read-only-output-claim:'+runtime.spine.continuity_root_id+':'+requestId,
+  epistemicStatus:'UNVERIFIED',evidenceRefs:[sourceRef],
+  payload:{event_type:'READ_ONLY_OUTPUT_CLAIM_PUBLICATION_DECISION',
+   request_id:requestId,source_user_message_ref:sourceRef,
+   actual_released_answer_hash:released,output_claim_assessment:publication,
+   output_claim_assessment_hash:digest,external_action_executed:false},
+  provenance:{source:'reality_existing_integrity_spine_read_only_publication_boundary'}
+ });
+ const history=await runtime.readback();
+ const copied=history.find(e=>e.event_id===event.event_id&&
+  e.continuity_root_id===runtime.spine.continuity_root_id&&
+  e.worldline_id===runtime.spine.worldline_id);
+ require(copied?.lineage_hash===event.lineage_hash&&
+  copied?.payload?.request_id===requestId&&copied.payload.source_user_message_ref===sourceRef&&
+  copied.payload.actual_released_answer_hash===released&&
+  copied.payload.output_claim_assessment_hash===digest&&
+  hashOutputClaimAssessment(copied.payload.output_claim_assessment)===digest,
+  'CHAT_READ_ONLY_CLAIM_LEDGER_READBACK_FAILED');
+ return Object.freeze({...publication,assessment_hash:digest,ledger_receipt_id:event.event_id,readback_verified:true});
+}
 
 export function assertFinalChatPublicationProof({
  answer,reliability,atomicGoalPublicationEnabled=false,
@@ -127,6 +164,10 @@ export function assertFinalChatPublicationProof({
   claims.candidate_answer_hash===gate.final_answer_hash:
   claims.candidate_answer_hash!==gate.final_answer_hash,
   'CHAT_OUTPUT_CLAIM_RELEASE_DISPOSITION_MISMATCH');
+ // An empty operational/unknown extraction cannot authorize raw candidate bytes.
+ require(!(claims.disposition==='CANDIDATE_RELEASED_COVERAGE_LIMITED'&&
+  claims.status==='CLAIM_COVERAGE_UNVERIFIED'&&claims.candidate_scope!=='CONVERSATIONAL'),
+  'CHAT_OUTPUT_CLAIM_COVERAGE_REQUIRED');
  const authority=reliability?.goal_authority_contracts?.authorized_user_goal_state;
  require(authority&&Number.isSafeInteger(authority.transition_count)&&
    authority.transition_count>=0,
