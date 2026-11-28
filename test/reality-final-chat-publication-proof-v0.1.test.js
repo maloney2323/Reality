@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {assertFinalChatPublicationProof as check,compileFinalOutputClaimAssessment,hashOutputClaimAssessment,summarizeOutputClaimAssessment}
+import {assertFinalChatPublicationProof as check,compileFinalOutputClaimAssessment,hashOutputClaimAssessment,summarizeOutputClaimAssessment,recordReadOnlyOutputClaimAssessment}
  from '../src/reality-final-chat-publication-proof-v0.1.js';
 const digest=x=>'sha256:'+createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const answer='The user goal remains drafting the contractor pilot summary.  ';
@@ -95,4 +95,29 @@ test('quarantined operational assertion stays in audit, never in client diagnost
  assert.equal(view.unsupported_assertion_detected,true);
  assert.equal(view.extracted_claim_count,1);
  assert.equal(JSON.stringify(view).includes(marker),false);
+});
+
+
+test('an internally consistent receipt with unknown or operational empty coverage cannot release raw bytes',()=>{
+ for(const scope of ['UNKNOWN','OPERATIONAL']){
+  const bad=mock();Object.assign(bad.final_direction_release.output_claim_assessment,{status:'CLAIM_COVERAGE_UNVERIFIED',candidate_scope:scope});seal(bad);
+  assert.throws(()=>check({answer,reliability:bad,atomicGoalPublicationEnabled:true}),/CHAT_OUTPUT_CLAIM_COVERAGE_REQUIRED/);
+ }
+ const discussion=mock();Object.assign(discussion.final_direction_release.output_claim_assessment,{status:'CLAIM_COVERAGE_UNVERIFIED',candidate_scope:'CONVERSATIONAL'});seal(discussion);
+ assert.equal(check({answer,reliability:discussion,atomicGoalPublicationEnabled:true}).final_answer_hash,digest(answer));
+});
+
+test('read-only assessment receipt is bound to exact source, released bytes and canonical scope',async()=>{
+ const root='root',world='world',source='supabase:reality_chat_messages:source';let stored,corrupt=false;
+ const runtime={enabled:true,spine:{continuity_root_id:root,worldline_id:world},
+  appendStage:async n=>{stored={event_id:'receipt',lineage_hash:'lineage',continuity_root_id:root,worldline_id:world,payload:structuredClone(n.payload)};return structuredClone(stored);},
+  readback:async()=>[corrupt?{...stored,payload:{...stored.payload,actual_released_answer_hash:'wrong'}}:structuredClone(stored)]};
+ const assessment=compileFinalOutputClaimAssessment({answer:'Unverified draft.'});
+ const params={runtime,requestId:'request',sourceRef:source,answer:'Outcome unverified.',assessment};
+ const receipt=await recordReadOnlyOutputClaimAssessment(params);
+ assert.equal(receipt.readback_verified,true);assert.equal(receipt.ledger_receipt_id,'receipt');
+ assert.equal(receipt.released_answer_hash,digest(params.answer));assert.equal(receipt.disposition,'UNSUPPORTED_CANDIDATE_WITHHELD');
+ assert.equal(receipt.external_execution_authorized,false);
+ assert.equal(stored.payload.source_user_message_ref,source);
+ corrupt=true;await assert.rejects(recordReadOnlyOutputClaimAssessment(params),/CHAT_READ_ONLY_CLAIM_LEDGER_READBACK_FAILED/);
 });
