@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {shiftRpc} from '../src/reality-governed-shift-boundary-v1.js';
 import {boundedRegisteredCapabilityCheckpoint} from '../src/reality-evidence-driven-capability-router-v1.js';
 import {createHash} from 'node:crypto';
-import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview}
+import {advanceOneFinalLoopChildReview,verifyFinalLoopChildPatch,computeClaimedFinalLoopChildAdvisory,advanceCanonicalFinalLoopChildReview,qualifyBoundedChildReviewStrategy,assembleBoundedChildReview,qualifyDistinctApprovedReviewScopes}
  from '../src/reality-final-loop-child-review-worker-v1.js';
 import {connectExistingIsolatedChildTransport,handleExistingChildTransport}
  from '../src/reality-final-loop-child-transport-v1.js';
@@ -564,7 +564,7 @@ test('canonical claim, isolated computation and independent return preserve one 
  const unresolved=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(returnedEvidence)});
  assert.equal(unresolved.status,'FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM');
  // A signed failed invocation can be reconciled into the ledger, but
- // even an exact returned failure must not allocate an untouched scope.
+ // the affected scope itself remains fenced; incomplete proof still blocks.
  const failedObservation={child_work_id:child,scope_sha256:h.scope_fingerprints[0].scope_sha256,
   invocation_id:'00000000-0000-4000-8000-000000000031',worker_run_id:other,
   event_id:event,event_head_sha256:h.continuity_head_sha256,event_revision:h.revision,
@@ -574,6 +574,31 @@ test('canonical claim, isolated computation and independent return preserve one 
   provider_outcome_unknown:true,model_artifact_recorded:false,
   provider_outcome_verified:false,replay_authorized:false};
  const failedReturned={...returnedEvidence,observations:[failedObservation]};
+ // Exact mixed terminal evidence can quarantine a different scope, not
+ // the scope selected below by the existing canonical allocator.
+ const secondScope=h.scope_fingerprints.find(x=>x.scope_sha256!==claim.scope_sha256);
+ assert.ok(secondScope,'multi-scope fixture required');
+ const distinctFailure={...failedObservation,child_work_id:'work:'+'3'.repeat(32),
+  scope_sha256:secondScope.scope_sha256};
+ const exactEvidence={...returnedEvidence,replay_authorized:false,execution_authorized:false,
+  original_job_completed:false,observations:[distinctFailure]};
+ const qualified=qualifyDistinctApprovedReviewScopes(exactEvidence,h);
+ assert.deepEqual(qualified.blocked_child_ids,[distinctFailure.child_work_id]);
+ assert.deepEqual(qualified.blocked_scope_sha256s,[distinctFailure.scope_sha256]);
+ for(const changed of [{worker_failure_attested:false},{provider_outcome_unknown:false},
+  {worker_terminal_status:'STARTED'},{worker_completed:true},
+  {worker_failure_stage:'SHIFT_DB_BOUNDARY'},{model_artifact_recorded:true},
+  {provider_outcome_verified:true},{replay_authorized:true},{scope_sha256:hash('0')}]){
+  assert.equal(qualifyDistinctApprovedReviewScopes({...exactEvidence,
+   observations:[{...distinctFailure,...changed}]},h),null);
+ }
+ const mixed={...exactEvidence,fenced_count:2,signed_observation_count:2,
+  observations:[distinctFailure,{...distinctFailure,child_work_id:'work:'+'4'.repeat(32),
+   scope_sha256:claim.scope_sha256,invocation_id:'00000000-0000-4000-8000-000000000032',
+   worker_completed:true,worker_failure_attested:undefined,worker_terminal_status:undefined,
+   provider_outcome_unknown:undefined,worker_failure_stage:undefined}]};
+ assert.deepEqual(qualifyDistinctApprovedReviewScopes(mixed,h)?.blocked_scope_sha256s,
+  [secondScope.scope_sha256,claim.scope_sha256]);
  const stillFenced=await advanceCanonicalFinalLoopChildReview({...base,
   readCurrentContinuity:async()=>withObservation(failedReturned)});
  assert.equal(stillFenced.status,'FINAL_LOOP_CANONICAL_UNRESOLVED_INVOCATION_RECOVERY_REQUIRED_NO_CLAIM');
@@ -653,7 +678,7 @@ test('canonical claim, isolated computation and independent return preserve one 
   assert.equal(conn.ready,true);
   return conn.runIsolatedAdvisory(args);
  };
- const prepared=await advanceCanonicalFinalLoopChildReview({...base,runIsolatedAdvisory:viaSignedTransport});
+ const prepared=await advanceCanonicalFinalLoopChildReview({...base,readCurrentContinuity:async()=>withObservation(exactEvidence),runIsolatedAdvisory:viaSignedTransport});
  assert.equal(prepared.status,'FINAL_LOOP_CHILD_MODEL_ARTIFACT_PREPARED_NOT_VERIFIED');
  assert.equal(prepared.canonical_continuity_head_sha256,h.continuity_head_sha256);
  assert.equal(claims,1);assert.equal(prepares,1);assert.equal(modelCalls,1);
@@ -661,7 +686,7 @@ test('canonical claim, isolated computation and independent return preserve one 
  // fence RPC, rather than the direct callback used by the earlier fixture.
  assert.ok(reads>=2);assert.equal(transportBegins,1);assert.equal(transportChecks,1);
  verificationMode=true;
- const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,runIsolatedAdvisory:viaSignedTransport});
+ const verified=await advanceCanonicalFinalLoopChildReview({...base,workerRunId:other,readCurrentContinuity:async()=>withObservation(exactEvidence),runIsolatedAdvisory:viaSignedTransport});
  assert.equal(verified.status,'FINAL_LOOP_CHILD_REVIEW_INDEPENDENTLY_VERIFIED_PARENT_OPEN');
  assert.equal(transportBegins,2);assert.equal(transportChecks,2);assert.equal(transportFences.size,2);
  assert.notEqual(transportFences.get('PREPARE|'+run),transportFences.get('VERIFY|'+other));
